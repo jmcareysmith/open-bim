@@ -8,12 +8,16 @@ import {
   type Document,
   type ElementId,
   type Vec2,
+  type View,
   type ViewRange,
+  viewCrop,
 } from "@open-bim/core";
 import {
   GRID_BUBBLE_RADIUS,
   fillLoops,
   planLinework,
+  sectionAnnotations,
+  sectionLinework,
   type GeometryKernel,
   type LineData,
   type MeshData,
@@ -44,7 +48,9 @@ const BEYOND = 0x8a919b;
 /** Drawn with plan symbols rather than cut/projection (like Revit door and window families). */
 const SYMBOLIC_IN_PLAN = new Set<string>([Cat.Door, Cat.Window]);
 const PREVIEW = 0x5fb3ff;
-export type ViewMode = "3d" | "plan";
+/** 3D model view, plan (top-down, clipped) or drawing (section/elevation in its own 2D space). */
+export type ViewMode = "3d" | "plan" | "drawing";
+type Rect = { min: Vec2; max: Vec2 };
 const PLAN_CAMERA_HEIGHT = 500_000; // mm; clipping planes, not the camera, limit what a plan shows
 const PLAN_HALF_HEIGHT = 10_000; // mm visible above/below centre at zoom 1
 
@@ -68,6 +74,15 @@ export class Viewport {
   private readonly cameraPlan: THREE.OrthographicCamera;
   private readonly controls3d: OrbitControls;
   private readonly controlsPlan: OrbitControls;
+  /** Sections and elevations are drawn in their own 2D scene (x along the view, y = Z). */
+  private readonly drawScene = new THREE.Scene();
+  private readonly cameraDraw: THREE.OrthographicCamera;
+  private readonly controlsDraw: OrbitControls;
+  private drawingView: View | null = null;
+  /** Levels, grids and crop frame of the current section/elevation. */
+  private drawExtras: THREE.Group | null = null;
+  /** Callouts: plan crop rectangle. */
+  private planCrop: Rect | null = null;
   private mode: ViewMode = "3d";
   private planRange: ViewRange = { bottom: 0, cut: PLAN_CUT_HEIGHT };
   private planFramed = false;
@@ -125,6 +140,16 @@ export class Viewport {
     this.controlsPlan.enabled = false;
     this.controlsPlan.addEventListener("change", () => (this.needsRender = true));
 
+    this.cameraDraw = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 10_000);
+    this.cameraDraw.position.set(0, 0, 1000);
+    this.controlsDraw = new OrbitControls(this.cameraDraw, this.renderer.domElement);
+    this.controlsDraw.enableRotate = false;
+    this.controlsDraw.screenSpacePanning = true;
+    this.controlsDraw.zoomToCursor = true;
+    this.controlsDraw.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN };
+    this.controlsDraw.enabled = false;
+    this.controlsDraw.addEventListener("change", () => (this.needsRender = true));
+
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.6));
     const sun = new THREE.DirectionalLight(0xffffff, 1.6);
     sun.position.set(-1, -2, 3);
@@ -177,7 +202,7 @@ export class Viewport {
       const mesh = this.kernel.build(this.doc, el);
       const lines = this.kernel.buildLines(this.doc, el);
       if (mesh) {
-        if (!SYMBOLIC_IN_PLAN.has(el.category)) this.meshes.set(id, mesh);
+        this.meshes.set(id, mesh);
         group = makeGroup(mesh, COLORS[el.category] ?? 0xcccccc);
         group.userData.solid = true;
         // Symbols drawn with a solid (door swings) ride along in the same group.
@@ -246,6 +271,13 @@ export class Viewport {
     this.setRay(ev);
     // Line picking tolerance: a few pixels, in mm at the current zoom.
     this.raycaster.params.Line.threshold = this.mmPerPixel() * 6;
+    if (this.mode === "drawing") {
+      // Sections/elevations: pick the drawn linework. `point` is in drawing coordinates.
+      const parts = [...this.drawing.entries()].filter(([id]) => !filter || filter(id)).flatMap(([, g]) => g.children);
+      const hit = this.raycaster.intersectObjects(parts, false)[0];
+      const id = hit?.object.parent?.userData.elementId as ElementId | undefined;
+      return hit && id ? { id, point: { x: hit.point.x, y: hit.point.y } } : null;
+    }
     const meshes = [...this.objects.entries()]
       .filter(([id, g]) => g.visible && (!filter || filter(id)))
       .map(([, g]) => g.children[0]!);
@@ -288,7 +320,8 @@ export class Viewport {
     const [xa, xb] = [Math.min(r.x0, r.x1), Math.max(r.x0, r.x1)];
     const [ya, yb] = [Math.min(r.y0, r.y1), Math.max(r.y0, r.y1)];
     const out: ElementId[] = [];
-    for (const [id, g] of this.objects) {
+    const source = this.mode === "drawing" ? this.drawing : this.objects;
+    for (const [id, g] of source) {
       if (!g.visible) continue;
       const box = new THREE.Box3().setFromObject(g);
       if (box.isEmpty()) continue;
@@ -367,11 +400,28 @@ export class Viewport {
   // ---- views & camera -----------------------------------------------------
 
   get camera(): THREE.PerspectiveCamera | THREE.OrthographicCamera {
-    return this.mode === "plan" ? this.cameraPlan : this.camera3d;
+    return this.mode === "plan" ? this.cameraPlan : this.mode === "drawing" ? this.cameraDraw : this.camera3d;
   }
 
   get controls(): OrbitControls {
-    return this.mode === "plan" ? this.controlsPlan : this.controls3d;
+    return this.mode === "plan" ? this.controlsPlan : this.mode === "drawing" ? this.controlsDraw : this.controls3d;
+  }
+
+  /** Show a section/elevation (drawing mode). */
+  setDrawingView(view: View): void {
+    const reframe = this.drawingView?.id !== view.id;
+    this.drawingView = view;
+    this.setViewMode("drawing");
+    this.drawingDirty = true;
+    if (reframe) this.zoomToFit();
+  }
+
+  /** Callouts crop their plan to a rectangle; null for an uncropped plan. */
+  setPlanCrop(crop: Rect | null): void {
+    const changed = JSON.stringify(crop) !== JSON.stringify(this.planCrop);
+    this.planCrop = crop;
+    this.applyClipping();
+    if (changed && this.mode === "plan") this.zoomToFit();
   }
 
   get viewMode(): ViewMode {
@@ -384,6 +434,7 @@ export class Viewport {
     this.mode = mode;
     this.controls3d.enabled = mode === "3d";
     this.controlsPlan.enabled = mode === "plan";
+    this.controlsDraw.enabled = mode === "drawing";
     this.grid.visible = mode === "3d"; // the work-plane grid fights with floor tops in plan
     for (const g of this.objects.values()) this.applyPlanOnly(g);
     this.drawingDirty = true;
@@ -409,28 +460,54 @@ export class Viewport {
   /** Recompute the plan drawing (cut + hidden-line projection) for visible solids. */
   private rebuildDrawing(): void {
     for (const g of this.drawing.values()) {
-      this.scene.remove(g);
+      g.removeFromParent();
       disposeGroup(g);
     }
     this.drawing.clear();
+    if (this.drawExtras) {
+      this.drawExtras.removeFromParent();
+      disposeGroup(this.drawExtras);
+      this.drawExtras = null;
+    }
     this.drawingDirty = false;
-    if (this.mode !== "plan") return;
+    if (this.mode === "3d") return;
+    const drawingMode = this.mode === "drawing" && this.drawingView;
     const items = [...this.meshes.entries()]
-      .filter(([id]) => this.objects.get(id)?.visible)
+      .filter(([id]) => {
+        const el = this.doc.get(id);
+        if (!el || !this.objects.get(id)?.visible) return false;
+        return drawingMode || !SYMBOLIC_IN_PLAN.has(el.category); // plans use door/window symbols
+      })
       .map(([id, mesh]) => ({ id, mesh }));
     let linework: PlanLinework[];
     try {
-      linework = planLinework(items, this.planRange);
+      linework = drawingMode ? sectionLinework(items, this.drawingView!) : planLinework(items, this.planRange);
     } catch (err) {
-      console.warn("Could not compute plan drawing", err);
+      console.warn("Could not compute drawing", err);
       return;
     }
+    const target = drawingMode ? this.drawScene : this.scene;
+    const z = drawingMode ? 0 : this.planRange.cut - 0.5;
     for (const lw of linework) {
-      const g = makeDrawingGroup(lw, this.planRange.cut - 0.5);
+      const g = makeDrawingGroup(lw, z);
       g.userData.elementId = lw.id;
       this.drawing.set(lw.id, g);
-      this.scene.add(g);
+      target.add(g);
       this.applyHighlight(lw.id);
+    }
+    if (drawingMode) {
+      const view = this.drawingView!;
+      const extras = makeLineGroup(sectionAnnotations(this.doc, view), 0xb8c7d6);
+      const crop = viewCrop(view);
+      const frame = new THREE.LineSegments(
+        new THREE.EdgesGeometry(new THREE.PlaneGeometry(crop.max.x - crop.min.x, crop.max.y - crop.min.y)),
+        new THREE.LineDashedMaterial({ color: 0x4b525c, dashSize: 300, gapSize: 200 }),
+      );
+      frame.computeLineDistances();
+      frame.position.set((crop.min.x + crop.max.x) / 2, (crop.min.y + crop.max.y) / 2, -1);
+      extras.add(frame);
+      this.drawExtras = extras;
+      this.drawScene.add(extras);
     }
   }
 
@@ -444,9 +521,21 @@ export class Viewport {
     const { bottom, cut } = this.planRange;
     // Keep bottom - 1 mm so floor tops sitting exactly at the level stay visible.
     this.drawingDirty = true;
+    const crop = this.planCrop;
     this.renderer.clippingPlanes =
       this.mode === "plan"
-        ? [new THREE.Plane(new THREE.Vector3(0, 0, -1), cut), new THREE.Plane(new THREE.Vector3(0, 0, 1), -(bottom - 1))]
+        ? [
+            new THREE.Plane(new THREE.Vector3(0, 0, -1), cut),
+            new THREE.Plane(new THREE.Vector3(0, 0, 1), -(bottom - 1)),
+            ...(crop
+              ? [
+                  new THREE.Plane(new THREE.Vector3(1, 0, 0), -crop.min.x),
+                  new THREE.Plane(new THREE.Vector3(-1, 0, 0), crop.max.x),
+                  new THREE.Plane(new THREE.Vector3(0, 1, 0), -crop.min.y),
+                  new THREE.Plane(new THREE.Vector3(0, -1, 0), crop.max.y),
+                ]
+              : []),
+          ]
         : [];
     this.needsRender = true;
   }
@@ -459,22 +548,32 @@ export class Viewport {
     return (2 * dist * Math.tan(THREE.MathUtils.degToRad(cam.fov / 2))) / h;
   }
 
+  /** Fit an orthographic camera to a plan/drawing rectangle. */
+  private fitOrtho(cam: THREE.OrthographicCamera, controls: OrbitControls, r: Rect, height: number): void {
+    const cx = (r.min.x + r.max.x) / 2;
+    const cy = (r.min.y + r.max.y) / 2;
+    const w = Math.max(r.max.x - r.min.x, 1);
+    const h = Math.max(r.max.y - r.min.y, 1);
+    const aspect = (cam.right - cam.left) / (cam.top - cam.bottom);
+    cam.zoom = Math.min((cam.top - cam.bottom) / (h * 1.15), ((cam.top - cam.bottom) * aspect) / (w * 1.15));
+    cam.position.set(cx, cy, height);
+    controls.target.set(cx, cy, 0);
+    cam.updateProjectionMatrix();
+    controls.update();
+    this.needsRender = true;
+  }
+
   zoomToFit(): void {
+    if (this.mode === "drawing" && this.drawingView) {
+      const c = viewCrop(this.drawingView);
+      return this.fitOrtho(this.cameraDraw, this.controlsDraw, { min: { x: c.min.x - 1500, y: c.min.y }, max: { x: c.max.x + 3000, y: c.max.y + 1200 } }, 1000);
+    }
+    if (this.mode === "plan" && this.planCrop) return this.fitOrtho(this.cameraPlan, this.controlsPlan, this.planCrop, PLAN_CAMERA_HEIGHT);
     const box = new THREE.Box3();
     for (const g of this.objects.values()) box.expandByObject(g);
     if (box.isEmpty()) return;
     if (this.mode === "plan") {
-      const c = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3());
-      const cam = this.cameraPlan;
-      const aspect = (cam.right - cam.left) / (cam.top - cam.bottom);
-      cam.zoom = Math.min((cam.top - cam.bottom) / (size.y * 1.15), ((cam.top - cam.bottom) * aspect) / (size.x * 1.15));
-      cam.position.set(c.x, c.y, PLAN_CAMERA_HEIGHT);
-      this.controlsPlan.target.set(c.x, c.y, 0);
-      cam.updateProjectionMatrix();
-      this.controlsPlan.update();
-      this.needsRender = true;
-      return;
+      return this.fitOrtho(this.cameraPlan, this.controlsPlan, { min: { x: box.min.x, y: box.min.y }, max: { x: box.max.x, y: box.max.y } }, PLAN_CAMERA_HEIGHT);
     }
     const sphere = box.getBoundingSphere(new THREE.Sphere());
     const cam = this.camera3d;
@@ -499,6 +598,13 @@ export class Viewport {
     plan.left = -PLAN_HALF_HEIGHT * (w / h);
     plan.right = PLAN_HALF_HEIGHT * (w / h);
     plan.updateProjectionMatrix();
+    for (const cam of [this.cameraDraw]) {
+      cam.top = PLAN_HALF_HEIGHT;
+      cam.bottom = -PLAN_HALF_HEIGHT;
+      cam.left = -PLAN_HALF_HEIGHT * (w / h);
+      cam.right = PLAN_HALF_HEIGHT * (w / h);
+      cam.updateProjectionMatrix();
+    }
     this.needsRender = true;
   }
 
@@ -510,7 +616,7 @@ export class Viewport {
       this.needsRender = true;
     }
     if (this.needsRender) {
-      this.renderer.render(this.scene, this.camera);
+      this.renderer.render(this.mode === "drawing" ? this.drawScene : this.scene, this.camera);
       this.needsRender = false;
     }
   };
@@ -593,27 +699,40 @@ function makeLineGroup(lines: LineData, color: number): THREE.Group {
   segs.position.z = DATUM_LIFT;
   g.add(segs);
   for (const label of lines.labels) {
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture(label.text), transparent: true }));
+    const { texture, aspect } = labelTexture(label.text, label.size !== undefined);
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));
     sprite.position.set(label.position[0], label.position[1], label.position[2] + DATUM_LIFT);
-    sprite.scale.setScalar(GRID_BUBBLE_RADIUS * 1.6);
+    if (label.size !== undefined) {
+      // Text labels: `size` is the cap height in mm; the texture is twice that tall.
+      sprite.scale.set(label.size * 2 * aspect, label.size * 2, 1);
+      if (label.align === "left") sprite.center.set(0, 0.5);
+    } else {
+      sprite.scale.setScalar(GRID_BUBBLE_RADIUS * 1.6); // fits a grid bubble
+    }
     g.add(sprite);
   }
   return g;
 }
 
-function labelTexture(text: string): THREE.CanvasTexture {
-  const size = 128;
+/** Text texture. Bubble labels are square; free text is as wide as it needs (`aspect` = width / height). */
+function labelTexture(text: string, free: boolean): { texture: THREE.CanvasTexture; aspect: number } {
+  const h = 128;
   const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = size;
+  const c0 = canvas.getContext("2d")!;
+  const font = free ? `500 64px system-ui, sans-serif` : `600 ${text.length > 2 ? 40 : 60}px system-ui, sans-serif`;
+  c0.font = font;
+  const w = free ? Math.max(h, Math.ceil(c0.measureText(text).width + 16)) : h;
+  canvas.width = w;
+  canvas.height = h;
   const c = canvas.getContext("2d")!;
+  c.font = font;
   c.fillStyle = "#d7dee6";
-  c.textAlign = "center";
+  c.textAlign = free ? "left" : "center";
   c.textBaseline = "middle";
-  c.font = `600 ${text.length > 2 ? 40 : 60}px system-ui, sans-serif`;
-  c.fillText(text, size / 2, size / 2 + 2);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  c.fillText(text, free ? 8 : w / 2, h / 2 + 2);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return { texture, aspect: w / h };
 }
 
 function disposeGroup(g: THREE.Group): void {

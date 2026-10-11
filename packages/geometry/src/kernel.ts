@@ -14,6 +14,7 @@ import { buildGridLines, buildOpeningLines, buildReferencePlaneLines, type LineD
 import { buildDoor, buildDoorLines, buildWindow, buildWindowLines } from "./doors.ts";
 import { joinedWallFootprint } from "./joins.ts";
 import { buildRoof } from "./roof.ts";
+import { buildViewMarker } from "./sections.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
 
 /**
@@ -83,6 +84,7 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.WallOpening, buildOpeningLines],
     [Cat.Door, buildDoorLines],
     [Cat.Window, buildWindowLines],
+    [Cat.View, buildViewMarker],
   ]);
 
   register(category: string, builder: Builder): void {

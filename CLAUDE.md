@@ -57,4 +57,5 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   doors/windows are parametric (no families); grids drawn over walls win picks (no Tab-cycling).
 - Views are elements (floor plan per level + {3D}); view properties show when nothing is selected.
 - Plans are true 2D drawings (cut + hidden-line projection, `geometry/src/hlr.ts`).
-- Next: Phase 2 — sections, elevations, callouts.
+- Sections (S tool), building elevations (Elevations button) and callouts (2D, HLR, levels + grids annotated).
+- Next: Phase 2 — detail lines, filled regions, text, dimensions.

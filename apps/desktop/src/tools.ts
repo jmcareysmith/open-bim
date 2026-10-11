@@ -7,6 +7,8 @@ import {
   createFloor,
   createReferencePlane,
   createRoof,
+  createSection,
+  createCallout,
   createWallOpening,
   createDoor,
   createWindow,
@@ -48,6 +50,8 @@ export interface ToolContext {
   selection(): ElementId[];
   setSelection(ids: ElementId[]): void;
   status(text: string): void;
+  /** The view shown in the viewport (callouts are drawn on it). */
+  activeViewId(): ElementId | undefined;
 }
 
 export interface Tool {
@@ -695,5 +699,92 @@ export class HostedTool implements Tool {
     } catch (err) {
       this.ctx.status(`\u26a0 ${(err as Error).message}`);
     }
+  }
+}
+
+// ---- Sections & callouts ----------------------------------------------------------
+
+/** Plain line preview on the work plane. */
+const linePreview = (start: Vec2, end: Vec2): LineData => ({
+  segments: new Float32Array([start.x, start.y, 0, end.x, end.y, 0]),
+  labels: [],
+});
+
+/** Section: click the head end, then the tail. The view looks to the left of the line you draw. */
+export class SectionTool extends DatumLineTool {
+  constructor(ctx: ToolContext) {
+    super(ctx, {
+      name: "section",
+      txName: "Create section",
+      label: () => "Section (looks to the left of the line)",
+      preview: (_doc, start, end) => linePreview(start, end),
+      create: (tx, doc, start, end) => createSection(tx, doc, start, end),
+    });
+  }
+}
+
+/** Callout: click two opposite corners on a floor plan. */
+export class CalloutTool implements Tool {
+  readonly name = "callout";
+  private start: Vec2 | null = null;
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.start = null;
+    this.ctx.status("Callout: click two opposite corners on a floor plan.");
+  }
+
+  deactivate(): void {
+    this.start = null;
+    this.ctx.viewport.setPreviewLines(null);
+  }
+
+  private point(ev: PointerEvent): Vec2 | null {
+    const elevation = this.ctx.doc.require<LevelParams>(this.ctx.activeLevelId()).params.elevation;
+    const p = this.ctx.viewport.pickPlane(ev, elevation);
+    return p && snapPoint(this.ctx, p, null, true).p;
+  }
+
+  pointerMove(ev: PointerEvent): void {
+    const p = this.point(ev);
+    if (!p || !this.start) return;
+    const a = this.start;
+    const corners = [a, { x: p.x, y: a.y }, p, { x: a.x, y: p.y }];
+    const seg = corners.flatMap((c, i) => {
+      const d = corners[(i + 1) % 4]!;
+      return [c.x, c.y, 0, d.x, d.y, 0];
+    });
+    this.ctx.viewport.setPreviewLines({ segments: new Float32Array(seg), labels: [], dashed: true });
+  }
+
+  click(ev: PointerEvent): void {
+    const p = this.point(ev);
+    if (!p) return;
+    if (!this.start) {
+      this.start = p;
+      return;
+    }
+    const { doc } = this.ctx;
+    const parent = this.ctx.activeViewId();
+    const start = this.start;
+    this.start = null;
+    this.ctx.viewport.setPreviewLines(null);
+    try {
+      if (!parent) throw new Error("Open a floor plan first");
+      const v = doc.transact("Create callout", (tx) => createCallout(tx, doc, parent, start, p));
+      this.ctx.setSelection([v.id]);
+      this.ctx.status(`${v.name} created \u2014 open it from the project browser.`);
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
+  }
+
+  key(ev: KeyboardEvent): boolean {
+    if (ev.key === "Escape" && this.start) {
+      this.start = null;
+      this.ctx.viewport.setPreviewLines(null);
+      return true;
+    }
+    return false;
   }
 }

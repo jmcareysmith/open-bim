@@ -14,7 +14,8 @@ import {
 export interface LineData {
   /** Segment pairs: [x0, y0, z0, x1, y1, z1, …]. */
   segments: Float32Array;
-  labels: { text: string; position: [number, number, number] }[];
+  /** Text; `size` is the text height in mm (default fits a grid bubble), `align` its anchor. */
+  labels: { text: string; position: [number, number, number]; size?: number; align?: "center" | "left" }[];
   /** Draw dashed (reference planes) rather than solid. */
   dashed?: boolean;
   /**

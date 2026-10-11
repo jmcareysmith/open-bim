@@ -10,6 +10,8 @@ import {
   projectSettings,
   viewRange,
   views,
+  createBuildingElevations,
+  isDrawingView,
   type View,
   type ViewParams,
   typeCategoryOf,
@@ -27,8 +29,10 @@ import { renderBrowser, renderProperties, type PanelContext } from "./panels.ts"
 import { buildSample } from "./sample.ts";
 import {
   GridTool,
+  CalloutTool,
   HostedTool,
   OpeningTool,
+  SectionTool,
   ReferencePlaneTool,
   SelectTool,
   SketchTool,
@@ -120,10 +124,22 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   opening: new OpeningTool(ctx),
   door: new HostedTool(ctx, "door"),
   window: new HostedTool(ctx, "window"),
+  section: new SectionTool(ctx),
+  callout: new CalloutTool(ctx),
 };
+/** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
+const DRAWING_TOOLS = new Set(["select"]);
 let tool: Tool = tools.select!;
 
 function setTool(name: string): void {
+  if (viewport.viewMode === "drawing" && !DRAWING_TOOLS.has(name)) {
+    status("That tool works in plan and 3D views. Open a floor plan or the 3D view to use it.");
+    name = "select";
+  }
+  if (name === "callout" && activeView()?.params.kind !== "floorPlan") {
+    status("Callouts are drawn on floor plans. Open a floor plan first.");
+    name = "select";
+  }
   tool.deactivate?.();
   tool = tools[name] ?? tools.select!;
   tool.activate?.();
@@ -215,6 +231,17 @@ const commands: Record<string, () => void | Promise<void>> = {
     viewport.visibility.isolateCategories(cats);
     afterVisibility(`Isolated ${cats.join(", ")}`);
   },
+  elevations() {
+    // N/E/S/W elevations around the model's walls.
+    const walls = doc.byCategory<{ start: { x: number; y: number }; end: { x: number; y: number } }>(Cat.Wall);
+    if (!walls.length) return status("Elevations: draw some walls first.");
+    const xs = walls.flatMap((w) => [w.params.start.x, w.params.end.x]);
+    const ys = walls.flatMap((w) => [w.params.start.y, w.params.end.y]);
+    const min = { x: Math.min(...xs), y: Math.min(...ys) };
+    const max = { x: Math.max(...xs), y: Math.max(...ys) };
+    const made = doc.transact("Create building elevations", (tx) => createBuildingElevations(tx, doc, min, max));
+    status(made.length ? `Created ${made.map((v) => v.name).join(", ")} elevations.` : "Building elevations already exist.");
+  },
   resetVisibility() {
     viewport.visibility.reset();
     afterVisibility("Temporary hide/isolate reset");
@@ -284,13 +311,17 @@ function applyView(): void {
   if (!activeView()) activeViewId = views(doc).find((v) => v.params.kind === "3d")?.id ?? views(doc)[0]?.id;
   const v = activeView();
   if (!v) return viewport.setViewMode("3d");
-  if (v.params.kind === "floorPlan") {
+  if (v.params.kind === "floorPlan" || v.params.kind === "callout") {
     viewport.setPlanRange(viewRange(doc, v));
     viewport.setViewMode("plan");
+    viewport.setPlanCrop(v.params.kind === "callout" ? (v.params.crop ?? null) : null);
+  } else if (isDrawingView(v)) {
+    viewport.setDrawingView(v);
   } else {
     viewport.setViewMode("3d");
   }
   viewport.setViewHiddenCategories(v.params.hiddenCategories);
+  if (viewport.viewMode === "drawing" && !DRAWING_TOOLS.has(tool.name)) setTool("select");
 }
 
 window.addEventListener("keydown", (ev) => {
@@ -310,6 +341,7 @@ window.addEventListener("keydown", (ev) => {
   if (ev.key.toLowerCase() === "r") return setTool("refplane");
   if (ev.key.toLowerCase() === "d") return setTool("door");
   if (ev.key.toLowerCase() === "n") return setTool("window");
+  if (ev.key.toLowerCase() === "s") return setTool("section");
   if (ev.key.toLowerCase() === "f") return run(ev, "fit");
   if (ev.key.toLowerCase() === "h") return run(ev, ev.shiftKey ? "hideCategory" : "hide");
   if (ev.key.toLowerCase() === "i") return run(ev, ev.shiftKey ? "isolateCategory" : "isolate");

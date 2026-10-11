@@ -82,8 +82,8 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | 3D view (orbit, pan, zoom, section box) | 0–1 | 🟨 |
 | Floor plans (cut plane, view range) | 2 | ✅ |
 | Reflected ceiling plans | 2 | ⬜ |
-| Elevations | 2 | ⬜ |
-| Sections & callouts | 2 | ⬜ |
+| Elevations | 2 | ✅ |
+| Sections & callouts | 2 | 🟨 |
 | Drafting views | 2 | ⬜ |
 | Legends | 4 | ⬜ |
 | Detail levels (coarse/medium/fine) | 2 | ⬜ |

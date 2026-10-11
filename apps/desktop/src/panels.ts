@@ -150,7 +150,13 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
   const { doc } = ctx;
   const p = view.params;
   const set = (name: string, patch: Partial<ViewParams>) => edit(ctx, name, (tx) => tx.update<ViewParams>(view.id, patch));
-  const sec = h("div", { class: "section" }, h("h3", {}, p.kind === "floorPlan" ? "Floor Plan" : "3D View"));
+  const title = { floorPlan: "Floor Plan", "3d": "3D View", section: "Section", elevation: "Elevation", callout: "Callout" }[p.kind];
+  const sec = h("div", { class: "section" }, h("h3", {}, title));
+  if (view.id !== ctx.activeViewId()) {
+    const open = h("button", { textContent: "Open view" });
+    open.onclick = () => ctx.setActiveView(view.id);
+    sec.append(row("", open));
+  }
   sec.append(
     row("View name", textInput(view.name ?? "", (v) => edit(ctx, "Rename view", (tx) => renameView(tx, doc, view.id, v)))),
     row(
@@ -170,6 +176,20 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
       ),
     ),
   );
+  if ((p.kind === "section" || p.kind === "elevation") && p.zRange) {
+    const z = p.zRange;
+    const setZ = (key: "bottom" | "top", v: number) =>
+      edit(ctx, "Change view crop", (tx) => {
+        const next = { ...z, [key]: v };
+        if (!(next.top > next.bottom)) throw new Error("Crop top must be above crop bottom");
+        tx.update<ViewParams>(view.id, { zRange: next });
+      });
+    sec.append(
+      row("Far clip offset", numberInput(p.farClip ?? 0, (v) => (v > 0 ? set("Change far clip", { farClip: v }) : ctx.status("\u26a0 Far clip must be positive")))),
+      row("Crop bottom", numberInput(z.bottom, (v) => setZ("bottom", v))),
+      row("Crop top", numberInput(z.top, (v) => setZ("top", v))),
+    );
+  }
   if (p.kind === "floorPlan" && p.range && p.levelId) {
     const range = p.range;
     const setRange = (key: keyof ViewRangeOffsets, v: number) =>
@@ -256,6 +276,12 @@ function settingsSections(ctx: PanelContext, id: ElementId, p: ProjectSettingsPa
   return [info, unitsSec];
 }
 
+function deleteButton(ctx: PanelContext, el: Element): HTMLButtonElement {
+  const del = h("button", { class: "danger", textContent: "Delete" });
+  del.onclick = () => edit(ctx, `Delete ${el.category}`, (tx) => tx.delete(el.id));
+  return del;
+}
+
 function editBoundaryButton(ctx: PanelContext, id: ElementId): HTMLElement {
   const b = h("button", { textContent: "Edit boundary" });
   b.onclick = () => ctx.editBoundary(id);
@@ -290,6 +316,9 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
         .filter((v) => v.params.kind === "floorPlan")
         .sort((a, b) => (levelOrder.get(a.params.levelId!) ?? 0) - (levelOrder.get(b.params.levelId!) ?? 0)),
     ],
+    ["Callouts", allViews.filter((v) => v.params.kind === "callout")],
+    ["Sections", allViews.filter((v) => v.params.kind === "section")],
+    ["Elevations", allViews.filter((v) => v.params.kind === "elevation")],
     ["3D Views", allViews.filter((v) => v.params.kind === "3d")],
   ];
   for (const [title, list] of groups) {
@@ -480,6 +509,10 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         editBoundaryButton(ctx, el.id),
       );
       break;
+    }
+    case Cat.View: {
+      root.replaceChildren(viewSection(ctx, el as View), h("div", { class: "section" }, deleteButton(ctx, el)));
+      return;
     }
     case Cat.WallOpening: {
       const p = el.params as HostedParams;

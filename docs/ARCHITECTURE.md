@@ -118,6 +118,12 @@ tools snap to grid endpoints, intersections and lines.
   the cut (per-edge hidden intervals; uniform grid for candidates). Mesh-based rather than OCCT HLR:
   works for every kernel and is exact for planar faces. Doors/windows use plan symbols instead.
   In plan, solids are hidden (still pickable) and the drawing is shown.
+- Sections and elevations: a `ViewFrame` (right / up / view direction) maps meshes into view
+  coordinates, then the same `planLinework` runs with the cut at the section line and the far clip
+  as depth; results are cropped to the view (`sectionLinework`). Levels and grids are annotated in
+  drawing space; plans show section heads, elevation markers and callout boxes (`buildViewMarker`).
+  Callouts are cropped plans (extra clip planes). The viewport draws sections/elevations in a
+  separate 2D scene ("drawing" mode).
 - Two viewport modes share the scene: 3D (perspective, orbit) and Plan (orthographic, top-down, clipped to
   the view's range — view depth up to the cut plane). Tools work the same in both.
 - Listens to `doc.on('changed')` and rebuilds only regenerated elements.

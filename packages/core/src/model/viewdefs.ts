@@ -1,13 +1,13 @@
 import { registerCategory } from "../categories.ts";
 import type { Document, Transaction } from "../document.ts";
-import type { Element, ElementId } from "../element.ts";
+import type { Element, ElementId, Vec2 } from "../element.ts";
 import { Cat, levels, type LevelParams } from "./architecture.ts";
 import { PLAN_CUT_HEIGHT, type ViewRange } from "./views.ts";
 
 // Views are elements, as in Revit: saved with the project, listed in the browser, each with its
 // own range, scale, detail level and visibility. Sections, elevations and sheets build on this.
 
-export type ViewKind = "floorPlan" | "3d";
+export type ViewKind = "floorPlan" | "3d" | "section" | "elevation" | "callout";
 export type DetailLevel = "coarse" | "medium" | "fine";
 
 /** Revit view range, as offsets from the view's level, mm. */
@@ -24,7 +24,7 @@ export type ViewRangeOffsets = {
 
 export type ViewParams = {
   kind: ViewKind;
-  /** Associated level (floor plans); null for 3D views. */
+  /** Associated level (floor plans and callouts); null otherwise. */
   levelId: ElementId | null;
   /** Plans only. */
   range: ViewRangeOffsets | null;
@@ -33,6 +33,18 @@ export type ViewParams = {
   detailLevel: DetailLevel;
   /** Categories hidden in this view (Visibility/Graphics). */
   hiddenCategories: string[];
+  /**
+   * Sections and elevations: the view plane's trace in plan. The view looks to the left of
+   * start -> end (Revit's section head direction); its width is the line's length.
+   */
+  line?: { start: Vec2; end: Vec2 } | null;
+  /** Sections/elevations: how far beyond the line the view sees, mm. */
+  farClip?: number | null;
+  /** Sections/elevations: absolute Z crop, mm. */
+  zRange?: { bottom: number; top: number } | null;
+  /** Callouts: the view they're drawn from, and the plan region they show. */
+  parentId?: ElementId | null;
+  crop?: { min: Vec2; max: Vec2 } | null;
 };
 export type View = Element<ViewParams>;
 
@@ -44,7 +56,7 @@ registerCategory({
   name: Cat.View,
   dependencies: (el) => {
     const p = el.params as ViewParams;
-    return p.levelId ? [p.levelId] : [];
+    return [...(p.levelId ? [p.levelId] : []), ...(p.parentId ? [p.parentId] : [])];
   },
   // Deleting a level deletes its plans (Revit does the same).
   cascadeDelete: true,
@@ -109,7 +121,7 @@ export function renameView(tx: Transaction, doc: Document, id: ElementId, name: 
 /** Absolute Z range a plan view shows: from its view depth up to its cut plane. */
 export function viewRange(doc: Document, view: View): ViewRange {
   const p = view.params;
-  if (p.kind !== "floorPlan" || !p.levelId || !p.range) throw new Error("Only plan views have a view range");
+  if ((p.kind !== "floorPlan" && p.kind !== "callout") || !p.levelId || !p.range) throw new Error("Only plan views have a view range");
   const elevation = doc.require<LevelParams>(p.levelId).params.elevation;
   return { bottom: elevation + Math.min(p.range.bottom, p.range.depth), cut: elevation + p.range.cut };
 }
@@ -128,4 +140,157 @@ export function ensureDefaultViews(tx: Transaction, doc: Document): View[] {
 
 export function isViewVisible(view: View, category: string): boolean {
   return !view.params.hiddenCategories.includes(category);
+}
+
+// ---- sections, elevations, callouts -------------------------------------------
+
+type LineViewOpts = { name?: string; farClip?: number; zRange?: { bottom: number; top: number }; scale?: number };
+
+/** Default vertical crop for a new section/elevation: lowest level - 1 m to highest level + 3 m. */
+function defaultZRange(doc: Document): { bottom: number; top: number } {
+  const ls = levels(doc);
+  const lo = ls[0]?.params.elevation ?? 0;
+  const hi = ls.at(-1)?.params.elevation ?? 3000;
+  return { bottom: lo - 1000, top: hi + 3000 };
+}
+
+function uniqueNumbered(doc: Document, kind: ViewKind, base: string): string {
+  let i = 1;
+  while (nameInUse(doc, kind, `${base} ${i}`)) i++;
+  return `${base} ${i}`;
+}
+
+function createLineView(tx: Transaction, doc: Document, kind: "section" | "elevation", start: Vec2, end: Vec2, opts: LineViewOpts): View {
+  if (Math.hypot(end.x - start.x, end.y - start.y) < 100) throw new Error(`A ${kind} line must be at least 100 mm long`);
+  const farClip = opts.farClip ?? 10_000;
+  if (!(farClip > 0)) throw new Error("Far clip must be positive");
+  const zRange = opts.zRange ?? defaultZRange(doc);
+  if (!(zRange.top > zRange.bottom)) throw new Error("Crop top must be above crop bottom");
+  const name = opts.name ?? uniqueNumbered(doc, kind, kind === "section" ? "Section" : "Elevation");
+  if (nameInUse(doc, kind, name)) throw new Error(`Another ${kind} is already called "${name}"`);
+  return tx.create<ViewParams>(
+    Cat.View,
+    {
+      kind,
+      levelId: null,
+      range: null,
+      scale: opts.scale ?? 100,
+      detailLevel: "medium",
+      hiddenCategories: [],
+      line: { start, end },
+      farClip,
+      zRange,
+      parentId: null,
+      crop: null,
+    },
+    { name },
+  );
+}
+
+/** Section looking to the left of start -> end. */
+export function createSection(tx: Transaction, doc: Document, start: Vec2, end: Vec2, opts: LineViewOpts = {}): View {
+  return createLineView(tx, doc, "section", start, end, opts);
+}
+
+export function createElevation(tx: Transaction, doc: Document, start: Vec2, end: Vec2, opts: LineViewOpts = {}): View {
+  return createLineView(tx, doc, "elevation", start, end, opts);
+}
+
+/**
+ * South, East, North and West elevations around a plan rectangle (usually the model extents),
+ * each `offset` outside it and looking back at it. Existing names are skipped.
+ */
+export function createBuildingElevations(tx: Transaction, doc: Document, min: Vec2, max: Vec2, offset = 3000): View[] {
+  const depth = Math.max(max.x - min.x, max.y - min.y) + 2 * offset;
+  const m = 1000; // views extend a little past the building
+  const specs: [string, Vec2, Vec2][] = [
+    // Each line runs so the building is on its left.
+    ["South", { x: min.x - m, y: min.y - offset }, { x: max.x + m, y: min.y - offset }],
+    ["East", { x: max.x + offset, y: min.y - m }, { x: max.x + offset, y: max.y + m }],
+    ["North", { x: max.x + m, y: max.y + offset }, { x: min.x - m, y: max.y + offset }],
+    ["West", { x: min.x - offset, y: max.y + m }, { x: min.x - offset, y: min.y - m }],
+  ];
+  return specs
+    .filter(([name]) => !nameInUse(doc, "elevation", name))
+    .map(([name, a, b]) => createElevation(tx, doc, a, b, { name, farClip: depth }));
+}
+
+/** Callout: a cropped plan region of a floor plan, usually at a larger scale. */
+export function createCallout(
+  tx: Transaction,
+  doc: Document,
+  parentId: ElementId,
+  a: Vec2,
+  b: Vec2,
+  opts: { name?: string; scale?: number } = {},
+): View {
+  const parent = doc.require<ViewParams>(parentId);
+  if (parent.category !== Cat.View || parent.params.kind !== "floorPlan") throw new Error("Callouts are drawn on floor plans");
+  const min = { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y) };
+  const max = { x: Math.max(a.x, b.x), y: Math.max(a.y, b.y) };
+  if (max.x - min.x < 100 || max.y - min.y < 100) throw new Error("Callout must be at least 100 mm each way");
+  const name = opts.name ?? uniqueNumbered(doc, "callout", `Callout of ${parent.name ?? "plan"}`);
+  if (nameInUse(doc, "callout", name)) throw new Error(`Another callout is already called "${name}"`);
+  return tx.create<ViewParams>(
+    Cat.View,
+    {
+      kind: "callout",
+      levelId: parent.params.levelId,
+      range: parent.params.range,
+      scale: opts.scale ?? 20,
+      detailLevel: "fine",
+      hiddenCategories: [...parent.params.hiddenCategories],
+      line: null,
+      farClip: null,
+      zRange: null,
+      parentId,
+      crop: { min, max },
+    },
+    { name },
+  );
+}
+
+type V3 = [number, number, number];
+
+/** Orthonormal view frame: drawing x = right, drawing y = up, `dir` points into the view. */
+export interface ViewFrame {
+  origin: V3;
+  right: V3;
+  up: V3;
+  dir: V3;
+}
+
+/** Frame of a section/elevation: origin at the line start, right along it, looking to its left. */
+export function viewFrame(view: View): ViewFrame {
+  const line = view.params.line;
+  if (!line) throw new Error("Only sections and elevations have a view frame");
+  const dx = line.end.x - line.start.x;
+  const dy = line.end.y - line.start.y;
+  const l = Math.hypot(dx, dy);
+  return { origin: [line.start.x, line.start.y, 0], right: [dx / l, dy / l, 0], up: [0, 0, 1], dir: [-dy / l, dx / l, 0] };
+}
+
+/** World point -> view coordinates: [x along the view, y up, depth towards the viewer (<= 0 is beyond the cut)]. */
+export function toViewCoords(f: ViewFrame, p: V3): V3 {
+  const d = [p[0] - f.origin[0], p[1] - f.origin[1], p[2] - f.origin[2]];
+  const dot = (v: V3) => d[0]! * v[0] + d[1]! * v[1] + d[2]! * v[2];
+  return [dot(f.right), dot(f.up), -dot(f.dir)];
+}
+
+/** Drawing-space crop of a section/elevation: x across the line, y = absolute Z. */
+export function viewCrop(view: View): { min: Vec2; max: Vec2 } {
+  const { line, zRange } = view.params;
+  if (!line || !zRange) throw new Error("Only sections and elevations have a drawing crop");
+  const w = Math.hypot(line.end.x - line.start.x, line.end.y - line.start.y);
+  return { min: { x: 0, y: zRange.bottom }, max: { x: w, y: zRange.top } };
+}
+
+/** Views drawn in their own 2D space (sections and elevations). */
+export function isDrawingView(view: View): boolean {
+  return view.params.kind === "section" || view.params.kind === "elevation";
+}
+
+/** Views drawn as plans (floor plans and callouts). */
+export function isPlanView(view: View): boolean {
+  return view.params.kind === "floorPlan" || view.params.kind === "callout";
 }

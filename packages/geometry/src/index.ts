@@ -6,3 +6,4 @@ export * from "./roof.ts";
 export * from "./occt.ts";
 export * from "./doors.ts";
 export * from "./hlr.ts";
+export * from "./sections.ts";

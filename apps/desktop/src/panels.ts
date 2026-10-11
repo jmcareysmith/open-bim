@@ -25,6 +25,16 @@ import {
   validateViewRange,
   dimensionLayout,
   flipWall,
+  createViewFilter,
+  createViewTemplate,
+  effectiveGraphics,
+  type AppliedFilter,
+  type FilterOp,
+  type FilterRule,
+  type GraphicOverride,
+  type ViewFilterParams,
+  type ViewGraphicsParams,
+  type ViewTemplateParams,
   materials as materialElements,
   layerMaterial,
   PATTERNS,
@@ -170,25 +180,36 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
     open.onclick = () => ctx.setActiveView(view.id);
     sec.append(row("", open));
   }
+  const templates = doc.byCategory<ViewTemplateParams>(Cat.ViewTemplate);
+  const template = p.templateId ? doc.get<ViewTemplateParams>(p.templateId) : undefined;
   sec.append(
     row("View name", textInput(view.name ?? "", (v) => edit(ctx, "Rename view", (tx) => renameView(tx, doc, view.id, v)))),
     row(
-      "View scale",
+      "View template",
       select(
-        SCALES.map((s) => ({ value: String(s), label: `1 : ${s}` })),
-        String(p.scale),
-        (v) => set("Change view scale", { scale: Number(v) }),
-      ),
-    ),
-    row(
-      "Detail level",
-      select(
-        (["coarse", "medium", "fine"] as const).map((d) => ({ value: d, label: d[0]!.toUpperCase() + d.slice(1) })),
-        p.detailLevel,
-        (v) => set("Change detail level", { detailLevel: v as DetailLevel }),
+        [{ value: "", label: "<None>" }, ...templates.map((t) => ({ value: t.id, label: t.name ?? t.id }))],
+        template ? template.id : "",
+        (v) => set("Change view template", { templateId: v || null }),
       ),
     ),
   );
+  if (template) {
+    // Revit greys out what the template controls.
+    const g = effectiveGraphics(doc, view);
+    sec.append(row("View scale", `1 : ${g.scale}`), row("Detail level", g.detailLevel), row("Visibility/Graphics", `from ${template.name}`));
+  } else {
+    sec.append(...graphicsRows(ctx, view.id, p));
+  }
+  {
+    const make = h("button", { textContent: "Create template from view" });
+    make.onclick = () =>
+      edit(ctx, "Create view template", (tx) => {
+        let name = `${view.name ?? "View"} template`;
+        for (let i = 2; doc.byCategory(Cat.ViewTemplate).some((t) => t.name === name); i++) name = `${view.name ?? "View"} template ${i}`;
+        createViewTemplate(tx, doc, name, view);
+      });
+    sec.append(row("", make));
+  }
   if ((p.kind === "section" || p.kind === "elevation") && p.zRange) {
     const z = p.zRange;
     const setZ = (key: "bottom" | "top", v: number) =>
@@ -220,6 +241,167 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
       row("View depth", numberInput(range.depth, (v) => setRange("depth", v))),
     );
   }
+  if (!template) sec.append(visibilityGraphics(ctx, view.id, p));
+  return sec;
+}
+
+/** Scale and detail level, for a view or a view template. */
+function graphicsRows(ctx: PanelContext, id: ElementId, p: ViewGraphicsParams): HTMLElement[] {
+  const set = (name: string, patch: Partial<ViewGraphicsParams>) => edit(ctx, name, (tx) => tx.update<ViewGraphicsParams>(id, patch));
+  return [
+    row(
+      "View scale",
+      select(SCALES.map((s) => ({ value: String(s), label: `1 : ${s}` })), String(p.scale), (v) => set("Change view scale", { scale: Number(v) })),
+    ),
+    row(
+      "Detail level",
+      select(
+        (["coarse", "medium", "fine"] as const).map((d) => ({ value: d, label: d[0]!.toUpperCase() + d.slice(1) })),
+        p.detailLevel,
+        (v) => set("Change detail level", { detailLevel: v as DetailLevel }),
+      ),
+    ),
+  ];
+}
+
+/** Categories shown in the V/G table, model first then annotation (Revit's two tabs). */
+const VG_CATEGORIES: [string, string][] = [
+  [Cat.Wall, "Walls"],
+  [Cat.Floor, "Floors"],
+  [Cat.Ceiling, "Ceilings"],
+  [Cat.Roof, "Roofs"],
+  [Cat.Door, "Doors"],
+  [Cat.Window, "Windows"],
+  [Cat.WallOpening, "Openings"],
+  [Cat.Grid, "Grids"],
+  [Cat.ReferencePlane, "Reference planes"],
+  [Cat.View, "View markers"],
+  [Cat.Dimension, "Dimensions"],
+  [Cat.TextNote, "Text"],
+  [Cat.DetailLine, "Detail lines"],
+  [Cat.FilledRegion, "Filled regions"],
+];
+
+const hex = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
+
+/** Visible / halftone / colour controls for one override. */
+function overrideControls(o: GraphicOverride, visibleDefault: boolean, onChange: (o: GraphicOverride) => void): HTMLElement {
+  const vis = h("input", { type: "checkbox", checked: o.visible ?? visibleDefault, title: "Visible" });
+  vis.onchange = () => onChange({ ...o, visible: vis.checked });
+  const half = h("input", { type: "checkbox", checked: !!o.halftone, title: "Halftone" });
+  half.onchange = () => onChange({ ...o, halftone: half.checked || undefined });
+  const col = h("input", { type: "color", value: hex(o.color ?? 0xd8dde4), title: "Line colour override" });
+  col.classList.toggle("unset", o.color === undefined);
+  col.onchange = () => onChange({ ...o, color: parseInt(col.value.slice(1), 16) });
+  const clear = h("button", { textContent: "\u00d7", title: "Clear colour override", class: "mini" });
+  clear.onclick = () => {
+    const { color: _c, ...rest } = o;
+    void _c;
+    onChange(rest);
+  };
+  return h("div", { class: "vg-controls" }, vis, half, col, clear);
+}
+
+/** Visibility/Graphics for a view or template: categories, then applied filters. */
+function visibilityGraphics(ctx: PanelContext, id: ElementId, p: ViewGraphicsParams): HTMLElement {
+  const { doc } = ctx;
+  const update = (name: string, patch: Partial<ViewGraphicsParams>) => edit(ctx, name, (tx) => tx.update<ViewGraphicsParams>(id, patch));
+  const box = h("div", { class: "vg" }, h("h3", {}, "Visibility/Graphics"), h("div", { class: "vg-head" }, h("span", {}, ""), h("span", {}, "Vis \u00b7 Half \u00b7 Colour")));
+  for (const [cat, label] of VG_CATEGORIES) {
+    const o = p.categoryOverrides?.[cat] ?? {};
+    const hidden = p.hiddenCategories.includes(cat);
+    box.append(
+      h(
+        "div",
+        { class: "vg-row" },
+        h("span", {}, label),
+        overrideControls({ ...o, visible: !hidden && o.visible !== false }, true, (next) => {
+          const hiddenCategories = next.visible === false ? [...new Set([...p.hiddenCategories, cat])] : p.hiddenCategories.filter((c) => c !== cat);
+          const { visible: _v, ...rest } = next;
+          void _v;
+          update(`V/G: ${label}`, { hiddenCategories, categoryOverrides: { ...(p.categoryOverrides ?? {}), [cat]: rest } });
+        }),
+      ),
+    );
+  }
+  box.append(h("h3", {}, "Filters (top wins)"));
+  const applied = p.filters ?? [];
+  applied.forEach((af, i) => {
+    const f = doc.get(af.filterId);
+    const setAt = (next: AppliedFilter | null) => {
+      const list = applied.flatMap((x, j) => (j === i ? (next ? [next] : []) : [x]));
+      update("Edit view filters", { filters: list });
+    };
+    const remove = h("button", { textContent: "Remove", class: "mini" });
+    remove.onclick = () => setAt(null);
+    box.append(
+      h(
+        "div",
+        { class: "vg-row" },
+        h("span", {}, f?.name ?? "(deleted filter)"),
+        overrideControls(af.override, true, (override) => setAt({ ...af, override })),
+      ),
+      h("div", { class: "row" }, h("span", {}), remove),
+    );
+  });
+  const available = doc.byCategory(Cat.ViewFilter).filter((f) => !applied.some((a) => a.filterId === f.id));
+  if (available.length) {
+    box.append(
+      row(
+        "Add filter",
+        select([{ value: "", label: "Choose\u2026" }, ...available.map((f) => ({ value: f.id, label: f.name ?? f.id }))], "", (v) => {
+          if (v) update("Add view filter", { filters: [...applied, { filterId: v, override: { color: 0xff6b3d } }] });
+        }),
+      ),
+    );
+  }
+  return box;
+}
+
+const FILTER_FIELDS: [string, string][] = [
+  ["type", "Type name"],
+  ["name", "Name"],
+  ["baseLevelId", "Base level"],
+  ["levelId", "Level"],
+  ["height", "Unconnected height"],
+  ["baseOffset", "Base offset"],
+  ["sillHeight", "Sill height"],
+];
+const FILTER_OPS: [FilterOp, string][] = [
+  ["equals", "equals"],
+  ["notEquals", "does not equal"],
+  ["contains", "contains"],
+  ["notContains", "does not contain"],
+  ["greater", "is greater than"],
+  ["less", "is less than"],
+];
+
+/** Filter editor: name, categories, rules. */
+function filterSection(ctx: PanelContext, id: ElementId, name: string, p: ViewFilterParams): HTMLElement {
+  const update = (label: string, patch: Partial<ViewFilterParams>) => edit(ctx, label, (tx) => tx.update<ViewFilterParams>(id, patch));
+  const sec = h("div", { class: "section" }, h("h3", {}, "Filter"));
+  sec.append(row("Name", textInput(name, (v) => edit(ctx, "Rename filter", (tx) => tx.setName(id, v || undefined)))));
+  sec.append(h("h3", {}, "Categories (none ticked = all)"));
+  for (const [cat, label] of VG_CATEGORIES) {
+    const cb = h("input", { type: "checkbox", checked: p.categories.includes(cat) });
+    cb.onchange = () =>
+      update("Edit filter categories", { categories: cb.checked ? [...p.categories, cat] : p.categories.filter((c) => c !== cat) });
+    sec.append(h("label", { class: "check" }, cb, label));
+  }
+  sec.append(h("h3", {}, "Rules (all must match)"));
+  const setRule = (i: number, r: FilterRule | null) =>
+    update("Edit filter rules", { rules: p.rules.flatMap((x, j) => (j === i ? (r ? [r] : []) : [x])) });
+  p.rules.forEach((r, i) => {
+    const field = select(FILTER_FIELDS.map(([value, label]) => ({ value, label })), r.field, (v) => setRule(i, { ...r, field: v }));
+    const op = select(FILTER_OPS.map(([value, label]) => ({ value, label })), r.op, (v) => setRule(i, { ...r, op: v as FilterOp }));
+    const value = textInput(r.value, (v) => setRule(i, { ...r, value: v }));
+    const remove = h("button", { textContent: "\u00d7", class: "mini" });
+    remove.onclick = () => setRule(i, null);
+    sec.append(h("div", { class: "rule" }, field, op, value, remove));
+  });
+  const add = h("button", { textContent: "Add rule" });
+  add.onclick = () => update("Add filter rule", { rules: [...p.rules, { field: "type", op: "contains", value: "" }] });
+  sec.append(row("", add));
   return sec;
 }
 
@@ -409,7 +591,34 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   info.onclick = openSettings;
   project.append(info);
 
-  root.replaceChildren(project, views, lv, types, mats, counts);
+  // Filters and view templates (Revit keeps these in dialogs; a list is quicker here).
+  const vg = h("div", { class: "section" }, h("h3", {}, "Filters & View Templates"));
+  for (const f of doc.byCategory(Cat.ViewFilter)) {
+    const div = h("div", { class: `list-item${sel.has(f.id) ? " selected" : ""}` }, h("span", {}, f.name ?? f.id), h("span", { class: "muted" }, "filter"));
+    div.onclick = () => ctx.setSelection([f.id]);
+    vg.append(div);
+  }
+  for (const t of doc.byCategory(Cat.ViewTemplate)) {
+    const div = h("div", { class: `list-item${sel.has(t.id) ? " selected" : ""}` }, h("span", {}, t.name ?? t.id), h("span", { class: "muted" }, "template"));
+    div.onclick = () => ctx.setSelection([t.id]);
+    vg.append(div);
+  }
+  const newFilter = h("button", { textContent: "New filter" });
+  newFilter.onclick = () => {
+    try {
+      const f = doc.transact("Create filter", (tx) => {
+        let name = "Filter 1";
+        for (let i = 2; doc.byCategory(Cat.ViewFilter).some((x) => x.name === name); i++) name = `Filter ${i}`;
+        return createViewFilter(tx, doc, name, { categories: [Cat.Wall], rules: [{ field: "type", op: "contains", value: "Exterior" }] });
+      });
+      ctx.setSelection([f.id]);
+    } catch (err) {
+      ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
+  };
+  vg.append(row("", newFilter));
+
+  root.replaceChildren(project, views, lv, types, mats, vg, counts);
 }
 
 // ---- Properties -----------------------------------------------------------
@@ -532,6 +741,19 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
           return row(`Edge ${i + 1} (${len(edgeLen)})`, slopeInput(s, (v) => setSlopes(p.slopes.map((x, j) => (j === i ? v : x)))));
         }),
         editBoundaryButton(ctx, el.id),
+      );
+      break;
+    }
+    case Cat.ViewFilter: {
+      root.replaceChildren(filterSection(ctx, el.id, el.name ?? "", el.params as ViewFilterParams), h("div", { class: "section" }, deleteButton(ctx, el)));
+      return;
+    }
+    case Cat.ViewTemplate: {
+      const t = el.params as ViewTemplateParams;
+      sec.append(
+        row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename view template", (tx) => tx.setName(el.id, v || undefined)))),
+        ...graphicsRows(ctx, el.id, t),
+        visibilityGraphics(ctx, el.id, t),
       );
       break;
     }

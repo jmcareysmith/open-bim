@@ -74,3 +74,15 @@ aside h2 {
 .subhead { color: var(--muted); font-size: 11px; margin: 6px 0 2px; text-transform: uppercase; letter-spacing: 0.04em; }
 .list-item.indent { padding-left: 14px; }
 .swatch { width: 12px; height: 12px; border-radius: 2px; border: 1px solid var(--line); flex: none; align-self: center; }
+.vg { margin-top: 8px; }
+.vg-head, .vg-row { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; margin: 2px 0; }
+.vg-head span { color: var(--muted); font-size: 11px; }
+.vg-row > span { color: var(--muted); }
+.vg-controls { display: flex; gap: 6px; align-items: center; }
+.vg-controls input[type=checkbox] { width: auto; }
+.vg-controls input[type=color] { width: 28px; height: 20px; padding: 0; border: 1px solid var(--line); }
+.vg-controls input[type=color].unset { opacity: 0.35; }
+button.mini { padding: 1px 6px; font-size: 11px; }
+label.check { display: flex; gap: 6px; align-items: center; color: var(--muted); margin: 2px 0; }
+label.check input { width: auto; }
+.rule { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 4px; margin: 3px 0; }

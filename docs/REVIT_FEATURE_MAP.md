@@ -87,8 +87,8 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Drafting views | 2 | ⬜ |
 | Legends | 4 | ⬜ |
 | Detail levels (coarse/medium/fine) | 2 | 🟨 |
-| Visibility/Graphics overrides, filters | 2 | ⬜ |
-| View templates | 2 | ⬜ |
+| Visibility/Graphics overrides, filters | 2 | 🟨 |
+| View templates | 2 | ✅ |
 | Hidden-line, shaded, realistic styles | 2 | 🟨 |
 | Camera / perspective views | 2 | ⬜ |
 | Temporary hide/isolate | 1 | ✅ |

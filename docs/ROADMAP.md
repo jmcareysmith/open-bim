@@ -33,7 +33,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Sections, elevations, callouts — straight sections only (no jogs); callouts of floor plans
 - [x] Detail lines, filled regions, text, dimensions (live, associative) — aligned dims in plans (sections: levels via API); no leaders yet
 - [x] Materials with cut/surface patterns — graphics only; appearance (textures) and thermal properties later
-- [ ] Visibility/Graphics, filters, view templates
+- [x] Visibility/Graphics, filters, view templates — visible / halftone / line colour overrides; no line weights or patterns overrides yet
 - [ ] Sheets, title blocks, viewports, vector PDF export
 
 ## Phase 3 — Families & parameters

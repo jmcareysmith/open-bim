@@ -89,6 +89,13 @@ into the view frame) and get their material's cut pattern; surface patterns are 
 facing the viewer and hidden with the same exact HLR test. Wall layers: exterior on the wall's
 left (draw clockwise, as in Revit); `flipWall` swaps sides and keeps hosted elements in place.
 
+**Visibility/Graphics** — views (and `ViewTemplate`s) carry hidden categories, per-category
+overrides (visible / halftone / colour) and applied `ViewFilter`s (category list + AND rules on
+name, type name or any parameter; references compare by name). `effectiveGraphics` takes the
+template's settings when a view has one; `elementGraphics` resolves category settings, then filters
+in priority order (first to set a property wins). Templates aren't view dependencies, so deleting
+one just returns its views to their own settings.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

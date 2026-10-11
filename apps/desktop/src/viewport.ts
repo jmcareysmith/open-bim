@@ -9,7 +9,9 @@ import {
   isDrawingView,
   viewFrame,
   type DetailLevel,
+  type Element,
   type MaterialParams,
+  type ResolvedGraphics,
   type ViewParams,
   type ChangeSet,
   type Document,
@@ -50,6 +52,14 @@ const COLORS: Record<string, number> = {
   [Cat.ReferencePlane]: 0x4caf50,
 };
 const SELECTED = 0x3d8bfd;
+/** Halftone fades colours towards the background. */
+const HALFTONE_TOWARD = 0x1b1e23;
+
+function blend(a: number, b: number, t: number): number {
+  const ch = (c: number, s: number) => (c >> s) & 0xff;
+  const mix = (s: number) => Math.round(ch(a, s) * (1 - t) + ch(b, s) * t) << s;
+  return mix(16) | mix(8) | mix(0);
+}
 /** Plan symbols (door swings) drawn alongside a solid. */
 const SYMBOL = 0xd7dee6;
 /** Plan drawing: cut outlines, poché fill and projection (beyond) lines. */
@@ -115,8 +125,8 @@ export class Viewport {
   private datums = new Set<ElementId>();
   /** Temporary hide/isolate state for this view. */
   readonly visibility = new TemporaryVisibility();
-  /** Categories the active view hides (its Visibility/Graphics settings). */
-  private viewHidden = new Set<string>();
+  /** The active view's Visibility/Graphics: visibility, halftone and colour per element. */
+  private resolveGraphics: (el: Element) => ResolvedGraphics = () => ({ visible: true, halftone: false, color: null });
   /** Annotations are drawn only in the view that owns them. */
   private annotationViewId: ElementId | undefined;
   private workPlaneZ = 0;
@@ -265,18 +275,16 @@ export class Viewport {
     const g = this.objects.get(id);
     const el = this.doc.get(id);
     const d = this.drawing.get(id);
-    if (d) {
-      const sel = this.selected.has(id);
+    if (d && el) {
       d.traverse((o) => {
         if (!(o instanceof THREE.Mesh || o instanceof THREE.LineSegments || o instanceof THREE.LineLoop)) return;
-        const base = o.userData.baseColor as number;
-        (o.material as THREE.MeshBasicMaterial).color.setHex(sel ? SELECTED : base);
+        (o.material as THREE.MeshBasicMaterial).color.setHex(this.displayColor(el, o.userData.baseColor as number));
       });
     }
     if (!g || !el) return;
     const mesh = g.children[0] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial | THREE.LineBasicMaterial>;
     const base = (g.userData.baseColor as number | undefined) ?? COLORS[el.category] ?? 0xcccccc;
-    mesh.material.color.setHex(this.selected.has(id) ? SELECTED : base);
+    mesh.material.color.setHex(this.displayColor(el, base));
   }
 
   // ---- picking ------------------------------------------------------------
@@ -321,15 +329,25 @@ export class Viewport {
 
   /** Re-apply temporary hide/isolate after changing `visibility`. */
   /** Categories hidden by the active view. */
-  setViewHiddenCategories(categories: Iterable<string>): void {
-    this.viewHidden = new Set(categories);
+  /** Install the active view's Visibility/Graphics resolver (category settings, filters, template). */
+  setGraphicsResolver(resolve: (el: Element) => ResolvedGraphics): void {
+    this.resolveGraphics = resolve;
     this.refreshVisibility();
+    for (const id of this.objects.keys()) this.applyHighlight(id);
+  }
+
+  /** Colour after selection, V/G colour override and halftone. */
+  private displayColor(el: Element, base: number): number {
+    if (this.selected.has(el.id)) return SELECTED;
+    const g = this.resolveGraphics(el);
+    const c = g.color ?? base;
+    return g.halftone ? blend(c, HALFTONE_TOWARD, 0.6) : c;
   }
 
   private isShown(el: { id: ElementId; category: string; params: unknown }): boolean {
     const owner = annotationView(el as never);
     if (owner && owner !== this.annotationViewId) return false;
-    return !this.viewHidden.has(el.category) && this.visibility.isVisible(el);
+    return this.resolveGraphics(el as Element).visible && this.visibility.isVisible(el);
   }
 
   /** The active view: its own annotations are shown, other views' are hidden. */

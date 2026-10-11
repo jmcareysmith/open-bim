@@ -30,6 +30,8 @@ export const Cat = {
   TextNote: "TextNote",
   Dimension: "Dimension",
   Material: "Material",
+  ViewFilter: "ViewFilter",
+  ViewTemplate: "ViewTemplate",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

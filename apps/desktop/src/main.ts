@@ -11,6 +11,8 @@ import {
   viewRange,
   views,
   createBuildingElevations,
+  effectiveGraphics,
+  elementGraphics,
   isDrawingView,
   type View,
   type ViewParams,
@@ -104,6 +106,9 @@ const ctx: ToolContext & PanelContext = {
     activeViewId = id;
     const v = activeView();
     if (v?.params.levelId) activeLevelId = v.params.levelId;
+    // Switching views clears the selection (Revit does too), so Properties shows the new view.
+    selection = [];
+    viewport.setSelection([]);
     refreshAll();
   },
   editBoundary(id) {
@@ -328,9 +333,11 @@ function applyView(): void {
   } else {
     viewport.setViewMode("3d");
   }
-  viewport.setViewHiddenCategories(v.params.hiddenCategories);
+  // Visibility/Graphics: the view's own settings, or its template's.
+  const g = effectiveGraphics(doc, v);
+  viewport.setGraphicsResolver((el) => elementGraphics(doc, g, el));
   viewport.setAnnotationView(v.id);
-  viewport.setViewGraphics({ detailLevel: v.params.detailLevel, scale: v.params.scale });
+  viewport.setViewGraphics({ detailLevel: g.detailLevel, scale: g.scale });
   if (viewport.viewMode === "drawing" && !DRAWING_TOOLS.has(tool.name)) setTool("select");
 }
 

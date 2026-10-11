@@ -60,4 +60,5 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Sections (S tool), building elevations (Elevations button) and callouts (2D, HLR, levels + grids annotated).
 - Annotation: aligned dimensions (M, live), detail lines (L), filled regions, text (T); view-owned.
 - Materials: cut patterns per layer at Medium/Fine, surface patterns in elevations, 3D colours; wall Flip.
-- Next: Phase 2 — Visibility/Graphics, filters, view templates.
+- V/G per view (visible/halftone/colour), rule filters, view templates (browser → Filters & View Templates).
+- Next: Phase 2 — sheets, title blocks, viewports, vector PDF export (last Phase 2 item).

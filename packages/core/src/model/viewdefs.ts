@@ -3,6 +3,7 @@ import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
 import { Cat, levels, type LevelParams } from "./architecture.ts";
 import { PLAN_CUT_HEIGHT, type ViewRange } from "./views.ts";
+import type { AppliedFilter, GraphicOverride } from "./graphics.ts";
 
 // Views are elements, as in Revit: saved with the project, listed in the browser, each with its
 // own range, scale, detail level and visibility. Sections, elevations and sheets build on this.
@@ -45,6 +46,15 @@ export type ViewParams = {
   /** Callouts: the view they're drawn from, and the plan region they show. */
   parentId?: ElementId | null;
   crop?: { min: Vec2; max: Vec2 } | null;
+  /** Visibility/Graphics overrides per category. */
+  categoryOverrides?: Record<string, GraphicOverride> | null;
+  /** Filters applied in this view, highest priority first. */
+  filters?: AppliedFilter[] | null;
+  /**
+   * View template controlling this view's graphics. Not a dependency: deleting a template leaves
+   * its views with their own settings rather than deleting them.
+   */
+  templateId?: ElementId | null;
 };
 export type View = Element<ViewParams>;
 

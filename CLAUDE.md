@@ -52,8 +52,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Phase 1 done (all roadmap items ticked; see notes on each for what's deferred).
 - Known gaps: joins are whole-wall (no per-layer cleanup); no "disallow join"; walls crossing
   mid-span overlap; very acute mitres are squared off; walls don't attach to floors/roofs; plan is a
-  clipped 3D view, not true 2D; grids straight only, no bubble toggles, no grip editing (drag ends);
+  grids straight only, no bubble toggles, no grip editing (drag ends);
   floors have no "pick walls" / slope arrows; roofs exact only for convex/L/T/U footprints;
   doors/windows are parametric (no families); grids drawn over walls win picks (no Tab-cycling).
 - Views are elements (floor plan per level + {3D}); view properties show when nothing is selected.
-- Next: Phase 2 — true 2D floor plans (cut + projection linework, OCCT HLR), then sections/elevations.
+- Plans are true 2D drawings (cut + hidden-line projection, `geometry/src/hlr.ts`).
+- Next: Phase 2 — sections, elevations, callouts.

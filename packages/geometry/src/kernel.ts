@@ -11,7 +11,7 @@ import {
   type Wall,
 } from "@open-bim/core";
 import { buildGridLines, buildOpeningLines, buildReferencePlaneLines, type LineData } from "./datums.ts";
-import { buildDoor, buildDoorLines, buildWindow } from "./doors.ts";
+import { buildDoor, buildDoorLines, buildWindow, buildWindowLines } from "./doors.ts";
 import { joinedWallFootprint } from "./joins.ts";
 import { buildRoof } from "./roof.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
@@ -82,6 +82,7 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.ReferencePlane, buildReferencePlaneLines],
     [Cat.WallOpening, buildOpeningLines],
     [Cat.Door, buildDoorLines],
+    [Cat.Window, buildWindowLines],
   ]);
 
   register(category: string, builder: Builder): void {

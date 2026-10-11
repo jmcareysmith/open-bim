@@ -112,6 +112,12 @@ tools snap to grid endpoints, intersections and lines.
 - Views are `View` elements (core `viewdefs.ts`): kind (floorPlan | 3d), level, Revit view range
   (top / cut / bottom / depth offsets), scale, detail level, hidden categories. The browser lists
   them; the active view drives the viewport. With nothing selected, Properties shows the view.
+- Plan drawings (`planLinework` in geometry): every solid is sliced at the cut plane (loops →
+  outline + poché, and caps that hide what's inside cut elements), and feature edges between the
+  view depth and the cut are projected with exact hidden-line removal against all triangles below
+  the cut (per-edge hidden intervals; uniform grid for candidates). Mesh-based rather than OCCT HLR:
+  works for every kernel and is exact for planar faces. Doors/windows use plan symbols instead.
+  In plan, solids are hidden (still pickable) and the drawing is shown.
 - Two viewport modes share the scene: 3D (perspective, orbit) and Plan (orthographic, top-down, clipped to
   the view's range — view depth up to the cut plane). Tools work the same in both.
 - Listens to `doc.on('changed')` and rebuilds only regenerated elements.

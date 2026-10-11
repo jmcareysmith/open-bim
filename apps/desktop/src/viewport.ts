@@ -10,7 +10,15 @@ import {
   type Vec2,
   type ViewRange,
 } from "@open-bim/core";
-import { GRID_BUBBLE_RADIUS, type GeometryKernel, type LineData, type MeshData } from "@open-bim/geometry";
+import {
+  GRID_BUBBLE_RADIUS,
+  fillLoops,
+  planLinework,
+  type GeometryKernel,
+  type LineData,
+  type MeshData,
+  type PlanLinework,
+} from "@open-bim/geometry";
 
 // Model space is millimetres with Z up (Revit convention).
 THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
@@ -29,6 +37,12 @@ const COLORS: Record<string, number> = {
 const SELECTED = 0x3d8bfd;
 /** Plan symbols (door swings) drawn alongside a solid. */
 const SYMBOL = 0xd7dee6;
+/** Plan drawing: cut outlines, poché fill and projection (beyond) lines. */
+const CUT_LINE = 0xf2f4f7;
+const POCHE = 0x6b717a;
+const BEYOND = 0x8a919b;
+/** Drawn with plan symbols rather than cut/projection (like Revit door and window families). */
+const SYMBOLIC_IN_PLAN = new Set<string>([Cat.Door, Cat.Window]);
 const PREVIEW = 0x5fb3ff;
 export type ViewMode = "3d" | "plan";
 const PLAN_CAMERA_HEIGHT = 500_000; // mm; clipping planes, not the camera, limit what a plan shows
@@ -58,6 +72,11 @@ export class Viewport {
   private planRange: ViewRange = { bottom: 0, cut: PLAN_CUT_HEIGHT };
   private planFramed = false;
   private objects = new Map<ElementId, THREE.Group>();
+  /** Last built mesh per element, for computing plan drawings. */
+  private meshes = new Map<ElementId, MeshData>();
+  /** 2D plan linework per element (plan views only). */
+  private drawing = new Map<ElementId, THREE.Group>();
+  private drawingDirty = true;
   private selected = new Set<ElementId>();
   private preview: THREE.Group | null = null;
   private previewLines: THREE.Group | null = null;
@@ -135,6 +154,7 @@ export class Viewport {
     for (const id of c.removed) this.remove(id);
     for (const id of c.regenerate) this.rebuild(id);
     for (const id of [...this.selected]) if (!this.doc.has(id)) this.selected.delete(id);
+    this.drawingDirty = true;
     this.needsRender = true;
   }
 
@@ -144,6 +164,7 @@ export class Viewport {
     this.scene.remove(obj);
     disposeGroup(obj);
     this.objects.delete(id);
+    this.meshes.delete(id);
     this.datums.delete(id);
   }
 
@@ -156,7 +177,9 @@ export class Viewport {
       const mesh = this.kernel.build(this.doc, el);
       const lines = this.kernel.buildLines(this.doc, el);
       if (mesh) {
+        if (!SYMBOLIC_IN_PLAN.has(el.category)) this.meshes.set(id, mesh);
         group = makeGroup(mesh, COLORS[el.category] ?? 0xcccccc);
+        group.userData.solid = true;
         // Symbols drawn with a solid (door swings) ride along in the same group.
         if (lines) group.add(makeLineGroup(lines, SYMBOL));
       } else if (lines) {
@@ -191,6 +214,15 @@ export class Viewport {
   private applyHighlight(id: ElementId): void {
     const g = this.objects.get(id);
     const el = this.doc.get(id);
+    const d = this.drawing.get(id);
+    if (d) {
+      const sel = this.selected.has(id);
+      d.traverse((o) => {
+        if (!(o instanceof THREE.Mesh || o instanceof THREE.LineSegments || o instanceof THREE.LineLoop)) return;
+        const base = o.userData.baseColor as number;
+        (o.material as THREE.MeshBasicMaterial).color.setHex(sel ? SELECTED : base);
+      });
+    }
     if (!g || !el) return;
     const mesh = g.children[0] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial | THREE.LineBasicMaterial>;
     mesh.material.color.setHex(this.selected.has(id) ? SELECTED : (COLORS[el.category] ?? 0xcccccc));
@@ -243,6 +275,7 @@ export class Viewport {
       g.visible = !!el && this.isShown(el);
     }
     this.container.classList.toggle("temp-visibility", this.visibility.active);
+    this.drawingDirty = true;
     this.needsRender = true;
   }
 
@@ -353,6 +386,7 @@ export class Viewport {
     this.controlsPlan.enabled = mode === "plan";
     this.grid.visible = mode === "3d"; // the work-plane grid fights with floor tops in plan
     for (const g of this.objects.values()) this.applyPlanOnly(g);
+    this.drawingDirty = true;
     if (mode === "plan" && !this.planFramed) {
       this.planFramed = true;
       this.zoomToFit();
@@ -365,6 +399,39 @@ export class Viewport {
     g.traverse((o) => {
       if (o.userData.planOnly) o.visible = this.mode === "plan";
     });
+    // In plan, solids give way to the 2D drawing (their meshes stay pickable while hidden).
+    if (g.userData.solid) {
+      g.children[0]!.visible = this.mode === "3d";
+      g.children[1]!.visible = this.mode === "3d";
+    }
+  }
+
+  /** Recompute the plan drawing (cut + hidden-line projection) for visible solids. */
+  private rebuildDrawing(): void {
+    for (const g of this.drawing.values()) {
+      this.scene.remove(g);
+      disposeGroup(g);
+    }
+    this.drawing.clear();
+    this.drawingDirty = false;
+    if (this.mode !== "plan") return;
+    const items = [...this.meshes.entries()]
+      .filter(([id]) => this.objects.get(id)?.visible)
+      .map(([id, mesh]) => ({ id, mesh }));
+    let linework: PlanLinework[];
+    try {
+      linework = planLinework(items, this.planRange);
+    } catch (err) {
+      console.warn("Could not compute plan drawing", err);
+      return;
+    }
+    for (const lw of linework) {
+      const g = makeDrawingGroup(lw, this.planRange.cut - 0.5);
+      g.userData.elementId = lw.id;
+      this.drawing.set(lw.id, g);
+      this.scene.add(g);
+      this.applyHighlight(lw.id);
+    }
   }
 
   /** Vertical range shown in plan (usually the active level up to its cut plane). */
@@ -376,6 +443,7 @@ export class Viewport {
   private applyClipping(): void {
     const { bottom, cut } = this.planRange;
     // Keep bottom - 1 mm so floor tops sitting exactly at the level stay visible.
+    this.drawingDirty = true;
     this.renderer.clippingPlanes =
       this.mode === "plan"
         ? [new THREE.Plane(new THREE.Vector3(0, 0, -1), cut), new THREE.Plane(new THREE.Vector3(0, 0, 1), -(bottom - 1))]
@@ -437,6 +505,10 @@ export class Viewport {
   private loop = (): void => {
     requestAnimationFrame(this.loop);
     this.controls.update();
+    if (this.drawingDirty) {
+      this.rebuildDrawing();
+      this.needsRender = true;
+    }
     if (this.needsRender) {
       this.renderer.render(this.scene, this.camera);
       this.needsRender = false;
@@ -464,6 +536,46 @@ function makeGroup(mesh: MeshData, color: number, opacity = 1): THREE.Group {
   );
   const g = new THREE.Group();
   g.add(new THREE.Mesh(geom, mat), edges);
+  return g;
+}
+
+/**
+ * Plan linework for one element at the cut plane height: poché fill, then projection lines, then
+ * cut outlines on top. Drawn without depth testing so draw order decides what's on top.
+ */
+function makeDrawingGroup(lw: PlanLinework, z: number): THREE.Group {
+  const g = new THREE.Group();
+  const flat = (o: THREE.Object3D, color: number, order: number) => {
+    o.userData.baseColor = color;
+    o.renderOrder = order;
+    g.add(o);
+  };
+  const mat = <T extends THREE.Material>(m: T) => {
+    m.depthTest = false;
+    m.depthWrite = false;
+    return m;
+  };
+  const tris = fillLoops(lw.cutLoops);
+  if (tris.length) {
+    const pos = new Float32Array(tris.flatMap((t) => t.flatMap((p) => [p.x, p.y, z])));
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    flat(new THREE.Mesh(geom, mat(new THREE.MeshBasicMaterial({ color: POCHE, side: THREE.DoubleSide }))), POCHE, -3);
+  }
+  if (lw.projection.length) {
+    const pos: number[] = [];
+    for (let i = 0; i < lw.projection.length; i += 4) {
+      pos.push(lw.projection[i]!, lw.projection[i + 1]!, z, lw.projection[i + 2]!, lw.projection[i + 3]!, z);
+    }
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pos), 3));
+    flat(new THREE.LineSegments(geom, mat(new THREE.LineBasicMaterial({ color: BEYOND }))), BEYOND, -2);
+  }
+  for (const loop of lw.cutLoops) {
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(loop.flatMap((p) => [p.x, p.y, z])), 3));
+    flat(new THREE.LineLoop(geom, mat(new THREE.LineBasicMaterial({ color: CUT_LINE }))), CUT_LINE, -1);
+  }
   return g;
 }
 
@@ -506,7 +618,7 @@ function labelTexture(text: string): THREE.CanvasTexture {
 
 function disposeGroup(g: THREE.Group): void {
   g.traverse((o) => {
-    if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) {
+    if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments || o instanceof THREE.LineLoop) {
       o.geometry.dispose();
       (o.material as THREE.Material).dispose();
     } else if (o instanceof THREE.Sprite) {

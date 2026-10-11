@@ -125,3 +125,26 @@ export function buildWindow(doc: Document, el: Element): MeshData {
     box(f, u0 + fw, u1 - fw, -GLASS / 2, GLASS / 2, z0 + fw, z1 - fw),
   ]);
 }
+
+/** Plan symbol: frame outline through the wall and the glass line, drawn just above the floor. */
+export function buildWindowLines(doc: Document, el: Element): LineData {
+  const wall = host(doc, el);
+  const f = wallFrame(doc, wall);
+  const p = windowPlacement(doc, el);
+  const u0 = p.position - p.width / 2;
+  const u1 = p.position + p.width / 2;
+  const d = Math.min(WINDOW_DEPTH, f.half * 2) / 2;
+  const z = f.bottom + 10;
+  const seg: number[] = [];
+  const line = (ua: number, va: number, ub: number, vb: number) => {
+    const a = f.at(ua, va);
+    const b = f.at(ub, vb);
+    seg.push(a.x, a.y, z, b.x, b.y, z);
+  };
+  line(u0, -f.half, u0, f.half); // jambs: where the wall stops
+  line(u1, -f.half, u1, f.half);
+  line(u0, -d, u1, -d); // frame faces
+  line(u0, d, u1, d);
+  line(u0, 0, u1, 0); // glass
+  return { segments: new Float32Array(seg), labels: [], placement: "model", planOnly: true };
+}

@@ -29,7 +29,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 
 ## Phase 2 — Views & drawing production (current)
 - [x] View system: each view = camera + view range + visibility rules + detail level — 3D camera not yet saved per view
-- [ ] Floor plans via cut plane + hidden-line removal (OCCT HLR) → 2D vector
+- [x] Floor plans via cut plane + hidden-line removal → 2D vector — exact mesh-based HLR (not OCCT); line weights come with materials
 - [ ] Sections, elevations, callouts
 - [ ] Detail lines, filled regions, text, dimensions (live, associative)
 - [ ] Materials with cut/surface patterns

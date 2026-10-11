@@ -51,3 +51,14 @@ describe("window geometry", () => {
     expect(meshVolume(m)).toBeCloseTo(frame + glass, -3);
   });
 });
+
+describe("window plan symbol", () => {
+  it("draws jambs, frame faces and glass, plan-only", () => {
+    const { doc, ids, wall, k } = setup();
+    const w = doc.transact("Win", (tx) => createWindow(tx, doc, ids.windowTypes.w1200x1200, wall.id, 2000));
+    const lines = k.buildLines(doc, w)!;
+    expect(lines.planOnly).toBe(true);
+    expect(lines.segments.length).toBe(5 * 6);
+    expect(Array.from(lines.segments.slice(24, 30))).toEqual([1400, 0, 10, 2600, 0, 10]); // glass on the location line
+  });
+});

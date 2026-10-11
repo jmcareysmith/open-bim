@@ -38,6 +38,8 @@ export interface PanelContext {
   setSelection(ids: ElementId[]): void;
   activeLevelId(): ElementId;
   setActiveLevel(id: ElementId): void;
+  viewMode(): "3d" | "plan";
+  setViewMode(mode: "3d" | "plan"): void;
   status(text: string): void;
 }
 
@@ -91,6 +93,24 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
     return div;
   };
 
+  // Views: Revit-style "Floor Plans" per level plus the default 3D view.
+  const views = h("div", { class: "section" }, h("h3", {}, "Views"));
+  const viewItem = (label: string, active: boolean, onClick: () => void) => {
+    const div = h("div", { class: `list-item${active ? " selected" : ""}` }, h("span", {}, label));
+    div.onclick = onClick;
+    return div;
+  };
+  for (const l of levels(doc)) {
+    const active = ctx.viewMode() === "plan" && l.id === ctx.activeLevelId();
+    views.append(
+      viewItem(`Floor Plan: ${l.name ?? l.id}`, active, () => {
+        ctx.setActiveLevel(l.id);
+        ctx.setViewMode("plan");
+      }),
+    );
+  }
+  views.append(viewItem("3D View", ctx.viewMode() === "3d", () => ctx.setViewMode("3d")));
+
   const lv = h("div", { class: "section" }, h("h3", {}, "Levels"));
   for (const l of levels(doc)) {
     lv.append(
@@ -113,7 +133,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   counts.append(row("Floors", String(doc.byCategory(Cat.Floor).length)));
   counts.append(row("Grids", String(doc.byCategory(Cat.Grid).length)));
 
-  root.replaceChildren(lv, types, counts);
+  root.replaceChildren(views, lv, types, counts);
 }
 
 // ---- Properties -----------------------------------------------------------

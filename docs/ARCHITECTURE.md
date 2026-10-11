@@ -80,6 +80,8 @@ tools snap to grid endpoints, intersections and lines.
 ## Desktop app (`apps/desktop`)
 
 - three.js scene; one `THREE.Object3D` per element, keyed by element id.
+- Two views share the scene: 3D (perspective, orbit) and Plan (orthographic, top-down, clipped to
+  the level's `planViewRange` — level to 1200 mm cut plane). Tools work the same in both.
 - Listens to `doc.on('changed')` and rebuilds only regenerated elements.
 - Tools (wall tool, select tool…) are state machines that turn pointer input into transactions.
 - Rust side exposes commands for open/save via Tauri plugins (dialog + fs).

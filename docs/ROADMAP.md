@@ -16,7 +16,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [ ] App icon + CI (GitHub Actions: tests + build)
 
 ## Phase 1 — Architectural modelling (current)
-- [ ] Wall drawing tool (click-click in plan/3D work plane), snapping, ortho — 3D work plane done; plan needs 2D views
+- [x] Wall drawing tool (click-click in plan/3D work plane), snapping, ortho — plan is a clipped top-down view; true 2D plans in Phase 2
 - [x] Wall joins (L, T, X) — whole-wall mitres; per-layer cleanup comes with layered geometry
 - [x] Grids — straight; arc and multi-segment grids later
 - [ ] Reference planes

@@ -80,7 +80,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Feature | Phase | Status |
 |---|---|---|
 | 3D view (orbit, pan, zoom, section box) | 0–1 | 🟨 |
-| Floor plans (cut plane, view range) | 2 | ⬜ |
+| Floor plans (cut plane, view range) | 2 | 🟨 |
 | Reflected ceiling plans | 2 | ⬜ |
 | Elevations | 2 | ⬜ |
 | Sections & callouts | 2 | ⬜ |

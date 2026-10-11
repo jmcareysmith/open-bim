@@ -3,6 +3,7 @@ import {
   Document,
   applyResidentialTemplate,
   levels,
+  planViewRange,
   type ElementId,
   type LevelParams,
 } from "@open-bim/core";
@@ -11,7 +12,7 @@ import { openProject, saveProject } from "./io.ts";
 import { renderBrowser, renderProperties, type PanelContext } from "./panels.ts";
 import { buildSample } from "./sample.ts";
 import { GridTool, SelectTool, WallTool, type Tool, type ToolContext } from "./tools.ts";
-import { Viewport } from "./viewport.ts";
+import { Viewport, type ViewMode } from "./viewport.ts";
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 
@@ -42,6 +43,11 @@ const ctx: ToolContext & PanelContext = {
   },
   setActiveLevel(id) {
     activeLevelId = id;
+    refreshAll();
+  },
+  viewMode: () => viewport.viewMode,
+  setViewMode(mode: ViewMode) {
+    viewport.setViewMode(mode);
     refreshAll();
   },
   status,
@@ -136,6 +142,9 @@ document.querySelectorAll<HTMLButtonElement>("[data-cmd]").forEach((b) => {
 document.querySelectorAll<HTMLButtonElement>("[data-tool]").forEach((b) => {
   b.onclick = () => setTool(b.dataset.tool!);
 });
+document.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((b) => {
+  b.onclick = () => ctx.setViewMode(b.dataset.view as ViewMode);
+});
 
 window.addEventListener("keydown", (ev) => {
   const target = ev.target as HTMLElement;
@@ -180,7 +189,13 @@ function refreshToolbar(): void {
   $<HTMLButtonElement>('[data-cmd="redo"]').title = doc.redoName ? `Redo ${doc.redoName} (Ctrl+Y)` : "Redo";
 
   const lv = doc.get<LevelParams>(activeLevelId);
-  if (lv) viewport.setWorkPlane(lv.params.elevation);
+  if (lv) {
+    viewport.setWorkPlane(lv.params.elevation);
+    viewport.setPlanRange(planViewRange(doc, activeLevelId));
+  }
+  document.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((b) => {
+    b.classList.toggle("active", b.dataset.view === viewport.viewMode);
+  });
 }
 
 function refreshPanels(): void {

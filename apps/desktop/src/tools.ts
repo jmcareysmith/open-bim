@@ -41,7 +41,8 @@ export interface ToolContext {
   doc: Document;
   viewport: Viewport;
   activeLevelId(): ElementId;
-  activeWallTypeId(): ElementId;
+  /** Type the placing tools use for a type category (the toolbar type selector). */
+  activeTypeId(typeCategory: string): ElementId | undefined;
   selection(): ElementId[];
   setSelection(ids: ElementId[]): void;
   status(text: string): void;
@@ -51,7 +52,9 @@ export interface Tool {
   readonly name: string;
   activate?(): void;
   deactivate?(): void;
+  pointerDown?(ev: PointerEvent): void;
   pointerMove?(ev: PointerEvent): void;
+  pointerUp?(ev: PointerEvent): void;
   click?(ev: PointerEvent): void;
   /** Return true if the key was handled. */
   key?(ev: KeyboardEvent): boolean;
@@ -61,10 +64,57 @@ export interface Tool {
 
 export class SelectTool implements Tool {
   readonly name = "select";
+  private dragFrom: { x: number; y: number } | null = null;
+  private band: HTMLDivElement | null = null;
+
   constructor(private ctx: ToolContext) {}
 
   activate(): void {
-    this.ctx.status("Select: click an element. Shift+click to add. Delete to remove. Middle-drag pan, right-drag orbit.");
+    this.ctx.status(
+      "Select: click, or drag a box (left\u2192right = inside, right\u2192left = crossing). Shift adds. Delete removes. H/I hide/isolate.",
+    );
+  }
+
+  deactivate(): void {
+    this.endBand();
+  }
+
+  pointerDown(ev: PointerEvent): void {
+    if (ev.button === 0) this.dragFrom = { x: ev.clientX, y: ev.clientY };
+  }
+
+  pointerMove(ev: PointerEvent): void {
+    if (!this.dragFrom || !(ev.buttons & 1)) return;
+    const { x, y } = this.dragFrom;
+    if (!this.band && Math.hypot(ev.clientX - x, ev.clientY - y) < 5) return;
+    if (!this.band) {
+      this.band = document.createElement("div");
+      this.band.className = "select-band";
+      document.body.append(this.band);
+    }
+    const crossing = ev.clientX < x;
+    Object.assign(this.band.style, {
+      left: `${Math.min(x, ev.clientX)}px`,
+      top: `${Math.min(y, ev.clientY)}px`,
+      width: `${Math.abs(ev.clientX - x)}px`,
+      height: `${Math.abs(ev.clientY - y)}px`,
+    });
+    this.band.classList.toggle("crossing", crossing);
+  }
+
+  pointerUp(ev: PointerEvent): void {
+    const from = this.dragFrom;
+    this.dragFrom = null;
+    if (!from || !this.band) return this.endBand();
+    this.endBand();
+    const ids = this.ctx.viewport.elementsInRect({ x0: from.x, y0: from.y, x1: ev.clientX, y1: ev.clientY }, ev.clientX < from.x);
+    this.ctx.setSelection(ev.shiftKey ? [...new Set([...this.ctx.selection(), ...ids])] : ids);
+    this.ctx.status(`${ids.length} element(s) in box`);
+  }
+
+  private endBand(): void {
+    this.band?.remove();
+    this.band = null;
   }
 
   click(ev: PointerEvent): void {
@@ -244,7 +294,9 @@ export class WallTool implements Tool {
       this.ctx.viewport.setPreview(null);
       return;
     }
-    const type = this.ctx.doc.require<LayeredTypeParams>(this.ctx.activeWallTypeId());
+    const typeId = this.ctx.activeTypeId(Cat.WallType);
+    if (!typeId) return;
+    const type = this.ctx.doc.require<LayeredTypeParams>(typeId);
     const z0 = this.levelElevation();
     const top = this.topLevelId();
     const z1 = top ? this.ctx.doc.require<LevelParams>(top).params.elevation : z0 + 2400;
@@ -263,7 +315,9 @@ export class WallTool implements Tool {
     const start = this.start;
     let wall: Wall | undefined;
     this.ctx.doc.transact("Create wall", (tx) => {
-      wall = createWall(tx, this.ctx.activeWallTypeId(), start, p, this.ctx.activeLevelId(), {
+      const typeId = this.ctx.activeTypeId(Cat.WallType);
+      if (!typeId) throw new Error("No wall types in this project");
+      wall = createWall(tx, typeId, start, p, this.ctx.activeLevelId(), {
         topLevelId: this.topLevelId(),
       });
     });
@@ -530,7 +584,7 @@ export class SketchTool implements Tool {
         doc.transact(`Edit ${this.def.label.toLowerCase()} boundary`, (tx) => tx.update(editing, patch));
         id = editing;
       } else {
-        const typeId = doc.byCategory(this.def.typeCategory)[0]?.id;
+        const typeId = this.ctx.activeTypeId(this.def.typeCategory);
         if (!typeId) throw new Error(`No ${this.def.label.toLowerCase()} types in this project`);
         const levelId = this.ctx.activeLevelId();
         id = doc.transact(`Create ${this.def.label.toLowerCase()}`, (tx) =>
@@ -603,7 +657,7 @@ export class HostedTool implements Tool {
   }
 
   private typeId(): ElementId | undefined {
-    return this.ctx.doc.byCategory(this.name === "door" ? Cat.DoorType : Cat.WindowType)[0]?.id;
+    return this.ctx.activeTypeId(this.name === "door" ? Cat.DoorType : Cat.WindowType);
   }
 
   activate(): void {

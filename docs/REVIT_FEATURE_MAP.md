@@ -91,7 +91,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | View templates | 2 | ⬜ |
 | Hidden-line, shaded, realistic styles | 2 | ⬜ |
 | Camera / perspective views | 2 | ⬜ |
-| Temporary hide/isolate | 1 | ⬜ |
+| Temporary hide/isolate | 1 | ✅ |
 
 ## 8. Annotation & documentation
 | Feature | Phase | Status |

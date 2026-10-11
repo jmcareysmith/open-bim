@@ -107,6 +107,10 @@ tools snap to grid endpoints, intersections and lines.
   the level's `planViewRange` — level to 1200 mm cut plane). Tools work the same in both.
 - Listens to `doc.on('changed')` and rebuilds only regenerated elements.
 - Tools (wall tool, select tool…) are state machines that turn pointer input into transactions.
+- Select: click, Shift+click, box select (left→right = fully inside, right→left = crossing).
+- Type selector (toolbar) picks the type for the active placing tool, or retypes the selection.
+- Temporary hide/isolate (`TemporaryVisibility` in core): per-view, never saved; H / I / Shift+H /
+  Shift+I / U, with a cyan viewport border while active (Revit convention).
 - Rust side exposes commands for open/save via Tauri plugins (dialog + fs).
 
 ## Units & coordinates

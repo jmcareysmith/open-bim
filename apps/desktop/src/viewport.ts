@@ -3,6 +3,7 @@ import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import {
   Cat,
   PLAN_CUT_HEIGHT,
+  TemporaryVisibility,
   type ChangeSet,
   type Document,
   type ElementId,
@@ -62,6 +63,8 @@ export class Viewport {
   private previewLines: THREE.Group | null = null;
   /** Datums (grids) are drawn at the work plane, like a plan view of the active level. */
   private datums = new Set<ElementId>();
+  /** Temporary hide/isolate state for this view. */
+  readonly visibility = new TemporaryVisibility();
   private workPlaneZ = 0;
   private raycaster = new THREE.Raycaster();
   private grid: THREE.GridHelper;
@@ -166,6 +169,7 @@ export class Viewport {
       return;
     }
     group.userData.elementId = id;
+    group.visible = this.visibility.isVisible(el);
     this.applyPlanOnly(group);
     this.objects.set(id, group);
     this.scene.add(group);
@@ -208,7 +212,9 @@ export class Viewport {
     this.setRay(ev);
     // Line picking tolerance: a few pixels, in mm at the current zoom.
     this.raycaster.params.Line.threshold = this.mmPerPixel() * 6;
-    const meshes = [...this.objects.entries()].filter(([id]) => !filter || filter(id)).map(([, g]) => g.children[0]!);
+    const meshes = [...this.objects.entries()]
+      .filter(([id, g]) => g.visible && (!filter || filter(id)))
+      .map(([, g]) => g.children[0]!);
     for (const hit of this.raycaster.intersectObjects(meshes, false)) {
       // Respect plan clipping: ignore hits on geometry that isn't drawn.
       if (this.renderer.clippingPlanes.some((pl) => pl.distanceToPoint(hit.point) < 0)) continue;
@@ -216,6 +222,48 @@ export class Viewport {
       if (id) return { id, point: { x: hit.point.x, y: hit.point.y } };
     }
     return null;
+  }
+
+  /** Re-apply temporary hide/isolate after changing `visibility`. */
+  refreshVisibility(): void {
+    for (const [id, g] of this.objects) {
+      const el = this.doc.get(id);
+      g.visible = !!el && this.visibility.isVisible(el);
+    }
+    this.container.classList.toggle("temp-visibility", this.visibility.active);
+    this.needsRender = true;
+  }
+
+  /**
+   * Elements inside a screen rectangle (client px). `crossing` (right-to-left drag in Revit)
+   * takes anything touching the rectangle; otherwise elements must lie fully inside it.
+   */
+  elementsInRect(r: { x0: number; y0: number; x1: number; y1: number }, crossing: boolean): ElementId[] {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const [xa, xb] = [Math.min(r.x0, r.x1), Math.max(r.x0, r.x1)];
+    const [ya, yb] = [Math.min(r.y0, r.y1), Math.max(r.y0, r.y1)];
+    const out: ElementId[] = [];
+    for (const [id, g] of this.objects) {
+      if (!g.visible) continue;
+      const box = new THREE.Box3().setFromObject(g);
+      if (box.isEmpty()) continue;
+      if (this.mode === "plan" && (box.min.z > this.planRange.cut || box.max.z < this.planRange.bottom - 1)) continue;
+      const pts: { x: number; y: number }[] = [];
+      for (const x of [box.min.x, box.max.x]) {
+        for (const y of [box.min.y, box.max.y]) {
+          for (const z of [box.min.z, box.max.z]) {
+            const v = new THREE.Vector3(x, y, z).project(this.camera);
+            pts.push({ x: rect.left + ((v.x + 1) / 2) * rect.width, y: rect.top + ((1 - v.y) / 2) * rect.height });
+          }
+        }
+      }
+      const sx = [Math.min(...pts.map((p) => p.x)), Math.max(...pts.map((p) => p.x))];
+      const sy = [Math.min(...pts.map((p) => p.y)), Math.max(...pts.map((p) => p.y))];
+      const inside = sx[0]! >= xa && sx[1]! <= xb && sy[0]! >= ya && sy[1]! <= yb;
+      const touches = sx[1]! >= xa && sx[0]! <= xb && sy[1]! >= ya && sy[0]! <= yb;
+      if (crossing ? touches : inside) out.push(id);
+    }
+    return out;
   }
 
   /** Swap geometry kernels (e.g. once OpenCascade has loaded) and rebuild everything. */

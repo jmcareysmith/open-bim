@@ -24,7 +24,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Roofs by footprint with per-edge slope — walls don't attach to roofs yet; complex footprints approximate
 - [x] OpenCascade (opencascade.js) kernel: booleans for openings — wall openings; floor/roof openings later
 - [x] Doors and windows hosted in walls, cutting openings — parametric types; loadable families in Phase 3
-- [ ] Selection, properties panel, type selector, temporary hide/isolate
+- [x] Selection, properties panel, type selector, temporary hide/isolate
 - [ ] Project units & settings
 
 ## Phase 2 — Views & drawing production

@@ -2,8 +2,12 @@ import {
   Cat,
   Document,
   applyResidentialTemplate,
+  hostedPlacement,
+  isWallCutter,
   levels,
   planViewRange,
+  typeCategoryOf,
+  validateHosted,
   type CeilingParams,
   type ElementId,
   type FloorParams,
@@ -37,18 +41,34 @@ buildSample(doc);
 
 let selection: ElementId[] = [];
 let activeLevelId: ElementId = levels(doc)[0]!.id;
-let activeWallTypeId: ElementId = doc.byCategory(Cat.WallType)[0]!.id;
+/** Type selector state: the type each placing tool uses, per type category. */
+const activeTypes = new Map<string, ElementId>();
+/** Type category each placing tool creates. */
+const TOOL_TYPES: Record<string, string> = {
+  wall: Cat.WallType,
+  floor: Cat.FloorType,
+  ceiling: Cat.CeilingType,
+  roof: Cat.RoofType,
+  door: Cat.DoorType,
+  window: Cat.WindowType,
+};
+const activeTypeId = (cat: string): ElementId | undefined => {
+  const id = activeTypes.get(cat);
+  return id && doc.has(id) ? id : doc.byCategory(cat)[0]?.id;
+};
 let filePath: string | null = null;
 let dirty = false;
 
 const viewport = new Viewport($("#viewport"), doc, new SimpleKernel());
-const status = (text: string) => ($("#status").textContent = text);
+const status = (text: string): void => {
+  $("#status").textContent = text;
+};
 
 const ctx: ToolContext & PanelContext = {
   doc,
   viewport,
   activeLevelId: () => activeLevelId,
-  activeWallTypeId: () => activeWallTypeId,
+  activeTypeId,
   selection: () => selection,
   setSelection(ids) {
     selection = ids;
@@ -95,18 +115,22 @@ function setTool(name: string): void {
   document.querySelectorAll<HTMLButtonElement>("[data-tool]").forEach((b) => {
     b.classList.toggle("active", b.dataset.tool === tool.name);
   });
+  refreshTypeSelector();
 }
 
 const canvas = viewport.renderer.domElement;
 let downAt: { x: number; y: number } | null = null;
 canvas.addEventListener("pointerdown", (ev) => {
   if (ev.button === 0) downAt = { x: ev.clientX, y: ev.clientY };
+  tool.pointerDown?.(ev);
 });
-canvas.addEventListener("pointerup", (ev) => {
+// Listen on window so a box-select drag that leaves the canvas still finishes.
+window.addEventListener("pointerup", (ev) => {
+  tool.pointerUp?.(ev);
   if (ev.button !== 0 || !downAt) return;
   const moved = Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y);
   downAt = null;
-  if (moved < 5) tool.click?.(ev);
+  if (moved < 5 && ev.target === canvas) tool.click?.(ev);
 });
 canvas.addEventListener("pointermove", (ev) => tool.pointerMove?.(ev));
 canvas.addEventListener("contextmenu", (ev) => ev.preventDefault());
@@ -151,7 +175,48 @@ const commands: Record<string, () => void | Promise<void>> = {
   fit() {
     viewport.zoomToFit();
   },
+  // Temporary hide/isolate (Revit HH / HI / HC / IC / HR). Category variants act on the selection's categories.
+  hide() {
+    if (!selection.length) return status("Hide: select something first.");
+    viewport.visibility.hide(selection);
+    afterVisibility(`Hid ${selection.length} element(s)`);
+    ctx.setSelection([]);
+  },
+  isolate() {
+    if (!selection.length) return status("Isolate: select something first.");
+    viewport.visibility.isolate(selection);
+    afterVisibility(`Isolated ${selection.length} element(s)`);
+  },
+  hideCategory() {
+    const cats = selectedCategories();
+    if (!cats.length) return status("Hide category: select something first.");
+    viewport.visibility.hideCategories(cats);
+    afterVisibility(`Hid ${cats.join(", ")}`);
+    ctx.setSelection([]);
+  },
+  isolateCategory() {
+    const cats = selectedCategories();
+    if (!cats.length) return status("Isolate category: select something first.");
+    viewport.visibility.isolateCategories(cats);
+    afterVisibility(`Isolated ${cats.join(", ")}`);
+  },
+  resetVisibility() {
+    viewport.visibility.reset();
+    afterVisibility("Temporary hide/isolate reset");
+  },
 };
+
+function selectedCategories(): string[] {
+  return [...new Set(selection.map((id) => doc.require(id).category))];
+}
+
+function afterVisibility(message: string): void {
+  viewport.refreshVisibility();
+  selection = selection.filter((id) => viewport.visibility.isVisible(doc.require(id)));
+  viewport.setSelection(selection);
+  refreshPanels();
+  status(viewport.visibility.active ? `${message} \u00b7 temporary hide/isolate is on (U to reset)` : message);
+}
 
 function loadInto(json: ReturnType<Document["toJSON"]>, path: string | null): void {
   doc.load(json);
@@ -159,7 +224,9 @@ function loadInto(json: ReturnType<Document["toJSON"]>, path: string | null): vo
   dirty = false;
   selection = [];
   activeLevelId = levels(doc)[0]?.id ?? "";
-  activeWallTypeId = doc.byCategory(Cat.WallType)[0]?.id ?? "";
+  activeTypes.clear();
+  viewport.visibility.reset();
+  viewport.refreshVisibility();
   viewport.setSelection([]);
   refreshAll();
   viewport.zoomToFit();
@@ -167,7 +234,12 @@ function loadInto(json: ReturnType<Document["toJSON"]>, path: string | null): vo
 }
 
 document.querySelectorAll<HTMLButtonElement>("[data-cmd]").forEach((b) => {
-  b.onclick = () => void commands[b.dataset.cmd!]?.();
+  // Shift+click on Hide/Isolate acts on whole categories.
+  b.onclick = (ev) => {
+    const cmd = b.dataset.cmd!;
+    const byCategory = ev.shiftKey && (cmd === "hide" || cmd === "isolate");
+    void commands[byCategory ? `${cmd}Category` : cmd]?.();
+  };
 });
 document.querySelectorAll<HTMLButtonElement>("[data-tool]").forEach((b) => {
   b.onclick = () => setTool(b.dataset.tool!);
@@ -194,6 +266,9 @@ window.addEventListener("keydown", (ev) => {
   if (ev.key.toLowerCase() === "d") return setTool("door");
   if (ev.key.toLowerCase() === "n") return setTool("window");
   if (ev.key.toLowerCase() === "f") return run(ev, "fit");
+  if (ev.key.toLowerCase() === "h") return run(ev, ev.shiftKey ? "hideCategory" : "hide");
+  if (ev.key.toLowerCase() === "i") return run(ev, ev.shiftKey ? "isolateCategory" : "isolate");
+  if (ev.key.toLowerCase() === "u") return run(ev, "resetVisibility");
 });
 
 function run(ev: KeyboardEvent, cmd: string): void {
@@ -210,11 +285,7 @@ function refreshToolbar(): void {
   );
   lvl.onchange = () => ctx.setActiveLevel(lvl.value);
 
-  const wt = $<HTMLSelectElement>("#active-wall-type");
-  wt.replaceChildren(
-    ...doc.byCategory(Cat.WallType).map((t) => new Option(t.name ?? t.id, t.id, false, t.id === activeWallTypeId)),
-  );
-  wt.onchange = () => (activeWallTypeId = wt.value);
+  refreshTypeSelector();
 
   $<HTMLButtonElement>('[data-cmd="undo"]').disabled = !doc.canUndo;
   $<HTMLButtonElement>('[data-cmd="redo"]').disabled = !doc.canRedo;
@@ -231,14 +302,60 @@ function refreshToolbar(): void {
   });
 }
 
+/**
+ * Revit-style type selector. With a placing tool active it picks the type to place; otherwise it
+ * shows (and changes) the type of the selected elements when they share a type category.
+ */
+function refreshTypeSelector(): void {
+  const sel = $<HTMLSelectElement>("#active-type");
+  const label = $<HTMLSpanElement>("#active-type-label");
+  const toolCat = TOOL_TYPES[tool.name];
+  const selCats = [...new Set(selection.map((id) => doc.get(id)).map((e) => e && typeCategoryOf(e.category)))];
+  const cat = toolCat ?? (selCats.length === 1 ? selCats[0] : undefined);
+  if (!cat) {
+    sel.replaceChildren(new Option("\u2014", ""));
+    sel.disabled = true;
+    label.textContent = "Type";
+    return;
+  }
+  sel.disabled = false;
+  label.textContent = cat.replace(/Type$/, " type");
+  const types = new Set(selection.map((id) => doc.get(id)?.typeId));
+  const current = toolCat ? activeTypeId(cat) : types.size === 1 ? [...types][0] : undefined;
+  sel.replaceChildren(
+    ...(current ? [] : [new Option("(varies)", "", true, true)]),
+    ...doc.byCategory(cat).map((t) => new Option(t.name ?? t.id, t.id, false, t.id === current)),
+  );
+  sel.onchange = () => {
+    if (!sel.value) return;
+    if (toolCat) {
+      activeTypes.set(cat, sel.value);
+      tool.activate?.();
+      return;
+    }
+    try {
+      doc.transact("Change type", (tx) => {
+        for (const id of selection) {
+          tx.setType(id, sel.value);
+          const el = doc.require(id);
+          if (isWallCutter(el.category)) validateHosted(doc, hostedPlacement(doc, el));
+        }
+      });
+    } catch (err) {
+      status(`\u26a0 ${(err as Error).message}`);
+      refreshTypeSelector();
+    }
+  };
+}
+
 function refreshPanels(): void {
+  refreshTypeSelector();
   renderBrowser($("#browser-body"), ctx);
   renderProperties($("#properties-body"), ctx);
 }
 
 function refreshAll(): void {
   if (!doc.has(activeLevelId)) activeLevelId = levels(doc)[0]?.id ?? "";
-  if (!doc.has(activeWallTypeId)) activeWallTypeId = doc.byCategory(Cat.WallType)[0]?.id ?? "";
   refreshToolbar();
   refreshPanels();
   updateTitle();

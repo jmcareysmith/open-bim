@@ -41,7 +41,7 @@ describe("loading and placing families", () => {
     const inst = project.transact("Place", (tx) =>
       placeFamilyInstance(tx, project, def.id, "1800 x 900", { levelId: ids.levels.ground, position: { x: 2000, y: 3000 }, overrides: { Height: 720 } }),
     );
-    expect(instanceValues(project, inst)).toEqual({ Width: 1800, Depth: 600, Height: 720 });
+    expect(instanceValues(project, inst)).toMatchObject({ Width: 1800, Depth: 600, Height: 720 });
     expect(() =>
       project.transact("Bad", (tx) => placeFamilyInstance(tx, project, def.id, "Nope", { levelId: ids.levels.ground })),
     ).toThrow(/no type "Nope"/);

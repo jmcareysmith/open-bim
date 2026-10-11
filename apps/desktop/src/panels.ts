@@ -1200,6 +1200,22 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       const d = el as Dimension;
       const values = dimensionLayout(doc, d).values.map((v) => len(v));
       sec.append(row("Values", values.join(" + ")), row("References", String((d.params as DimensionParams).refs.length)));
+      if (familyInfo(doc)) {
+        // Family dimensions between reference planes can drive them (Revit's label and EQ).
+        const dp = d.params as DimensionParams;
+        const params = familyParameters(doc).map((fp) => fp.name ?? "").filter(Boolean);
+        sec.append(
+          row(
+            "Label",
+            select([{ value: "", label: "<None>" }, ...params.map((n) => ({ value: n, label: n }))], dp.label ?? "", (v) =>
+              edit(ctx, "Label dimension", (tx) => tx.update<DimensionParams>(d.id, { label: v || null })),
+            ),
+          ),
+        );
+        const eq = h("input", { type: "checkbox", checked: !!dp.equality });
+        eq.onchange = () => edit(ctx, "Toggle EQ", (tx) => tx.update<DimensionParams>(d.id, { equality: eq.checked }));
+        sec.append(row("EQ (equal spacing)", eq));
+      }
       break;
     }
     case Cat.View: {

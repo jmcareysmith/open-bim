@@ -90,10 +90,14 @@ export function buildDimensionLines(doc: Document, dim: Dimension): LineData {
   // Values above the line, on the side away from the references.
   const side = points.length && (at.x - points[0]!.x) * perp.x + (at.y - points[0]!.y) * perp.y < 0 ? -1 : 1;
   const textSize = paper * k;
+  // Family dimensions read like Revit's: "Width = 1200" when labelled, "EQ" when equalised.
+  const { label, equality } = dim.params;
   const labels: LineData["labels"] = values.map((v, i) => {
     const mid = { x: (ticks[i]!.x + ticks[i + 1]!.x) / 2, y: (ticks[i]!.y + ticks[i + 1]!.y) / 2 };
     const pos = add(mid, perp, side * textSize * 0.9);
-    return { text: lengthInputValue(v, units), position: [pos.x, pos.y, 0], size: textSize };
+    const value = lengthInputValue(v, units);
+    const text = equality ? "EQ" : label && values.length === 1 ? `${label} = ${value}` : value;
+    return { text, position: [pos.x, pos.y, 0], size: textSize };
   });
   return { segments: new Float32Array(seg), labels };
 }

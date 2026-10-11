@@ -69,7 +69,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 |---|---|---|
 | System families (walls, floors, roofs) | 1 | ⬜ |
 | Loadable family editor (sketch, extrude, revolve, sweep, blend, void) | 3 | 🟨 |
-| Reference planes + dimension constraints (parametric solver) | 3 | ⬜ |
+| Reference planes + dimension constraints (parametric solver) | 3 | 🟨 |
 | Formulas & conditionals in parameters | 3 | ✅ |
 | Nested & shared families | 3 | ⬜ |
 | Type catalogs | 3 | ⬜ |

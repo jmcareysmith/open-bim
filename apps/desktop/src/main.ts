@@ -32,11 +32,14 @@ import {
   familyName,
   familyTypeNames,
   loadFamily,
+  enableFamilyFlex,
+  setFamilySolver,
   type FamilyCategory,
   type FamilyDef,
 } from "@open-bim/core";
-import { OcctKernel, SimpleKernel, sheetDrawing, writePdf } from "@open-bim/geometry";
+import { OcctKernel, SimpleKernel, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
+import gcsWasmUrl from "@salusoft89/planegcs/dist/planegcs_dist/planegcs.wasm?url";
 import { openProject, savePdf, saveProject } from "./io.ts";
 import { renderBrowser, renderProperties, type PanelContext } from "./panels.ts";
 import { buildSample } from "./sample.ts";
@@ -614,13 +617,18 @@ function switchDocument(next: Document, s: Partial<Session> = {}): void {
 function openFamily(fam: Document): void {
   if (projectSession) return status("Finish the open family first (Load into Project or Close Family).");
   projectSession = { doc, selection, activeLevelId, activeViewId, filePath, dirty };
+  // Labelled/EQ dimensions move reference planes after every edit, within the same undo step.
+  stopFlex = enableFamilyFlex(fam);
   switchDocument(fam);
   status(`Family editor: ${familyName(fam)}. Sketch forms with Extrusion / Blend / Revolve / Sweep; set parameters and types in Properties.`);
 }
 
+let stopFlex: () => void = () => {};
+
 function closeFamilyEditor(): void {
   const s = projectSession;
   if (!s) return;
+  stopFlex();
   projectSession = null;
   switchDocument(s.doc, s);
 }
@@ -628,6 +636,17 @@ function closeFamilyEditor(): void {
 refreshAll();
 setTool("select");
 viewport.zoomToFit();
+
+// Family constraint solver (PlaneGCS, ~1 MB WASM): small and quick, so load it straight away.
+createPlaneSolver({ locateFile: () => gcsWasmUrl })
+  .then((s) => {
+    setFamilySolver(s);
+    viewport.rebuildAll();
+  })
+  .catch((err) => {
+    console.error(err);
+    status("\u26a0 The family constraint solver failed to load \u2014 labelled dimensions won't flex.");
+  });
 
 // Start on the fast extrusion kernel; switch to OpenCascade (booleans for openings) once its WASM loads.
 OcctKernel.create({ locateFile: () => occtWasmUrl })

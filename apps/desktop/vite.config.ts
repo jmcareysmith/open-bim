@@ -14,7 +14,7 @@ export default defineConfig({
   },
   envPrefix: ["VITE_", "TAURI_ENV_*"],
   // OpenCascade's Emscripten loader resolves its own .wasm; pre-bundling breaks that.
-  optimizeDeps: { exclude: ["replicad-opencascadejs"] },
+  optimizeDeps: { exclude: ["replicad-opencascadejs", "@salusoft89/planegcs"] },
   build: {
     target: process.env.TAURI_ENV_PLATFORM === "windows" ? "chrome105" : "safari15",
     minify: !process.env.TAURI_ENV_DEBUG ? "esbuild" : false,

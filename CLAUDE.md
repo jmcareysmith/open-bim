@@ -56,5 +56,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Families (Phase 3 started): family editor (Browser → Families → New family / Edit family) with
   Extrusion/Blend/Revolve/Sweep (+ Void), parameters with formulas, family types; Load into Project;
   Component tool (C) places them (free-standing, or in walls for Door/Window families).
-- Next: Phase 3 — 2D constraint solver (evaluate PlaneGCS), then type catalogs / nested families,
-  project/shared/global parameters, family library.
+- Family constraints: label a dimension between reference planes with a parameter, or set EQ;
+  planes flex (PlaneGCS) on every edit; forms use plane names in formulas (e.g. x = Left).
+- Next: Phase 3 — type catalogs / nested + shared families, then project/shared/global
+  parameters, then the family library.

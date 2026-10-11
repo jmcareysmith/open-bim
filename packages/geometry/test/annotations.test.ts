@@ -40,6 +40,10 @@ describe("annotation line work", () => {
     expect(lines.labels[0]!.size).toBe(250); // 2.5 mm at 1:100
     // 2 witness lines + dimension line + 2 ticks
     expect(lines.segments.length / 6).toBe(5);
+    doc.transact("Label", (tx) => tx.update(dim.id, { label: "Bay" }));
+    expect(k.buildLines(doc, doc.require(dim.id))!.labels[0]!.text).toBe("Bay = 3600");
+    doc.transact("EQ", (tx) => tx.update(dim.id, { equality: true }));
+    expect(k.buildLines(doc, doc.require(dim.id))!.labels[0]!.text).toBe("EQ");
     doc.transact("Scale", (tx) => tx.update<ViewParams>(plan.id, { scale: 50 }));
     expect(k.buildLines(doc, doc.require(dim.id))!.labels[0]!.size).toBe(125);
   });

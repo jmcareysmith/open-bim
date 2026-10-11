@@ -42,7 +42,10 @@ export function closestPointOnDatum(d: DatumLine, p: Vec2): Vec2 {
 
 // ---- Reference planes --------------------------------------------------------
 
-export type ReferencePlaneParams = DatumLineParams;
+export type ReferencePlaneParams = DatumLineParams & {
+  /** Pinned: constraint solving never moves it (the family template's centre planes). */
+  fixed?: boolean;
+};
 export type ReferencePlane = Element<ReferencePlaneParams>;
 
 registerCategory({ name: Cat.ReferencePlane, dependencies: () => [], cascadeDelete: false, isType: false });

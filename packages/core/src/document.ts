@@ -51,6 +51,7 @@ export class Document {
   private undoStack: Committed[] = [];
   private redoStack: Committed[] = [];
   private listeners = new Set<ChangeListener>();
+  private commitHooks = new Set<(tx: Transaction) => void>();
   private active: Map<ElementId, Element | undefined> | null = null;
 
   // ---- queries -----------------------------------------------------------
@@ -93,6 +94,16 @@ export class Document {
     return () => this.listeners.delete(listener);
   }
 
+  /**
+   * Run `hook` at the end of every transaction, before it commits, so its edits join the same
+   * undo step (used by families to flex reference planes to their constraints). If it throws,
+   * the whole transaction rolls back.
+   */
+  addCommitHook(hook: (tx: Transaction) => void): () => void {
+    this.commitHooks.add(hook);
+    return () => this.commitHooks.delete(hook);
+  }
+
   // ---- transactions ------------------------------------------------------
 
   get canUndo(): boolean {
@@ -117,7 +128,9 @@ export class Document {
     this.active = touched;
     let result: T;
     try {
-      result = fn(this.makeTx(touched));
+      const tx = this.makeTx(touched);
+      result = fn(tx);
+      if (touched.size) for (const hook of this.commitHooks) hook(tx);
     } catch (err) {
       for (const [id, before] of touched) this.put(id, before);
       this.active = null;

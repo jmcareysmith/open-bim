@@ -116,6 +116,15 @@ meshed in their plane frames; the OCCT kernel sews them into solids and cuts voi
 are cached per family version and parameter values. The desktop app swaps documents (project ⇄
 family) keeping each one's undo, view and selection.
 
+**Family constraints** — dimensions between reference planes in a family can carry a `label`
+(a parameter) or `equality` (EQ). `planeSystem` turns them into a constraint problem; the solver is
+PlaneGCS (FreeCAD's sketcher solver, LGPL, WASM, pinned 1.2.0) behind `setFamilySolver`: each free
+plane keeps its direction and only slides along its normal, labels are point-to-line distances, EQ
+puts the outer planes' midpoint on the middle one. `enableFamilyFlex` runs the solve as a commit hook
+(`Document.addCommitHook`), so flexing joins the edit's undo step and over-constrained edits roll
+back. Named planes are formula variables (x of vertical planes, y of horizontal), and
+`familyValues` re-solves per type, so instances of every type get their own plane positions.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

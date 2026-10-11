@@ -8,6 +8,7 @@ import {
   createFamilyType,
   familyInfo,
   familyName,
+  familyParamValues,
   familyValues,
   setFamilyValue,
   views,
@@ -21,7 +22,8 @@ describe("family documents", () => {
     applyFamilyTemplate(doc, "Furniture");
     expect(views(doc).map((v) => v.name)).toEqual(["Ref. Level", "Front", "Right", "{3D}"]);
     expect(doc.byCategory(Cat.ReferencePlane).map((r) => r.name)).toEqual(["Center (Left/Right)", "Center (Front/Back)"]);
-    expect(familyValues(doc)).toEqual({ Width: 1200, Depth: 600, Height: 750 });
+    expect(familyParamValues(doc)).toEqual({ Width: 1200, Depth: 600, Height: 750 });
+    expect(familyValues(doc)).toMatchObject({ Width: 1200, "Center (Left/Right)": 0, "Center (Front/Back)": 0 });
     expect(familyInfo(doc)!.params.hosting).toBe("none");
     expect(familyName(doc)).toBe("Family 1");
     const door = new Document();

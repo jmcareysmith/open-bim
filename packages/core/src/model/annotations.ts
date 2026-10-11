@@ -48,6 +48,10 @@ export type DimensionParams = {
   at: Vec2;
   /** Text height on paper, mm. */
   size: number;
+  /** Families: parameter whose value this (two-reference) dimension drives. */
+  label?: string | null;
+  /** Families: keep all segments equal (Revit's EQ). */
+  equality?: boolean;
 };
 
 export type DetailLine = Element<DetailLineParams>;

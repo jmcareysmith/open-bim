@@ -35,6 +35,8 @@ type Deletable = { delete(): void };
  */
 export class OcctKernel implements GeometryKernel {
   private simple = new SimpleKernel();
+  /** Stable family mesher (the family mesh cache is keyed by it). */
+  private mesher = (fd: Document, v: Values) => this.familyMesh(fd, v);
 
   constructor(private oc: OpenCascadeInstance) {}
 
@@ -50,7 +52,7 @@ export class OcctKernel implements GeometryKernel {
       const cuts = wallCuts(doc, wall);
       if (cuts.length) return this.buildWallWithCuts(doc, wall, cuts);
     }
-    if (el.category === Cat.FamilyInstance) return buildFamilyInstance(doc, el, (fd, v) => this.familyMesh(fd, v));
+    if (el.category === Cat.FamilyInstance) return buildFamilyInstance(doc, el, this.mesher);
     if (isFormCategory(el.category) && !(el.params as { isVoid?: boolean }).isVoid) {
       // Family solids are cut by every void in the family (Revit behaviour).
       const values = familyValues(doc);
@@ -65,7 +67,7 @@ export class OcctKernel implements GeometryKernel {
     const forms = familyDoc.all().filter((e) => isFormCategory(e.category));
     const solids = forms.filter((f) => !(f.params as { isVoid?: boolean }).isVoid).map((f) => formMesh(f, values));
     const voids = forms.filter((f) => (f.params as { isVoid?: boolean }).isVoid).map((f) => formMesh(f, values));
-    const nested = nestedMeshes(familyDoc, values, (fd, v) => this.familyMesh(fd, v));
+    const nested = nestedMeshes(familyDoc, values, this.mesher);
     if (!solids.length && !nested.length) return null;
     if (!voids.length) return mergeMeshes([...solids, ...nested]);
     return mergeMeshes([...solids.map((s) => this.cutMeshes(s, voids)), ...nested]);

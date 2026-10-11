@@ -149,6 +149,10 @@ export interface PanelContext {
   newFamily(category: FamilyCategory): void;
   /** Open a loaded family in the family editor. */
   editFamily(defId: ElementId): void;
+  /** The built-in family library, and loading from it or from an .obim-family file. */
+  libraryFamilies(): { name: string; category: FamilyCategory; description: string }[];
+  loadLibraryFamily(name: string): void;
+  loadFamilyFile(): void;
   /** Family editor: the project's loaded families, and copying one in to nest it. */
   projectFamilies(): FamilyDef[];
   nestFamily(defId: ElementId): void;
@@ -1065,7 +1069,18 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
         (v) => v && ctx.newFamily(v as FamilyCategory),
       ),
     ),
+    row(
+      "Load from library",
+      select(
+        [{ value: "", label: "Family…" }, ...ctx.libraryFamilies().map((f) => ({ value: f.name, label: f.name }))],
+        "",
+        (v) => v && ctx.loadLibraryFamily(v),
+      ),
+    ),
   );
+  const loadFile = h("button", { textContent: "Load family file…" });
+  loadFile.onclick = () => ctx.loadFamilyFile();
+  fams.append(row("", h("div", { class: "buttons" }, loadFile)));
 
   // Project, shared and global parameters.
   const paramsSec = h("div", { class: "section" }, h("h3", {}, "Parameters"));

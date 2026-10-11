@@ -21,11 +21,15 @@ import type { MeshData } from "./mesh.ts";
 /** Kernel hook: geometry of a family document for given values (solids minus voids where supported). */
 export type FamilyMesher = (familyDoc: Document, values: Values) => MeshData | null;
 
-const cache = new WeakMap<object, Map<string, MeshData | null>>();
+// Keyed by mesher (one per kernel, so a SimpleKernel result never stands in for an OCCT one),
+// then family JSON, then values.
+const cache = new WeakMap<FamilyMesher, WeakMap<object, Map<string, MeshData | null>>>();
 
 function familyMeshCached(def: FamilyDef, values: Values, mesher: FamilyMesher): MeshData | null {
-  let byValues = cache.get(def.params.json);
-  if (!byValues) cache.set(def.params.json, (byValues = new Map()));
+  let byDef = cache.get(mesher);
+  if (!byDef) cache.set(mesher, (byDef = new WeakMap()));
+  let byValues = byDef.get(def.params.json);
+  if (!byValues) byDef.set(def.params.json, (byValues = new Map()));
   const key = JSON.stringify(Object.entries(values).sort(([a], [b]) => a.localeCompare(b)));
   if (!byValues.has(key)) byValues.set(key, mesher(familyDocument(def), values));
   return byValues.get(key) ?? null;

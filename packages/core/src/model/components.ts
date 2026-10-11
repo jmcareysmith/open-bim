@@ -184,7 +184,8 @@ export function placeFamilyInstance(
     rotation: opts.rotation ?? 0,
     hostId: def.params.hosting === "wall" ? opts.hostId! : null,
     along: opts.along ?? 0,
-    sillHeight: opts.sillHeight ?? 0,
+    // Hosted families may define a "Default Sill" (window families do).
+    sillHeight: opts.sillHeight ?? familyValues(familyDocument(def), typeName)["Default Sill"] ?? 0,
     flipped: false,
   };
   if (params.hostId) validateHosted(doc, familyPlacement(doc, { id: "", category: Cat.FamilyInstance, params }));

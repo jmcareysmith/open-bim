@@ -40,7 +40,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Openings (shaft, wall, vertical) | 1 | 🟨 |
 | Stairs (run, landing, sketch) & railings | 6 | ⬜ |
 | Ramps | 6 | ⬜ |
-| Components / furniture (loadable families) | 3 | 🟨 |
+| Components / furniture (loadable families) | 3 | ✅ |
 | Model in-place | 3 | ⬜ |
 | Rooms, room separation, room bounding | 4 | ⬜ |
 | Areas & area plans (GFA, NLA) | 4 | ⬜ |
@@ -73,6 +73,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Formulas & conditionals in parameters | 3 | ✅ |
 | Nested & shared families | 3 | 🟨 |
 | Type catalogs | 3 | ✅ |
+| Family library (open `.obim-family` format; doors, windows, furniture, casework) | 3 | ✅ |
 | Shared parameters, project parameters, global parameters | 3 | ✅ |
 | Family visibility (detail level, view direction) | 3 | ⬜ |
 

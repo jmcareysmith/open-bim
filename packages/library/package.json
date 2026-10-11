@@ -1,0 +1,15 @@
+{
+  "name": "@open-bim/library",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@open-bim/core": "0.1.0"
+  },
+  "devDependencies": {
+    "@open-bim/geometry": "0.1.0"
+  }
+}

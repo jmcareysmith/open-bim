@@ -12,6 +12,7 @@
   "dependencies": {
     "@open-bim/core": "0.1.0",
     "@open-bim/geometry": "0.1.0",
+    "@open-bim/library": "0.1.0",
     "@salusoft89/planegcs": "1.2.0",
     "@tauri-apps/api": "^2.8.0",
     "@tauri-apps/plugin-dialog": "^2.4.0",

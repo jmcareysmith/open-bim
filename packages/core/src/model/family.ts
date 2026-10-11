@@ -1,5 +1,5 @@
 import { registerCategory } from "../categories.ts";
-import type { Document, Transaction } from "../document.ts";
+import { Document, type DocumentJSON, type Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
 import type { DimensionParams } from "./annotations.ts";
 import type { ReferencePlaneParams } from "./datums.ts";
@@ -341,4 +341,32 @@ export function createSweep(
   if (path.length < 2) throw new Error("Sweep path needs at least 2 points");
   if (profile.length < 3) throw new Error("Sweep profile needs at least 3 points");
   return tx.create<SweepParams>(Cat.Sweep, { ...base(opts.plane, opts.isVoid), path, profile });
+}
+
+// ---- family files (.obim-family) ----------------------------------------------------------
+
+/** Open family file: plain JSON around the family document, readable and diffable without the app. */
+export interface FamilyFile {
+  format: "open-bim-family";
+  version: 1;
+  name: string;
+  category: FamilyCategory;
+  document: DocumentJSON;
+}
+
+export function familyFile(doc: Document): FamilyFile {
+  const info = familyInfo(doc);
+  if (!info) throw new Error("Not a family document");
+  return { format: "open-bim-family", version: 1, name: info.name ?? "Family", category: info.params.category, document: doc.toJSON() };
+}
+
+/** Read a family file into a family document (validated). */
+export function readFamilyFile(json: unknown): Document {
+  const f = json as Partial<FamilyFile> | null;
+  if (!f || f.format !== "open-bim-family") throw new Error("Not an Open-BIM family file");
+  if (f.version !== 1) throw new Error(`Unsupported family file version: ${String(f.version)}`);
+  if (!f.document) throw new Error("Family file has no document");
+  const doc = Document.fromJSON(f.document);
+  if (!familyInfo(doc)) throw new Error("Family file has no family information");
+  return doc;
 }

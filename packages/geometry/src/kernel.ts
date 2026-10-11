@@ -77,6 +77,8 @@ export function buildCeiling(doc: Document, el: Element): MeshData | null {
 }
 
 export class SimpleKernel implements GeometryKernel {
+  /** Stable family mesher (the family mesh cache is keyed by it). */
+  private mesher = (fd: Document, v: Values) => this.familyMesh(fd, v);
   private builders = new Map<string, Builder>([
     [Cat.Wall, buildWall],
     [Cat.Floor, buildFloor],
@@ -88,7 +90,7 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.Blend, buildForm],
     [Cat.Revolution, buildForm],
     [Cat.Sweep, buildForm],
-    [Cat.FamilyInstance, (doc, el) => buildFamilyInstance(doc, el, (fd, v) => this.familyMesh(fd, v))],
+    [Cat.FamilyInstance, (doc, el) => buildFamilyInstance(doc, el, this.mesher)],
   ]);
 
   private lineBuilders = new Map<string, LineBuilder>([
@@ -126,7 +128,7 @@ export class SimpleKernel implements GeometryKernel {
       .all()
       .filter((e) => isFormCategory(e.category) && !(e.params as { isVoid?: boolean }).isVoid)
       .map((e) => formMesh(e, values));
-    const parts = [...solids, ...nestedMeshes(familyDoc, values, (fd, v) => this.familyMesh(fd, v))];
+    const parts = [...solids, ...nestedMeshes(familyDoc, values, this.mesher)];
     return parts.length ? mergeMeshes(parts) : null;
   }
 }

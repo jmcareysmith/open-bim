@@ -36,7 +36,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - End each session by updating the "Current state" section below and pushing to GitHub.
 
 ## Current state (update at the end of each session)
-- Phase 0 done except CI green (runs on Windows via `npm run tauri dev`). Phases 1 and 2 done.
+- Phase 0 done except CI green (runs on Windows via `npm run tauri dev`). Phases 1, 2 and 3 done.
 - Modelling: levels, layered wall/floor/ceiling/roof types with materials, walls (W; auto L/T/X joins,
   Flip), floors/ceilings/roofs from sketches (roofs: per-edge slope or gable), doors (D) and windows (N)
   as parametric hosted types, wall openings, grids (G), reference planes (R), project units + info.
@@ -62,4 +62,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   associate parameters with host formulas).
 - Parameters: project parameters (per category, instance/type), shared parameter files, global
   parameters driving element values (browser → Parameters; element properties).
-- Next: Phase 3 — family library (doors, windows, furniture) in an open format (last Phase 3 item).
+- Family library: Browser → Families → Load from library (`packages/library`) or Load family file;
+  family editor → Save Family File (`.obim-family`, open JSON).
+- Next: Phase 4 — rooms/areas/area plans, then tags/keynotes/legends, schedules + takeoffs + CSV/XLSX,
+  revisions/groups, plugin API + scripting console.

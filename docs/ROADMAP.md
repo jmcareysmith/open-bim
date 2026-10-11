@@ -36,19 +36,19 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Visibility/Graphics, filters, view templates — visible / halftone / line colour overrides; no line weights or patterns overrides yet
 - [x] Sheets, title blocks, viewports, vector PDF export — built-in title block; no 3D viewports or schedules on sheets yet
 
-## Phase 3 — Families & parameters (current)
+## Phase 3 — Families & parameters (done)
 - [x] Family editor: reference planes, sketches, extrude/revolve/sweep/blend/void — profiles editable as formula points; no graphical profile editing after creation yet
 - [x] 2D constraint solver (dimensions drive geometry) — PlaneGCS adopted: labelled + EQ dimensions flex reference planes; forms follow planes by name. Sketch-level locks/angles later
 - [x] Formulas, conditionals, type catalogs, nested/shared families — nested with parameter associations; "shared" nested (scheduled separately) later
 - [x] Project, shared and global parameters — shared parameters for projects (family shared params later); not yet in schedules (Phase 4)
-- [ ] Family library (doors, windows, furniture) in an open format
+- [x] Family library (doors, windows, furniture) in an open format — `packages/library`, `.obim-family` JSON files
 
-## Phase 4 — Data & documentation
-- Rooms, areas, area plans
-- Tags, keynotes, legends
-- Schedules + material takeoffs, CSV/XLSX export
-- Revisions, groups
-- Plugin API + scripting console
+## Phase 4 — Data & documentation (current)
+- [ ] Rooms, areas, area plans
+- [ ] Tags, keynotes, legends
+- [ ] Schedules + material takeoffs, CSV/XLSX export
+- [ ] Revisions, groups
+- [ ] Plugin API + scripting console
 
 ## Phase 5 — Interoperability
 - IFC4 export, then import (web-ifc; IfcOpenShell if needed)

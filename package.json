@@ -8,7 +8,7 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -p packages/core && tsc -p packages/geometry && tsc -p apps/desktop",
+    "typecheck": "tsc -p packages/core && tsc -p packages/geometry && tsc -p packages/library && tsc -p apps/desktop",
     "dev": "npm run dev -w @open-bim/desktop",
     "build": "npm run build -w @open-bim/desktop",
     "tauri": "npm run tauri -w @open-bim/desktop --"

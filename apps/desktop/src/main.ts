@@ -32,6 +32,8 @@ import {
   familyName,
   familyTypeNames,
   loadFamily,
+  familyFile,
+  readFamilyFile,
   enableFamilyFlex,
   copyFamilyDef,
   enableGlobalParameters,
@@ -49,6 +51,7 @@ import {
 import { OcctKernel, SimpleKernel, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
 import gcsWasmUrl from "@salusoft89/planegcs/dist/planegcs_dist/planegcs.wasm?url";
+import { LIBRARY } from "@open-bim/library";
 import { openProject, openText, savePdf, saveProject, saveText } from "./io.ts";
 import { renderBrowser, renderProperties, type PanelContext } from "./panels.ts";
 import { buildSample } from "./sample.ts";
@@ -200,6 +203,21 @@ const ctx: ToolContext & PanelContext = {
       status(`\u26a0 ${(err as Error).message}`);
     }
   },
+  libraryFamilies: () => LIBRARY.map((f) => ({ name: f.name, category: f.category, description: f.description })),
+  loadLibraryFamily(name: string) {
+    const lib = LIBRARY.find((f) => f.name === name);
+    if (lib) loadFamilyIntoProject(lib.build(), lib.name);
+  },
+  async loadFamilyFile() {
+    try {
+      const text = await openText({ name: "Open-BIM family", extensions: ["obim-family", "json"] });
+      if (!text) return;
+      const fam = readFamilyFile(JSON.parse(text));
+      loadFamilyIntoProject(fam, familyName(fam));
+    } catch (err) {
+      status(`⚠ ${(err as Error).message}`);
+    }
+  },
   editFamily(defId: ElementId) {
     const def = doc.require(defId) as FamilyDef;
     openFamily(Document.fromJSON(def.params.json as unknown as ReturnType<Document["toJSON"]>));
@@ -333,6 +351,16 @@ const commands: Record<string, () => void | Promise<void>> = {
       status(`Loaded ${name}. Place it with the Component tool (C).`);
     } catch (err) {
       status(`\u26a0 ${(err as Error).message}`);
+    }
+  },
+  async saveFamilyFile() {
+    if (!projectSession) return status("Save Family File: open a family first.");
+    try {
+      const name = familyName(doc);
+      const path = await saveText(JSON.stringify(familyFile(doc), null, 1), `${name}.obim-family`, { name: "Open-BIM family", extensions: ["obim-family"] });
+      if (path) status(`Family saved to ${path}`);
+    } catch (err) {
+      status(`⚠ ${(err as Error).message}`);
     }
   },
   closeFamily() {
@@ -693,6 +721,19 @@ function openFamily(fam: Document): void {
 }
 
 let stopFlex: () => void = () => {};
+
+/** Load (or reload, by name) a family document into the open project. */
+function loadFamilyIntoProject(fam: Document, name: string): void {
+  if (projectSession) return status("Finish the open family first (Load into Project or Close Family).");
+  try {
+    const reload = familyDefs(doc).some((f) => f.name === name);
+    const def = doc.transact(`${reload ? "Reload" : "Load"} family ${name}`, (tx) => loadFamily(tx, doc, fam, name));
+    activeComponentKey = `${def.id}|${familyTypeNames(def)[0] ?? ""}`;
+    status(`${reload ? "Reloaded" : "Loaded"} ${name}. Place it with the Component tool (C).`);
+  } catch (err) {
+    status(`⚠ ${(err as Error).message}`);
+  }
+}
 
 function closeFamilyEditor(): void {
   const s = projectSession;

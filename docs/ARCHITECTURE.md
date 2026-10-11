@@ -13,6 +13,8 @@ apps/desktop (Tauri 2)
  ├─ src/            UI: viewport, panels, tools  (TypeScript, three.js)
  └─ src-tauri/      Native shell: file IO, menus, OS integration (Rust)
         │
+packages/library    Built-in parametric families (written against the core family API)
+        │
 packages/geometry   Kernel interface + implementations → mesh/edge data
         │
 packages/core       Document, elements, parameters, transactions, regeneration
@@ -130,6 +132,13 @@ catalogs (`Name##length##millimeters` headers, unit conversion). Families can co
 FamilyInstances of other families; a nested instance's `associations` map its parameters to
 formulas over the host's, evaluated per host type (`instanceValues(doc, inst, hostValues)`), and
 `familyMesh` includes nested instance meshes.
+
+**Family library & files** — `packages/library` builds families in code (`LIBRARY`: doors, windows,
+tables, chair, NZ-size beds, base cabinet with a void toe kick, revolved round table), so they are
+reviewable and diffable. `familyFile` / `readFamilyFile` wrap a family document as an open
+`.obim-family` JSON file (`format: "open-bim-family"`, `version: 1`). Hosted families: X along the
+wall, Y across, origin at the opening's bottom centre; a "Default Sill" parameter sets the sill.
+The family mesh cache is keyed per kernel, so SimpleKernel and OCCT results never mix.
 
 **Parameters** — `ProjectParameter` (name, data type, categories, instance/type binding, optional
 shared GUID) stores values under `params.custom` on the element or its type; filters can test them.

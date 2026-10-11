@@ -51,6 +51,7 @@ export const Cat = {
   Tag: "Tag",
   LegendComponent: "LegendComponent",
   KeynoteLegend: "KeynoteLegend",
+  Schedule: "Schedule",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

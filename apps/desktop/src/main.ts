@@ -35,6 +35,9 @@ import {
   loadFamily,
   familyFile,
   readFamilyFile,
+  tableCsv,
+  tableXlsx,
+  type Schedule,
   parseKeynoteFile,
   setKeynoteTable,
   writeKeynoteFile,
@@ -57,12 +60,12 @@ import {
   type FamilyCategory,
   type FamilyDef,
 } from "@open-bim/core";
-import { OcctKernel, SimpleKernel, areaLoopsFromWalls, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
+import { OcctKernel, SimpleKernel, areaLoopsFromWalls, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
 import gcsWasmUrl from "@salusoft89/planegcs/dist/planegcs_dist/planegcs.wasm?url";
 import { LIBRARY } from "@open-bim/library";
-import { openProject, openText, savePdf, saveProject, saveText } from "./io.ts";
-import { renderBrowser, renderProperties, type PanelContext } from "./panels.ts";
+import { openProject, openText, saveBytes, savePdf, saveProject, saveText } from "./io.ts";
+import { renderBrowser, renderProperties, renderSchedulePane, type PanelContext } from "./panels.ts";
 import { buildSample } from "./sample.ts";
 import {
   GridTool,
@@ -213,6 +216,20 @@ const ctx: ToolContext & PanelContext = {
       if (!text) return;
       const types = doc.transact("Import type catalog", (tx) => importTypeCatalog(tx, doc, text));
       status(`Loaded ${types.length} type(s) from the catalog.`);
+    } catch (err) {
+      status(`\u26a0 ${(err as Error).message}`);
+    }
+  },
+  async exportSchedule(id: ElementId, format: "csv" | "xlsx") {
+    try {
+      const s = doc.require(id) as Schedule;
+      const t = scheduleTable(doc, s);
+      const name = (s.name ?? "Schedule").replace(/[\\/:*?"<>|]/g, "-");
+      const path =
+        format === "csv"
+          ? await saveText(tableCsv(t), `${name}.csv`, { name: "CSV", extensions: ["csv"] })
+          : await saveBytes(tableXlsx(t), `${name}.xlsx`, { name: "Excel workbook", extensions: ["xlsx"] }, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      if (path) status(`Schedule exported to ${path}`);
     } catch (err) {
       status(`\u26a0 ${(err as Error).message}`);
     }
@@ -559,8 +576,17 @@ function activeView(): View | undefined {
 
 /** Push the active view's settings (mode, range, hidden categories) into the viewport. */
 function applyView(): void {
+  // Schedules open like views, as a table over the viewport.
+  const active = activeViewId ? doc.get(activeViewId) : undefined;
+  const pane = $<HTMLDivElement>("#schedule-pane");
+  pane.hidden = active?.category !== Cat.Schedule;
+  if (active?.category === Cat.Schedule) {
+    renderSchedulePane(pane, ctx, active as Schedule);
+    if (tool.name !== "select") setTool("select");
+    return;
+  }
   // Sheets open like views.
-  const sheet = activeViewId ? doc.get(activeViewId) : undefined;
+  const sheet = active;
   if (sheet?.category === Cat.Sheet) {
     viewport.setSheet(sheet as Sheet);
     viewport.setGraphicsResolver(() => ({ visible: true, halftone: false, color: null }));
@@ -716,6 +742,8 @@ function refreshPanels(): void {
   refreshTypeSelector();
   renderBrowser($("#browser-body"), ctx);
   renderProperties($("#properties-body"), ctx);
+  const active = activeViewId ? doc.get(activeViewId) : undefined;
+  if (active?.category === Cat.Schedule) renderSchedulePane($("#schedule-pane"), ctx, active as Schedule);
 }
 
 function refreshAll(): void {

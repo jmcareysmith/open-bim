@@ -110,11 +110,11 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 9. Schedules & data
 | Feature | Phase | Status |
 |---|---|---|
-| Schedules (fields, filters, sorting, grouping, totals) | 4 | ⬜ |
+| Schedules (fields, filters, sorting, grouping, totals) | 4 | ✅ |
 | Calculated fields | 4 | ⬜ |
-| Material takeoffs | 4 | ⬜ |
+| Material takeoffs | 4 | ✅ |
 | Key schedules | 4 | ⬜ |
-| Schedule export (CSV / XLSX) | 4 | ⬜ |
+| Schedule export (CSV / XLSX) | 4 | ✅ |
 
 ## 10. Materials & visualisation
 | Feature | Phase | Status |

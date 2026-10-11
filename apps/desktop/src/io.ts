@@ -59,6 +59,23 @@ export async function savePdf(bytes: Uint8Array, defaultName: string): Promise<s
   return defaultName;
 }
 
+/** Save binary bytes (e.g. an .xlsx). */
+export async function saveBytes(bytes: Uint8Array, defaultName: string, filter: { name: string; extensions: string[] }, mime: string): Promise<string | null> {
+  if (isTauri()) {
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    const { writeFile } = await import("@tauri-apps/plugin-fs");
+    const path = await save({ filters: [filter], defaultPath: defaultName });
+    if (!path) return null;
+    await writeFile(path, bytes);
+    return path;
+  }
+  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: mime }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: defaultName });
+  a.click();
+  URL.revokeObjectURL(url);
+  return defaultName;
+}
+
 /** Save a text file (e.g. a type catalog). */
 export async function saveText(text: string, defaultName: string, filter: { name: string; extensions: string[] }): Promise<string | null> {
   if (isTauri()) {

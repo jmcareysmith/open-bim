@@ -18,3 +18,4 @@ export * from "./components.ts";
 export * from "./constraints.ts";
 export * from "./rooms.ts";
 export * from "./legends.ts";
+export * from "./schedules.ts";

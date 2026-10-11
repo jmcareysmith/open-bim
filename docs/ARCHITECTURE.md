@@ -174,6 +174,13 @@ sections). `LegendComponent`s draw a type from its current definition (layered s
 hatches, door/window elevation) and `KeynoteLegend`s tabulate `keynotesInView` for one view or all.
 Tags and project settings list keynote legends as `related`, so the tables stay current.
 
+**Schedules** — a `Schedule` element (core) is only a definition: category, field keys, filters,
+sort/group levels (header/footer), itemise, grand totals; kind `takeoff` adds a row per layer.
+`geometry/src/schedules.ts` holds the field registry (common, per-category, takeoff and project
+parameters) and computes a `ScheduleTable` on demand — walls net of openings, roofs by sloped top
+area, rooms/areas from their boundaries — keeping model units until display. `tableCsv` and
+`tableXlsx` (hand-written OOXML in a stored zip, no dependencies) export it.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

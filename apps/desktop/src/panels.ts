@@ -1,4 +1,4 @@
-import { areaBoundary, areaLoopsFromWalls, roomBoundary } from "@open-bim/geometry";
+import { areaBoundary, areaLoopsFromWalls, roomBoundary, scheduleFields, scheduleTable } from "@open-bim/geometry";
 import {
   Cat,
   levels,
@@ -9,6 +9,13 @@ import {
   keynoteTable,
   getCategory,
   createLegend,
+  createSchedule,
+  schedules,
+  SCHEDULE_CATEGORIES,
+  TAKEOFF_CATEGORIES,
+  type Schedule,
+  type ScheduleParams,
+  type ScheduleFilterOp,
   createLegendComponent,
   createKeynoteLegend,
   nextLegendPosition,
@@ -179,6 +186,7 @@ export interface PanelContext {
   newAreaPlan(levelId: ElementId, scheme: AreaScheme): void;
   importKeynotes(): void;
   exportKeynotes(): void;
+  exportSchedule(id: ElementId, format: "csv" | "xlsx"): void;
   /** Family editor: the project's loaded families, and copying one in to nest it. */
   projectFamilies(): FamilyDef[];
   nestFamily(defId: ElementId): void;
@@ -367,6 +375,124 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
   }
   if (!template) sec.append(visibilityGraphics(ctx, view.id, p));
   return sec;
+}
+
+const SCHEDULE_FILTER_OPS: { value: ScheduleFilterOp; label: string }[] = [
+  { value: "eq", label: "equals" },
+  { value: "ne", label: "does not equal" },
+  { value: "gt", label: "is greater than" },
+  { value: "lt", label: "is less than" },
+  { value: "contains", label: "contains" },
+  { value: "notContains", label: "does not contain" },
+];
+
+/** Schedule properties: fields, filter, sorting/grouping and formatting (Revit's Schedule Properties tabs). */
+function scheduleSections(ctx: PanelContext, s: Schedule): HTMLElement[] {
+  const { doc } = ctx;
+  const p = s.params;
+  const set = (name: string, patch: Partial<ScheduleParams>) => edit(ctx, name, (tx) => tx.update<ScheduleParams>(s.id, patch));
+  const all = scheduleFields(doc, p);
+  const label = (k: string) => all.find((f) => f.key === k)?.label ?? k;
+  const fieldOpts = all.map((f) => ({ value: f.key, label: f.label }));
+
+  const general = h("div", { class: "section" }, h("h3", {}, p.kind === "takeoff" ? "Material Takeoff" : "Schedule"));
+  const csv = h("button", { textContent: "Export CSV" });
+  csv.onclick = () => ctx.exportSchedule(s.id, "csv");
+  const xlsx = h("button", { textContent: "Export Excel" });
+  xlsx.onclick = () => ctx.exportSchedule(s.id, "xlsx");
+  const del = h("button", { class: "danger", textContent: "Delete schedule" });
+  del.onclick = () => edit(ctx, "Delete schedule", (tx) => tx.delete(s.id));
+  general.append(
+    row("Name", textInput(s.name ?? "", (v) => (v ? edit(ctx, "Rename schedule", (tx) => tx.setName(s.id, v)) : ctx.status("\u26a0 Schedules need a name")))),
+    row("Category", SCHEDULE_CATEGORIES.find(([c]) => c === p.category)?.[1] ?? p.category),
+    row("Itemise every instance", checkbox(p.itemize, (v) => set("Itemise", { itemize: v }))),
+    row("Grand totals", checkbox(p.grandTotals, (v) => set("Grand totals", { grandTotals: v }))),
+    row("", h("div", { class: "buttons wrap" }, csv, xlsx)),
+  );
+
+  const fields = h("div", { class: "section" }, h("h3", {}, "Fields"));
+  p.fields.forEach((k, i) => {
+    const up = h("button", { textContent: "\u2191", title: "Move up", disabled: i === 0 });
+    up.onclick = () => {
+      const f = [...p.fields];
+      [f[i - 1], f[i]] = [f[i]!, f[i - 1]!];
+      set("Reorder fields", { fields: f });
+    };
+    const rm = h("button", { textContent: "\u00d7", title: "Remove" });
+    rm.onclick = () => set("Remove field", { fields: p.fields.filter((_, j) => j !== i) });
+    fields.append(h("div", { class: "list-item" }, h("span", {}, label(k)), h("span", { class: "buttons" }, up, rm)));
+  });
+  const unused = all.filter((f) => !p.fields.includes(f.key));
+  if (unused.length) {
+    fields.append(
+      row(
+        "Add field",
+        select([{ value: "", label: "Field\u2026" }, ...unused.map((f) => ({ value: f.key, label: f.label }))], "", (v) => v && set("Add field", { fields: [...p.fields, v] })),
+      ),
+    );
+  }
+
+  const filters = h("div", { class: "section" }, h("h3", {}, "Filter"));
+  p.filters.forEach((f, i) => {
+    const patch = (q: Partial<typeof f>) => set("Change filter", { filters: p.filters.map((x, j) => (j === i ? { ...x, ...q } : x)) });
+    const rm = h("button", { textContent: "\u00d7", title: "Remove" });
+    rm.onclick = () => set("Remove filter", { filters: p.filters.filter((_, j) => j !== i) });
+    filters.append(
+      h(
+        "div",
+        { class: "buttons wrap" },
+        select(fieldOpts, f.field, (v) => patch({ field: v })),
+        select(SCHEDULE_FILTER_OPS, f.op, (v) => patch({ op: v as ScheduleFilterOp })),
+        textInput(f.value, (v) => patch({ value: v })),
+        rm,
+      ),
+    );
+  });
+  const addFilter = h("button", { textContent: "Add filter" });
+  addFilter.onclick = () => set("Add filter", { filters: [...p.filters, { field: p.fields[0] ?? all[0]!.key, op: "eq", value: "" }] });
+  filters.append(row("", addFilter));
+
+  const sorting = h("div", { class: "section" }, h("h3", {}, "Sorting/Grouping"));
+  p.sort.forEach((o, i) => {
+    const patch = (q: Partial<typeof o>) => set("Change sorting", { sort: p.sort.map((x, j) => (j === i ? { ...x, ...q } : x)) });
+    const rm = h("button", { textContent: "\u00d7", title: "Remove" });
+    rm.onclick = () => set("Remove sort", { sort: p.sort.filter((_, j) => j !== i) });
+    sorting.append(
+      h("div", { class: "buttons wrap" }, select(fieldOpts, o.field, (v) => patch({ field: v })), rm),
+      h(
+        "div",
+        { class: "buttons wrap" },
+        h("label", { class: "check" }, checkbox(o.descending, (v) => patch({ descending: v })), "Descending"),
+        h("label", { class: "check" }, checkbox(o.header, (v) => patch({ header: v })), "Header"),
+        h("label", { class: "check" }, checkbox(o.footer, (v) => patch({ footer: v })), "Footer"),
+      ),
+    );
+  });
+  const addSort = h("button", { textContent: "Add sort level" });
+  addSort.onclick = () => set("Add sort", { sort: [...p.sort, { field: p.fields[0] ?? all[0]!.key, descending: false, header: false, footer: false }] });
+  sorting.append(row("", addSort));
+  return [general, fields, filters, sorting, h("div", { class: "section" }, del)];
+}
+
+/** The schedule's table, filling the viewport area (click a row to select its elements). */
+export function renderSchedulePane(root: HTMLElement, ctx: PanelContext, s: Schedule): void {
+  let t: ReturnType<typeof scheduleTable>;
+  try {
+    t = scheduleTable(ctx.doc, s);
+  } catch (err) {
+    root.replaceChildren(h("div", { class: "empty" }, `\u26a0 ${(err as Error).message}`));
+    return;
+  }
+  const head = h("tr", {}, ...t.headings.map((x) => h("th", {}, x)));
+  const body = t.rows.map((r) => {
+    const tr = h("tr", { class: r.kind === "row" ? "data" : r.kind }, ...r.cells.map((c, i) => h("td", { class: typeof r.values[i] === "number" ? "num" : "" }, c)));
+    if (r.kind === "row" && r.ids.length) tr.onclick = () => ctx.setSelection(r.ids);
+    return tr;
+  });
+  root.replaceChildren(
+    h("h2", {}, t.title),
+    t.rows.length ? h("table", {}, h("thead", {}, head), h("tbody", {}, ...body)) : h("div", { class: "empty" }, "No elements match this schedule."),
+  );
 }
 
 const FAMILY_CATEGORIES: [FamilyCategory, string][] = [
@@ -1192,6 +1318,30 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   loadFile.onclick = () => ctx.loadFamilyFile();
   fams.append(row("", h("div", { class: "buttons" }, loadFile)));
 
+  // Schedules / quantities and material takeoffs (open like views).
+  const schedSec = h("div", { class: "section" }, h("h3", {}, "Schedules/Quantities"));
+  for (const s of schedules(doc)) {
+    const div = h("div", { class: `list-item${s.id === ctx.activeViewId() ? " selected" : ""}` }, h("span", {}, s.name ?? s.id));
+    div.onclick = () => ctx.setActiveView(s.id);
+    schedSec.append(div);
+  }
+  const newSchedule = (kind: "schedule" | "takeoff") =>
+    select(
+      [
+        { value: "", label: "Category\u2026" },
+        ...SCHEDULE_CATEGORIES.filter(([c]) => kind === "schedule" || TAKEOFF_CATEGORIES.has(c)).map(([v, l]) => ({ value: v, label: l })),
+      ],
+      "",
+      (v) => {
+        if (!v) return;
+        edit(ctx, kind === "takeoff" ? "New material takeoff" : "New schedule", (tx) => {
+          const s = createSchedule(tx, doc, v, { kind });
+          queueMicrotask(() => ctx.setActiveView(s.id));
+        });
+      },
+    );
+  schedSec.append(row("New schedule", newSchedule("schedule")), row("New takeoff", newSchedule("takeoff")));
+
   // Project, shared and global parameters.
   const paramsSec = h("div", { class: "section" }, h("h3", {}, "Parameters"));
   for (const p of projectParameters(doc)) {
@@ -1242,7 +1392,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
     h("div", { class: "buttons wrap" }, imp, exp),
   );
 
-  root.replaceChildren(project, views, sheetsSec, fams, paramsSec, lv, types, mats, vg, counts);
+  root.replaceChildren(project, views, schedSec, sheetsSec, fams, paramsSec, lv, types, mats, vg, counts);
 }
 
 // ---- Properties -----------------------------------------------------------
@@ -1261,6 +1411,10 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
     }
     if (active?.category === Cat.Sheet) {
       root.replaceChildren(sheetSection(ctx, active as Element<SheetParams>));
+      return;
+    }
+    if (active?.category === Cat.Schedule) {
+      root.replaceChildren(...scheduleSections(ctx, active as Schedule));
       return;
     }
     root.replaceChildren(active ? viewSection(ctx, active as View) : h("div", { class: "empty" }, "Nothing selected"));

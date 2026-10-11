@@ -68,5 +68,6 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   boundaries from walls; Area / Area Boundary tools).
 - Tags (Tag / Keynote tools; Mark property), keynote table (browser → Project → Load keynotes),
   legends (Views → New legend; add components / keynote legend in its properties).
-- Next: Phase 4 — schedules + takeoffs + CSV/XLSX,
-  revisions/groups, plugin API + scripting console.
+- Schedules/Quantities and material takeoffs (browser → Schedules; fields, filter, sort/group,
+  totals; Export CSV / Excel). Not yet placeable on sheets; no calculated fields.
+- Next: Phase 4 — revisions/groups, then plugin API + scripting console.

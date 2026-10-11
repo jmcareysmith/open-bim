@@ -97,3 +97,14 @@ textarea.points { width: 100%; min-height: 70px; font: 12px/1.35 ui-monospace, C
 .param > span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
 input.invalid { outline: 1px solid var(--danger); }
 .buttons.wrap { flex-wrap: wrap; margin-top: 4px; }
+#schedule-pane { position: absolute; inset: 0; overflow: auto; background: #fff; color: #1f2328; padding: 16px; z-index: 2; }
+#schedule-pane h2 { font-size: 15px; margin: 0 0 10px; }
+#schedule-pane table { border-collapse: collapse; font-size: 12px; }
+#schedule-pane th, #schedule-pane td { border: 1px solid #c9ced4; padding: 3px 8px; text-align: left; white-space: nowrap; }
+#schedule-pane th { background: #eef1f4; }
+#schedule-pane td.num { text-align: right; }
+#schedule-pane tr.data { cursor: pointer; }
+#schedule-pane tr.data:hover td { background: #eaf2fe; }
+#schedule-pane tr.header td { font-weight: 600; background: #f6f7f9; }
+#schedule-pane tr.subtotal td, #schedule-pane tr.total td { font-weight: 600; border-top: 2px solid #8a929b; }
+#schedule-pane .empty { color: #6b737c; }

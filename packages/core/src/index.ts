@@ -25,5 +25,6 @@ export * from "./model/areas.ts";
 export * from "./model/tags.ts";
 export * from "./model/keynotes.ts";
 export * from "./model/legends.ts";
+export * from "./model/schedules.ts";
 export * from "./model/settings.ts";
 export * from "./model/template.ts";

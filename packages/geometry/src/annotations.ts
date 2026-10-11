@@ -11,6 +11,11 @@ import {
   type FilledRegionParams,
   type TextNoteParams,
   type Vec2,
+  anchorInView,
+  tagPosition,
+  tagText,
+  type Tag,
+  type View,
 } from "@open-bim/core";
 import type { LineData } from "./datums.ts";
 
@@ -54,9 +59,47 @@ export function buildAnnotationLines(doc: Document, el: Element): LineData | nul
     }
     case Cat.Dimension:
       return buildDimensionLines(doc, el as Dimension);
+    case Cat.Tag:
+      return buildTagLines(doc, el as Tag);
     default:
       return null;
   }
+}
+
+/** Approximate text width for a height (the renderers use a sans-serif at about 0.6 em per glyph). */
+const textWidth = (text: string, size: number) => text.length * size * 0.6;
+
+/** Tag: its text in a box at the tag position, with an optional leader to the host's anchor. */
+export function buildTagLines(doc: Document, tag: Tag): LineData | null {
+  const pos = tagPosition(doc, tag);
+  if (!pos) return null;
+  const size = modelTextSize(doc, tag.params.viewId, tag.params.size);
+  const text = tagText(doc, tag);
+  const hw = textWidth(text, size) / 2 + size * 0.4;
+  const hh = size * 0.9;
+  const seg: number[] = [];
+  const line = (a: Vec2, b: Vec2) => seg.push(a.x, a.y, 0, b.x, b.y, 0);
+  const c = [
+    { x: pos.x - hw, y: pos.y - hh },
+    { x: pos.x + hw, y: pos.y - hh },
+    { x: pos.x + hw, y: pos.y + hh },
+    { x: pos.x - hw, y: pos.y + hh },
+  ];
+  // Keynote tags are boxed (Revit's keynote tag); category tags are plain text.
+  if (tag.params.kind === "keynote") c.forEach((a, i) => line(a, c[(i + 1) % 4]!));
+  if (tag.params.leader) {
+    const view = doc.get(tag.params.viewId) as View | undefined;
+    const host = doc.get(tag.params.hostId);
+    const a = view && host ? anchorInView(doc, view, host) : null;
+    if (a) {
+      // Leader from the anchor to the nearest point on the tag's box.
+      const end = { x: Math.max(pos.x - hw, Math.min(pos.x + hw, a.x)), y: Math.max(pos.y - hh, Math.min(pos.y + hh, a.y)) };
+      if (Math.hypot(end.x - a.x, end.y - a.y) > size * 0.2) line(a, end);
+    }
+  }
+  // An invisible anchor segment keeps an unboxed tag pickable.
+  if (!seg.length) line(pos, { x: pos.x + size * 0.01, y: pos.y });
+  return { segments: new Float32Array(seg), labels: [{ text, position: [pos.x, pos.y, 0], size }] };
 }
 
 export function buildDimensionLines(doc: Document, dim: Dimension): LineData {

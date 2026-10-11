@@ -109,6 +109,7 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.RoomSeparator, buildRoomSeparatorLines],
     [Cat.Area, buildAreaLines],
     [Cat.AreaBoundary, buildAreaBoundaryLines],
+    [Cat.Tag, buildAnnotationLines],
   ]);
 
   register(category: string, builder: Builder): void {

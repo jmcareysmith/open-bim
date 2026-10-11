@@ -69,6 +69,7 @@ import {
   RoomTool,
   RoomSeparatorTool,
   AreaTool,
+  TagTool,
   AreaBoundaryTool,
   HostedTool,
   TextTool,
@@ -306,10 +307,12 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   room: new RoomTool(ctx),
   roomseparator: new RoomSeparatorTool(ctx),
   area: new AreaTool(ctx),
+  tag: new TagTool(ctx, "category"),
+  keynote: new TagTool(ctx, "keynote"),
   areaboundary: new AreaBoundaryTool(ctx),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
-const DRAWING_TOOLS = new Set(["select", "detailline", "region", "text", "extrusion", "blend", "revolution"]);
+const DRAWING_TOOLS = new Set(["select", "detailline", "region", "text", "tag", "keynote", "extrusion", "blend", "revolution"]);
 let tool: Tool = tools.select!;
 
 function setTool(name: string): void {

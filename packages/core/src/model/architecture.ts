@@ -48,6 +48,7 @@ export const Cat = {
   RoomSeparator: "RoomSeparator",
   Area: "Area",
   AreaBoundary: "AreaBoundary",
+  Tag: "Tag",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

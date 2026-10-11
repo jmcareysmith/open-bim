@@ -159,6 +159,12 @@ Rooms and separators are level-scoped (`planLevelOf`): drawn only in plans of th
 region of its plan's boundary lines around its point. `areaLoopsFromWalls` derives boundaries:
 the outside of the wall union (GFA) or the inside face of external walls (NLA, PCNZ).
 
+**Tags** — a `Tag` is view-owned and points at a host (dependency: deleting the host deletes the
+tag, moving it regenerates it). Its text is read from the host when drawn (`tagText`: Mark, else type
+name; rooms "Name Number"; keynote tags the element's or type's `keynote`), and its position is an
+offset from the host's anchor (`elementAnchor`, projected into the view), so tags follow their hosts
+in plans, sections and elevations. Tagging a door/window without a Mark numbers it.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

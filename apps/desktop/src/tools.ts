@@ -60,6 +60,10 @@ import {
   type Room,
   createArea,
   createAreaBoundary,
+  createTag,
+  anchorInView,
+  TAGGABLE,
+  type TagKind,
   type ViewParams,
 } from "@open-bim/core";
 import { areaBoundary, buildGridLines, buildReferencePlaneLines, buildRoomLines, extrudePolygon, roomBoundary, wallFootprint, type LineData } from "@open-bim/geometry";
@@ -802,6 +806,42 @@ export class RoomSeparatorTool extends DatumLineTool {
       preview: (_doc, start, end) => linePreview(start, end),
       create: (tx, doc, start, end) => createRoomSeparator(tx, doc, ctx.activeLevelId(), start, end),
     });
+  }
+}
+
+/** Tag by category / keynote: click an element, the tag goes where you click. Shift: no snapping. */
+export class TagTool implements Tool {
+  readonly name: string;
+  leader = false;
+  constructor(
+    private ctx: ToolContext,
+    private kind: TagKind,
+  ) {
+    this.name = kind === "keynote" ? "keynote" : "tag";
+  }
+
+  activate(): void {
+    const what = this.kind === "keynote" ? "Keynote" : "Tag";
+    this.ctx.status(`${what}: click a wall, door, window, component, floor or room. The tag goes where you click.`);
+  }
+
+  click(ev: PointerEvent): void {
+    const viewId = requireAnnotView(this.ctx);
+    if (!viewId) return;
+    const { doc } = this.ctx;
+    const hit = this.ctx.viewport.pickHit(ev, (id) => TAGGABLE.has(doc.get(id)?.category ?? ""));
+    if (!hit) return this.ctx.status("Nothing taggable there.");
+    // Openings are tagged on their centre (Revit's door/window tags); everything else where clicked.
+    const host = doc.require(hit.id);
+    const view = doc.require<ViewParams>(viewId) as View;
+    const centred = this.kind === "category" && (host.category === Cat.Door || host.category === Cat.Window);
+    const at = (centred ? anchorInView(doc, view, host) : null) ?? viewPoint(this.ctx, ev, null) ?? hit.point;
+    try {
+      const tag = doc.transact(this.kind === "keynote" ? "Keynote" : "Tag", (tx) => createTag(tx, doc, viewId, hit.id, at, { kind: this.kind, leader: this.leader }));
+      this.ctx.setSelection([tag.id]);
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
   }
 }
 

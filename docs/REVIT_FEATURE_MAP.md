@@ -99,7 +99,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 |---|---|---|
 | Dimensions (aligned, linear, angular, radial, spot) | 2 | 🟨 |
 | Text, leaders | 2 | 🟨 |
-| Tags (by category, multi-category, material) | 4 | ⬜ |
+| Tags (by category, multi-category, material) | 4 | 🟨 |
 | Keynotes | 4 | ⬜ |
 | Detail lines, filled regions, detail components, insulation | 2 | 🟨 |
 | Symbols, north arrow, section/elevation heads | 2 | ⬜ |

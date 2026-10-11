@@ -4,6 +4,10 @@ import {
   levels,
   roomExtent,
   AREA_SCHEMES,
+  TAGGABLE,
+  elementMark,
+  tagText,
+  type TagParams,
   createAreaBoundary,
   type Area,
   type AreaParams,
@@ -1298,6 +1302,21 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       );
       break;
     }
+    case Cat.Tag: {
+      const p = el.params as TagParams;
+      const host = doc.get(p.hostId);
+      const sel = h("button", { textContent: "Select tagged element" });
+      sel.onclick = () => ctx.setSelection([p.hostId]);
+      sec.append(
+        row("Tags", host ? `${host.category} ${host.name ?? ""}`.trim() : "(missing)"),
+        row("Text", tagText(doc, el as never)),
+        row("Leader", checkbox(p.leader, (v) => update<TagParams>("Change leader", { leader: v }))),
+        row("Offset X", numberInput(p.offset.x, (v) => update<TagParams>("Move tag", { offset: { ...p.offset, x: v } }))),
+        row("Offset Y", numberInput(p.offset.y, (v) => update<TagParams>("Move tag", { offset: { ...p.offset, y: v } }))),
+        row("", sel),
+      );
+      break;
+    }
     case Cat.RoomSeparator: {
       const p = el.params as { levelId: string };
       sec.append(row("Level", select(levelOpts, p.levelId, (v) => update<{ levelId: string }>("Change separator level", { levelId: v }))));
@@ -1656,6 +1675,10 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
     return;
   }
 
+  // Revit "Mark": the instance identifier tags show (rooms and areas use their number).
+  if (TAGGABLE.has(el.category) && el.category !== Cat.Room && el.category !== Cat.Area) {
+    sec.append(row("Mark", textInput(elementMark(el) ?? "", (v) => edit(ctx, "Change mark", (tx) => tx.update(el.id, { mark: v || undefined })))));
+  }
   const extra = parameterSections(ctx, el);
   const del = h("button", { class: "danger", textContent: "Delete" });
   del.onclick = () => edit(ctx, `Delete ${el.category}`, (tx) => tx.delete(el.id));

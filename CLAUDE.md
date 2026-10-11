@@ -30,7 +30,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - NZ context: metric, NZS 3604 / H1 relevant later; use NZ English in UI text.
 
 ## Current state (update at the end of each session)
-- Phase 0 done except: first run on Windows (`npm run tauri dev`) and CI green.
+- Phase 0 done except CI green (runs on Windows via `npm run tauri dev`).
 - Working: levels, wall/floor types with layers, walls, floors, undo/redo, regeneration,
   3D viewport (middle = pan, right = orbit, wheel = zoom), wall tool (W) with grid/ortho/endpoint snap,
   select + delete, properties panel, project browser, save/open `.obim`.

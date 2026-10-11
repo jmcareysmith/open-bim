@@ -3,7 +3,7 @@
 Each phase ends with something usable. Work one feature per session; tick items off in
 `REVIT_FEATURE_MAP.md` as they land.
 
-## Phase 0 — Foundations (current)
+## Phase 0 — Foundations
 - [x] Monorepo: `packages/core`, `packages/geometry`, `apps/desktop` (Tauri 2 + Vite + TS)
 - [x] Element store with stable IDs, categories, types/instances, parameters
 - [x] Transactions with undo/redo
@@ -12,10 +12,10 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Geometry kernel interface + simple extrusion kernel
 - [x] three.js 3D viewport with orbit controls
 - [x] Save/load project as JSON (`.obim`)
-- [ ] Run on Windows PC via `npm run tauri dev`
+- [x] Run on Windows PC via `npm run tauri dev`
 - [ ] App icon + CI (GitHub Actions: tests + build)
 
-## Phase 1 — Architectural modelling
+## Phase 1 — Architectural modelling (current)
 - Wall drawing tool (click-click in plan/3D work plane), snapping, ortho
 - Wall joins (L, T, X) with mitred layers
 - Grids, reference planes

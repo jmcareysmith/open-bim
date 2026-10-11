@@ -17,3 +17,4 @@ export * from "./forms.ts";
 export * from "./components.ts";
 export * from "./constraints.ts";
 export * from "./rooms.ts";
+export * from "./legends.ts";

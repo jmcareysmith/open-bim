@@ -45,6 +45,8 @@ registerCategory({
   name: Cat.Tag,
   // Deleting the host deletes its tags; moving it regenerates them.
   dependencies: (el) => [(el.params as TagParams).viewId, (el.params as TagParams).hostId],
+  // Keynote legends list what's tagged.
+  related: (doc) => doc.byCategory(Cat.KeynoteLegend).map((k) => k.id),
   cascadeDelete: true,
   isType: false,
 });

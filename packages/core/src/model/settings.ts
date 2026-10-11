@@ -40,7 +40,14 @@ export const DEFAULT_UNITS: UnitsSettings = {
 
 export const DEFAULT_PROJECT_INFO: ProjectInfo = { name: "", number: "", client: "", address: "" };
 
-registerCategory({ name: Cat.ProjectSettings, dependencies: () => [], cascadeDelete: false, isType: false });
+registerCategory({
+  name: Cat.ProjectSettings,
+  dependencies: () => [],
+  // Units and keynote text show in tags, room/area labels and keynote legends.
+  related: (doc) => [Cat.Tag, Cat.KeynoteLegend, Cat.Room, Cat.Area].flatMap((c) => doc.byCategory(c).map((e) => e.id)),
+  cascadeDelete: false,
+  isType: false,
+});
 
 /** The project's settings element, if the document has one (older files may not). */
 export function projectSettings(doc: Document): ProjectSettings | undefined {

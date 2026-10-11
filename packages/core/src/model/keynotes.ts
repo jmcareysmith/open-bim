@@ -48,11 +48,11 @@ export function keynoteText(doc: Document, key: string): string | undefined {
   return keynoteTable(doc).find((e) => e.key === key)?.text;
 }
 
-/** Keynotes tagged in a view, in key order, with their text (Revit's keynote legend "by sheet/view"). */
-export function keynotesInView(doc: Document, viewId: ElementId): KeynoteEntry[] {
+/** Keynotes tagged in a view (or anywhere, for null), in key order, with their text. */
+export function keynotesInView(doc: Document, viewId: ElementId | null): KeynoteEntry[] {
   const keys = new Set<string>();
   for (const t of doc.byCategory<TagParams>(Cat.Tag)) {
-    if (t.params.viewId !== viewId || t.params.kind !== "keynote") continue;
+    if ((viewId && t.params.viewId !== viewId) || t.params.kind !== "keynote") continue;
     const host = doc.get(t.params.hostId);
     const k = host && elementKeynote(doc, host);
     if (k) keys.add(k);

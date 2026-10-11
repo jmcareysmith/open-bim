@@ -8,7 +8,7 @@ import type { AppliedFilter, GraphicOverride } from "./graphics.ts";
 // Views are elements, as in Revit: saved with the project, listed in the browser, each with its
 // own range, scale, detail level and visibility. Sections, elevations and sheets build on this.
 
-export type ViewKind = "floorPlan" | "3d" | "section" | "elevation" | "callout" | "areaPlan";
+export type ViewKind = "floorPlan" | "3d" | "section" | "elevation" | "callout" | "areaPlan" | "legend";
 export type DetailLevel = "coarse" | "medium" | "fine";
 
 /** Revit view range, as offsets from the view's level, mm. */
@@ -295,6 +295,11 @@ export function viewCrop(view: View): { min: Vec2; max: Vec2 } {
   if (!line || !zRange) throw new Error("Only sections and elevations have a drawing crop");
   const w = Math.hypot(line.end.x - line.start.x, line.end.y - line.start.y);
   return { min: { x: 0, y: zRange.bottom }, max: { x: w, y: zRange.top } };
+}
+
+/** Views drawn in their own 2D space rather than plan XY: sections, elevations and legends. */
+export function is2DView(view: View): boolean {
+  return isDrawingView(view) || view.params.kind === "legend";
 }
 
 /** Views drawn in their own 2D space (sections and elevations). */

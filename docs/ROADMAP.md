@@ -45,7 +45,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 
 ## Phase 4 — Data & documentation (current)
 - [x] Rooms, areas, area plans — room separators, room bounding; GFA/NLA area schemes, boundaries from walls
-- [ ] Tags, keynotes, legends
+- [x] Tags, keynotes, legends — tag by category, keynote files/tags, legend views with type swatches and keynote legends
 - [ ] Schedules + material takeoffs, CSV/XLSX export
 - [ ] Revisions, groups
 - [ ] Plugin API + scripting console

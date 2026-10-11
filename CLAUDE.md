@@ -66,5 +66,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   family editor → Save Family File (`.obim-family`, open JSON).
 - Rooms (Room / Separator tools, plans) and area plans (browser → New area plan; GFA/NLA,
   boundaries from walls; Area / Area Boundary tools).
-- Next: Phase 4 — tags/keynotes/legends, schedules + takeoffs + CSV/XLSX,
+- Tags (Tag / Keynote tools; Mark property), keynote table (browser → Project → Load keynotes),
+  legends (Views → New legend; add components / keynote legend in its properties).
+- Next: Phase 4 — schedules + takeoffs + CSV/XLSX,
   revisions/groups, plugin API + scripting console.

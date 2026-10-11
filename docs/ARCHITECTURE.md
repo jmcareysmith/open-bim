@@ -169,6 +169,11 @@ in plans, sections and elevations. Tagging a door/window without a Mark numbers 
 Revit's tab-delimited keynote file. `keynote` keys sit on elements, types and materials; a keynote
 tag shows the element's own key, else its type's, else its structure layer material's.
 
+**Legends** — a `View` of kind `legend` holds no model (`is2DView`: drawn in its own 2D space like
+sections). `LegendComponent`s draw a type from its current definition (layered swatch with cut
+hatches, door/window elevation) and `KeynoteLegend`s tabulate `keynotesInView` for one view or all.
+Tags and project settings list keynote legends as `related`, so the tables stay current.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

@@ -49,6 +49,8 @@ export const Cat = {
   Area: "Area",
   AreaBoundary: "AreaBoundary",
   Tag: "Tag",
+  LegendComponent: "LegendComponent",
+  KeynoteLegend: "KeynoteLegend",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

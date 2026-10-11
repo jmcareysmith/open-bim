@@ -89,6 +89,16 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
   const els = doc.all().filter(shown);
   const out = emptyDrawing();
   const section = isDrawingView(view);
+  if (view.params.kind === "legend") {
+    // Legends hold no model: only their own annotation and legend components.
+    for (const el of els.filter((e) => annotationView(e) === view.id)) {
+      const lines = kernel.buildLines(doc, el);
+      const r = elementGraphics(doc, g, el);
+      if (lines) addLineData(out, lines, "annotation", { color: r.color ?? undefined, halftone: r.halftone, id: el.id });
+    }
+    out.bounds = contentBounds(out);
+    return out;
+  }
   if (!section && !isPlanView(view)) return out;
 
   // Solids: cut + hidden-line projection, with layers and patterns at medium/fine.

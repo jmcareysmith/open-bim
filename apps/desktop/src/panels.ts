@@ -8,6 +8,13 @@ import {
   elementMark,
   keynoteTable,
   getCategory,
+  createLegend,
+  createLegendComponent,
+  createKeynoteLegend,
+  nextLegendPosition,
+  LEGEND_TYPE_CATEGORIES,
+  type LegendComponentParams,
+  type KeynoteLegendParams,
   tagText,
   type TagParams,
   createAreaBoundary,
@@ -255,7 +262,7 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
   const { doc } = ctx;
   const p = view.params;
   const set = (name: string, patch: Partial<ViewParams>) => edit(ctx, name, (tx) => tx.update<ViewParams>(view.id, patch));
-  const title = { floorPlan: "Floor Plan", "3d": "3D View", section: "Section", elevation: "Elevation", callout: "Callout", areaPlan: "Area Plan" }[p.kind];
+  const title = { floorPlan: "Floor Plan", "3d": "3D View", section: "Section", elevation: "Elevation", callout: "Callout", areaPlan: "Area Plan", legend: "Legend" }[p.kind];
   const sec = h("div", { class: "section" }, h("h3", {}, title));
   if (view.id !== ctx.activeViewId()) {
     const open = h("button", { textContent: "Open view" });
@@ -305,6 +312,28 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
       row("Crop bottom", numberInput(z.bottom, (v) => setZ("bottom", v))),
       row("Crop top", numberInput(z.top, (v) => setZ("top", v))),
     );
+  }
+  if (p.kind === "legend") {
+    const types = doc.all().filter((e) => LEGEND_TYPE_CATEGORIES.has(e.category));
+    sec.append(
+      row(
+        "Add component",
+        select([{ value: "", label: "Type\u2026" }, ...types.map((t) => ({ value: t.id, label: `${t.name ?? t.id} (${t.category.replace("Type", "")})` }))], "", (v) => {
+          if (v) edit(ctx, "Add legend component", (tx) => createLegendComponent(tx, doc, view.id, v, nextLegendPosition(doc, view.id)));
+        }),
+      ),
+    );
+  }
+  if (p.kind !== "3d") {
+    const addKeynotes = h("button", { textContent: "Add keynote legend" });
+    addKeynotes.title = "A table of the keynotes tagged in a view (pick which in its properties)";
+    addKeynotes.onclick = () =>
+      edit(ctx, "Add keynote legend", (tx) => {
+        const at = p.kind === "legend" ? { x: 3000, y: 0 } : { x: 0, y: 0 };
+        const k = createKeynoteLegend(tx, doc, view.id, at, p.kind === "legend" ? null : view.id);
+        queueMicrotask(() => ctx.setSelection([k.id]));
+      });
+    sec.append(row("", addKeynotes));
   }
   if (p.kind === "areaPlan" && p.levelId && p.areaScheme) {
     const levelId = p.levelId;
@@ -731,6 +760,7 @@ const VG_CATEGORIES: [string, string][] = [
   [Cat.View, "View markers"],
   [Cat.Dimension, "Dimensions"],
   [Cat.TextNote, "Text"],
+  [Cat.Tag, "Tags"],
   [Cat.DetailLine, "Detail lines"],
   [Cat.FilledRegion, "Filled regions"],
 ];
@@ -975,6 +1005,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
     ["Sections", allViews.filter((v) => v.params.kind === "section")],
     ["Elevations", allViews.filter((v) => v.params.kind === "elevation")],
     ["3D Views", allViews.filter((v) => v.params.kind === "3d")],
+    ["Legends", allViews.filter((v) => v.params.kind === "legend")],
   ];
   for (const [title, list] of groups) {
     if (!list.length) continue;
@@ -1004,6 +1035,13 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
       ),
     ),
   );
+  const newLegend = h("button", { textContent: "New legend" });
+  newLegend.onclick = () =>
+    edit(ctx, "New legend", (tx) => {
+      const v = createLegend(tx, doc);
+      queueMicrotask(() => ctx.setActiveView(v.id));
+    });
+  viewsSec.append(row("", newLegend));
   const views = viewsSec;
 
   const lv = h("div", { class: "section" }, h("h3", {}, "Levels"));
@@ -1323,6 +1361,36 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Offset X", numberInput(p.offset.x, (v) => update<TagParams>("Move tag", { offset: { ...p.offset, x: v } }))),
         row("Offset Y", numberInput(p.offset.y, (v) => update<TagParams>("Move tag", { offset: { ...p.offset, y: v } }))),
         row("", sel),
+      );
+      break;
+    }
+    case Cat.LegendComponent: {
+      const p = el.params as LegendComponentParams;
+      const type = doc.get(p.typeId);
+      const same = doc.all().filter((e) => e.category === type?.category);
+      sec.append(
+        row("Type", select(same.map((t) => ({ value: t.id, label: t.name ?? t.id })), p.typeId, (v) => update<LegendComponentParams>("Change legend type", { typeId: v }))),
+        ...(type && type.category !== Cat.DoorType && type.category !== Cat.WindowType
+          ? [row("Host length", numberInput(p.length, (v) => (v > 0 ? update<LegendComponentParams>("Change length", { length: v }) : ctx.status("\u26a0 Length must be positive"))))]
+          : []),
+        row("Label", checkbox(p.label, (v) => update<LegendComponentParams>("Toggle label", { label: v }))),
+        row("X", numberInput(p.position.x, (v) => update<LegendComponentParams>("Move component", { position: { ...p.position, x: v } }))),
+        row("Y", numberInput(p.position.y, (v) => update<LegendComponentParams>("Move component", { position: { ...p.position, y: v } }))),
+      );
+      break;
+    }
+    case Cat.KeynoteLegend: {
+      const p = el.params as KeynoteLegendParams;
+      const vs = viewElements(doc).filter((v) => v.params.kind !== "3d" && v.params.kind !== "legend");
+      sec.append(
+        row(
+          "Keynotes from",
+          select([{ value: "", label: "All views" }, ...vs.map((v) => ({ value: v.id, label: v.name ?? v.id }))], p.sourceViewId ?? "", (v) =>
+            update<KeynoteLegendParams>("Change keynote legend source", { sourceViewId: v || null }),
+          ),
+        ),
+        row("X", numberInput(p.position.x, (v) => update<KeynoteLegendParams>("Move keynote legend", { position: { ...p.position, x: v } }))),
+        row("Y", numberInput(p.position.y, (v) => update<KeynoteLegendParams>("Move keynote legend", { position: { ...p.position, y: v } }))),
       );
       break;
     }

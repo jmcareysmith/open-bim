@@ -17,6 +17,7 @@ import {
   sheets,
   type Sheet,
   isDrawingView,
+  is2DView,
   type View,
   type ViewParams,
   typeCategoryOf,
@@ -575,7 +576,7 @@ function applyView(): void {
     viewport.setPlanRange(viewRange(doc, v));
     viewport.setViewMode("plan");
     viewport.setPlanCrop(v.params.kind === "callout" ? (v.params.crop ?? null) : null);
-  } else if (isDrawingView(v)) {
+  } else if (is2DView(v)) {
     viewport.setDrawingView(v);
   } else {
     viewport.setViewMode("3d");

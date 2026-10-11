@@ -26,6 +26,8 @@ export type ProjectInfo = {
 export type ProjectSettingsParams = {
   units: UnitsSettings;
   info: ProjectInfo;
+  /** Keynote table (keynotes.ts). */
+  keynotes?: { key: string; text: string; parent: string | null }[] | null;
 };
 export type ProjectSettings = Element<ProjectSettingsParams>;
 

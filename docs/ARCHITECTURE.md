@@ -165,6 +165,10 @@ name; rooms "Name Number"; keynote tags the element's or type's `keynote`), and 
 offset from the host's anchor (`elementAnchor`, projected into the view), so tags follow their hosts
 in plans, sections and elevations. Tagging a door/window without a Mark numbers it.
 
+**Keynotes** — the keynote table (key, text, parent) lives in `ProjectSettings` and reads/writes
+Revit's tab-delimited keynote file. `keynote` keys sit on elements, types and materials; a keynote
+tag shows the element's own key, else its type's, else its structure layer material's.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

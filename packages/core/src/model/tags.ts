@@ -132,7 +132,13 @@ export function elementKeynote(doc: Document, el: Element): string | undefined {
   if (typeof own === "string" && own) return own;
   const type = el.typeId ? doc.get(el.typeId) : undefined;
   const k = type ? (type.params as { keynote?: unknown }).keynote : undefined;
-  return typeof k === "string" && k ? k : undefined;
+  if (typeof k === "string" && k) return k;
+  // Layered types fall back to their structure layer's material keynote.
+  const layers = (type?.params as { layers?: { function: string; materialId?: ElementId | null }[] } | undefined)?.layers;
+  const core = layers?.find((l) => l.function === "structure") ?? layers?.[0];
+  const m = core?.materialId ? doc.get(core.materialId) : undefined;
+  const mk = m ? (m.params as { keynote?: unknown }).keynote : undefined;
+  return typeof mk === "string" && mk ? mk : undefined;
 }
 
 /** Where a tag sits in its view (host anchor + offset), or null when the host is gone. */

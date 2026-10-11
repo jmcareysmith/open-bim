@@ -23,5 +23,6 @@ export * from "./model/doors.ts";
 export * from "./model/rooms.ts";
 export * from "./model/areas.ts";
 export * from "./model/tags.ts";
+export * from "./model/keynotes.ts";
 export * from "./model/settings.ts";
 export * from "./model/template.ts";

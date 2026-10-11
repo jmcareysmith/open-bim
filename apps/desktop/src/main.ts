@@ -34,6 +34,10 @@ import {
   loadFamily,
   familyFile,
   readFamilyFile,
+  parseKeynoteFile,
+  setKeynoteTable,
+  writeKeynoteFile,
+  keynoteTable,
   createAreaPlan,
   createAreaBoundary,
   isPlanView,
@@ -208,6 +212,25 @@ const ctx: ToolContext & PanelContext = {
       if (!text) return;
       const types = doc.transact("Import type catalog", (tx) => importTypeCatalog(tx, doc, text));
       status(`Loaded ${types.length} type(s) from the catalog.`);
+    } catch (err) {
+      status(`\u26a0 ${(err as Error).message}`);
+    }
+  },
+  async importKeynotes() {
+    try {
+      const text = await openText({ name: "Keynote file", extensions: ["txt"] });
+      if (!text) return;
+      const entries = parseKeynoteFile(text);
+      doc.transact("Load keynote file", (tx) => setKeynoteTable(tx, doc, entries));
+      status(`Loaded ${entries.length} keynote(s).`);
+    } catch (err) {
+      status(`\u26a0 ${(err as Error).message}`);
+    }
+  },
+  async exportKeynotes() {
+    try {
+      const path = await saveText(writeKeynoteFile(keynoteTable(doc)), "Keynotes.txt", { name: "Keynote file", extensions: ["txt"] });
+      if (path) status(`Keynotes saved to ${path}`);
     } catch (err) {
       status(`\u26a0 ${(err as Error).message}`);
     }

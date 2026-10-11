@@ -6,6 +6,8 @@ import {
   AREA_SCHEMES,
   TAGGABLE,
   elementMark,
+  keynoteTable,
+  getCategory,
   tagText,
   type TagParams,
   createAreaBoundary,
@@ -168,6 +170,8 @@ export interface PanelContext {
   loadFamilyFile(): void;
   /** Create an area plan (with boundaries from walls) and open it. */
   newAreaPlan(levelId: ElementId, scheme: AreaScheme): void;
+  importKeynotes(): void;
+  exportKeynotes(): void;
   /** Family editor: the project's loaded families, and copying one in to nest it. */
   projectFamilies(): FamilyDef[];
   nestFamily(defId: ElementId): void;
@@ -1065,6 +1069,11 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   );
   info.onclick = openSettings;
   project.append(info);
+  const kImp = h("button", { textContent: "Load keynotes" });
+  kImp.onclick = () => ctx.importKeynotes();
+  const kExp = h("button", { textContent: "Export" });
+  kExp.onclick = () => ctx.exportKeynotes();
+  project.append(row(`Keynotes (${keynoteTable(doc).length})`, h("div", { class: "buttons" }, kImp, kExp)));
 
   // Sheets.
   const sheetsSec = h("div", { class: "section" }, h("h3", {}, "Sheets"));
@@ -1675,6 +1684,14 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
     return;
   }
 
+  // Keynotes on types, materials and taggable elements (an element's own overrides its type's).
+  if (getCategory(el.category).isType || el.category === Cat.Material || (TAGGABLE.has(el.category) && el.category !== Cat.Room && el.category !== Cat.Area)) {
+    const table = keynoteTable(doc);
+    const cur = (el.params as { keynote?: string }).keynote ?? "";
+    const opts = [{ value: "", label: "\u2014" }, ...table.map((k) => ({ value: k.key, label: `${k.key}  ${k.text}` }))];
+    if (cur && !table.some((k) => k.key === cur)) opts.push({ value: cur, label: `${cur} (not in table)` });
+    sec.append(row("Keynote", select(opts, cur, (v) => edit(ctx, "Change keynote", (tx) => tx.update(el.id, { keynote: v || undefined })))));
+  }
   // Revit "Mark": the instance identifier tags show (rooms and areas use their number).
   if (TAGGABLE.has(el.category) && el.category !== Cat.Room && el.category !== Cat.Area) {
     sec.append(row("Mark", textInput(elementMark(el) ?? "", (v) => edit(ctx, "Change mark", (tx) => tx.update(el.id, { mark: v || undefined })))));

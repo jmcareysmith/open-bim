@@ -1,6 +1,8 @@
 import {
   Cat,
   ceilingExtent,
+  isFormCategory,
+  type Values,
   floorExtent,
   wallExtent,
   type Document,
@@ -14,6 +16,8 @@ import { buildGridLines, buildOpeningLines, buildReferencePlaneLines, type LineD
 import { buildDoor, buildDoorLines, buildWindow, buildWindowLines } from "./doors.ts";
 import { joinedWallFootprint } from "./joins.ts";
 import { buildRoof } from "./roof.ts";
+import { buildForm, formMesh } from "./forms.ts";
+import { mergeMeshes } from "./doors.ts";
 import { buildViewMarker } from "./sections.ts";
 import { buildAnnotationLines } from "./annotations.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
@@ -28,6 +32,8 @@ export interface GeometryKernel {
   build(doc: Document, el: Element): MeshData | null;
   /** Line work: datums (grids…), opening outlines, plan symbols (door swings). May accompany a mesh. */
   buildLines(doc: Document, el: Element): LineData | null;
+  /** A family document's geometry (solids minus voids where supported) for given parameter values. */
+  familyMesh(familyDoc: Document, values: Values): MeshData | null;
 }
 
 type Builder = (doc: Document, el: Element) => MeshData | null;
@@ -77,6 +83,10 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.Roof, buildRoof],
     [Cat.Door, buildDoor],
     [Cat.Window, buildWindow],
+    [Cat.Extrusion, buildForm],
+    [Cat.Blend, buildForm],
+    [Cat.Revolution, buildForm],
+    [Cat.Sweep, buildForm],
   ]);
 
   private lineBuilders = new Map<string, LineBuilder>([
@@ -106,5 +116,14 @@ export class SimpleKernel implements GeometryKernel {
 
   buildLines(doc: Document, el: Element): LineData | null {
     return this.lineBuilders.get(el.category)?.(doc, el) ?? null;
+  }
+
+  /** All solid forms of a family document as one mesh. Voids need the OCCT kernel and are skipped. */
+  familyMesh(familyDoc: Document, values: Values): MeshData | null {
+    const solids = familyDoc
+      .all()
+      .filter((e) => isFormCategory(e.category) && !(e.params as { isVoid?: boolean }).isVoid)
+      .map((e) => formMesh(e, values));
+    return solids.length ? mergeMeshes(solids) : null;
   }
 }

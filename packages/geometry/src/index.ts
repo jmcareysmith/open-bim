@@ -13,3 +13,4 @@ export * from "./layers.ts";
 export * from "./drawing.ts";
 export * from "./sheet.ts";
 export * from "./pdf.ts";
+export * from "./forms.ts";

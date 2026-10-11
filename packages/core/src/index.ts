@@ -1,6 +1,7 @@
 export * from "./element.ts";
 export * from "./categories.ts";
 export * from "./document.ts";
+export * from "./expr.ts";
 export * from "./model/architecture.ts";
 export * from "./model/joins.ts";
 export * from "./model/grids.ts";
@@ -11,6 +12,7 @@ export * from "./model/annotations.ts";
 export * from "./model/materials.ts";
 export * from "./model/graphics.ts";
 export * from "./model/sheets.ts";
+export * from "./model/family.ts";
 export * from "./model/sketch.ts";
 export * from "./model/roofs.ts";
 export * from "./model/openings.ts";

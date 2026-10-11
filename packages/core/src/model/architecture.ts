@@ -34,6 +34,12 @@ export const Cat = {
   ViewTemplate: "ViewTemplate",
   Sheet: "Sheet",
   Viewport: "Viewport",
+  FamilyInfo: "FamilyInfo",
+  FamilyParameter: "FamilyParameter",
+  Extrusion: "Extrusion",
+  Blend: "Blend",
+  Revolution: "Revolution",
+  Sweep: "Sweep",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

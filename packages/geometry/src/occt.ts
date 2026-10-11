@@ -1,5 +1,20 @@
 import type { OpenCascadeInstance, TopoDS_Shape } from "replicad-opencascadejs";
-import { Cat, wallCuts, wallDirection, wallExtent, wallThickness, type Document, type Element, type Wall, type WallCut } from "@open-bim/core";
+import {
+  Cat,
+  familyValues,
+  isFormCategory,
+  wallCuts,
+  wallDirection,
+  wallExtent,
+  wallThickness,
+  type Document,
+  type Element,
+  type Values,
+  type Wall,
+  type WallCut,
+} from "@open-bim/core";
+import { mergeMeshes } from "./doors.ts";
+import { formMesh } from "./forms.ts";
 import type { LineData } from "./datums.ts";
 import { joinedWallFootprint } from "./joins.ts";
 import { SimpleKernel, type GeometryKernel } from "./kernel.ts";
@@ -34,7 +49,71 @@ export class OcctKernel implements GeometryKernel {
       const cuts = wallCuts(doc, wall);
       if (cuts.length) return this.buildWallWithCuts(doc, wall, cuts);
     }
+    if (isFormCategory(el.category) && !(el.params as { isVoid?: boolean }).isVoid) {
+      // Family solids are cut by every void in the family (Revit behaviour).
+      const values = familyValues(doc);
+      const voids = doc.all().filter((e) => isFormCategory(e.category) && (e.params as { isVoid?: boolean }).isVoid);
+      if (voids.length) return this.cutMeshes(formMesh(el, values), voids.map((v) => formMesh(v, values)));
+    }
     return this.simple.build(doc, el);
+  }
+
+  /** All solid forms of a family, minus its voids, as one mesh (for placed family instances). */
+  familyMesh(familyDoc: Document, values: Values): MeshData | null {
+    const forms = familyDoc.all().filter((e) => isFormCategory(e.category));
+    const solids = forms.filter((f) => !(f.params as { isVoid?: boolean }).isVoid).map((f) => formMesh(f, values));
+    const voids = forms.filter((f) => (f.params as { isVoid?: boolean }).isVoid).map((f) => formMesh(f, values));
+    if (!solids.length) return null;
+    if (!voids.length) return this.simple.familyMesh(familyDoc, values);
+    const parts = solids.map((s) => this.cutMeshes(s, voids));
+    return mergeMeshes(parts);
+  }
+
+  /** Boolean difference of closed triangle meshes (each sewn into an OCCT solid first). */
+  cutMeshes(solid: MeshData, voids: MeshData[]): MeshData {
+    const gc: Deletable[] = [];
+    const keep = <T extends Deletable>(o: T): T => {
+      gc.push(o);
+      return o;
+    };
+    try {
+      let shape = this.meshToSolid(solid, keep);
+      for (const v of voids) shape = keep(keep(new this.oc.BRepAlgoAPI_Cut(shape, this.meshToSolid(v, keep))).Shape());
+      return this.mesh(shape, keep);
+    } finally {
+      for (const o of gc.reverse()) o.delete();
+    }
+  }
+
+  /** Sew a closed triangle mesh into a solid. */
+  private meshToSolid(m: MeshData, keep: <T extends Deletable>(o: T) => T): TopoDS_Shape {
+    const oc = this.oc;
+    const sewing = keep(new oc.BRepBuilderAPI_Sewing(1e-3, true, true, true, false));
+    const p = m.positions;
+    const pt = (i: number) => keep(new oc.gp_Pnt(p[i * 3]!, p[i * 3 + 1]!, p[i * 3 + 2]!));
+    for (let t = 0; t < m.indices.length; t += 3) {
+      const [a, b, c] = [m.indices[t]!, m.indices[t + 1]!, m.indices[t + 2]!].map(pt) as [ReturnType<typeof pt>, ReturnType<typeof pt>, ReturnType<typeof pt>];
+      if (a.Distance(b) < 1e-6 || b.Distance(c) < 1e-6 || c.Distance(a) < 1e-6) continue;
+      const wire = keep(new oc.BRepBuilderAPI_MakeWire());
+      for (const [u, v] of [
+        [a, b],
+        [b, c],
+        [c, a],
+      ] as const) {
+        wire.Add(keep(keep(new oc.BRepBuilderAPI_MakeEdge(u, v)).Edge()));
+      }
+      const face = keep(new oc.BRepBuilderAPI_MakeFace(keep(wire.Wire()), true));
+      if (face.IsDone()) sewing.Add(keep(face.Shape()));
+    }
+    sewing.Perform();
+    const sewn = keep(sewing.SewedShape());
+    const shells = keep(new oc.TopExp_Explorer(sewn, oc.TopAbs_ShapeEnum.TopAbs_SHELL));
+    if (!shells.More()) throw new Error("Could not make a closed solid from a family form");
+    const shell = keep(oc.TopoDS.Shell(keep(shells.Current())));
+    const solid = keep(keep(new oc.BRepBuilderAPI_MakeSolid(shell)).Solid());
+    const fix = keep(new oc.ShapeFix_Solid(solid));
+    fix.Perform();
+    return keep(fix.Solid());
   }
 
   buildLines(doc: Document, el: Element): LineData | null {

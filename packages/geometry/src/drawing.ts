@@ -16,6 +16,7 @@ import {
   type Vec2,
   type View,
   type ViewParams,
+  planLevelOf,
 } from "@open-bim/core";
 import { GRID_BUBBLE_RADIUS, type LineData } from "./datums.ts";
 import { planLinework, type PlanLinework } from "./hlr.ts";
@@ -80,6 +81,9 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
     if (el.category === Cat.View && el.id === view.id) return false; // a view doesn't show its own marker
     const owner = annotationView(el);
     if (owner && owner !== view.id) return false;
+    // Rooms and separators: only in plans of their level.
+    const lvl = planLevelOf(el);
+    if (lvl && (!isPlanView(view) || (view.params as ViewParams).levelId !== lvl)) return false;
     return elementGraphics(doc, g, el).visible;
   };
   const els = doc.all().filter(shown);

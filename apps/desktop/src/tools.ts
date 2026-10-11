@@ -54,8 +54,12 @@ import {
   type WallParams,
   totalThickness,
   type LayeredTypeParams,
+  createRoom,
+  createRoomSeparator,
+  nextRoomNumber,
+  type Room,
 } from "@open-bim/core";
-import { buildGridLines, buildReferencePlaneLines, extrudePolygon, wallFootprint, type LineData } from "@open-bim/geometry";
+import { buildGridLines, buildReferencePlaneLines, buildRoomLines, extrudePolygon, roomBoundary, wallFootprint, type LineData } from "@open-bim/geometry";
 import type { Viewport } from "./viewport.ts";
 
 export interface ToolContext {
@@ -782,6 +786,61 @@ export class SectionTool extends DatumLineTool {
       preview: (_doc, start, end) => linePreview(start, end),
       create: (tx, doc, start, end) => createSection(tx, doc, start, end),
     });
+  }
+}
+
+/** Room separation line: click start and end on the active level (plans). */
+export class RoomSeparatorTool extends DatumLineTool {
+  constructor(ctx: ToolContext) {
+    super(ctx, {
+      name: "roomseparator",
+      txName: "Create room separator",
+      label: () => "Room separator",
+      preview: (_doc, start, end) => linePreview(start, end),
+      create: (tx, doc, start, end) => createRoomSeparator(tx, doc, ctx.activeLevelId(), start, end),
+    });
+  }
+}
+
+/** Room: hover to preview the enclosed region, click to place a room (and its tag) there. */
+export class RoomTool implements Tool {
+  readonly name = "room";
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.ctx.status("Room: click inside an area enclosed by walls or room separators.");
+  }
+
+  deactivate(): void {
+    this.ctx.viewport.setPreviewLines(null);
+  }
+
+  private probe(p: Vec2): Room {
+    const { doc } = this.ctx;
+    return {
+      id: "preview",
+      category: Cat.Room,
+      name: "Room",
+      params: { levelId: this.ctx.activeLevelId(), point: p, number: nextRoomNumber(doc), upperLevelId: null, limitOffset: 2400, baseOffset: 0 },
+    } as Room;
+  }
+
+  pointerMove(ev: PointerEvent): void {
+    if (this.ctx.viewport.viewMode !== "plan") return;
+    const elevation = this.ctx.doc.require<LevelParams>(this.ctx.activeLevelId()).params.elevation;
+    const p = this.ctx.viewport.pickPlane(ev, elevation);
+    this.ctx.viewport.setPreviewLines(p ? buildRoomLines(this.ctx.doc, this.probe(p)) : null);
+  }
+
+  click(ev: PointerEvent): void {
+    if (this.ctx.viewport.viewMode !== "plan") return this.ctx.status("Rooms are placed in floor plans. Open one first.");
+    const { doc } = this.ctx;
+    const elevation = doc.require<LevelParams>(this.ctx.activeLevelId()).params.elevation;
+    const p = this.ctx.viewport.pickPlane(ev, elevation);
+    if (!p) return;
+    const room = doc.transact("Create room", (tx) => createRoom(tx, doc, this.ctx.activeLevelId(), p));
+    this.ctx.setSelection([room.id]);
+    this.ctx.status(roomBoundary(doc, room) ? `Room ${room.params.number} placed.` : "⚠ Room is not enclosed. Add walls or room separators around it.");
   }
 }
 

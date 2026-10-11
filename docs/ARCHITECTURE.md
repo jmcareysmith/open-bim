@@ -147,6 +147,13 @@ parameters and export with GUIDs. `GlobalParameter`s (value or formula) drive nu
 parameters through `params.globals` associations, re-applied by a commit hook in every transaction.
 Picking prefers solids under the cursor over line work, and line work over floors/ceilings/roofs.
 
+**Rooms** — a `Room` is a point on a level plus number, upper limit and offsets; its boundary is
+derived, never stored: `geometry/src/rooms.ts` subtracts room-bounding walls' joined footprints
+(tested at 1200 mm above the room base) and `RoomSeparator` lines (1 mm strips) from the plan with
+polygon-clipping, and takes the free region containing the point (null when it reaches the outside).
+Walls and separators list every room as `related`, so boundaries, areas and tags follow edits.
+Rooms and separators are level-scoped (`planLevelOf`): drawn only in plans of their level.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

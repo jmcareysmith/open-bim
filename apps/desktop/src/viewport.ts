@@ -22,6 +22,7 @@ import {
   type View,
   type ViewRange,
   viewCrop,
+  planLevelOf,
 } from "@open-bim/core";
 import {
   GRID_BUBBLE_RADIUS,
@@ -65,11 +66,13 @@ const COLORS: Record<string, number> = {
   [Cat.Dimension]: 0x1f2328,
   [Cat.TextNote]: 0x1f2328,
   [Cat.FilledRegion]: 0x1f2328,
+  [Cat.Room]: 0x7a8fa6,
+  [Cat.RoomSeparator]: 0x1f2328,
 };
 const SELECTED = 0x3d8bfd;
 const VOID_COLOR = 0xff8c1a;
 /** Large surfaces that lose picks to line work drawn over them. */
-const BACKGROUND_CATEGORIES = new Set<string>([Cat.Floor, Cat.Ceiling, Cat.Roof, Cat.FilledRegion]);
+const BACKGROUND_CATEGORIES = new Set<string>([Cat.Floor, Cat.Ceiling, Cat.Roof, Cat.FilledRegion, Cat.Room]);
 /** Halftone fades colours towards the (white) background. */
 const HALFTONE_TOWARD = 0xffffff;
 /** Backgrounds: white for plans, sections, elevations (Revit default); very light grey for 3D. */
@@ -155,6 +158,8 @@ export class Viewport {
   /** Annotations are drawn only in the view that owns them. */
   private annotationViewId: ElementId | undefined;
   private workPlaneZ = 0;
+  /** Level of the open plan: rooms and separators show only there. */
+  private planLevelId: ElementId | undefined;
   private raycaster = new THREE.Raycaster();
   private grid: THREE.GridHelper;
   private needsRender = true;
@@ -407,7 +412,16 @@ export class Viewport {
   private isShown(el: { id: ElementId; category: string; params: unknown }): boolean {
     const owner = annotationView(el as never);
     if (owner && owner !== this.annotationViewId) return false;
+    const lvl = planLevelOf(el as Element);
+    if (lvl && lvl !== this.planLevelId) return false;
     return this.resolveGraphics(el as Element).visible && this.visibility.isVisible(el);
+  }
+
+  /** The open plan's level (undefined outside plans). */
+  setPlanLevel(id: ElementId | undefined): void {
+    if (id === this.planLevelId) return;
+    this.planLevelId = id;
+    this.refreshVisibility();
   }
 
   /** The active view: its own annotations are shown, other views' are hidden. */

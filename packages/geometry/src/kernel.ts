@@ -21,6 +21,7 @@ import { mergeMeshes } from "./doors.ts";
 import { buildFamilyInstance, nestedMeshes } from "./components.ts";
 import { buildViewMarker } from "./sections.ts";
 import { buildAnnotationLines } from "./annotations.ts";
+import { buildRoomLines, buildRoomSeparatorLines } from "./rooms.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
 
 /**
@@ -104,6 +105,8 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.FilledRegion, buildAnnotationLines],
     [Cat.TextNote, buildAnnotationLines],
     [Cat.Dimension, buildAnnotationLines],
+    [Cat.Room, buildRoomLines],
+    [Cat.RoomSeparator, buildRoomSeparatorLines],
   ]);
 
   register(category: string, builder: Builder): void {

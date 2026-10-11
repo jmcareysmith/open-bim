@@ -44,6 +44,8 @@ export const Cat = {
   FamilyInstance: "FamilyInstance",
   ProjectParameter: "ProjectParameter",
   GlobalParameter: "GlobalParameter",
+  Room: "Room",
+  RoomSeparator: "RoomSeparator",
 } as const;
 
 // ---- Level ---------------------------------------------------------------
@@ -95,6 +97,8 @@ export type WallParams = {
   topOffset: number;
   /** Unconnected height, mm. Used when topLevelId is null. */
   height: number;
+  /** Bounds rooms (default true). */
+  roomBounding?: boolean;
 };
 export type Wall = Element<WallParams>;
 
@@ -179,7 +183,8 @@ registerCategory({
     const p = el.params as WallParams;
     return [p.baseLevelId, ...(p.topLevelId ? [p.topLevelId] : []), ...typeDeps(el)];
   },
-  related: (doc, el) => relatedWalls(doc, el as Wall),
+  // Joined walls, and rooms (their boundaries follow walls; extra regeneration is cheap).
+  related: (doc, el) => [...relatedWalls(doc, el as Wall), ...doc.byCategory(Cat.Room).map((r) => r.id)],
   cascadeDelete: true,
   isType: false,
 });

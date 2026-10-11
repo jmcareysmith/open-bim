@@ -1,6 +1,10 @@
+import { roomBoundary } from "@open-bim/geometry";
 import {
   Cat,
   levels,
+  roomExtent,
+  type Room,
+  type RoomParams,
   regionArea,
   angleInputValue,
   ensureProjectSettings,
@@ -205,6 +209,12 @@ function textInput(value: string, onCommit: (v: string) => void): HTMLInputEleme
   const input = h("input", { type: "text", value });
   input.onchange = () => onCommit(input.value.trim());
   return input;
+}
+
+function checkbox(value: boolean, onChange: (v: boolean) => void): HTMLInputElement {
+  const cb = h("input", { type: "checkbox", checked: value });
+  cb.onchange = () => onChange(cb.checked);
+  return cb;
 }
 
 function select(options: { value: string; label: string }[], value: string, onChange: (v: string) => void) {
@@ -684,6 +694,8 @@ const VG_CATEGORIES: [string, string][] = [
   [Cat.Door, "Doors"],
   [Cat.Window, "Windows"],
   [Cat.WallOpening, "Openings"],
+  [Cat.Room, "Rooms"],
+  [Cat.RoomSeparator, "Room separators"],
   [Cat.Grid, "Grids"],
   [Cat.ReferencePlane, "Reference planes"],
   [Cat.View, "View markers"],
@@ -1198,7 +1210,37 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
           : row("Unconnected height", numberInput(p.height, (v) => update<WallParams>("Change wall height", { height: v }))),
         row("Length", len(wallLength(w))),
         row("Thickness", len(wallThickness(doc, w))),
+        row("Room bounding", checkbox(p.roomBounding !== false, (v) => update<WallParams>("Change room bounding", { roomBounding: v }))),
       );
+      break;
+    }
+    case Cat.Room: {
+      const r = el as Room;
+      const p = r.params;
+      const b = roomBoundary(doc, r);
+      const { bottom, top } = roomExtent(doc, r);
+      sec.append(
+        row("Name", textInput(r.name ?? "", (v) => edit(ctx, "Rename room", (tx) => tx.setName(r.id, v || undefined)))),
+        row("Number", textInput(p.number, (v) => update<RoomParams>("Change room number", { number: v }))),
+        row("Level", select(levelOpts, p.levelId, (v) => update<RoomParams>("Change room level", { levelId: v }))),
+        row(
+          "Upper limit",
+          select([{ value: "", label: "(base level)" }, ...levelOpts], p.upperLevelId ?? "", (v) =>
+            update<RoomParams>("Change upper limit", { upperLevelId: v || null }),
+          ),
+        ),
+        row("Limit offset", numberInput(p.limitOffset, (v) => update<RoomParams>("Change limit offset", { limitOffset: v }))),
+        row("Base offset", numberInput(p.baseOffset, (v) => update<RoomParams>("Change base offset", { baseOffset: v }))),
+        row("Area", b ? formatArea(b.area, units) : "Not enclosed"),
+        row("Perimeter", b ? len(b.perimeter) : "—"),
+        row("Unbounded height", len(top - bottom)),
+        row("Volume", b ? `${((b.area * (top - bottom)) / 1e9).toFixed(2)} m³` : "—"),
+      );
+      break;
+    }
+    case Cat.RoomSeparator: {
+      const p = el.params as { levelId: string };
+      sec.append(row("Level", select(levelOpts, p.levelId, (v) => update<{ levelId: string }>("Change separator level", { levelId: v }))));
       break;
     }
     case Cat.Floor: {

@@ -16,3 +16,4 @@ export * from "./pdf.ts";
 export * from "./forms.ts";
 export * from "./components.ts";
 export * from "./constraints.ts";
+export * from "./rooms.ts";

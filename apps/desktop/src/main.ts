@@ -62,6 +62,8 @@ import {
   SweepTool,
   DetailLineTool,
   DimensionTool,
+  RoomTool,
+  RoomSeparatorTool,
   HostedTool,
   TextTool,
   OpeningTool,
@@ -282,6 +284,8 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   region: new SketchTool(ctx, "region"),
   text: new TextTool(ctx),
   dimension: new DimensionTool(ctx),
+  room: new RoomTool(ctx),
+  roomseparator: new RoomSeparatorTool(ctx),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
 const DRAWING_TOOLS = new Set(["select", "detailline", "region", "text", "extrusion", "blend", "revolution"]);
@@ -513,6 +517,7 @@ function applyView(): void {
     viewport.setSheet(sheet as Sheet);
     viewport.setGraphicsResolver(() => ({ visible: true, halftone: false, color: null }));
     viewport.setAnnotationView(sheet.id);
+    viewport.setPlanLevel(undefined);
     if (!DRAWING_TOOLS.has(tool.name)) setTool("select");
     return;
   }
@@ -532,6 +537,7 @@ function applyView(): void {
   const g = effectiveGraphics(doc, v);
   viewport.setGraphicsResolver((el) => elementGraphics(doc, g, el));
   viewport.setAnnotationView(v.id);
+  viewport.setPlanLevel(viewport.viewMode === "plan" ? (v.params.levelId ?? undefined) : undefined);
   viewport.setViewGraphics({ detailLevel: g.detailLevel, scale: g.scale });
   if (viewport.viewMode === "drawing" && !DRAWING_TOOLS.has(tool.name)) setTool("select");
 }

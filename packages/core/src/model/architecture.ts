@@ -40,6 +40,8 @@ export const Cat = {
   Blend: "Blend",
   Revolution: "Revolution",
   Sweep: "Sweep",
+  FamilyDef: "FamilyDef",
+  FamilyInstance: "FamilyInstance",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

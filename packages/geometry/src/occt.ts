@@ -15,6 +15,7 @@ import {
 } from "@open-bim/core";
 import { mergeMeshes } from "./doors.ts";
 import { formMesh } from "./forms.ts";
+import { buildFamilyInstance } from "./components.ts";
 import type { LineData } from "./datums.ts";
 import { joinedWallFootprint } from "./joins.ts";
 import { SimpleKernel, type GeometryKernel } from "./kernel.ts";
@@ -49,6 +50,7 @@ export class OcctKernel implements GeometryKernel {
       const cuts = wallCuts(doc, wall);
       if (cuts.length) return this.buildWallWithCuts(doc, wall, cuts);
     }
+    if (el.category === Cat.FamilyInstance) return buildFamilyInstance(doc, el, (fd, v) => this.familyMesh(fd, v));
     if (isFormCategory(el.category) && !(el.params as { isVoid?: boolean }).isVoid) {
       // Family solids are cut by every void in the family (Revit behaviour).
       const values = familyValues(doc);

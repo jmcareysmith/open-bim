@@ -40,7 +40,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Openings (shaft, wall, vertical) | 1 | 🟨 |
 | Stairs (run, landing, sketch) & railings | 6 | ⬜ |
 | Ramps | 6 | ⬜ |
-| Components / furniture (loadable families) | 3 | ⬜ |
+| Components / furniture (loadable families) | 3 | 🟨 |
 | Model in-place | 3 | ⬜ |
 | Rooms, room separation, room bounding | 4 | ⬜ |
 | Areas & area plans (GFA, NLA) | 4 | ⬜ |
@@ -68,9 +68,9 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Feature | Phase | Status |
 |---|---|---|
 | System families (walls, floors, roofs) | 1 | ⬜ |
-| Loadable family editor (sketch, extrude, revolve, sweep, blend, void) | 3 | ⬜ |
+| Loadable family editor (sketch, extrude, revolve, sweep, blend, void) | 3 | 🟨 |
 | Reference planes + dimension constraints (parametric solver) | 3 | ⬜ |
-| Formulas & conditionals in parameters | 3 | ⬜ |
+| Formulas & conditionals in parameters | 3 | ✅ |
 | Nested & shared families | 3 | ⬜ |
 | Type catalogs | 3 | ⬜ |
 | Shared parameters, project parameters, global parameters | 3 | ⬜ |

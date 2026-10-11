@@ -14,6 +14,18 @@ import {
   createTextNote,
   createDimension,
   type DimRef,
+  createBlend,
+  createExtrusion,
+  createRevolution,
+  createSweep,
+  placeFamilyInstance,
+  familyDocument,
+  familyValues,
+  viewFrame,
+  type FamilyDef,
+  type NumPt,
+  type View,
+  type WorkPlane,
   createWallOpening,
   createDoor,
   createWindow,
@@ -57,6 +69,10 @@ export interface ToolContext {
   status(text: string): void;
   /** The view shown in the viewport (callouts are drawn on it). */
   activeViewId(): ElementId | undefined;
+  /** Family editor: make new forms voids. */
+  formIsVoid(): boolean;
+  /** Component tool: the family and type to place (from the type selector). */
+  activeComponent(): { familyId: ElementId; typeName: string } | undefined;
 }
 
 export interface Tool {
@@ -457,13 +473,16 @@ export class ReferencePlaneTool extends DatumLineTool {
 
 // ---- Sketch (floors, ceilings) --------------------------------------------
 
-type SketchKind = "floor" | "ceiling" | "roof" | "region";
+type SketchKind = "floor" | "ceiling" | "roof" | "region" | "extrusion" | "blend" | "revolution";
 
 const SKETCH: Record<SketchKind, { category: string; typeCategory: string; label: string }> = {
   floor: { category: Cat.Floor, typeCategory: Cat.FloorType, label: "Floor" },
   ceiling: { category: Cat.Ceiling, typeCategory: Cat.CeilingType, label: "Ceiling" },
   roof: { category: Cat.Roof, typeCategory: Cat.RoofType, label: "Roof" },
   region: { category: Cat.FilledRegion, typeCategory: "", label: "Filled region" },
+  extrusion: { category: Cat.Extrusion, typeCategory: "", label: "Extrusion" },
+  blend: { category: Cat.Blend, typeCategory: "", label: "Blend (bottom loop, then top loop)" },
+  revolution: { category: Cat.Revolution, typeCategory: "", label: "Revolve (profile right of the centre line)" },
 };
 
 /**
@@ -576,9 +595,39 @@ export class SketchTool implements Tool {
     return false;
   }
 
+  /** Family forms: map the sketch onto the view's work plane and create the form. */
+  private finishForm(loops: Vec2[][]): void {
+    const { doc } = this.ctx;
+    try {
+      const sp = sketchPlane(this.ctx);
+      const toNum = (loop: Vec2[]): NumPt[] => loop.map((p) => sp.toPlane(p)).map((p) => ({ x: Math.round(p.x), y: Math.round(p.y) }));
+      const isVoid = this.ctx.formIsVoid();
+      let id: ElementId;
+      if (this.name === "extrusion") {
+        const region = regionFromLoops(loops.map((l) => l.map(sp.toPlane)));
+        id = doc.transact(isVoid ? "Create void extrusion" : "Create extrusion", (tx) =>
+          createExtrusion(tx, toNum(region.boundary), { holes: region.holes.map(toNum), end: sp.depth, plane: sp.plane, isVoid }),
+        ).id;
+      } else if (this.name === "blend") {
+        if (loops.length !== 2) throw new Error("Sketch two loops: the bottom profile, then the top");
+        id = doc.transact("Create blend", (tx) => createBlend(tx, toNum(loops[0]!), toNum(loops[1]!), { end: sp.depth, plane: sp.plane, isVoid })).id;
+      } else {
+        if (loops.length !== 1) throw new Error("Sketch one closed profile to revolve");
+        id = doc.transact("Create revolve", (tx) => createRevolution(tx, toNum(loops[0]!), { plane: sp.plane, isVoid })).id;
+      }
+      this.reset();
+      this.redraw();
+      this.ctx.setSelection([id]);
+      this.ctx.status(`${this.def.label.split(" (")[0]} created. Edit depths and points (formulas welcome) in Properties.`);
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
+  }
+
   private finish(): void {
     const loops = this.current.length >= 3 ? [...this.loops, this.current] : this.loops;
     const { doc } = this.ctx;
+    if (this.name === "extrusion" || this.name === "blend" || this.name === "revolution") return this.finishForm(loops);
     try {
       const region = regionFromLoops(loops);
       if (this.name === "roof" && region.holes.length) throw new Error("A footprint roof takes a single boundary loop");
@@ -971,5 +1020,133 @@ export class DimensionTool implements Tool {
       return true;
     }
     return false;
+  }
+}
+
+// ---- Family editor ------------------------------------------------------------------
+
+/**
+ * The work plane a family sketch lies on, from the active view: plans sketch on XY; the Front
+ * elevation on XZ (u = x, v = z); side elevations on YZ (u = y, v = z).
+ */
+export function sketchPlane(ctx: ToolContext): { plane: WorkPlane; toPlane: (p: Vec2) => Vec2; depth: number } {
+  const v = ctx.activeViewId() ? ctx.doc.get(ctx.activeViewId()!) : undefined;
+  const view = v as View | undefined;
+  if (view && (view.params.kind === "section" || view.params.kind === "elevation")) {
+    const f = viewFrame(view);
+    const front = Math.abs(f.dir[1]) >= Math.abs(f.dir[0]);
+    return {
+      plane: { kind: front ? "XZ" : "YZ", offset: 0 },
+      toPlane: (p) => ({ x: front ? f.origin[0] + f.right[0] * p.x : f.origin[1] + f.right[1] * p.x, y: p.y }),
+      depth: 300,
+    };
+  }
+  return { plane: { kind: "XY", offset: 0 }, toPlane: (p) => p, depth: 1000 };
+}
+
+/** Sweep: click the path in plan, Enter to finish; a 50 x 50 profile is swept along it (edit in Properties). */
+export class SweepTool implements Tool {
+  readonly name = "sweep";
+  private path: Vec2[] = [];
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.path = [];
+    this.ctx.status("Sweep: click the path points in plan, then Enter. The profile is edited in Properties.");
+  }
+
+  deactivate(): void {
+    this.path = [];
+    this.ctx.viewport.setPreviewLines(null);
+  }
+
+  pointerMove(ev: PointerEvent): void {
+    const p = viewPoint(this.ctx, ev, this.path.at(-1) ?? null, this.path);
+    if (!p || !this.path.length) return;
+    const pts = [...this.path, p];
+    const seg = pts.slice(1).flatMap((q, i) => [pts[i]!.x, pts[i]!.y, 0, q.x, q.y, 0]);
+    this.ctx.viewport.setPreviewLines({ segments: new Float32Array(seg), labels: [] });
+  }
+
+  click(ev: PointerEvent): void {
+    const p = viewPoint(this.ctx, ev, this.path.at(-1) ?? null, this.path);
+    if (p) this.path.push(p);
+  }
+
+  key(ev: KeyboardEvent): boolean {
+    if (ev.key === "Enter") {
+      const { doc } = this.ctx;
+      try {
+        if (this.path.length < 2) throw new Error("Click at least two path points first");
+        const path = this.path.map((q) => ({ x: Math.round(q.x), y: Math.round(q.y) }));
+        const profile: NumPt[] = [{ x: -25, y: 0 }, { x: 25, y: 0 }, { x: 25, y: 50 }, { x: -25, y: 50 }];
+        const s = doc.transact("Create sweep", (tx) => createSweep(tx, path, profile, { isVoid: this.ctx.formIsVoid() }));
+        this.ctx.setSelection([s.id]);
+        this.activate();
+      } catch (err) {
+        this.ctx.status(`\u26a0 ${(err as Error).message}`);
+      }
+      this.ctx.viewport.setPreviewLines(null);
+      return true;
+    }
+    if (ev.key === "Escape" && this.path.length) {
+      this.activate();
+      this.ctx.viewport.setPreviewLines(null);
+      return true;
+    }
+    return false;
+  }
+}
+
+/** Component: place the selected family type; hosted families go in a wall. Space rotates 90 degrees. */
+export class ComponentTool implements Tool {
+  readonly name = "component";
+  private rotation = 0;
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    const c = this.ctx.activeComponent();
+    if (!c) return this.ctx.status("Component: load a family first (Project Browser \u2192 Families).");
+    const def = this.ctx.doc.get(c.familyId) as FamilyDef | undefined;
+    const hosted = def?.params.hosting === "wall";
+    this.ctx.status(`Component ${def?.name} : ${c.typeName} \u2014 click ${hosted ? "a wall" : "to place; Space rotates 90\u00b0"}.`);
+  }
+
+  key(ev: KeyboardEvent): boolean {
+    if (ev.key === " ") {
+      this.rotation = (this.rotation + Math.PI / 2) % (2 * Math.PI);
+      this.ctx.status(`Component rotation ${Math.round((this.rotation * 180) / Math.PI)}\u00b0`);
+      return true;
+    }
+    return false;
+  }
+
+  click(ev: PointerEvent): void {
+    const c = this.ctx.activeComponent();
+    if (!c) return this.activate();
+    const { doc, viewport } = this.ctx;
+    const def = doc.require(c.familyId) as FamilyDef;
+    try {
+      let inst;
+      if (def.params.hosting === "wall") {
+        const hit = viewport.pickHit(ev, (id) => doc.get(id)?.category === Cat.Wall);
+        if (!hit) return this.ctx.status("Component: click on a wall.");
+        const wall = doc.require<WallParams>(hit.id) as Wall;
+        const width = familyValues(familyDocument(def), c.typeName)["Width"] ?? 0;
+        const len = wallLength(wall);
+        const along = Math.round(Math.min(Math.max(positionAlongWall(wall, hit.point), width / 2), len - width / 2));
+        inst = doc.transact("Place component", (tx) => placeFamilyInstance(tx, doc, def.id, c.typeName, { hostId: wall.id, along }));
+      } else {
+        const p = viewPoint(this.ctx, ev, null);
+        if (!p) return;
+        const levelId = this.ctx.activeLevelId();
+        inst = doc.transact("Place component", (tx) =>
+          placeFamilyInstance(tx, doc, def.id, c.typeName, { levelId, position: p, rotation: this.rotation }),
+        );
+      }
+      this.ctx.setSelection([inst.id]);
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
   }
 }

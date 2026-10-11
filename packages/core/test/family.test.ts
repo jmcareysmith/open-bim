@@ -7,6 +7,7 @@ import {
   createFamilyParameter,
   createFamilyType,
   familyInfo,
+  familyName,
   familyValues,
   setFamilyValue,
   views,
@@ -22,6 +23,7 @@ describe("family documents", () => {
     expect(doc.byCategory(Cat.ReferencePlane).map((r) => r.name)).toEqual(["Center (Left/Right)", "Center (Front/Back)"]);
     expect(familyValues(doc)).toEqual({ Width: 1200, Depth: 600, Height: 750 });
     expect(familyInfo(doc)!.params.hosting).toBe("none");
+    expect(familyName(doc)).toBe("Family 1");
     const door = new Document();
     applyFamilyTemplate(door, "Door");
     expect(familyInfo(door)!.params.hosting).toBe("wall");

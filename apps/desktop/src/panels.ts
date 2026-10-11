@@ -25,6 +25,25 @@ import {
   validateViewRange,
   dimensionLayout,
   flipWall,
+  createFamilyParameter,
+  createFamilyType,
+  evaluate,
+  familyDefs,
+  familyDocument,
+  familyInfo,
+  familyParameters,
+  familyTypeNames,
+  familyValues,
+  isFormCategory,
+  setFamilyValue,
+  type FamilyCategory,
+  type FamilyDef,
+  type FamilyInfoParams,
+  type FamilyInstance,
+  type FamilyInstanceParams,
+  type FamilyParameterParams,
+  type Num,
+  type NumPt,
   createSheet,
   placeView,
   sheetOfView,
@@ -112,6 +131,10 @@ export interface PanelContext {
   activeViewId(): ElementId | undefined;
   setActiveView(id: ElementId): void;
   status(text: string): void;
+  /** Open a new family of a category in the family editor. */
+  newFamily(category: FamilyCategory): void;
+  /** Open a loaded family in the family editor. */
+  editFamily(defId: ElementId): void;
 }
 
 /** Run an edit, surfacing validation errors in the status bar instead of throwing. */
@@ -252,6 +275,222 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
   }
   if (!template) sec.append(visibilityGraphics(ctx, view.id, p));
   return sec;
+}
+
+const FAMILY_CATEGORIES: [FamilyCategory, string][] = [
+  ["GenericModel", "Generic Model"],
+  ["Furniture", "Furniture"],
+  ["Casework", "Casework"],
+  ["Door", "Door (wall hosted)"],
+  ["Window", "Window (wall hosted)"],
+];
+
+/** A number or formula: numeric text is stored as a number, anything else as a formula. */
+function formulaInput(value: Num, onCommit: (v: Num) => void, check?: (v: Num) => void): HTMLInputElement {
+  const input = h("input", { type: "text", value: String(value), title: "Number or formula, e.g. Width / 2" });
+  input.onchange = () => {
+    const t = input.value.trim();
+    const v: Num = /^[-+]?(\d+\.?\d*|\.\d+)$/.test(t) ? Number(t) : t;
+    try {
+      check?.(v);
+      onCommit(v);
+    } catch (err) {
+      input.classList.add("invalid");
+      input.title = (err as Error).message;
+    }
+  };
+  return input;
+}
+
+const ptsText = (pts: NumPt[]) => pts.map((p) => `${p.x}, ${p.y}`).join("\n");
+
+/** Points textarea: one "x, y" per line; each coordinate a number or formula. */
+function pointsInput(pts: NumPt[], onCommit: (p: NumPt[]) => void): HTMLTextAreaElement {
+  const ta = h("textarea", { class: "points", value: ptsText(pts), title: "One point per line: x, y (numbers or formulas)" });
+  ta.onchange = () => {
+    const parsed = ta.value
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((l) => {
+        const parts = l.split(",");
+        if (parts.length !== 2) throw new Error(`"${l}" should be x, y`);
+        const num = (s: string): Num => (/^[-+]?(\d+\.?\d*|\.\d+)$/.test(s.trim()) ? Number(s.trim()) : s.trim());
+        return { x: num(parts[0]!), y: num(parts[1]!) };
+      });
+    onCommit(parsed);
+  };
+  return ta;
+}
+
+/** Form properties (family editor). */
+function formRows(ctx: PanelContext, el: Element): HTMLElement[] {
+  const { doc } = ctx;
+  const p = el.params as Record<string, unknown> & { isVoid: boolean; plane: { kind: string } };
+  const values = familyValues(doc);
+  const check = (v: Num) => void evaluate(v, values);
+  const update = (name: string, patch: Record<string, unknown>) => edit(ctx, name, (tx) => tx.update(el.id, patch as never));
+  const isVoid = h("input", { type: "checkbox", checked: p.isVoid });
+  isVoid.onchange = () => update("Toggle void", { isVoid: isVoid.checked });
+  const rows: HTMLElement[] = [row("Void (cuts solids)", isVoid), row("Work plane", p.plane.kind)];
+  const field = (key: string, label: string) => rows.push(row(label, formulaInput(p[key] as Num, (v) => update(`Edit ${label.toLowerCase()}`, { [key]: v }), check)));
+  const pts = (key: string, label: string) => {
+    rows.push(h("h3", {}, label));
+    rows.push(pointsInput(p[key] as NumPt[], (v) => update(`Edit ${label.toLowerCase()}`, { [key]: v })));
+  };
+  switch (el.category) {
+    case Cat.Extrusion:
+      field("start", "Extrusion start");
+      field("end", "Extrusion end");
+      pts("profile", "Profile (x, y)");
+      break;
+    case Cat.Blend:
+      field("start", "Base offset");
+      field("end", "Top offset");
+      pts("bottom", "Bottom profile");
+      pts("top", "Top profile");
+      break;
+    case Cat.Revolution:
+      field("axis", "Axis (u)");
+      field("startAngle", "Start angle (\u00b0)");
+      field("endAngle", "End angle (\u00b0)");
+      pts("profile", "Profile (u, v)");
+      break;
+    case Cat.Sweep:
+      pts("path", "Path (x, y)");
+      pts("profile", "Profile (across, up)");
+      break;
+  }
+  return rows;
+}
+
+/** Family editor: name, current type, parameters (value, formula, instance/type), add parameter/type. */
+function familyTypesSection(ctx: PanelContext): HTMLElement {
+  const { doc } = ctx;
+  const info = familyInfo(doc)!;
+  const p = info.params;
+  const sec = h("div", { class: "section" }, h("h3", {}, "Family Types"));
+  sec.append(
+    row("Family name", textInput(info.name ?? "", (v) => edit(ctx, "Rename family", (tx) => tx.setName(info.id, v || undefined)))),
+    row("Category", p.category + (p.hosting === "wall" ? " (wall hosted)" : "")),
+    row(
+      "Type",
+      select(p.types.map((t) => ({ value: t.name, label: t.name })), p.currentType, (v) =>
+        edit(ctx, "Change current type", (tx) => tx.update<FamilyInfoParams>(info.id, { currentType: v })),
+      ),
+    ),
+  );
+  const newType = h("button", { textContent: "New type" });
+  newType.onclick = () =>
+    edit(ctx, "New family type", (tx) => {
+      let n = p.types.length + 1;
+      while (p.types.some((t) => t.name === `Type ${n}`)) n++;
+      createFamilyType(tx, doc, `Type ${n}`);
+    });
+  sec.append(row("", newType));
+
+  let values: Record<string, number> = {};
+  let error = "";
+  try {
+    values = familyValues(doc);
+  } catch (err) {
+    error = (err as Error).message;
+  }
+  sec.append(h("h3", {}, "Parameters (value \u00b7 formula \u00b7 instance)"));
+  if (error) sec.append(h("div", { class: "empty" }, `\u26a0 ${error}`));
+  for (const fp of familyParameters(doc)) {
+    const name = fp.name ?? "";
+    const valueCell = fp.params.formula
+      ? h("span", { class: "value" }, String(Math.round((values[name] ?? 0) * 100) / 100))
+      : numberInput(values[name] ?? 0, (v) => edit(ctx, `Set ${name}`, (tx) => setFamilyValue(tx, doc, name, v)));
+    const formula = h("input", { type: "text", value: fp.params.formula ?? "", placeholder: "formula" });
+    formula.onchange = () =>
+      edit(ctx, `Formula for ${name}`, (tx) => {
+        const f = formula.value.trim() || null;
+        tx.update<FamilyParameterParams>(fp.id, { formula: f });
+        familyValues(doc); // reject circular or invalid formulas (rolls back)
+      });
+    const inst = h("input", { type: "checkbox", checked: fp.params.instance, title: "Instance parameter" });
+    inst.onchange = () => edit(ctx, "Change parameter kind", (tx) => tx.update<FamilyParameterParams>(fp.id, { instance: inst.checked }));
+    const del = h("button", { textContent: "\u00d7", class: "mini", title: "Delete parameter" });
+    del.onclick = () => edit(ctx, `Delete ${name}`, (tx) => tx.delete(fp.id));
+    sec.append(h("div", { class: "param" }, h("span", { title: name }, name), valueCell, formula, inst, del));
+  }
+  const newName = h("input", { type: "text", placeholder: "New parameter name" });
+  const add = h("button", { textContent: "Add" });
+  add.onclick = () => edit(ctx, "Add parameter", (tx) => createFamilyParameter(tx, doc, newName.value.trim(), { value: 0 }));
+  sec.append(h("div", { class: "rule" }, newName, add));
+  return sec;
+}
+
+/** Placed family instance: type, placement, instance parameters. */
+function instanceRows(ctx: PanelContext, inst: FamilyInstance): HTMLElement[] {
+  const { doc } = ctx;
+  const p = inst.params;
+  const def = doc.get(p.familyId) as FamilyDef | undefined;
+  if (!def) return [row("Family", "(missing)")];
+  const update = (name: string, patch: Partial<FamilyInstanceParams>) => edit(ctx, name, (tx) => tx.update<FamilyInstanceParams>(inst.id, patch));
+  const rows: HTMLElement[] = [
+    row("Family", def.name ?? ""),
+    row(
+      "Type",
+      select(familyTypeNames(def).map((t) => ({ value: t, label: t })), p.typeName, (v) => update("Change family type", { typeName: v })),
+    ),
+  ];
+  if (p.hostId) {
+    const flip = h("button", { textContent: "Flip" });
+    flip.onclick = () => update("Flip component", { flipped: !p.flipped });
+    rows.push(
+      row("Position along wall", numberInput(p.along, (v) => update("Move component", { along: v }))),
+      row("Sill height", numberInput(p.sillHeight, (v) => update("Change sill height", { sillHeight: v }))),
+      row("Facing", flip),
+    );
+  } else {
+    rows.push(
+      row("Offset from level", numberInput(p.offset, (v) => update("Change offset", { offset: v }))),
+      row("X", numberInput(p.position.x, (v) => update("Move component", { position: { ...p.position, x: v } }))),
+      row("Y", numberInput(p.position.y, (v) => update("Move component", { position: { ...p.position, y: v } }))),
+      row(
+        "Rotation (\u00b0)",
+        formulaInput(Math.round((p.rotation * 180) / Math.PI), (v) => update("Rotate component", { rotation: (Number(v) * Math.PI) / 180 })),
+      ),
+    );
+  }
+  // Instance parameters: overrides of the type's value.
+  const fam = familyDocument(def);
+  const instParams = familyParameters(fam).filter((fp) => fp.params.instance && !fp.params.formula);
+  if (instParams.length) {
+    rows.push(h("h3", {}, "Instance parameters"));
+    const vals = familyValues(fam, p.typeName, p.overrides);
+    for (const fp of instParams) {
+      const name = fp.name ?? "";
+      rows.push(row(name, numberInput(vals[name] ?? 0, (v) => update(`Set ${name}`, { overrides: { ...p.overrides, [name]: v } }))));
+    }
+  }
+  return rows;
+}
+
+/** Family editor browser: views, parameters summary, forms. */
+function renderFamilyBrowser(root: HTMLElement, ctx: PanelContext): void {
+  const { doc } = ctx;
+  const sel = new Set(ctx.selection());
+  const viewsSec = h("div", { class: "section" }, h("h3", {}, "Views"));
+  for (const v of viewElements(doc)) {
+    const div = h("div", { class: `list-item${v.id === ctx.activeViewId() ? " selected" : ""}` }, h("span", {}, v.name ?? v.id));
+    div.onclick = () => ctx.setActiveView(v.id);
+    viewsSec.append(div);
+  }
+  const forms = h("div", { class: "section" }, h("h3", {}, "Forms"));
+  for (const f of doc.all().filter((e) => isFormCategory(e.category))) {
+    const label = `${f.category}${(f.params as { isVoid?: boolean }).isVoid ? " (void)" : ""}`;
+    const div = h("div", { class: `list-item${sel.has(f.id) ? " selected" : ""}` }, h("span", {}, label));
+    div.onclick = () => ctx.setSelection([f.id]);
+    forms.append(div);
+  }
+  if (!forms.children[1]) forms.append(h("div", { class: "empty" }, "No forms yet: use Extrusion, Blend, Revolve or Sweep."));
+  const info = familyInfo(doc)!;
+  const summary = h("div", { class: "section" }, h("h3", {}, "Family"), row("Name", info.name ?? ""), row("Types", String(info.params.types.length)));
+  root.replaceChildren(summary, viewsSec, forms);
 }
 
 /** Sheet properties: title block fields, paper size, placing views. */
@@ -550,6 +789,7 @@ function editBoundaryButton(ctx: PanelContext, id: ElementId): HTMLElement {
 export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   const { doc } = ctx;
   units = projectUnits(doc);
+  if (familyInfo(doc)) return renderFamilyBrowser(root, ctx);
   const sel = new Set(ctx.selection());
   const item = (el: Element, right: string, onClick: () => void, active = false) => {
     const div = h(
@@ -703,7 +943,25 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   };
   vg.append(row("", newFilter));
 
-  root.replaceChildren(project, views, sheetsSec, lv, types, mats, vg, counts);
+  // Families: loaded (embedded) families and starting new ones.
+  const fams = h("div", { class: "section" }, h("h3", {}, "Families"));
+  for (const f of familyDefs(doc)) {
+    const div = h("div", { class: `list-item${sel.has(f.id) ? " selected" : ""}` }, h("span", {}, f.name ?? f.id), h("span", { class: "muted" }, f.params.category));
+    div.onclick = () => ctx.setSelection([f.id]);
+    fams.append(div);
+  }
+  fams.append(
+    row(
+      "New family",
+      select(
+        [{ value: "", label: "Category\u2026" }, ...FAMILY_CATEGORIES.map(([v, l]) => ({ value: v, label: l }))],
+        "",
+        (v) => v && ctx.newFamily(v as FamilyCategory),
+      ),
+    ),
+  );
+
+  root.replaceChildren(project, views, sheetsSec, fams, lv, types, mats, vg, counts);
 }
 
 // ---- Properties -----------------------------------------------------------
@@ -715,6 +973,11 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
   if (ids.length === 0) {
     // Nothing selected: show the active view's properties, as Revit does.
     const active = ctx.activeViewId() ? doc.get(ctx.activeViewId()!) : undefined;
+    if (familyInfo(doc)) {
+      // Family editor: Family Types (parameters and values) first, then the view.
+      root.replaceChildren(familyTypesSection(ctx), ...(active ? [viewSection(ctx, active as View)] : []));
+      return;
+    }
     if (active?.category === Cat.Sheet) {
       root.replaceChildren(sheetSection(ctx, active as Element<SheetParams>));
       return;
@@ -831,6 +1094,32 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         }),
         editBoundaryButton(ctx, el.id),
       );
+      break;
+    }
+    case Cat.Extrusion:
+    case Cat.Blend:
+    case Cat.Revolution:
+    case Cat.Sweep: {
+      sec.append(...formRows(ctx, el));
+      break;
+    }
+    case Cat.FamilyDef: {
+      const def = el as FamilyDef;
+      const open = h("button", { textContent: "Edit family" });
+      open.onclick = () => ctx.editFamily(def.id);
+      const count = doc.byCategory<FamilyInstanceParams>(Cat.FamilyInstance).filter((i) => i.params.familyId === def.id).length;
+      sec.append(
+        row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename family", (tx) => tx.setName(el.id, v || undefined)))),
+        row("Category", def.params.category),
+        row("Hosting", def.params.hosting === "wall" ? "Wall" : "None"),
+        row("Types", familyTypeNames(def).join(", ")),
+        row("Placed", String(count)),
+        row("", open),
+      );
+      break;
+    }
+    case Cat.FamilyInstance: {
+      sec.append(...instanceRows(ctx, el as FamilyInstance));
       break;
     }
     case Cat.Viewport: {

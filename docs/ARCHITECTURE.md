@@ -104,6 +104,18 @@ view scale; `writePdf` is a dependency-free vector PDF writer (Helvetica, WinAns
 and the PDF render the same primitives. (The interactive viewport still has its own plan/section
 path; folding it onto `viewDrawing` is a later clean-up.)
 
+**Families** — a family is its own `Document` (Revit's family editor): reference level, views,
+centre reference planes, `FamilyInfo` (category, hosting, types with values, current type),
+`FamilyParameter`s (type/instance, optional formula) and forms (`Extrusion`, `Blend`, `Revolution`,
+`Sweep`; solid or void; on an XY/XZ/YZ work plane). Every form coordinate and depth is a `Num` —
+a number or a formula (`expr.ts`: arithmetic, comparisons, and/or/not, if(), min/max/round, degree
+trig; no eval). `familyValues` evaluates parameters in dependency order. Loading embeds the family
+JSON in the project as a `FamilyDef`; `FamilyInstance`s place a type free-standing (level, position,
+rotation) or wall-hosted (along, sill, flip; cut = the family's Width × Height). Geometry: forms are
+meshed in their plane frames; the OCCT kernel sews them into solids and cuts voids; instance meshes
+are cached per family version and parameter values. The desktop app swaps documents (project ⇄
+family) keeping each one's undo, view and selection.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

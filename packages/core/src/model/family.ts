@@ -71,6 +71,11 @@ export function familyInfo(doc: Document): FamilyInfo | undefined {
   return doc.byCategory<FamilyInfoParams>(Cat.FamilyInfo)[0];
 }
 
+/** The family's name (stored on its FamilyInfo element). */
+export function familyName(doc: Document): string {
+  return familyInfo(doc)?.name ?? "Family";
+}
+
 export function familyParameters(doc: Document): FamilyParameter[] {
   return doc.byCategory<FamilyParameterParams>(Cat.FamilyParameter);
 }
@@ -160,7 +165,7 @@ const STARTER: Record<FamilyCategory, [string, number][]> = {
 };
 
 /** New family document: reference level, views, centre reference planes, starter parameters. */
-export function applyFamilyTemplate(doc: Document, category: FamilyCategory = "GenericModel"): { levelId: ElementId } {
+export function applyFamilyTemplate(doc: Document, category: FamilyCategory = "GenericModel", name = "Family 1"): { levelId: ElementId } {
   return doc.transact(`New ${category} family`, (tx) => {
     createProjectSettings(tx, doc);
     const level = createLevel(tx, "Ref. Level", 0);
@@ -175,9 +180,9 @@ export function applyFamilyTemplate(doc: Document, category: FamilyCategory = "G
       hosting: category === "Door" || category === "Window" ? "wall" : "none",
       types: [{ name: "Default", values: Object.fromEntries(STARTER[category]) }],
       currentType: "Default",
-    });
-    for (const [name] of STARTER[category]) {
-      tx.create<FamilyParameterParams>(Cat.FamilyParameter, { kind: "length", instance: false, formula: null }, { name });
+    }, { name });
+    for (const [param] of STARTER[category]) {
+      tx.create<FamilyParameterParams>(Cat.FamilyParameter, { kind: "length", instance: false, formula: null }, { name: param });
     }
     return { levelId: level.id };
   });

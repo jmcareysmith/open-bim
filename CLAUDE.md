@@ -53,5 +53,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   floors lack pick-walls/slope arrows; roofs exact for convex/L/T/U only; doors/windows parametric;
   dimensions only in plans via the tool; no 3D view camera saved per view; viewport (interactive)
   and sheet/PDF drawing paths are separate (fold the viewport onto `viewDrawing` later).
-- Next: Phase 3 — family editor (reference planes, sketches, extrude/revolve/sweep/blend/void), then
-  the 2D constraint solver (evaluate PlaneGCS).
+- Families (Phase 3 started): family editor (Browser → Families → New family / Edit family) with
+  Extrusion/Blend/Revolve/Sweep (+ Void), parameters with formulas, family types; Load into Project;
+  Component tool (C) places them (free-standing, or in walls for Door/Window families).
+- Next: Phase 3 — 2D constraint solver (evaluate PlaneGCS), then type catalogs / nested families,
+  project/shared/global parameters, family library.

@@ -36,12 +36,12 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Visibility/Graphics, filters, view templates — visible / halftone / line colour overrides; no line weights or patterns overrides yet
 - [x] Sheets, title blocks, viewports, vector PDF export — built-in title block; no 3D viewports or schedules on sheets yet
 
-## Phase 3 — Families & parameters (next)
-- Family editor: reference planes, sketches, extrude/revolve/sweep/blend/void
-- 2D constraint solver (dimensions drive geometry) — evaluate PlaneGCS (FreeCAD's solver) compiled to WASM
-- Formulas, conditionals, type catalogs, nested/shared families
-- Project, shared and global parameters
-- Family library (doors, windows, furniture) in an open format
+## Phase 3 — Families & parameters (current)
+- [x] Family editor: reference planes, sketches, extrude/revolve/sweep/blend/void — profiles editable as formula points; no graphical profile editing after creation yet
+- [ ] 2D constraint solver (dimensions drive geometry) — evaluate PlaneGCS (FreeCAD's solver) compiled to WASM
+- [ ] Formulas, conditionals, type catalogs, nested/shared families — formulas + conditionals done (expr.ts)
+- [ ] Project, shared and global parameters
+- [ ] Family library (doors, windows, furniture) in an open format
 
 ## Phase 4 — Data & documentation
 - Rooms, areas, area plans

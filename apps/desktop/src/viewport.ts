@@ -6,6 +6,7 @@ import {
   TemporaryVisibility,
   annotationView,
   elementMaterial,
+  isFormCategory,
   isDrawingView,
   viewFrame,
   type DetailLevel,
@@ -52,6 +53,11 @@ const COLORS: Record<string, number> = {
   [Cat.WallOpening]: 0xd9822b,
   [Cat.Door]: 0xa0764f,
   [Cat.Window]: 0x9cc3d9,
+  [Cat.Extrusion]: 0xc8c3b6,
+  [Cat.Blend]: 0xc8c3b6,
+  [Cat.Revolution]: 0xc8c3b6,
+  [Cat.Sweep]: 0xc8c3b6,
+  [Cat.FamilyInstance]: 0xb9a48a,
   [Cat.Grid]: 0x4a5560,
   [Cat.ReferencePlane]: 0x2e8b57,
   [Cat.View]: 0x2b2f36,
@@ -61,6 +67,7 @@ const COLORS: Record<string, number> = {
   [Cat.FilledRegion]: 0x1f2328,
 };
 const SELECTED = 0x3d8bfd;
+const VOID_COLOR = 0xff8c1a;
 /** Halftone fades colours towards the (white) background. */
 const HALFTONE_TOWARD = 0xffffff;
 /** Backgrounds: white for plans, sections, elevations (Revit default); very light grey for 3D. */
@@ -128,6 +135,7 @@ export class Viewport {
   private planRange: ViewRange = { bottom: 0, cut: PLAN_CUT_HEIGHT };
   private planFramed = false;
   private objects = new Map<ElementId, THREE.Group>();
+  private unsubscribe: () => void = () => {};
   /** Last built mesh per element, for computing plan drawings. */
   private meshes = new Map<ElementId, MeshData>();
   /** 2D plan linework per element (plan views only). */
@@ -205,12 +213,26 @@ export class Viewport {
     new ResizeObserver(() => this.resize()).observe(container);
     this.resize();
 
-    doc.on((c) => this.sync(c));
+    this.unsubscribe = doc.on((c) => this.sync(c));
     this.rebuildAll();
     this.loop();
   }
 
   // ---- sync ----------------------------------------------------------------
+
+  /** Show a different document (project or family being edited). */
+  setDocument(doc: Document): void {
+    this.unsubscribe();
+    this.doc = doc;
+    this.unsubscribe = doc.on((c) => this.sync(c));
+    this.selected.clear();
+    this.visibility.reset();
+    this.drawingView = null;
+    this.sheet = null;
+    this.planFramed = false;
+    this.rebuildAll();
+    this.refreshVisibility();
+  }
 
   rebuildAll(): void {
     for (const id of [...this.objects.keys()]) this.remove(id);
@@ -247,7 +269,9 @@ export class Viewport {
       if (mesh) {
         this.meshes.set(id, mesh);
         const material = elementMaterial(this.doc, el);
-        group = makeGroup(mesh, material?.params.color ?? COLORS[el.category] ?? 0xcccccc);
+        // Family voids show as translucent orange in the family editor (Revit convention).
+        const isVoid = isFormCategory(el.category) && (el.params as { isVoid?: boolean }).isVoid;
+        group = isVoid ? makeGroup(mesh, VOID_COLOR, 0.35) : makeGroup(mesh, material?.params.color ?? COLORS[el.category] ?? 0xcccccc);
         group.userData.baseColor = material?.params.color;
         group.userData.solid = true;
         // Symbols drawn with a solid (door swings) ride along in the same group.

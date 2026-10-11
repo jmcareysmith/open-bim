@@ -26,6 +26,14 @@ import {
   type FloorParams,
   type RoofParams,
   type LevelParams,
+  applyFamilyTemplate,
+  familyDefs,
+  familyInfo,
+  familyName,
+  familyTypeNames,
+  loadFamily,
+  type FamilyCategory,
+  type FamilyDef,
 } from "@open-bim/core";
 import { OcctKernel, SimpleKernel, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
@@ -35,6 +43,8 @@ import { buildSample } from "./sample.ts";
 import {
   GridTool,
   CalloutTool,
+  ComponentTool,
+  SweepTool,
   DetailLineTool,
   DimensionTool,
   HostedTool,
@@ -54,8 +64,21 @@ const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)
 
 // ---- state ----------------------------------------------------------------
 
-const doc = new Document();
+/** The document being edited: the project, or a family open in the family editor. */
+let doc = new Document();
 buildSample(doc);
+/** While a family is open, the project's state to return to. */
+let projectSession: Session | null = null;
+interface Session {
+  doc: Document;
+  selection: ElementId[];
+  activeLevelId: ElementId;
+  activeViewId: ElementId | undefined;
+  filePath: string | null;
+  dirty: boolean;
+}
+/** Component tool: the family type chosen in the type selector ("familyId|type"). */
+let activeComponentKey: string | undefined;
 
 let selection: ElementId[] = [];
 let activeLevelId: ElementId = levels(doc)[0]!.id;
@@ -85,8 +108,30 @@ const status = (text: string): void => {
 };
 
 const ctx: ToolContext & PanelContext = {
-  doc,
+  get doc() {
+    return doc;
+  },
   viewport,
+  formIsVoid: () => $<HTMLInputElement>("#void-form").checked,
+  activeComponent() {
+    const defs = familyDefs(doc);
+    const [id, type] = (activeComponentKey ?? "").split("|");
+    const def = defs.find((d) => d.id === id) ?? defs[0];
+    if (!def) return undefined;
+    const types = familyTypeNames(def);
+    return { familyId: def.id, typeName: def.id === id && type && types.includes(type) ? type : (types[0] ?? "Default") };
+  },
+  newFamily(category: FamilyCategory) {
+    const fam = new Document();
+    let n = 1;
+    while (familyDefs(doc).some((f) => f.name === `${category} ${n}`)) n++;
+    applyFamilyTemplate(fam, category, `${category} ${n}`);
+    openFamily(fam);
+  },
+  editFamily(defId: ElementId) {
+    const def = doc.require(defId) as FamilyDef;
+    openFamily(Document.fromJSON(def.params.json as unknown as ReturnType<Document["toJSON"]>));
+  },
   activeLevelId: () => activeLevelId,
   activeTypeId,
   selection: () => selection,
@@ -138,13 +183,18 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   window: new HostedTool(ctx, "window"),
   section: new SectionTool(ctx),
   callout: new CalloutTool(ctx),
+  extrusion: new SketchTool(ctx, "extrusion"),
+  blend: new SketchTool(ctx, "blend"),
+  revolution: new SketchTool(ctx, "revolution"),
+  sweep: new SweepTool(ctx),
+  component: new ComponentTool(ctx),
   detailline: new DetailLineTool(ctx),
   region: new SketchTool(ctx, "region"),
   text: new TextTool(ctx),
   dimension: new DimensionTool(ctx),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
-const DRAWING_TOOLS = new Set(["select", "detailline", "region", "text"]);
+const DRAWING_TOOLS = new Set(["select", "detailline", "region", "text", "extrusion", "blend", "revolution"]);
 let tool: Tool = tools.select!;
 
 function setTool(name: string): void {
@@ -200,7 +250,27 @@ const commands: Record<string, () => void | Promise<void>> = {
       status(`⚠ Could not open: ${(err as Error).message}`);
     }
   },
+  loadFamily() {
+    if (!projectSession) return status("Load into Project: open a family first.");
+    const fam = doc;
+    const name = familyName(fam);
+    closeFamilyEditor();
+    try {
+      doc.transact(`Load family ${name}`, (tx) => loadFamily(tx, doc, fam, name));
+      activeComponentKey = undefined;
+      status(`Loaded ${name}. Place it with the Component tool (C).`);
+    } catch (err) {
+      status(`\u26a0 ${(err as Error).message}`);
+    }
+  },
+  closeFamily() {
+    if (!projectSession) return;
+    if (dirty && !confirm("Close the family without loading it into the project?")) return;
+    closeFamilyEditor();
+    status("Family closed.");
+  },
   async save() {
+    if (projectSession) return status("You're editing a family: use Load into Project to keep it.");
     try {
       const path = await saveProject(doc.toJSON(), filePath);
       if (path) {
@@ -387,6 +457,7 @@ window.addEventListener("keydown", (ev) => {
   if (ev.key.toLowerCase() === "l") return setTool("detailline");
   if (ev.key.toLowerCase() === "t") return setTool("text");
   if (ev.key.toLowerCase() === "m") return setTool("dimension");
+  if (ev.key.toLowerCase() === "c") return setTool(projectSession ? "select" : "component");
   if (ev.key.toLowerCase() === "f") return run(ev, "fit");
   if (ev.key.toLowerCase() === "h") return run(ev, ev.shiftKey ? "hideCategory" : "hide");
   if (ev.key.toLowerCase() === "i") return run(ev, ev.shiftKey ? "isolateCategory" : "isolate");
@@ -431,6 +502,22 @@ function refreshToolbar(): void {
 function refreshTypeSelector(): void {
   const sel = $<HTMLSelectElement>("#active-type");
   const label = $<HTMLSpanElement>("#active-type-label");
+  if (tool.name === "component") {
+    // Component: every loaded family's types, "Family : Type".
+    const current = ctx.activeComponent();
+    const opts = familyDefs(doc).flatMap((d) => familyTypeNames(d).map((t) => ({ key: `${d.id}|${t}`, label: `${d.name} : ${t}` })));
+    sel.disabled = !opts.length;
+    label.textContent = "Family type";
+    sel.replaceChildren(
+      ...(opts.length ? [] : [new Option("(no families loaded)", "")]),
+      ...opts.map((o) => new Option(o.label, o.key, false, current ? o.key === `${current.familyId}|${current.typeName}` : false)),
+    );
+    sel.onchange = () => {
+      activeComponentKey = sel.value;
+      tool.activate?.();
+    };
+    return;
+  }
   const toolCat = TOOL_TYPES[tool.name];
   const selCats = [...new Set(selection.map((id) => doc.get(id)).map((e) => e && typeCategoryOf(e.category)))];
   const cat = toolCat ?? (selCats.length === 1 ? selCats[0] : undefined);
@@ -484,17 +571,59 @@ function refreshAll(): void {
 }
 
 function updateTitle(): void {
+  if (projectSession) {
+    document.title = `${dirty ? "\u2022 " : ""}Family: ${familyName(doc)} \u2014 Open-BIM`;
+    $("#family-banner").textContent = `Editing family: ${familyName(doc)}`;
+    return;
+  }
   const name = filePath?.split(/[\\/]/).pop() ?? "Untitled";
   const project = projectSettings(doc)?.params.info.name;
   document.title = `${dirty ? "• " : ""}${name}${project ? ` (${project})` : ""} — Open-BIM`;
 }
 
-doc.on((c) => {
-  if (c.name !== "Load") dirty = true;
-  selection = selection.filter((id) => doc.has(id));
+function attachDocument(d: Document): () => void {
+  return d.on((c) => {
+    if (c.name !== "Load") dirty = true;
+    selection = selection.filter((id) => doc.has(id));
+    refreshAll();
+    if (c.name.startsWith("Undo") || c.name.startsWith("Redo")) status(c.name);
+  });
+}
+let detachDocument = attachDocument(doc);
+
+/** Show another document, restoring that document's view/selection state. */
+function switchDocument(next: Document, s: Partial<Session> = {}): void {
+  tool.deactivate?.();
+  detachDocument();
+  doc = next;
+  detachDocument = attachDocument(doc);
+  viewport.setDocument(doc);
+  selection = s.selection ?? [];
+  activeLevelId = s.activeLevelId ?? levels(doc)[0]?.id ?? "";
+  activeViewId = s.activeViewId ?? floorPlanFor(doc, activeLevelId)?.id ?? views(doc)[0]?.id;
+  filePath = s.filePath ?? null;
+  dirty = s.dirty ?? false;
+  activeTypes.clear();
+  document.body.classList.toggle("family-mode", !!familyInfo(doc));
+  setTool("select");
   refreshAll();
-  if (c.name.startsWith("Undo") || c.name.startsWith("Redo")) status(c.name);
-});
+  viewport.zoomToFit();
+}
+
+/** Open a family document in the family editor (the project waits in the background). */
+function openFamily(fam: Document): void {
+  if (projectSession) return status("Finish the open family first (Load into Project or Close Family).");
+  projectSession = { doc, selection, activeLevelId, activeViewId, filePath, dirty };
+  switchDocument(fam);
+  status(`Family editor: ${familyName(fam)}. Sketch forms with Extrusion / Blend / Revolve / Sweep; set parameters and types in Properties.`);
+}
+
+function closeFamilyEditor(): void {
+  const s = projectSession;
+  if (!s) return;
+  projectSession = null;
+  switchDocument(s.doc, s);
+}
 
 refreshAll();
 setTool("select");

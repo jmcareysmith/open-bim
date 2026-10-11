@@ -21,22 +21,35 @@
       </div>
       <div class="group">
         <button data-tool="select" class="active" title="Select (Esc)">Select</button>
+        <button data-tool="refplane" title="Reference plane (R)">Ref Plane</button>
+      </div>
+      <div class="group family-only">
+        <span id="family-banner" class="banner">Family</span>
+        <button data-tool="extrusion" title="Extrusion: sketch a profile (plan = XY, Front = XZ, Right = YZ), Enter">Extrusion</button>
+        <button data-tool="blend" title="Blend: sketch the bottom loop, then the top loop, Enter">Blend</button>
+        <button data-tool="revolution" title="Revolve: sketch a profile in an elevation; it turns about the centre line">Revolve</button>
+        <button data-tool="sweep" title="Sweep: click a path in plan, Enter">Sweep</button>
+        <label title="New forms are voids (cut the solids)"><input type="checkbox" id="void-form" /> Void</label>
+        <button data-cmd="loadFamily" class="primary" title="Load this family into the project and close the editor">Load into Project</button>
+        <button data-cmd="closeFamily" title="Close the family without loading it">Close Family</button>
+      </div>
+      <div class="group project-only">
         <button data-tool="wall" title="Wall (W)">Wall</button>
         <button data-tool="grid" title="Grid (G)">Grid</button>
-        <button data-tool="refplane" title="Reference plane (R)">Ref Plane</button>
         <button data-tool="floor" title="Floor: sketch boundary">Floor</button>
         <button data-tool="ceiling" title="Ceiling: sketch boundary">Ceiling</button>
         <button data-tool="roof" title="Roof by footprint: sketch boundary">Roof</button>
         <button data-tool="door" title="Door: click a wall (D)">Door</button>
         <button data-tool="window" title="Window: click a wall (N)">Window</button>
         <button data-tool="opening" title="Wall opening: click a wall">Opening</button>
+        <button data-tool="component" title="Component: place a loaded family (C)">Component</button>
       </div>
-      <div class="group">
+      <div class="group project-only">
         <button data-tool="section" title="Section: click head, then tail; looks to the left (S)">Section</button>
         <button data-cmd="elevations" title="Create North/East/South/West elevations around the model">Elevations</button>
         <button data-tool="callout" title="Callout: click two corners on a floor plan">Callout</button>
       </div>
-      <div class="group">
+      <div class="group project-only">
         <button data-tool="dimension" title="Aligned dimension: pick walls/grids, then place (M)">Dimension</button>
         <button data-tool="detailline" title="Detail line, this view only (L)">Detail Line</button>
         <button data-tool="region" title="Filled region: sketch a boundary">Region</button>

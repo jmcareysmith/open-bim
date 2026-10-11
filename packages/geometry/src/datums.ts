@@ -1,4 +1,14 @@
-import type { Document, Element, Grid, ReferencePlane } from "@open-bim/core";
+import {
+  wallCuts,
+  wallDirection,
+  wallThickness,
+  type Document,
+  type Element,
+  type Grid,
+  type HostedParams,
+  type ReferencePlane,
+  type Wall,
+} from "@open-bim/core";
 
 /** Line work for datums and annotation, model mm, Z up. */
 export interface LineData {
@@ -7,6 +17,11 @@ export interface LineData {
   labels: { text: string; position: [number, number, number] }[];
   /** Draw dashed (reference planes) rather than solid. */
   dashed?: boolean;
+  /**
+   * "workplane" (default): drawn at z = 0 and placed on the active level by the view (datums).
+   * "model": coordinates are absolute model space (e.g. opening outlines).
+   */
+  placement?: "workplane" | "model";
 }
 
 /** Grid head (bubble) radius, mm. ~8 mm on paper at 1:100. */
@@ -55,3 +70,22 @@ export function buildReferencePlaneLines(_doc: Document, el: Element): LineData 
 }
 
 const REF_PLANE_LABEL_OFFSET = 300; // mm beyond the end
+
+/** Outline of a wall opening on both wall faces, so it can be seen and picked. */
+export function buildOpeningLines(doc: Document, el: Element): LineData | null {
+  const host = doc.get(((el.params as HostedParams).hostId)) as Wall | undefined;
+  if (!host) return null;
+  const cut = wallCuts(doc, host).find((c) => c.id === el.id);
+  if (!cut) return null;
+  const d = wallDirection(host);
+  const n = { x: -d.y, y: d.x };
+  const h = wallThickness(doc, host) / 2;
+  const { start } = host.params;
+  const seg: number[] = [];
+  for (const s of [-1, 1]) {
+    const at = (u: number, z: number) => [start.x + d.x * u + n.x * h * s, start.y + d.y * u + n.y * h * s, z];
+    const corners = [at(cut.u0, cut.z0), at(cut.u1, cut.z0), at(cut.u1, cut.z1), at(cut.u0, cut.z1)];
+    corners.forEach((c, i) => seg.push(...c, ...corners[(i + 1) % 4]!));
+  }
+  return { segments: new Float32Array(seg), labels: [], placement: "model" };
+}

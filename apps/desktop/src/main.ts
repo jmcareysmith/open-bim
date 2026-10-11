@@ -10,11 +10,12 @@ import {
   type RoofParams,
   type LevelParams,
 } from "@open-bim/core";
-import { SimpleKernel } from "@open-bim/geometry";
+import { OcctKernel, SimpleKernel } from "@open-bim/geometry";
+import occtWasmUrl from "replicad-opencascadejs/wasm?url";
 import { openProject, saveProject } from "./io.ts";
 import { renderBrowser, renderProperties, type PanelContext } from "./panels.ts";
 import { buildSample } from "./sample.ts";
-import { GridTool, ReferencePlaneTool, SelectTool, SketchTool, WallTool, type Tool, type ToolContext } from "./tools.ts";
+import { GridTool, OpeningTool, ReferencePlaneTool, SelectTool, SketchTool, WallTool, type Tool, type ToolContext } from "./tools.ts";
 import { Viewport, type ViewMode } from "./viewport.ts";
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
@@ -71,6 +72,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   floor: new SketchTool(ctx, "floor"),
   ceiling: new SketchTool(ctx, "ceiling"),
   roof: new SketchTool(ctx, "roof"),
+  opening: new OpeningTool(ctx),
 };
 let tool: Tool = tools.select!;
 
@@ -243,3 +245,11 @@ doc.on((c) => {
 refreshAll();
 setTool("select");
 viewport.zoomToFit();
+
+// Start on the fast extrusion kernel; switch to OpenCascade (booleans for openings) once its WASM loads.
+OcctKernel.create({ locateFile: () => occtWasmUrl })
+  .then((k) => viewport.setKernel(k))
+  .catch((err) => {
+    console.error(err);
+    status("\u26a0 OpenCascade failed to load \u2014 openings won't cut walls until restart.");
+  });

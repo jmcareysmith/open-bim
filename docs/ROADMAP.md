@@ -22,7 +22,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Reference planes
 - [x] Floors and ceilings from sketch boundary (polygon with holes) — no "pick walls" or slope arrows yet
 - [x] Roofs by footprint with per-edge slope — walls don't attach to roofs yet; complex footprints approximate
-- [ ] OpenCascade (opencascade.js) kernel: booleans for openings
+- [x] OpenCascade (opencascade.js) kernel: booleans for openings — wall openings; floor/roof openings later
 - [ ] Doors and windows hosted in walls, cutting openings
 - [ ] Selection, properties panel, type selector, temporary hide/isolate
 - [ ] Project units & settings

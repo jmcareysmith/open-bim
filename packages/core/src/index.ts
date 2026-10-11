@@ -8,4 +8,5 @@ export * from "./model/datums.ts";
 export * from "./model/views.ts";
 export * from "./model/sketch.ts";
 export * from "./model/roofs.ts";
+export * from "./model/openings.ts";
 export * from "./model/template.ts";

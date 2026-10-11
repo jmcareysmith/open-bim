@@ -37,7 +37,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Roofs (footprint, extrusion, slopes, fascia/gutter) | 1 | 🟨 |
 | Ceilings | 1 | 🟨 |
 | Doors & windows (hosted, cut openings) | 1 | ⬜ |
-| Openings (shaft, wall, vertical) | 1 | ⬜ |
+| Openings (shaft, wall, vertical) | 1 | 🟨 |
 | Stairs (run, landing, sketch) & railings | 6 | ⬜ |
 | Ramps | 6 | ⬜ |
 | Components / furniture (loadable families) | 3 | ⬜ |

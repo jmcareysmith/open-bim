@@ -75,9 +75,18 @@ JSON for now; move to SQLite (via Rust) when files get large, keeping the same e
 `GeometryKernel` interface converts elements into `MeshData`
 (`positions: Float32Array, indices: Uint32Array, normals`) plus edge data.
 
-- `SimpleKernel` (now): extrusions of 2D profiles. Enough for straight walls and slabs.
-- `OcctKernel` (Phase 1): opencascade.js (WASM) for booleans (openings), fillets,
-  sweeps, and hidden-line removal for 2D drawings.
+- `SimpleKernel`: extrusions of 2D profiles (walls, floors, ceilings, roofs). Fast, synchronous.
+- `OcctKernel`: OpenCascade via `replicad-opencascadejs` (a maintained opencascade.js build,
+  LGPL, ~23 MB WASM). Builds walls with openings (prism of the joined footprint minus boxes,
+  `BRepAlgoAPI_Cut`, meshed with `BRepMesh_IncrementalMesh`) and delegates everything else to
+  `SimpleKernel`. Created async (`await OcctKernel.create({ locateFile })`); the desktop app
+  starts on `SimpleKernel` and swaps in OCCT when the WASM has loaded. Later: fillets, sweeps,
+  hidden-line removal for 2D drawings. Every OCCT object is `delete()`d after use.
+
+**Hosted openings** — `WallOpening` (and later doors/windows) store `hostId`, `position` along
+the location line, `width`, `sillHeight`, `height`. They depend on the host (cascade delete)
+and list it as `related`, so changing an opening regenerates the wall. `wallCuts()` gives each
+wall's cut boxes in wall coordinates; categories opt in with `registerWallCutter()`.
 
 Element → geometry builders live here (`buildWall`, `buildFloor`…), keyed by category.
 Datums (grids, later reference planes) have no solid; `buildLines()` returns `LineData`

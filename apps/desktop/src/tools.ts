@@ -7,6 +7,9 @@ import {
   createFloor,
   createReferencePlane,
   createRoof,
+  createWallOpening,
+  positionAlongWall,
+  wallLength,
   DEFAULT_ROOF_SLOPE,
   normaliseFootprint,
   regionFromLoops,
@@ -544,6 +547,36 @@ export class SketchTool implements Tool {
       );
     } catch (err) {
       this.ctx.status(`⚠ ${(err as Error).message}`);
+    }
+  }
+}
+
+// ---- Wall opening -----------------------------------------------------------
+
+const OPENING_DEFAULT = { width: 900, sillHeight: 0, height: 2100 };
+
+/** Click a wall to cut a rectangular opening there (Revit "Wall Opening"). Edit sizes in Properties. */
+export class OpeningTool implements Tool {
+  readonly name = "opening";
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.ctx.status(`Opening: click a wall to cut a ${OPENING_DEFAULT.width} \u00d7 ${OPENING_DEFAULT.height} opening. Change sizes in Properties.`);
+  }
+
+  click(ev: PointerEvent): void {
+    const { doc, viewport } = this.ctx;
+    const hit = viewport.pickHit(ev, (id) => doc.get(id)?.category === Cat.Wall);
+    if (!hit) return this.ctx.status("Opening: click on a wall.");
+    const wall = doc.require<WallParams>(hit.id) as Wall;
+    const half = OPENING_DEFAULT.width / 2;
+    const len = wallLength(wall);
+    const at = Math.round(Math.min(Math.max(positionAlongWall(wall, hit.point), half), len - half));
+    try {
+      const o = doc.transact("Create opening", (tx) => createWallOpening(tx, doc, wall.id, at, OPENING_DEFAULT));
+      this.ctx.setSelection([o.id]);
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
     }
   }
 }

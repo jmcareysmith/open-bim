@@ -2,6 +2,7 @@ import {
   Cat,
   levels,
   regionArea,
+  validateHosted,
   roofBaseElevation,
   renameGrid,
   renameReferencePlane,
@@ -12,6 +13,7 @@ import {
   type Element,
   type ElementId,
   type CeilingParams,
+  type HostedParams,
   type Roof,
   type RoofParams,
   type FloorParams,
@@ -158,6 +160,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   counts.append(row("Floors", String(doc.byCategory(Cat.Floor).length)));
   counts.append(row("Ceilings", String(doc.byCategory(Cat.Ceiling).length)));
   counts.append(row("Roofs", String(doc.byCategory(Cat.Roof).length)));
+  counts.append(row("Openings", String(doc.byCategory(Cat.WallOpening).length)));
   counts.append(row("Grids", String(doc.byCategory(Cat.Grid).length)));
   counts.append(row("Reference planes", String(doc.byCategory(Cat.ReferencePlane).length)));
 
@@ -278,6 +281,21 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
           return row(`Edge ${i + 1} (${len} mm)`, slopeInput(s, (v) => setSlopes(p.slopes.map((x, j) => (j === i ? v : x)))));
         }),
         editBoundaryButton(ctx, el.id),
+      );
+      break;
+    }
+    case Cat.WallOpening: {
+      const p = el.params as HostedParams;
+      const set = (name: string, patch: Partial<HostedParams>) =>
+        edit(ctx, name, (tx) => {
+          validateHosted(doc, { ...p, ...patch });
+          tx.update<HostedParams>(el.id, patch);
+        });
+      sec.append(
+        row("Position along wall", numberInput(p.position, (v) => set("Move opening", { position: v }))),
+        row("Width", numberInput(p.width, (v) => set("Change opening width", { width: v }))),
+        row("Sill height", numberInput(p.sillHeight, (v) => set("Change sill height", { sillHeight: v }))),
+        row("Height", numberInput(p.height, (v) => set("Change opening height", { height: v }))),
       );
       break;
     }

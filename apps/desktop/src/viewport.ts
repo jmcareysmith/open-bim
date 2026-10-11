@@ -19,6 +19,7 @@ const COLORS: Record<string, number> = {
   [Cat.Floor]: 0x9aa3ad,
   [Cat.Ceiling]: 0xe8e6df,
   [Cat.Roof]: 0x7d8a96,
+  [Cat.WallOpening]: 0xf0a040,
   [Cat.Grid]: 0xb8c7d6,
   [Cat.ReferencePlane]: 0x4caf50,
 };
@@ -148,8 +149,10 @@ export class Viewport {
       if (mesh) group = makeGroup(mesh, COLORS[el.category] ?? 0xcccccc);
       else if (lines) {
         group = makeLineGroup(lines, COLORS[el.category] ?? 0xcccccc);
-        group.position.z = this.workPlaneZ;
-        this.datums.add(id);
+        if (lines.placement !== "model") {
+          group.position.z = this.workPlaneZ;
+          this.datums.add(id);
+        }
       } else return;
     } catch (err) {
       console.warn(`Could not build ${el.category} ${id}`, err);
@@ -189,12 +192,29 @@ export class Viewport {
 
   /** Element under the cursor, nearest first. */
   pick(ev: { clientX: number; clientY: number }): ElementId | null {
+    return this.pickHit(ev)?.id ?? null;
+  }
+
+  /** Element under the cursor and the model point hit, nearest first. */
+  pickHit(ev: { clientX: number; clientY: number }, filter?: (id: ElementId) => boolean): { id: ElementId; point: Vec2 } | null {
     this.setRay(ev);
     // Line picking tolerance: a few pixels, in mm at the current zoom.
     this.raycaster.params.Line.threshold = this.mmPerPixel() * 6;
-    const meshes = [...this.objects.values()].map((g) => g.children[0]!);
-    const hit = this.raycaster.intersectObjects(meshes, false)[0];
-    return (hit?.object.parent?.userData.elementId as ElementId | undefined) ?? null;
+    const meshes = [...this.objects.entries()].filter(([id]) => !filter || filter(id)).map(([, g]) => g.children[0]!);
+    for (const hit of this.raycaster.intersectObjects(meshes, false)) {
+      // Respect plan clipping: ignore hits on geometry that isn't drawn.
+      if (this.renderer.clippingPlanes.some((pl) => pl.distanceToPoint(hit.point) < 0)) continue;
+      const id = hit.object.parent?.userData.elementId as ElementId | undefined;
+      if (id) return { id, point: { x: hit.point.x, y: hit.point.y } };
+    }
+    return null;
+  }
+
+  /** Swap geometry kernels (e.g. once OpenCascade has loaded) and rebuild everything. */
+  setKernel(kernel: GeometryKernel): void {
+    this.kernel = kernel;
+    this.rebuildAll();
+    this.setSelection(this.selected);
   }
 
   /** Point on the horizontal plane z = elevation under the cursor. */

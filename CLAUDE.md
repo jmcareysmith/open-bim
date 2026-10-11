@@ -44,8 +44,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   grids (G tool, auto-named, unique names, drawn on the active level; walls snap to grid lines/intersections),
   reference planes (R tool, dashed green, optional unique name), plan view per level (clipped at 1200 mm cut),
   floor + ceiling sketch tools (loops → boundary + holes, validated; Edit boundary re-sketches),
-  footprint roofs (Roof tool; per-edge slope or gable in properties; sample has a hipped roof).
+  footprint roofs (Roof tool; per-edge slope or gable in properties; sample has a hipped roof),
+  OpenCascade kernel (loads async; cuts wall openings), Opening tool (click a wall).
 - Known gaps: joins are whole-wall (no per-layer cleanup); no "disallow join"; walls crossing
   mid-span overlap; very acute mitres are squared off; no wall attach top/base; no 2D views;
   grids are straight only (no arc/multi-segment), no bubble on/off per end, can't drag grid ends.
-- Next: Phase 1 — OpenCascade kernel (openings), then doors/windows, then type selector + hide/isolate, then units.
+- Next: Phase 1 — doors/windows, then type selector + hide/isolate, then units.

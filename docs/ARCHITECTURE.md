@@ -181,6 +181,11 @@ parameters) and computes a `ScheduleTable` on demand — walls net of openings, 
 area, rooms/areas from their boundaries — keeping model units until display. `tableCsv` and
 `tableXlsx` (hand-written OOXML in a stored zip, no dependencies) export it.
 
+**Revisions** — `Revision`s are numbered from their sequence (alphabetic or numeric counted
+separately). `RevisionCloud`s are view- or sheet-owned annotation on a revision (issued revisions
+are locked). A sheet's revisions are those clouded on it or in its placed views, plus `revisionIds`
+added by hand; the title block shows the current revision and a revision schedule.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

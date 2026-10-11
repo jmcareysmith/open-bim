@@ -10,6 +10,14 @@ import {
   getCategory,
   createLegend,
   createSchedule,
+  createRevision,
+  moveRevision,
+  revisionNumber,
+  revisions,
+  sheetRevisions,
+  type RevisionParams,
+  type RevisionCloudParams,
+  type Sheet,
   schedules,
   SCHEDULE_CATEGORIES,
   TAKEOFF_CATEGORIES,
@@ -826,6 +834,19 @@ function sheetSection(ctx: PanelContext, sheet: Element<SheetParams>): HTMLEleme
     row("Checked by", textInput(p.checkedBy, (v) => set("Edit title block", { checkedBy: v }))),
     row("Issue date", textInput(p.issueDate, (v) => set("Edit title block", { issueDate: v }))),
   );
+  // Revisions on the sheet: clouded ones are fixed; others can be ticked on by hand.
+  const revs = revisions(doc);
+  if (revs.length) {
+    const shown = new Set(sheetRevisions(doc, sheet as Sheet).map((r) => r.id));
+    const manual = new Set(p.revisionIds ?? []);
+    sec.append(h("h3", {}, "Revisions on sheet"));
+    for (const r of revs) {
+      const clouded = shown.has(r.id) && !manual.has(r.id);
+      const cb = checkbox(shown.has(r.id), (v) => set("Revisions on sheet", { revisionIds: v ? [...manual, r.id] : [...manual].filter((x) => x !== r.id) }));
+      cb.disabled = clouded;
+      sec.append(h("label", { class: "check", title: clouded ? "Clouded on this sheet" : "" }, cb, `${revisionNumber(doc, r)}  ${r.params.description}`));
+    }
+  }
   // Views not yet on a sheet can be placed.
   const placeable = viewElements(doc).filter((v) => v.params.kind !== "3d" && !sheetOfView(doc, v.id));
   if (placeable.length) {
@@ -1318,6 +1339,26 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   loadFile.onclick = () => ctx.loadFamilyFile();
   fams.append(row("", h("div", { class: "buttons" }, loadFile)));
 
+  // Sheet issues / revisions, in sequence.
+  const revSec = h("div", { class: "section" }, h("h3", {}, "Revisions"));
+  for (const r of revisions(doc)) {
+    const div = h(
+      "div",
+      { class: `list-item${sel.has(r.id) ? " selected" : ""}` },
+      h("span", {}, `${revisionNumber(doc, r)}  ${r.params.description || "(no description)"}`),
+      h("span", { class: "muted" }, r.params.issued ? "issued" : r.params.date),
+    );
+    div.onclick = () => ctx.setSelection([r.id]);
+    revSec.append(div);
+  }
+  const newRev = h("button", { textContent: "New revision" });
+  newRev.onclick = () =>
+    edit(ctx, "New revision", (tx) => {
+      const r = createRevision(tx, doc, { date: new Date().toISOString().slice(0, 10) });
+      queueMicrotask(() => ctx.setSelection([r.id]));
+    });
+  revSec.append(row("", newRev));
+
   // Schedules / quantities and material takeoffs (open like views).
   const schedSec = h("div", { class: "section" }, h("h3", {}, "Schedules/Quantities"));
   for (const s of schedules(doc)) {
@@ -1392,7 +1433,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
     h("div", { class: "buttons wrap" }, imp, exp),
   );
 
-  root.replaceChildren(project, views, schedSec, sheetsSec, fams, paramsSec, lv, types, mats, vg, counts);
+  root.replaceChildren(project, views, schedSec, sheetsSec, revSec, fams, paramsSec, lv, types, mats, vg, counts);
 }
 
 // ---- Properties -----------------------------------------------------------
@@ -1545,6 +1586,53 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         ),
         row("X", numberInput(p.position.x, (v) => update<KeynoteLegendParams>("Move keynote legend", { position: { ...p.position, x: v } }))),
         row("Y", numberInput(p.position.y, (v) => update<KeynoteLegendParams>("Move keynote legend", { position: { ...p.position, y: v } }))),
+      );
+      break;
+    }
+    case Cat.Revision: {
+      const p = el.params as RevisionParams;
+      const set = (name: string, patch: Partial<RevisionParams>) => update(name, patch);
+      const up = h("button", { textContent: "Earlier" });
+      up.onclick = () => edit(ctx, "Reorder revisions", (tx) => moveRevision(tx, doc, el.id, -1));
+      const down = h("button", { textContent: "Later" });
+      down.onclick = () => edit(ctx, "Reorder revisions", (tx) => moveRevision(tx, doc, el.id, 1));
+      sec.append(
+        row("Revision", revisionNumber(doc, el as never)),
+        row("Sequence", h("div", { class: "buttons" }, up, down)),
+        row(
+          "Numbering",
+          select(
+            [
+              { value: "alpha", label: "Alphabetic (A, B, C)" },
+              { value: "numeric", label: "Numeric (1, 2, 3)" },
+            ],
+            p.numbering,
+            (v) => set("Change numbering", { numbering: v as RevisionParams["numbering"] }),
+          ),
+        ),
+        row("Date", textInput(p.date, (v) => set("Change revision date", { date: v }))),
+        row("Description", textInput(p.description, (v) => set("Change revision description", { description: v }))),
+        row("Issued to", textInput(p.issuedTo, (v) => set("Change issued to", { issuedTo: v }))),
+        row("Issued by", textInput(p.issuedBy, (v) => set("Change issued by", { issuedBy: v }))),
+        row("Issued", checkbox(p.issued, (v) => set(v ? "Issue revision" : "Reopen revision", { issued: v }))),
+      );
+      break;
+    }
+    case Cat.RevisionCloud: {
+      const p = el.params as RevisionCloudParams;
+      const revs = revisions(doc);
+      const r = doc.get<RevisionParams>(p.revisionId);
+      sec.append(
+        r?.params.issued
+          ? row("Revision", `${revisionNumber(doc, r as never)} (issued)`)
+          : row(
+              "Revision",
+              select(
+                revs.filter((x) => !x.params.issued).map((x) => ({ value: x.id, label: `${revisionNumber(doc, x)}  ${x.params.description}` })),
+                p.revisionId,
+                (v) => update("Change cloud revision", { revisionId: v }),
+              ),
+            ),
       );
       break;
     }

@@ -1,6 +1,10 @@
 import {
+  Cat,
   PAPER_SIZES,
+  currentRevision,
   effectiveGraphics,
+  revisionNumber,
+  sheetRevisions,
   projectSettings,
   viewportsOn,
   type Document,
@@ -10,7 +14,7 @@ import {
   type ViewParams,
   type Viewport,
 } from "@open-bim/core";
-import { contentBounds, emptyDrawing, loopSegments, transformDrawing, viewDrawing, type Drawing } from "./drawing.ts";
+import { addLineData, contentBounds, emptyDrawing, loopSegments, transformDrawing, viewDrawing, type Drawing } from "./drawing.ts";
 import type { GeometryKernel } from "./kernel.ts";
 
 // Sheet layout in paper mm (origin bottom-left): border, NZ-style title strip down the right-hand
@@ -63,6 +67,7 @@ export function sheetDrawing(doc: Document, kernel: GeometryKernel, sheet: Sheet
   ];
   const fields: [string, string, number][] = [
     ["Sheet", sheet.params.number, 9],
+    ["Revision", currentRevision(doc, sheet) || "-", 4],
     ["Sheet name", sheet.name ?? "", 4],
     ["Scale", scales.join(", ") || "-", 3],
     ["Date", sheet.params.issueDate, 3],
@@ -81,6 +86,32 @@ export function sheetDrawing(doc: Document, kernel: GeometryKernel, sheet: Sheet
     out.strokes.push({ kind: "annotation", segments: line(strip, y, right, y) });
   }
   out.texts.push({ text: "Open-BIM", x: strip + 3, y: height - MARGIN - 6, size: 3, align: "left" });
+
+  // Revision schedule at the top of the strip, latest first: Rev | Date | Description.
+  const revs = sheetRevisions(doc, sheet);
+  if (revs.length) {
+    let ry = height - MARGIN - 12;
+    out.strokes.push({ kind: "annotation", segments: line(strip, ry, right, ry) });
+    out.texts.push({ text: "REV", x: strip + 3, y: ry - 3, size: 1.8, align: "left" });
+    out.texts.push({ text: "DATE", x: strip + 12, y: ry - 3, size: 1.8, align: "left" });
+    out.texts.push({ text: "DESCRIPTION", x: strip + 32, y: ry - 3, size: 1.8, align: "left" });
+    ry -= 5;
+    for (const r of [...revs].reverse()) {
+      out.strokes.push({ kind: "annotation", segments: line(strip, ry, right, ry) });
+      const ty = ry - 3.2;
+      out.texts.push({ text: revisionNumber(doc, r), x: strip + 3, y: ty, size: 2.2, align: "left" });
+      out.texts.push({ text: r.params.date, x: strip + 12, y: ty, size: 2.2, align: "left" });
+      out.texts.push({ text: r.params.description, x: strip + 32, y: ty, size: 2.2, align: "left" });
+      ry -= 6;
+    }
+    out.strokes.push({ kind: "annotation", segments: line(strip, ry, right, ry) });
+  }
+  // Annotation drawn on the sheet itself (revision clouds), in paper mm.
+  for (const c of doc.byCategory(Cat.RevisionCloud)) {
+    if ((c.params as { viewId: ElementId }).viewId !== sheet.id) continue;
+    const lines = kernel.buildLines(doc, c);
+    if (lines) addLineData(out, lines, "annotation", { id: c.id });
+  }
 
   // Viewports, each with a title: number circle, view name, scale.
   viewportsOn(doc, sheet.id).forEach((vp, i) => {

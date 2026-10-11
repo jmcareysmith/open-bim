@@ -343,6 +343,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   component: new ComponentTool(ctx),
   detailline: new DetailLineTool(ctx),
   region: new SketchTool(ctx, "region"),
+  cloud: new SketchTool(ctx, "cloud"),
   text: new TextTool(ctx),
   dimension: new DimensionTool(ctx),
   room: new RoomTool(ctx),
@@ -353,7 +354,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   areaboundary: new AreaBoundaryTool(ctx),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
-const DRAWING_TOOLS = new Set(["select", "detailline", "region", "text", "tag", "keynote", "extrusion", "blend", "revolution"]);
+const DRAWING_TOOLS = new Set(["select", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution"]);
 let tool: Tool = tools.select!;
 
 function setTool(name: string): void {

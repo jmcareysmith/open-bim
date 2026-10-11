@@ -24,6 +24,8 @@ export type SheetParams = {
   drawnBy: string;
   checkedBy: string;
   issueDate: string;
+  /** Revisions added to the sheet by hand (Revit "Revisions on Sheet"); clouds add others. */
+  revisionIds?: ElementId[] | null;
 };
 export type Sheet = Element<SheetParams>;
 

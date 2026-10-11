@@ -22,6 +22,7 @@ import { buildFamilyInstance, nestedMeshes } from "./components.ts";
 import { buildViewMarker } from "./sections.ts";
 import { buildAnnotationLines } from "./annotations.ts";
 import { buildLegendLines } from "./legends.ts";
+import { buildRevisionCloudLines } from "./revisions.ts";
 import { buildAreaBoundaryLines, buildAreaLines, buildRoomLines, buildRoomSeparatorLines } from "./rooms.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
 
@@ -113,6 +114,7 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.Tag, buildAnnotationLines],
     [Cat.LegendComponent, buildLegendLines],
     [Cat.KeynoteLegend, buildLegendLines],
+    [Cat.RevisionCloud, buildRevisionCloudLines],
   ]);
 
   register(category: string, builder: Builder): void {

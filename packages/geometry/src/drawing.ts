@@ -164,7 +164,7 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
   return out;
 }
 
-function addLineData(out: Drawing, lines: LineData, kind: StrokeKind, style: Omit<Stroke, "kind" | "segments">): void {
+export function addLineData(out: Drawing, lines: LineData, kind: StrokeKind, style: Omit<Stroke, "kind" | "segments">): void {
   const seg: number[] = [];
   for (let i = 0; i < lines.segments.length; i += 6) seg.push(lines.segments[i]!, lines.segments[i + 1]!, lines.segments[i + 3]!, lines.segments[i + 4]!);
   if (seg.length) out.strokes.push({ kind, segments: seg, ...style, ...(lines.dashed ? { dashed: true } : {}) });

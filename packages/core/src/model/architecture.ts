@@ -52,6 +52,8 @@ export const Cat = {
   LegendComponent: "LegendComponent",
   KeynoteLegend: "KeynoteLegend",
   Schedule: "Schedule",
+  Revision: "Revision",
+  RevisionCloud: "RevisionCloud",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

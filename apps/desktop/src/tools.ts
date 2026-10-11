@@ -60,6 +60,9 @@ import {
   type Room,
   createArea,
   createAreaBoundary,
+  createRevisionCloud,
+  revisionNumber,
+  revisions,
   createTag,
   anchorInView,
   TAGGABLE,
@@ -484,13 +487,14 @@ export class ReferencePlaneTool extends DatumLineTool {
 
 // ---- Sketch (floors, ceilings) --------------------------------------------
 
-type SketchKind = "floor" | "ceiling" | "roof" | "region" | "extrusion" | "blend" | "revolution";
+type SketchKind = "floor" | "ceiling" | "roof" | "region" | "cloud" | "extrusion" | "blend" | "revolution";
 
 const SKETCH: Record<SketchKind, { category: string; typeCategory: string; label: string }> = {
   floor: { category: Cat.Floor, typeCategory: Cat.FloorType, label: "Floor" },
   ceiling: { category: Cat.Ceiling, typeCategory: Cat.CeilingType, label: "Ceiling" },
   roof: { category: Cat.Roof, typeCategory: Cat.RoofType, label: "Roof" },
   region: { category: Cat.FilledRegion, typeCategory: "", label: "Filled region" },
+  cloud: { category: Cat.RevisionCloud, typeCategory: "", label: "Revision cloud" },
   extrusion: { category: Cat.Extrusion, typeCategory: "", label: "Extrusion" },
   blend: { category: Cat.Blend, typeCategory: "", label: "Blend (bottom loop, then top loop)" },
   revolution: { category: Cat.Revolution, typeCategory: "", label: "Revolve (profile right of the centre line)" },
@@ -653,6 +657,19 @@ export class SketchTool implements Tool {
         doc.transact(`Edit ${this.def.label.toLowerCase()} boundary`, (tx) => tx.update(editing, patch));
         id = editing;
       } else {
+        if (this.name === "cloud") {
+          const viewId = this.ctx.activeViewId();
+          if (!viewId) throw new Error("Open a view or sheet first");
+          // Clouds go on the latest revision that hasn't been issued (Revit's default).
+          const rev = revisions(doc).filter((r) => !r.params.issued).at(-1);
+          if (!rev) throw new Error("No open revision: add one in the browser (Revisions \u2192 New revision)");
+          const c = doc.transact("Create revision cloud", (tx) => createRevisionCloud(tx, doc, viewId, rev.id, region.boundary));
+          this.reset();
+          this.redraw();
+          this.ctx.setSelection([c.id]);
+          this.ctx.status(`Revision cloud added for revision ${revisionNumber(doc, rev)}.`);
+          return;
+        }
         if (this.name === "region") {
           const viewId = this.ctx.activeViewId();
           if (!viewId) throw new Error("Open a plan, section or elevation first");

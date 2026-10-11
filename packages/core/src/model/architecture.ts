@@ -16,6 +16,8 @@ export const Cat = {
   ReferencePlane: "ReferencePlane",
   Ceiling: "Ceiling",
   CeilingType: "CeilingType",
+  Roof: "Roof",
+  RoofType: "RoofType",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

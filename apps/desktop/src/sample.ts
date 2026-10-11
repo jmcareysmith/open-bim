@@ -1,4 +1,4 @@
-import { applyResidentialTemplate, createFloor, createGrid, createWall, type Document, type Vec2 } from "@open-bim/core";
+import { applyResidentialTemplate, createFloor, createGrid, createRoof, createWall, type Document, type Vec2 } from "@open-bim/core";
 
 /** A small two-storey box so the app opens with something to look at. */
 export function buildSample(doc: Document): void {
@@ -27,6 +27,15 @@ export function buildSample(doc: Document): void {
     // Interior partitions, ground floor
     createWall(tx, ids.wallTypes.interior, { x: 4000, y: 0 }, { x: 4000, y: 5000 }, ground, { topLevelId: first });
     createWall(tx, ids.wallTypes.interior, { x: 4000, y: 5000 }, { x: W, y: 5000 }, ground, { topLevelId: first });
+    // Hipped roof, 600 mm eaves.
+    const e = 600;
+    const eaves: Vec2[] = [
+      { x: -e, y: -e },
+      { x: W + e, y: -e },
+      { x: W + e, y: D + e },
+      { x: -e, y: D + e },
+    ];
+    createRoof(tx, ids.roofTypes.steel, roof, eaves);
   });
 
   const ext = 1500; // grids run past the building

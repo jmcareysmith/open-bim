@@ -7,6 +7,7 @@ import {
   type CeilingParams,
   type ElementId,
   type FloorParams,
+  type RoofParams,
   type LevelParams,
 } from "@open-bim/core";
 import { SimpleKernel } from "@open-bim/geometry";
@@ -48,8 +49,8 @@ const ctx: ToolContext & PanelContext = {
     refreshAll();
   },
   editBoundary(id) {
-    const el = doc.require<FloorParams | CeilingParams>(id);
-    const name = el.category === Cat.Ceiling ? "ceiling" : "floor";
+    const el = doc.require<FloorParams | CeilingParams | RoofParams>(id);
+    const name = el.category === Cat.Ceiling ? "ceiling" : el.category === Cat.Roof ? "roof" : "floor";
     activeLevelId = el.params.levelId;
     setTool(name);
     refreshAll();
@@ -69,6 +70,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   refplane: new ReferencePlaneTool(ctx),
   floor: new SketchTool(ctx, "floor"),
   ceiling: new SketchTool(ctx, "ceiling"),
+  roof: new SketchTool(ctx, "roof"),
 };
 let tool: Tool = tools.select!;
 

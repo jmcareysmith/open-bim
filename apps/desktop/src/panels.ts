@@ -2,6 +2,7 @@ import {
   Cat,
   levels,
   regionArea,
+  roofBaseElevation,
   renameGrid,
   renameReferencePlane,
   totalThickness,
@@ -11,6 +12,8 @@ import {
   type Element,
   type ElementId,
   type CeilingParams,
+  type Roof,
+  type RoofParams,
   type FloorParams,
   type GridParams,
   type LayeredTypeParams,
@@ -82,6 +85,17 @@ function select(options: { value: string; label: string }[], value: string, onCh
   return s;
 }
 
+/** Slope in degrees; empty = no slope. Stored as radians. */
+function slopeInput(rad: number | null, onCommit: (v: number | null) => void): HTMLInputElement {
+  const input = h("input", { type: "number", step: "0.5", min: "0", max: "89", value: rad === null ? "" : (rad * 180 / Math.PI).toFixed(1) });
+  input.onchange = () => {
+    if (input.value.trim() === "") return onCommit(null);
+    const d = Number(input.value);
+    if (Number.isFinite(d) && d > 0 && d < 90) onCommit((d * Math.PI) / 180);
+  };
+  return input;
+}
+
 function editBoundaryButton(ctx: PanelContext, id: ElementId): HTMLElement {
   const b = h("button", { textContent: "Edit boundary" });
   b.onclick = () => ctx.editBoundary(id);
@@ -133,7 +147,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   }
 
   const types = h("div", { class: "section" }, h("h3", {}, "Types"));
-  for (const cat of [Cat.WallType, Cat.FloorType, Cat.CeilingType]) {
+  for (const cat of [Cat.WallType, Cat.FloorType, Cat.CeilingType, Cat.RoofType]) {
     for (const t of doc.byCategory<LayeredTypeParams>(cat)) {
       types.append(item(t, `${totalThickness(t)} mm`, () => ctx.setSelection([t.id])));
     }
@@ -143,6 +157,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   counts.append(row("Walls", String(doc.byCategory(Cat.Wall).length)));
   counts.append(row("Floors", String(doc.byCategory(Cat.Floor).length)));
   counts.append(row("Ceilings", String(doc.byCategory(Cat.Ceiling).length)));
+  counts.append(row("Roofs", String(doc.byCategory(Cat.Roof).length)));
   counts.append(row("Grids", String(doc.byCategory(Cat.Grid).length)));
   counts.append(row("Reference planes", String(doc.byCategory(Cat.ReferencePlane).length)));
 
@@ -241,9 +256,35 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       );
       break;
     }
+    case Cat.Roof: {
+      const r = el as Roof;
+      const p = r.params;
+      const setSlopes = (slopes: (number | null)[]) => update<RoofParams>("Change roof slope", { slopes });
+      const sloped = p.slopes.filter((s): s is number => s !== null);
+      sec.append(
+        row("Type", select(typeOpts(Cat.RoofType), el.typeId ?? "", (v) => edit(ctx, "Change roof type", (tx) => tx.setType(el.id, v)))),
+        row("Base level", select(levelOpts, p.levelId, (v) => update<RoofParams>("Change roof level", { levelId: v }))),
+        row("Base offset", numberInput(p.baseOffset, (v) => update<RoofParams>("Change roof offset", { baseOffset: v }))),
+        row("Base elevation", `${Math.round(roofBaseElevation(doc, r))} mm`),
+        row(
+          "Slope, all sloped edges (°)",
+          slopeInput(sloped.length ? sloped[0]! : null, (v) => v !== null && setSlopes(p.slopes.map((s) => (s === null ? null : v)))),
+        ),
+        h("h3", {}, "Edges (blank = no slope / gable)"),
+        ...p.slopes.map((s, i) => {
+          const a = p.boundary[i]!;
+          const b = p.boundary[(i + 1) % p.boundary.length]!;
+          const len = Math.round(Math.hypot(b.x - a.x, b.y - a.y));
+          return row(`Edge ${i + 1} (${len} mm)`, slopeInput(s, (v) => setSlopes(p.slopes.map((x, j) => (j === i ? v : x)))));
+        }),
+        editBoundaryButton(ctx, el.id),
+      );
+      break;
+    }
     case Cat.WallType:
     case Cat.FloorType:
-    case Cat.CeilingType: {
+    case Cat.CeilingType:
+    case Cat.RoofType: {
       const t = el as Element<LayeredTypeParams>;
       sec.append(
         row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename type", (tx) => tx.setName(el.id, v || undefined)))),

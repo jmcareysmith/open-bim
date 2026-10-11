@@ -7,6 +7,7 @@ export interface TemplateIds {
   wallTypes: { exterior: ElementId; interior: ElementId };
   floorTypes: { slab: ElementId; timber: ElementId };
   ceilingTypes: { plasterboard: ElementId };
+  roofTypes: { steel: ElementId };
 }
 
 /** Starter project: NZ residential levels and common NZS 3604-style assemblies. */
@@ -50,11 +51,24 @@ export function applyResidentialTemplate(doc: Document): TemplateIds {
       { name: "Ceiling - 13 Plasterboard on Battens" },
     ).id;
 
+    const steel = tx.create<LayeredTypeParams>(
+      Cat.RoofType,
+      {
+        layers: [
+          { function: "finish1", material: "Long-run Steel", thickness: 1 },
+          { function: "substrate", material: "Purlins 70x45", thickness: 70 },
+          { function: "structure", material: "Rafters 140x45", thickness: 140 },
+        ],
+      },
+      { name: "Roof - Long-run Steel on Purlins and Rafters" },
+    ).id;
+
     return {
       levels: { ground, first, roof },
       wallTypes: { exterior, interior },
       floorTypes: { slab, timber },
       ceilingTypes: { plasterboard },
+      roofTypes: { steel },
     };
   });
 }

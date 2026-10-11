@@ -6,6 +6,9 @@ import {
   createCeiling,
   createFloor,
   createReferencePlane,
+  createRoof,
+  DEFAULT_ROOF_SLOPE,
+  normaliseFootprint,
   regionFromLoops,
   datumIntersection,
   datumLines,
@@ -382,11 +385,12 @@ export class ReferencePlaneTool extends DatumLineTool {
 
 // ---- Sketch (floors, ceilings) --------------------------------------------
 
-type SketchKind = "floor" | "ceiling";
+type SketchKind = "floor" | "ceiling" | "roof";
 
 const SKETCH: Record<SketchKind, { category: string; typeCategory: string; label: string }> = {
   floor: { category: Cat.Floor, typeCategory: Cat.FloorType, label: "Floor" },
   ceiling: { category: Cat.Ceiling, typeCategory: Cat.CeilingType, label: "Ceiling" },
+  roof: { category: Cat.Roof, typeCategory: Cat.RoofType, label: "Roof" },
 };
 
 /**
@@ -507,10 +511,16 @@ export class SketchTool implements Tool {
     const { doc } = this.ctx;
     try {
       const region = regionFromLoops(loops);
+      if (this.name === "roof" && region.holes.length) throw new Error("A footprint roof takes a single boundary loop");
       const editing = this.editing;
       let id: ElementId;
       if (editing) {
-        doc.transact(`Edit ${this.def.label.toLowerCase()} boundary`, (tx) => tx.update(editing, { ...region }));
+        // A re-sketched roof footprint gets default slopes: the old per-edge values no longer line up.
+        const patch =
+          this.name === "roof"
+            ? normaliseFootprint(region.boundary, region.boundary.map(() => DEFAULT_ROOF_SLOPE))
+            : { ...region };
+        doc.transact(`Edit ${this.def.label.toLowerCase()} boundary`, (tx) => tx.update(editing, patch));
         id = editing;
       } else {
         const typeId = doc.byCategory(this.def.typeCategory)[0]?.id;
@@ -519,7 +529,9 @@ export class SketchTool implements Tool {
         id = doc.transact(`Create ${this.def.label.toLowerCase()}`, (tx) =>
           this.name === "floor"
             ? createFloor(tx, typeId, levelId, region.boundary, { holes: region.holes })
-            : createCeiling(tx, typeId, levelId, region.boundary, { holes: region.holes }),
+            : this.name === "ceiling"
+              ? createCeiling(tx, typeId, levelId, region.boundary, { holes: region.holes })
+              : createRoof(tx, typeId, levelId, region.boundary),
         ).id;
       }
       this.reset();

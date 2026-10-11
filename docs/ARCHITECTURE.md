@@ -60,6 +60,13 @@ wedges; neighbours compute identical cut points so footprints tile with no overl
 largest loop as the boundary and the rest as holes; `validateRegion()` rejects self-crossing loops,
 holes outside the boundary and overlapping holes, and normalises winding (boundary CCW, holes CW).
 
+**Roofs** — footprint roofs store a CCW boundary and a per-edge slope (radians, or null = gable).
+The surface is the lower envelope of the eave planes, each limited to the wedge between the
+hip/valley/gable lines at its ends (`roofPlanes`, `roofHeightAt` in core). Exact for convex and
+typical L/T/U plans; a full weighted straight skeleton is needed only for split events.
+Geometry cuts the footprint along every line where the lowest plane can change, so each convex
+cell is one plane, then extrudes the surface by the type thickness (vertical).
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

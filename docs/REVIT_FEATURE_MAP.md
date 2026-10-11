@@ -34,7 +34,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Stacked walls | 6 | ⬜ |
 | Curtain walls, grids, mullions, panels | 6 | ⬜ |
 | Floors (sketch-based, layered, slope arrows) | 1 | 🟨 |
-| Roofs (footprint, extrusion, slopes, fascia/gutter) | 1 | ⬜ |
+| Roofs (footprint, extrusion, slopes, fascia/gutter) | 1 | 🟨 |
 | Ceilings | 1 | 🟨 |
 | Doors & windows (hosted, cut openings) | 1 | ⬜ |
 | Openings (shaft, wall, vertical) | 1 | ⬜ |

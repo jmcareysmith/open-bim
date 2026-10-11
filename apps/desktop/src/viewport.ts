@@ -18,6 +18,7 @@ const COLORS: Record<string, number> = {
   [Cat.Wall]: 0xd9d4c7,
   [Cat.Floor]: 0x9aa3ad,
   [Cat.Ceiling]: 0xe8e6df,
+  [Cat.Roof]: 0x7d8a96,
   [Cat.Grid]: 0xb8c7d6,
   [Cat.ReferencePlane]: 0x4caf50,
 };

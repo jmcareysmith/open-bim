@@ -12,6 +12,7 @@ import {
 } from "@open-bim/core";
 import { buildGridLines, buildReferencePlaneLines, type LineData } from "./datums.ts";
 import { joinedWallFootprint } from "./joins.ts";
+import { buildRoof } from "./roof.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
 
 /**
@@ -70,6 +71,7 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.Wall, buildWall],
     [Cat.Floor, buildFloor],
     [Cat.Ceiling, buildCeiling],
+    [Cat.Roof, buildRoof],
   ]);
 
   private lineBuilders = new Map<string, LineBuilder>([

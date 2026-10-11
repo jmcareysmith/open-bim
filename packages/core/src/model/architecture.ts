@@ -19,6 +19,10 @@ export const Cat = {
   Roof: "Roof",
   RoofType: "RoofType",
   WallOpening: "WallOpening",
+  Door: "Door",
+  DoorType: "DoorType",
+  Window: "Window",
+  WindowType: "WindowType",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

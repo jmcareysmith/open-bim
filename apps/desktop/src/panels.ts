@@ -3,6 +3,9 @@ import {
   levels,
   regionArea,
   validateHosted,
+  doorPlacement,
+  hostedPlacement,
+  windowPlacement,
   roofBaseElevation,
   renameGrid,
   renameReferencePlane,
@@ -14,6 +17,11 @@ import {
   type ElementId,
   type CeilingParams,
   type HostedParams,
+  type DoorParams,
+  type DoorTypeParams,
+  type WindowParams,
+  type WindowTypeParams,
+  type Transaction,
   type Roof,
   type RoofParams,
   type FloorParams,
@@ -154,12 +162,20 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
       types.append(item(t, `${totalThickness(t)} mm`, () => ctx.setSelection([t.id])));
     }
   }
+  for (const t of doc.byCategory<DoorTypeParams>(Cat.DoorType)) {
+    types.append(item(t, `${t.params.leafWidth} \u00d7 ${t.params.leafHeight}`, () => ctx.setSelection([t.id])));
+  }
+  for (const t of doc.byCategory<WindowTypeParams>(Cat.WindowType)) {
+    types.append(item(t, `${t.params.width} \u00d7 ${t.params.height}`, () => ctx.setSelection([t.id])));
+  }
 
   const counts = h("div", { class: "section" }, h("h3", {}, "Model"));
   counts.append(row("Walls", String(doc.byCategory(Cat.Wall).length)));
   counts.append(row("Floors", String(doc.byCategory(Cat.Floor).length)));
   counts.append(row("Ceilings", String(doc.byCategory(Cat.Ceiling).length)));
   counts.append(row("Roofs", String(doc.byCategory(Cat.Roof).length)));
+  counts.append(row("Doors", String(doc.byCategory(Cat.Door).length)));
+  counts.append(row("Windows", String(doc.byCategory(Cat.Window).length)));
   counts.append(row("Openings", String(doc.byCategory(Cat.WallOpening).length)));
   counts.append(row("Grids", String(doc.byCategory(Cat.Grid).length)));
   counts.append(row("Reference planes", String(doc.byCategory(Cat.ReferencePlane).length)));
@@ -297,6 +313,60 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Sill height", numberInput(p.sillHeight, (v) => set("Change sill height", { sillHeight: v }))),
         row("Height", numberInput(p.height, (v) => set("Change opening height", { height: v }))),
       );
+      break;
+    }
+    case Cat.Door:
+    case Cat.Window: {
+      const isDoor = el.category === Cat.Door;
+      const p = el.params as DoorParams | WindowParams;
+      const set = (name: string, patch: Partial<DoorParams>) =>
+        edit(ctx, name, (tx) => {
+          const next = { ...el, params: { ...p, ...patch } };
+          validateHosted(doc, isDoor ? doorPlacement(doc, next) : windowPlacement(doc, next));
+          tx.update(el.id, patch);
+        });
+      const typeCat = isDoor ? Cat.DoorType : Cat.WindowType;
+      sec.append(
+        row(
+          "Type",
+          select(typeOpts(typeCat), el.typeId ?? "", (v) =>
+            edit(ctx, `Change ${isDoor ? "door" : "window"} type`, (tx) => {
+              tx.setType(el.id, v);
+              validateHosted(doc, hostedPlacement(doc, doc.require(el.id)));
+            }),
+          ),
+        ),
+        row("Position along wall", numberInput(p.position, (v) => set("Move " + (isDoor ? "door" : "window"), { position: v }))),
+        row("Sill height", numberInput(p.sillHeight, (v) => set("Change sill height", { sillHeight: v }))),
+      );
+      if (isDoor) {
+        const d = p as DoorParams;
+        const flip = (label: string, key: "facingFlipped" | "handFlipped") => {
+          const b = h("button", { textContent: label });
+          b.onclick = () => set(label, { [key]: !d[key] });
+          return b;
+        };
+        sec.append(row("Flip", h("div", { class: "buttons" }, flip("Facing", "facingFlipped"), flip("Hand", "handFlipped"))));
+      }
+      break;
+    }
+    case Cat.DoorType:
+    case Cat.WindowType: {
+      const isDoor = el.category === Cat.DoorType;
+      // Resizing a type must keep every instance inside its wall.
+      const setType = (patch: Params) =>
+        edit(ctx, `Edit ${isDoor ? "door" : "window"} type`, (tx: Transaction) => {
+          tx.update(el.id, patch);
+          for (const inst of doc.byCategory(isDoor ? Cat.Door : Cat.Window)) {
+            if (inst.typeId === el.id) validateHosted(doc, hostedPlacement(doc, inst));
+          }
+        });
+      const p = el.params as Record<string, number>;
+      const fields: [string, string][] = isDoor
+        ? [["leafWidth", "Leaf width"], ["leafHeight", "Leaf height"], ["frameWidth", "Frame width"]]
+        : [["width", "Width"], ["height", "Height"], ["frameWidth", "Frame width"], ["defaultSill", "Default sill"]];
+      sec.append(row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename type", (tx) => tx.setName(el.id, v || undefined)))));
+      for (const [key, label] of fields) sec.append(row(label, numberInput(p[key]!, (v) => setType({ [key]: v }))));
       break;
     }
     case Cat.WallType:

@@ -1,6 +1,7 @@
 import type { Document } from "../document.ts";
 import type { ElementId } from "../element.ts";
 import { Cat, createLevel, type LayeredTypeParams } from "./architecture.ts";
+import type { DoorTypeParams, WindowTypeParams } from "./doors.ts";
 
 export interface TemplateIds {
   levels: { ground: ElementId; first: ElementId; roof: ElementId };
@@ -8,6 +9,8 @@ export interface TemplateIds {
   floorTypes: { slab: ElementId; timber: ElementId };
   ceilingTypes: { plasterboard: ElementId };
   roofTypes: { steel: ElementId };
+  doorTypes: { single810: ElementId; single860: ElementId };
+  windowTypes: { w1200x1200: ElementId; w1800x1200: ElementId; w600x600: ElementId };
 }
 
 /** Starter project: NZ residential levels and common NZS 3604-style assemblies. */
@@ -63,12 +66,25 @@ export function applyResidentialTemplate(doc: Document): TemplateIds {
       { name: "Roof - Long-run Steel on Purlins and Rafters" },
     ).id;
 
+    // NZ standard leaf heights are 1980; common leaf widths 760/810/860.
+    const door = (name: string, leafWidth: number) =>
+      tx.create<DoorTypeParams>(Cat.DoorType, { leafWidth, leafHeight: 1980, frameWidth: 30 }, { name }).id;
+    const single810 = door("Door - Single 810 x 1980", 810);
+    const single860 = door("Door - Single 860 x 1980", 860);
+    const win = (name: string, width: number, height: number, defaultSill: number) =>
+      tx.create<WindowTypeParams>(Cat.WindowType, { width, height, frameWidth: 50, defaultSill }, { name }).id;
+    const w1200x1200 = win("Window - Aluminium 1200 x 1200", 1200, 1200, 900);
+    const w1800x1200 = win("Window - Aluminium 1800 x 1200", 1800, 1200, 900);
+    const w600x600 = win("Window - Aluminium 600 x 600 (bathroom)", 600, 600, 1500);
+
     return {
       levels: { ground, first, roof },
       wallTypes: { exterior, interior },
       floorTypes: { slab, timber },
       ceilingTypes: { plasterboard },
       roofTypes: { steel },
+      doorTypes: { single810, single860 },
+      windowTypes: { w1200x1200, w1800x1200, w600x600 },
     };
   });
 }

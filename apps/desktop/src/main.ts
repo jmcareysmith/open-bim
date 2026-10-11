@@ -15,7 +15,17 @@ import occtWasmUrl from "replicad-opencascadejs/wasm?url";
 import { openProject, saveProject } from "./io.ts";
 import { renderBrowser, renderProperties, type PanelContext } from "./panels.ts";
 import { buildSample } from "./sample.ts";
-import { GridTool, OpeningTool, ReferencePlaneTool, SelectTool, SketchTool, WallTool, type Tool, type ToolContext } from "./tools.ts";
+import {
+  GridTool,
+  HostedTool,
+  OpeningTool,
+  ReferencePlaneTool,
+  SelectTool,
+  SketchTool,
+  WallTool,
+  type Tool,
+  type ToolContext,
+} from "./tools.ts";
 import { Viewport, type ViewMode } from "./viewport.ts";
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
@@ -73,6 +83,8 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   ceiling: new SketchTool(ctx, "ceiling"),
   roof: new SketchTool(ctx, "roof"),
   opening: new OpeningTool(ctx),
+  door: new HostedTool(ctx, "door"),
+  window: new HostedTool(ctx, "window"),
 };
 let tool: Tool = tools.select!;
 
@@ -179,6 +191,8 @@ window.addEventListener("keydown", (ev) => {
   if (ev.key.toLowerCase() === "w") return setTool("wall");
   if (ev.key.toLowerCase() === "g") return setTool("grid");
   if (ev.key.toLowerCase() === "r") return setTool("refplane");
+  if (ev.key.toLowerCase() === "d") return setTool("door");
+  if (ev.key.toLowerCase() === "n") return setTool("window");
   if (ev.key.toLowerCase() === "f") return run(ev, "fit");
 });
 

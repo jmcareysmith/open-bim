@@ -8,6 +8,10 @@ import {
   createReferencePlane,
   createRoof,
   createWallOpening,
+  createDoor,
+  createWindow,
+  doorPlacement,
+  windowPlacement,
   positionAlongWall,
   wallLength,
   DEFAULT_ROOF_SLOPE,
@@ -575,6 +579,63 @@ export class OpeningTool implements Tool {
     try {
       const o = doc.transact("Create opening", (tx) => createWallOpening(tx, doc, wall.id, at, OPENING_DEFAULT));
       this.ctx.setSelection([o.id]);
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
+  }
+}
+
+// ---- Doors & windows -----------------------------------------------------------
+
+type HostedKind = "door" | "window";
+
+/**
+ * Click a wall to place a door or window of the first type, centred on the click
+ * (nudged to fit). Doors swing to the side of the wall you clicked.
+ */
+export class HostedTool implements Tool {
+  readonly name: HostedKind;
+  constructor(
+    private ctx: ToolContext,
+    kind: HostedKind,
+  ) {
+    this.name = kind;
+  }
+
+  private typeId(): ElementId | undefined {
+    return this.ctx.doc.byCategory(this.name === "door" ? Cat.DoorType : Cat.WindowType)[0]?.id;
+  }
+
+  activate(): void {
+    const t = this.typeId();
+    const name = t ? this.ctx.doc.require(t).name : "none";
+    this.ctx.status(`${this.name === "door" ? "Door" : "Window"} (${name}): click a wall to place. Edit in Properties.`);
+  }
+
+  click(ev: PointerEvent): void {
+    const { doc, viewport } = this.ctx;
+    const typeId = this.typeId();
+    if (!typeId) return this.ctx.status(`\u26a0 No ${this.name} types in this project`);
+    const hit = viewport.pickHit(ev, (id) => doc.get(id)?.category === Cat.Wall);
+    if (!hit) return this.ctx.status(`${this.name === "door" ? "Door" : "Window"}: click on a wall.`);
+    const wall = doc.require<WallParams>(hit.id) as Wall;
+    const probe = { id: "", category: this.name === "door" ? Cat.Door : Cat.Window, typeId };
+    const width =
+      this.name === "door"
+        ? doorPlacement(doc, { ...probe, params: { hostId: wall.id, position: 0, sillHeight: 0, facingFlipped: false, handFlipped: false } }).width
+        : windowPlacement(doc, { ...probe, params: { hostId: wall.id, position: 0, sillHeight: 0 } }).width;
+    const len = wallLength(wall);
+    const at = Math.round(Math.min(Math.max(positionAlongWall(wall, hit.point), width / 2), len - width / 2));
+    // Which side of the location line was clicked: + is the wall's left.
+    const { start, end } = wall.params;
+    const side = (end.x - start.x) * (hit.point.y - start.y) - (end.y - start.y) * (hit.point.x - start.x);
+    try {
+      const el = doc.transact(`Place ${this.name}`, (tx) =>
+        this.name === "door"
+          ? createDoor(tx, doc, typeId, wall.id, at, { facingFlipped: side < 0 })
+          : createWindow(tx, doc, typeId, wall.id, at),
+      );
+      this.ctx.setSelection([el.id]);
     } catch (err) {
       this.ctx.status(`\u26a0 ${(err as Error).message}`);
     }

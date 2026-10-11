@@ -86,7 +86,10 @@ JSON for now; move to SQLite (via Rust) when files get large, keeping the same e
 **Hosted openings** — `WallOpening` (and later doors/windows) store `hostId`, `position` along
 the location line, `width`, `sillHeight`, `height`. They depend on the host (cascade delete)
 and list it as `related`, so changing an opening regenerates the wall. `wallCuts()` gives each
-wall's cut boxes in wall coordinates; categories opt in with `registerWallCutter()`.
+wall's cut boxes in wall coordinates; categories opt in with `registerWallCutter(category, resolve)`,
+where `resolve` gives the cut size — doors and windows take theirs from `DoorType`/`WindowType`
+(parametric for now: frame + leaf/glass; door swings are plan-only `LineData`). Loadable
+families replace these in Phase 3.
 
 Element → geometry builders live here (`buildWall`, `buildFloor`…), keyed by category.
 Datums (grids, later reference planes) have no solid; `buildLines()` returns `LineData`

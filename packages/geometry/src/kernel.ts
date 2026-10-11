@@ -11,6 +11,7 @@ import {
   type Wall,
 } from "@open-bim/core";
 import { buildGridLines, buildOpeningLines, buildReferencePlaneLines, type LineData } from "./datums.ts";
+import { buildDoor, buildDoorLines, buildWindow } from "./doors.ts";
 import { joinedWallFootprint } from "./joins.ts";
 import { buildRoof } from "./roof.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
@@ -23,7 +24,7 @@ import { extrudePolygon, type MeshData } from "./mesh.ts";
 export interface GeometryKernel {
   /** Returns null for elements without 3D geometry (levels, types…). */
   build(doc: Document, el: Element): MeshData | null;
-  /** Line work for datums (grids…). Null for elements drawn as solids or not at all. */
+  /** Line work: datums (grids…), opening outlines, plan symbols (door swings). May accompany a mesh. */
   buildLines(doc: Document, el: Element): LineData | null;
 }
 
@@ -72,12 +73,15 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.Floor, buildFloor],
     [Cat.Ceiling, buildCeiling],
     [Cat.Roof, buildRoof],
+    [Cat.Door, buildDoor],
+    [Cat.Window, buildWindow],
   ]);
 
   private lineBuilders = new Map<string, LineBuilder>([
     [Cat.Grid, buildGridLines],
     [Cat.ReferencePlane, buildReferencePlaneLines],
     [Cat.WallOpening, buildOpeningLines],
+    [Cat.Door, buildDoorLines],
   ]);
 
   register(category: string, builder: Builder): void {

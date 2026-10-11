@@ -20,10 +20,14 @@ const COLORS: Record<string, number> = {
   [Cat.Ceiling]: 0xe8e6df,
   [Cat.Roof]: 0x7d8a96,
   [Cat.WallOpening]: 0xf0a040,
+  [Cat.Door]: 0xa0764f,
+  [Cat.Window]: 0x9cc3d9,
   [Cat.Grid]: 0xb8c7d6,
   [Cat.ReferencePlane]: 0x4caf50,
 };
 const SELECTED = 0x3d8bfd;
+/** Plan symbols (door swings) drawn alongside a solid. */
+const SYMBOL = 0xd7dee6;
 const PREVIEW = 0x5fb3ff;
 export type ViewMode = "3d" | "plan";
 const PLAN_CAMERA_HEIGHT = 500_000; // mm; clipping planes, not the camera, limit what a plan shows
@@ -145,9 +149,12 @@ export class Viewport {
     let group: THREE.Group;
     try {
       const mesh = this.kernel.build(this.doc, el);
-      const lines = mesh ? null : this.kernel.buildLines(this.doc, el);
-      if (mesh) group = makeGroup(mesh, COLORS[el.category] ?? 0xcccccc);
-      else if (lines) {
+      const lines = this.kernel.buildLines(this.doc, el);
+      if (mesh) {
+        group = makeGroup(mesh, COLORS[el.category] ?? 0xcccccc);
+        // Symbols drawn with a solid (door swings) ride along in the same group.
+        if (lines) group.add(makeLineGroup(lines, SYMBOL));
+      } else if (lines) {
         group = makeLineGroup(lines, COLORS[el.category] ?? 0xcccccc);
         if (lines.placement !== "model") {
           group.position.z = this.workPlaneZ;
@@ -159,6 +166,7 @@ export class Viewport {
       return;
     }
     group.userData.elementId = id;
+    this.applyPlanOnly(group);
     this.objects.set(id, group);
     this.scene.add(group);
     this.applyHighlight(id);
@@ -284,12 +292,19 @@ export class Viewport {
     this.controls3d.enabled = mode === "3d";
     this.controlsPlan.enabled = mode === "plan";
     this.grid.visible = mode === "3d"; // the work-plane grid fights with floor tops in plan
+    for (const g of this.objects.values()) this.applyPlanOnly(g);
     if (mode === "plan" && !this.planFramed) {
       this.planFramed = true;
       this.zoomToFit();
     }
     this.applyClipping();
     this.resize();
+  }
+
+  private applyPlanOnly(g: THREE.Object3D): void {
+    g.traverse((o) => {
+      if (o.userData.planOnly) o.visible = this.mode === "plan";
+    });
   }
 
   /** Vertical range shown in plan (usually the active level up to its cut plane). */
@@ -397,6 +412,7 @@ function makeLineGroup(lines: LineData, color: number): THREE.Group {
   geom.setAttribute("position", new THREE.BufferAttribute(lines.segments, 3));
   geom.computeBoundingSphere();
   const g = new THREE.Group();
+  g.userData.planOnly = !!lines.planOnly;
   const segs = new THREE.LineSegments(
     geom,
     lines.dashed ? new THREE.LineDashedMaterial({ color, dashSize: 400, gapSize: 200 }) : new THREE.LineBasicMaterial({ color }),

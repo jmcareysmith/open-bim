@@ -22,6 +22,8 @@ export interface LineData {
    * "model": coordinates are absolute model space (e.g. opening outlines).
    */
   placement?: "workplane" | "model";
+  /** Only drawn in plan views (e.g. door swings). */
+  planOnly?: boolean;
 }
 
 /** Grid head (bubble) radius, mm. ~8 mm on paper at 1:100. */

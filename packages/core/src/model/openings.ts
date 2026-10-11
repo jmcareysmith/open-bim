@@ -22,15 +22,25 @@ export type HostedParams = {
 export type WallOpeningParams = HostedParams;
 export type WallOpening = Element<WallOpeningParams>;
 
-/** Categories whose elements cut a rectangular hole in their host wall. */
-const cutters = new Set<string>([Cat.WallOpening]);
+/** Resolves an element's placement and opening size (doors/windows take sizes from their type). */
+export type PlacementResolver = (doc: Document, el: Element) => HostedParams;
 
-export function registerWallCutter(category: string): void {
-  cutters.add(category);
+/** Categories whose elements cut a rectangular hole in their host wall. */
+const cutters = new Map<string, PlacementResolver>([[Cat.WallOpening, (_doc, el) => el.params as HostedParams]]);
+
+export function registerWallCutter(category: string, resolve: PlacementResolver): void {
+  cutters.set(category, resolve);
 }
 
 export function isWallCutter(category: string): boolean {
   return cutters.has(category);
+}
+
+/** Placement and cut size of a hosted element. */
+export function hostedPlacement(doc: Document, el: Element): HostedParams {
+  const resolve = cutters.get(el.category);
+  if (!resolve) throw new Error(`${el.category} is not hosted in walls`);
+  return resolve(doc, el);
 }
 
 const hostDeps = (el: Element) => [(el.params as HostedParams).hostId];
@@ -58,9 +68,9 @@ export function wallCuts(doc: Document, wall: Wall): WallCut[] {
   const { bottom } = wallExtent(doc, wall);
   return doc
     .all()
-    .filter((e) => cutters.has(e.category) && (e.params as HostedParams).hostId === wall.id)
+    .filter((e) => cutters.has(e.category) && (e.params as { hostId?: ElementId }).hostId === wall.id)
     .map((e) => {
-      const p = e.params as HostedParams;
+      const p = hostedPlacement(doc, e);
       return {
         id: e.id,
         u0: p.position - p.width / 2,

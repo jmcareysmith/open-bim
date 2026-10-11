@@ -43,14 +43,14 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Project, shared and global parameters — shared parameters for projects (family shared params later); not yet in schedules (Phase 4)
 - [x] Family library (doors, windows, furniture) in an open format — `packages/library`, `.obim-family` JSON files
 
-## Phase 4 — Data & documentation (current)
+## Phase 4 — Data & documentation (done)
 - [x] Rooms, areas, area plans — room separators, room bounding; GFA/NLA area schemes, boundaries from walls
 - [x] Tags, keynotes, legends — tag by category, keynote files/tags, legend views with type swatches and keynote legends
 - [x] Schedules + material takeoffs, CSV/XLSX export — not yet on sheets; no calculated fields or in-table editing
 - [x] Revisions, groups — model groups (place copies, apply to all instances); detail groups later
-- [ ] Plugin API + scripting console
+- [x] Plugin API + scripting console — JS plugins (ES modules) and console; see docs/PLUGINS.md
 
-## Phase 5 — Interoperability
+## Phase 5 — Interoperability (current)
 - IFC4 export, then import (web-ifc; IfcOpenShell if needed)
 - DXF/DWG import & export
 - Shared coordinates, links

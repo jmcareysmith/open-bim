@@ -192,6 +192,13 @@ a group deletes its members. Placing a group copies the source instance's member
 plan transform (`transformedParams`), remapping host ids; "apply to all" re-copies one instance into
 the others. Clicking a member selects its group (Alt+click: the member).
 
+**Plugins & scripting** — `core/src/scripting.ts` runs scripts (`runScript`: expression or
+statements, async, with a named scope) and normalises plugin modules (`pluginFromModule`). The
+desktop `PluginHost` (`apps/desktop/src/plugins.ts`) builds the version-1 `OpenBimApi` (live doc,
+core/geometry exports, selection, views, commands), loads plugin source as a blob-URL ES module,
+and keeps loaded plugins in local storage. Plugins are trusted code (like Revit macros). See
+`docs/PLUGINS.md`.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

@@ -36,7 +36,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - End each session by updating the "Current state" section below and pushing to GitHub.
 
 ## Current state (update at the end of each session)
-- Phase 0 done except CI green (runs on Windows via `npm run tauri dev`). Phases 1, 2 and 3 done.
+- Phase 0 done except CI green (runs on Windows via `npm run tauri dev`). Phases 1–4 done.
 - Modelling: levels, layered wall/floor/ceiling/roof types with materials, walls (W; auto L/T/X joins,
   Flip), floors/ceilings/roofs from sketches (roofs: per-edge slope or gable), doors (D) and windows (N)
   as parametric hosted types, wall openings, grids (G), reference planes (R), project units + info.
@@ -72,4 +72,5 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   totals; Export CSV / Excel). Not yet placeable on sheets; no calculated fields.
 - Revisions (browser → Revisions; Cloud tool; sheet revision schedule) and model groups (Group /
   Ctrl+G; Place copy; Apply to other instances; Ungroup).
-- Next: Phase 4 — plugin API + scripting console (last Phase 4 item).
+- Plugins + scripting console (toolbar Console or `; docs/PLUGINS.md, examples/plugins).
+- Next: Phase 5 — IFC4 export then import (web-ifc), DXF/DWG, shared coordinates/links, glTF/OBJ.

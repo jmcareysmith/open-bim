@@ -156,7 +156,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 14. Extensibility
 | Feature | Phase | Status |
 |---|---|---|
-| Plugin API (TypeScript) | 4 | ⬜ |
-| Scripting console | 4 | ⬜ |
+| Plugin API (TypeScript) | 4 | ✅ |
+| Scripting console | 4 | ✅ |
 | Visual programming (Dynamo equivalent) | 8 | ⬜ |
-| Add-in manager | 4 | ⬜ |
+| Add-in manager | 4 | 🟨 |

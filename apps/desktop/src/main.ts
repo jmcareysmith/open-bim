@@ -69,6 +69,7 @@ import gcsWasmUrl from "@salusoft89/planegcs/dist/planegcs_dist/planegcs.wasm?ur
 import { LIBRARY } from "@open-bim/library";
 import { openProject, openText, saveBytes, savePdf, saveProject, saveText } from "./io.ts";
 import { renderBrowser, renderProperties, renderSchedulePane, type PanelContext } from "./panels.ts";
+import { PluginHost, mountConsole } from "./plugins.ts";
 import { buildSample } from "./sample.ts";
 import {
   GridTool,
@@ -469,6 +470,11 @@ const commands: Record<string, () => void | Promise<void>> = {
   fit() {
     viewport.zoomToFit();
   },
+  console() {
+    const c = $<HTMLDivElement>("#console");
+    c.hidden = !c.hidden;
+    if (!c.hidden) c.querySelector<HTMLTextAreaElement>("textarea")?.focus();
+  },
   group() {
     if (!selection.length) return status("Group: select walls, floors, components or rooms first.");
     // Datums, views and annotation can't be in model groups: leave them out.
@@ -655,6 +661,7 @@ window.addEventListener("keydown", (ev) => {
   if (mod && ev.key.toLowerCase() === "o") return run(ev, "open");
   if (mod && ev.key.toLowerCase() === "n") return run(ev, "new");
   if (mod && ev.key.toLowerCase() === "g") return run(ev, "group");
+  if (ev.key === "`") return run(ev, "console");
   if (mod) return;
   if (tool.key?.(ev)) return ev.preventDefault();
   if (ev.key === "Escape") return setTool("select");
@@ -877,3 +884,26 @@ OcctKernel.create({ locateFile: () => occtWasmUrl })
     console.error(err);
     status("\u26a0 OpenCascade failed to load \u2014 openings won't cut walls until restart.");
   });
+
+// ---- plugins & scripting console ----------------------------------------------
+
+const plugins = new PluginHost({
+  doc: () => doc,
+  selection: () => selection,
+  setSelection: (ids) => ctx.setSelection(ids),
+  activeViewId: () => activeViewId,
+  activeLevelId: () => activeLevelId,
+  status,
+});
+mountConsole(
+  $("#console"),
+  plugins,
+  async () => {
+    const text = await openText({ name: "JavaScript plugin", extensions: ["js", "mjs"] });
+    return text ? { text, name: "Plugin" } : null;
+  },
+  () => refreshPanels(),
+);
+// Scripts and plugins can reach the API from the browser devtools too.
+(globalThis as { openBim?: unknown }).openBim = plugins.api;
+void plugins.restore();

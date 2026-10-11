@@ -30,3 +30,4 @@ export * from "./model/revisions.ts";
 export * from "./model/groups.ts";
 export * from "./model/settings.ts";
 export * from "./model/template.ts";
+export * from "./scripting.ts";

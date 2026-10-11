@@ -10,3 +10,6 @@ export * from "./sections.ts";
 export * from "./annotations.ts";
 export * from "./patterns.ts";
 export * from "./layers.ts";
+export * from "./drawing.ts";
+export * from "./sheet.ts";
+export * from "./pdf.ts";

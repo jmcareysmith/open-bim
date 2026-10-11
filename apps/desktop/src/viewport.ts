@@ -12,6 +12,7 @@ import {
   type Element,
   type MaterialParams,
   type ResolvedGraphics,
+  type Sheet,
   type ViewParams,
   type ChangeSet,
   type Document,
@@ -31,6 +32,9 @@ import {
   planLinework,
   sectionAnnotations,
   sectionLinework,
+  sheetDrawing,
+  type Drawing,
+  type StrokeKind,
   type GeometryKernel,
   type LineData,
   type MeshData,
@@ -103,6 +107,8 @@ export class Viewport {
   private readonly cameraDraw: THREE.OrthographicCamera;
   private readonly controlsDraw: OrbitControls;
   private drawingView: View | null = null;
+  /** Sheet shown in drawing mode (instead of a section/elevation). */
+  private sheet: Sheet | null = null;
   /** Levels, grids and crop frame of the current section/elevation. */
   private drawExtras: THREE.Group | null = null;
   /** Callouts: plan crop rectangle. */
@@ -275,6 +281,15 @@ export class Viewport {
     const g = this.objects.get(id);
     const el = this.doc.get(id);
     const d = this.drawing.get(id);
+    if (d && el && el.category === Cat.Viewport) {
+      // Viewports on sheets: highlight the whole view when selected.
+      d.traverse((o) => {
+        if (o instanceof THREE.LineSegments || o instanceof THREE.Mesh) {
+          (o.material as THREE.LineBasicMaterial).color.setHex(this.selected.has(id) ? SELECTED : (o.userData.baseColor as number));
+        }
+      });
+      return;
+    }
     if (d && el) {
       d.traverse((o) => {
         if (!(o instanceof THREE.Mesh || o instanceof THREE.LineSegments || o instanceof THREE.LineLoop)) return;
@@ -479,11 +494,27 @@ export class Viewport {
 
   /** Show a section/elevation (drawing mode). */
   setDrawingView(view: View): void {
-    const reframe = this.drawingView?.id !== view.id;
+    const reframe = this.drawingView?.id !== view.id || this.sheet !== null;
     this.drawingView = view;
+    this.sheet = null;
     this.setViewMode("drawing");
     this.drawingDirty = true;
     if (reframe) this.zoomToFit();
+  }
+
+  /** Show a sheet: paper with title block and viewports (drawing mode, paper mm). */
+  setSheet(sheet: Sheet): void {
+    const reframe = this.sheet?.id !== sheet.id;
+    this.sheet = sheet;
+    this.drawingView = null;
+    this.setViewMode("drawing");
+    this.drawingDirty = true;
+    if (reframe) this.zoomToFit();
+  }
+
+  /** The kernel in use (OCCT once loaded), for exports. */
+  get geometryKernel(): GeometryKernel {
+    return this.kernel;
   }
 
   /** Detail level and scale of the active view (they change how cut and surface patterns draw). */
@@ -548,6 +579,30 @@ export class Viewport {
     }
     this.drawingDirty = false;
     if (this.mode === "3d") return;
+    if (this.mode === "drawing" && this.sheet) {
+      const sheet = this.doc.get(this.sheet.id) as Sheet | undefined;
+      if (!sheet) return;
+      this.sheet = sheet;
+      let d: ReturnType<typeof sheetDrawing>;
+      try {
+        d = sheetDrawing(this.doc, this.kernel, sheet);
+      } catch (err) {
+        console.warn("Could not draw sheet", err);
+        return;
+      }
+      const paper = renderPaper(d);
+      this.drawExtras = paper;
+      this.drawScene.add(paper);
+      // Each viewport's linework is its own pickable group.
+      for (const vp of d.viewports) {
+        const g = renderDrawing({ strokes: d.strokes.filter((s) => s.id === vp.id), fills: d.fills.filter((f) => f.id === vp.id), texts: [], bounds: d.bounds });
+        g.userData.elementId = vp.id;
+        this.drawing.set(vp.id, g);
+        this.drawScene.add(g);
+        this.applyHighlight(vp.id);
+      }
+      return;
+    }
     const drawingMode = this.mode === "drawing" && this.drawingView;
     const items = [...this.meshes.entries()]
       .filter(([id]) => {
@@ -657,6 +712,11 @@ export class Viewport {
   }
 
   zoomToFit(): void {
+    if (this.mode === "drawing" && this.sheet) {
+      const size = this.sheet.params.size;
+      const paper = { A0: [1189, 841], A1: [841, 594], A2: [594, 420], A3: [420, 297], A4: [297, 210] }[size];
+      return this.fitOrtho(this.cameraDraw, this.controlsDraw, { min: { x: 0, y: 0 }, max: { x: paper[0]!, y: paper[1]! } }, 1000);
+    }
     if (this.mode === "drawing" && this.drawingView) {
       const c = viewCrop(this.drawingView);
       return this.fitOrtho(this.cameraDraw, this.controlsDraw, { min: { x: c.min.x - 1500, y: c.min.y }, max: { x: c.max.x + 3000, y: c.max.y + 1200 } }, 1000);
@@ -847,7 +907,7 @@ function makeLineGroup(lines: LineData, color: number): THREE.Group {
 }
 
 /** Text texture. Bubble labels are square; free text is as wide as it needs (`aspect` = width / height). */
-function labelTexture(text: string, free: boolean): { texture: THREE.CanvasTexture; aspect: number } {
+function labelTexture(text: string, free: boolean, color = "#d7dee6"): { texture: THREE.CanvasTexture; aspect: number } {
   const h = 128;
   const canvas = document.createElement("canvas");
   const c0 = canvas.getContext("2d")!;
@@ -858,7 +918,7 @@ function labelTexture(text: string, free: boolean): { texture: THREE.CanvasTextu
   canvas.height = h;
   const c = canvas.getContext("2d")!;
   c.font = font;
-  c.fillStyle = "#d7dee6";
+  c.fillStyle = color;
   c.textAlign = free ? "left" : "center";
   c.textBaseline = "middle";
   c.fillText(text, free ? 8 : w / 2, h / 2 + 2);
@@ -877,4 +937,74 @@ function disposeGroup(g: THREE.Group): void {
       o.material.dispose();
     }
   });
+}
+
+// ---- sheets ---------------------------------------------------------------------------
+
+/** Ink colours on white paper, by stroke kind. */
+const INK: Record<StrokeKind, number> = {
+  cut: 0x111111,
+  beyond: 0x444444,
+  hatch: 0x777777,
+  surface: 0x888888,
+  annotation: 0x222222,
+  datum: 0x555555,
+  symbol: 0x333333,
+};
+
+/** Render 2D drawing primitives (paper mm) as dark ink. */
+function renderDrawing(d: Drawing): THREE.Group {
+  const g = new THREE.Group();
+  const byStyle = new Map<string, number[]>();
+  for (const s of d.strokes) {
+    const color = s.halftone ? 0x999999 : (s.color ?? INK[s.kind]);
+    const key = `${color}|${s.dashed ? 1 : 0}`;
+    const list = byStyle.get(key) ?? [];
+    list.push(...s.segments);
+    byStyle.set(key, list);
+  }
+  for (const [key, seg] of byStyle) {
+    const [c, dashed] = key.split("|");
+    const color = Number(c);
+    const geom = segmentsGeom(seg, 1);
+    const line = new THREE.LineSegments(
+      geom,
+      dashed === "1" ? new THREE.LineDashedMaterial({ color, dashSize: 3, gapSize: 2 }) : new THREE.LineBasicMaterial({ color }),
+    );
+    if (dashed === "1") line.computeLineDistances();
+    line.userData.baseColor = color;
+    g.add(line);
+  }
+  for (const f of d.fills) {
+    const tris = fillLoops(f.loops);
+    if (!tris.length) continue;
+    const color = f.kind === "poche" ? 0x8c8c8c : f.kind === "solid" ? 0x333333 : (f.color ?? 0xbbbbbb);
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(tris.flatMap((t) => t.flatMap((p) => [p.x, p.y, 0.5]))), 3));
+    const mesh = new THREE.Mesh(geom, new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide, transparent: f.kind === "region", opacity: 0.6 }));
+    mesh.userData.baseColor = color;
+    g.add(mesh);
+  }
+  for (const t of d.texts) {
+    const { texture, aspect } = labelTexture(t.text, true, "#111111");
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));
+    sprite.position.set(t.x, t.y, 2);
+    sprite.scale.set(t.size * 2 * aspect, t.size * 2, 1);
+    if (t.align === "left") sprite.center.set(0, 0.5);
+    g.add(sprite);
+  }
+  return g;
+}
+
+/** White paper with a drop shadow, plus the sheet's own linework (border, title block, titles). */
+function renderPaper(d: Drawing & { width: number; height: number; viewports: { id: ElementId }[] }): THREE.Group {
+  const g = new THREE.Group();
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(d.width, d.height), new THREE.MeshBasicMaterial({ color: 0x0c0d10 }));
+  shadow.position.set(d.width / 2 + 3, d.height / 2 - 3, -2);
+  const paper = new THREE.Mesh(new THREE.PlaneGeometry(d.width, d.height), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  paper.position.set(d.width / 2, d.height / 2, -1);
+  g.add(shadow, paper);
+  const vpIds = new Set(d.viewports.map((v) => v.id));
+  g.add(renderDrawing({ strokes: d.strokes.filter((s) => !s.id || !vpIds.has(s.id)), fills: d.fills.filter((f) => !f.id || !vpIds.has(f.id)), texts: d.texts, bounds: d.bounds }));
+  return g;
 }

@@ -103,8 +103,8 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Detail lines, filled regions, detail components, insulation | 2 | 🟨 |
 | Symbols, north arrow, section/elevation heads | 2 | ⬜ |
 | Revision clouds & revisions | 4 | ⬜ |
-| Sheets, title blocks, viewports | 2 | ⬜ |
-| Print / PDF export (vector) | 2 | ⬜ |
+| Sheets, title blocks, viewports | 2 | 🟨 |
+| Print / PDF export (vector) | 2 | ✅ |
 
 ## 9. Schedules & data
 | Feature | Phase | Status |

@@ -25,6 +25,15 @@ import {
   validateViewRange,
   dimensionLayout,
   flipWall,
+  createSheet,
+  placeView,
+  sheetOfView,
+  sheets as sheetElements,
+  viewportsOn,
+  PAPER_SIZES,
+  type PaperSize,
+  type SheetParams,
+  type ViewportParams,
   createViewFilter,
   createViewTemplate,
   effectiveGraphics,
@@ -243,6 +252,59 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
   }
   if (!template) sec.append(visibilityGraphics(ctx, view.id, p));
   return sec;
+}
+
+/** Sheet properties: title block fields, paper size, placing views. */
+function sheetSection(ctx: PanelContext, sheet: Element<SheetParams>): HTMLElement {
+  const { doc } = ctx;
+  const p = sheet.params;
+  const set = (name: string, patch: Partial<SheetParams>) => edit(ctx, name, (tx) => tx.update<SheetParams>(sheet.id, patch));
+  const sec = h("div", { class: "section" }, h("h3", {}, "Sheet"));
+  sec.append(
+    row(
+      "Sheet number",
+      textInput(p.number, (v) =>
+        edit(ctx, "Renumber sheet", (tx) => {
+          if (!v) throw new Error("Sheets need a number");
+          if (doc.byCategory<SheetParams>(Cat.Sheet).some((s) => s.id !== sheet.id && s.params.number === v)) throw new Error(`Sheet ${v} already exists`);
+          tx.update<SheetParams>(sheet.id, { number: v });
+        }),
+      ),
+    ),
+    row("Sheet name", textInput(sheet.name ?? "", (v) => edit(ctx, "Rename sheet", (tx) => tx.setName(sheet.id, v || undefined)))),
+    row(
+      "Paper size",
+      select(
+        (Object.keys(PAPER_SIZES) as PaperSize[]).map((s) => ({ value: s, label: `${s} (${PAPER_SIZES[s].width} \u00d7 ${PAPER_SIZES[s].height})` })),
+        p.size,
+        (v) => set("Change paper size", { size: v as PaperSize }),
+      ),
+    ),
+    row("Drawn by", textInput(p.drawnBy, (v) => set("Edit title block", { drawnBy: v }))),
+    row("Checked by", textInput(p.checkedBy, (v) => set("Edit title block", { checkedBy: v }))),
+    row("Issue date", textInput(p.issueDate, (v) => set("Edit title block", { issueDate: v }))),
+  );
+  // Views not yet on a sheet can be placed.
+  const placeable = viewElements(doc).filter((v) => v.params.kind !== "3d" && !sheetOfView(doc, v.id));
+  if (placeable.length) {
+    sec.append(
+      row(
+        "Place view",
+        select([{ value: "", label: "Choose\u2026" }, ...placeable.map((v) => ({ value: v.id, label: v.name ?? v.id }))], "", (v) => {
+          if (v) edit(ctx, "Place view on sheet", (tx) => placeView(tx, doc, sheet.id, v));
+        }),
+      ),
+    );
+  }
+  sec.append(h("h3", {}, "Viewports"));
+  for (const vp of viewportsOn(doc, sheet.id)) {
+    const div = h("div", { class: "list-item" }, h("span", {}, doc.get(vp.params.viewId)?.name ?? "(deleted)"));
+    div.onclick = () => ctx.setSelection([vp.id]);
+    sec.append(div);
+  }
+  const del = h("button", { class: "danger", textContent: "Delete sheet" });
+  del.onclick = () => edit(ctx, "Delete sheet", (tx) => tx.delete(sheet.id));
+  return h("div", {}, sec, h("div", { class: "section" }, del));
 }
 
 /** Scale and detail level, for a view or a view template. */
@@ -591,6 +653,29 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   info.onclick = openSettings;
   project.append(info);
 
+  // Sheets.
+  const sheetsSec = h("div", { class: "section" }, h("h3", {}, "Sheets"));
+  for (const s of sheetElements(doc)) {
+    const div = h(
+      "div",
+      { class: `list-item${s.id === ctx.activeViewId() ? " selected" : ""}` },
+      h("span", {}, `${s.params.number} - ${s.name ?? ""}`),
+      h("span", { class: "muted" }, s.params.size),
+    );
+    div.onclick = () => ctx.setActiveView(s.id);
+    sheetsSec.append(div);
+  }
+  const newSheet = h("button", { textContent: "New sheet" });
+  newSheet.onclick = () => {
+    try {
+      const s = doc.transact("Create sheet", (tx) => createSheet(tx, doc));
+      ctx.setActiveView(s.id);
+    } catch (err) {
+      ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
+  };
+  sheetsSec.append(row("", newSheet));
+
   // Filters and view templates (Revit keeps these in dialogs; a list is quicker here).
   const vg = h("div", { class: "section" }, h("h3", {}, "Filters & View Templates"));
   for (const f of doc.byCategory(Cat.ViewFilter)) {
@@ -618,7 +703,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   };
   vg.append(row("", newFilter));
 
-  root.replaceChildren(project, views, lv, types, mats, vg, counts);
+  root.replaceChildren(project, views, sheetsSec, lv, types, mats, vg, counts);
 }
 
 // ---- Properties -----------------------------------------------------------
@@ -629,8 +714,12 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
   const ids = ctx.selection().filter((id) => doc.has(id));
   if (ids.length === 0) {
     // Nothing selected: show the active view's properties, as Revit does.
-    const view = ctx.activeViewId() ? doc.get<ViewParams>(ctx.activeViewId()!) : undefined;
-    root.replaceChildren(view ? viewSection(ctx, view as View) : h("div", { class: "empty" }, "Nothing selected"));
+    const active = ctx.activeViewId() ? doc.get(ctx.activeViewId()!) : undefined;
+    if (active?.category === Cat.Sheet) {
+      root.replaceChildren(sheetSection(ctx, active as Element<SheetParams>));
+      return;
+    }
+    root.replaceChildren(active ? viewSection(ctx, active as View) : h("div", { class: "empty" }, "Nothing selected"));
     return;
   }
   if (ids.length > 1) {
@@ -741,6 +830,21 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
           return row(`Edge ${i + 1} (${len(edgeLen)})`, slopeInput(s, (v) => setSlopes(p.slopes.map((x, j) => (j === i ? v : x)))));
         }),
         editBoundaryButton(ctx, el.id),
+      );
+      break;
+    }
+    case Cat.Viewport: {
+      const p = el.params as ViewportParams;
+      const v = doc.get(p.viewId);
+      const setCentre = (key: "x" | "y", val: number) =>
+        edit(ctx, "Move viewport", (tx) => tx.update<ViewportParams>(el.id, { centre: { ...p.centre, [key]: val } }));
+      const open = h("button", { textContent: "Open view" });
+      open.onclick = () => ctx.setActiveView(p.viewId);
+      sec.append(
+        row("View", v?.name ?? "(deleted)"),
+        row("", open),
+        row("Centre X (paper mm)", numberInput(p.centre.x, (val) => setCentre("x", val))),
+        row("Centre Y (paper mm)", numberInput(p.centre.y, (val) => setCentre("y", val))),
       );
       break;
     }

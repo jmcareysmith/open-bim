@@ -10,6 +10,7 @@ export * from "./model/viewdefs.ts";
 export * from "./model/annotations.ts";
 export * from "./model/materials.ts";
 export * from "./model/graphics.ts";
+export * from "./model/sheets.ts";
 export * from "./model/sketch.ts";
 export * from "./model/roofs.ts";
 export * from "./model/openings.ts";

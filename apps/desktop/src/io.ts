@@ -41,3 +41,20 @@ export async function openProject(): Promise<{ path: string; json: DocumentJSON 
     input.click();
   });
 }
+
+/** Save PDF bytes. Returns the path (desktop) or file name (browser), or null if cancelled. */
+export async function savePdf(bytes: Uint8Array, defaultName: string): Promise<string | null> {
+  if (isTauri()) {
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    const { writeFile } = await import("@tauri-apps/plugin-fs");
+    const path = await save({ filters: [{ name: "PDF", extensions: ["pdf"] }], defaultPath: defaultName });
+    if (!path) return null;
+    await writeFile(path, bytes);
+    return path;
+  }
+  const url = URL.createObjectURL(new Blob([bytes as BlobPart], { type: "application/pdf" }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: defaultName });
+  a.click();
+  URL.revokeObjectURL(url);
+  return defaultName;
+}

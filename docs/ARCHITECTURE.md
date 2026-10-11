@@ -96,6 +96,14 @@ template's settings when a view has one; `elementGraphics` resolves category set
 in priority order (first to set a property wins). Templates aren't view dependencies, so deleting
 one just returns its views to their own settings.
 
+**Sheets & PDF** — `Sheet` (number, paper size, title block fields) and `Viewport` (view + centre in
+paper mm; a view goes on one sheet). `viewDrawing` turns any plan/callout/section/elevation into 2D
+vector primitives (strokes tagged cut/beyond/hatch/surface/annotation/datum/symbol, fills, texts)
+honouring V/G, detail level and patterns; `sheetDrawing` lays out the title block and viewports at
+view scale; `writePdf` is a dependency-free vector PDF writer (Helvetica, WinAnsi). The sheet display
+and the PDF render the same primitives. (The interactive viewport still has its own plan/section
+path; folding it onto `viewDrawing` is a later clean-up.)
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

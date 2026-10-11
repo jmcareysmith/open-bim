@@ -32,6 +32,8 @@ export const Cat = {
   Material: "Material",
   ViewFilter: "ViewFilter",
   ViewTemplate: "ViewTemplate",
+  Sheet: "Sheet",
+  Viewport: "Viewport",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

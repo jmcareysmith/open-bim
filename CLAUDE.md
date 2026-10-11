@@ -36,29 +36,23 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - End each session by updating the "Current state" section below and pushing to GitHub.
 
 ## Current state (update at the end of each session)
-- Phase 0 done except CI green (runs on Windows via `npm run tauri dev`).
-- Working: levels, wall/floor types with layers, walls, floors, undo/redo, regeneration,
-  3D viewport (middle = pan, right = orbit, wheel = zoom), wall tool (W) with grid/ortho/endpoint snap,
-  select + delete, properties panel, project browser, save/open `.obim`,
-  automatic wall joins (L/T/X mitres, tee stems stop at face; `core/model/joins.ts`, `geometry/src/joins.ts`),
-  grids (G tool, auto-named, unique names, drawn on the active level; walls snap to grid lines/intersections),
-  reference planes (R tool, dashed green, optional unique name), plan view per level (clipped at 1200 mm cut),
-  floor + ceiling sketch tools (loops → boundary + holes, validated; Edit boundary re-sketches),
-  footprint roofs (Roof tool; per-edge slope or gable in properties; sample has a hipped roof),
-  OpenCascade kernel (loads async; cuts wall openings), Opening tool (click a wall),
-  doors (D) and windows (N): parametric types, hosted, cut walls, door swing in plan, flip facing/hand,
-  box select, toolbar type selector (per tool / retype selection), temporary hide/isolate (H, I, Shift+H/I, U),
-  project information + units (browser → Project; mm/cm/m, typed suffixes like "2.4m").
-- Phase 1 done (all roadmap items ticked; see notes on each for what's deferred).
-- Known gaps: joins are whole-wall (no per-layer cleanup); no "disallow join"; walls crossing
-  mid-span overlap; very acute mitres are squared off; walls don't attach to floors/roofs; plan is a
-  grids straight only, no bubble toggles, no grip editing (drag ends);
-  floors have no "pick walls" / slope arrows; roofs exact only for convex/L/T/U footprints;
-  doors/windows are parametric (no families); grids drawn over walls win picks (no Tab-cycling).
-- Views are elements (floor plan per level + {3D}); view properties show when nothing is selected.
-- Plans are true 2D drawings (cut + hidden-line projection, `geometry/src/hlr.ts`).
-- Sections (S tool), building elevations (Elevations button) and callouts (2D, HLR, levels + grids annotated).
-- Annotation: aligned dimensions (M, live), detail lines (L), filled regions, text (T); view-owned.
-- Materials: cut patterns per layer at Medium/Fine, surface patterns in elevations, 3D colours; wall Flip.
-- V/G per view (visible/halftone/colour), rule filters, view templates (browser → Filters & View Templates).
-- Next: Phase 2 — sheets, title blocks, viewports, vector PDF export (last Phase 2 item).
+- Phase 0 done except CI green (runs on Windows via `npm run tauri dev`). Phases 1 and 2 done.
+- Modelling: levels, layered wall/floor/ceiling/roof types with materials, walls (W; auto L/T/X joins,
+  Flip), floors/ceilings/roofs from sketches (roofs: per-edge slope or gable), doors (D) and windows (N)
+  as parametric hosted types, wall openings, grids (G), reference planes (R), project units + info.
+- Kernels: SimpleKernel (extrusions) and OcctKernel (OpenCascade via replicad-opencascadejs, async load;
+  boolean wall openings).
+- Views are elements: floor plans per level, callouts, sections (S), building elevations, {3D}. Plans and
+  sections are true 2D drawings from mesh hidden-line removal (`geometry/src/hlr.ts`), with layer cut
+  patterns at Medium/Fine and material surface patterns. V/G per view, rule filters, view templates.
+- Annotation (view-owned): live aligned dimensions (M), detail lines (L), filled regions, text (T).
+- Sheets with a built-in title block, viewports, and vector PDF export (`geometry/src/pdf.ts`).
+- UI: box select, type selector, temporary hide/isolate (H/I/U), properties for everything, browser.
+- Known gaps: joins whole-wall (no per-layer cleanup), no disallow-join, crossing walls overlap; walls
+  don't attach to floors/roofs; grids straight only, no grip editing (no drag-to-edit anywhere yet);
+  floors lack pick-walls/slope arrows; roofs exact for convex/L/T/U only; doors/windows parametric;
+  dimensions only in plans via the tool; no 3D view camera saved per view; viewport (interactive)
+  and sheet/PDF drawing paths are separate (fold the viewport onto `viewDrawing` later); edges of
+  internal triangulation are hidden but walls joined at corners show a seam line in 3D.
+- Next: Phase 3 — family editor (reference planes, sketches, extrude/revolve/sweep/blend/void), then
+  the 2D constraint solver (evaluate PlaneGCS).

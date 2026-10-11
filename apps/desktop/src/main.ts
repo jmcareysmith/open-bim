@@ -13,6 +13,9 @@ import {
   createBuildingElevations,
   effectiveGraphics,
   elementGraphics,
+  PAPER_SIZES,
+  sheets,
+  type Sheet,
   isDrawingView,
   type View,
   type ViewParams,
@@ -24,9 +27,9 @@ import {
   type RoofParams,
   type LevelParams,
 } from "@open-bim/core";
-import { OcctKernel, SimpleKernel } from "@open-bim/geometry";
+import { OcctKernel, SimpleKernel, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
-import { openProject, saveProject } from "./io.ts";
+import { openProject, savePdf, saveProject } from "./io.ts";
 import { renderBrowser, renderProperties, type PanelContext } from "./panels.ts";
 import { buildSample } from "./sample.ts";
 import {
@@ -244,6 +247,19 @@ const commands: Record<string, () => void | Promise<void>> = {
     viewport.visibility.isolateCategories(cats);
     afterVisibility(`Isolated ${cats.join(", ")}`);
   },
+  async exportPdf() {
+    const all = sheets(doc);
+    if (!all.length) return status("Export PDF: create a sheet first (Project Browser \u2192 Sheets \u2192 New sheet).");
+    try {
+      const kernel = viewport.geometryKernel;
+      const pages = all.map((s) => ({ ...PAPER_SIZES[s.params.size], drawing: sheetDrawing(doc, kernel, s) }));
+      const project = projectSettings(doc)?.params.info.name || "Open-BIM";
+      const path = await savePdf(writePdf(pages, project), `${project} - Sheets.pdf`);
+      if (path) status(`Exported ${pages.length} sheet(s) to ${path}`);
+    } catch (err) {
+      status(`\u26a0 Could not export PDF: ${(err as Error).message}`);
+    }
+  },
   elevations() {
     // N/E/S/W elevations around the model's walls.
     const walls = doc.byCategory<{ start: { x: number; y: number }; end: { x: number; y: number } }>(Cat.Wall);
@@ -321,6 +337,15 @@ function activeView(): View | undefined {
 
 /** Push the active view's settings (mode, range, hidden categories) into the viewport. */
 function applyView(): void {
+  // Sheets open like views.
+  const sheet = activeViewId ? doc.get(activeViewId) : undefined;
+  if (sheet?.category === Cat.Sheet) {
+    viewport.setSheet(sheet as Sheet);
+    viewport.setGraphicsResolver(() => ({ visible: true, halftone: false, color: null }));
+    viewport.setAnnotationView(sheet.id);
+    if (!DRAWING_TOOLS.has(tool.name)) setTool("select");
+    return;
+  }
   if (!activeView()) activeViewId = views(doc).find((v) => v.params.kind === "3d")?.id ?? views(doc)[0]?.id;
   const v = activeView();
   if (!v) return viewport.setViewMode("3d");

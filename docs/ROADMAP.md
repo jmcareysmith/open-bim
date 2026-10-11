@@ -27,16 +27,16 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Selection, properties panel, type selector, temporary hide/isolate
 - [x] Project units & settings
 
-## Phase 2 — Views & drawing production (current)
+## Phase 2 — Views & drawing production (done)
 - [x] View system: each view = camera + view range + visibility rules + detail level — 3D camera not yet saved per view
 - [x] Floor plans via cut plane + hidden-line removal → 2D vector — exact mesh-based HLR (not OCCT); line weights come with materials
 - [x] Sections, elevations, callouts — straight sections only (no jogs); callouts of floor plans
 - [x] Detail lines, filled regions, text, dimensions (live, associative) — aligned dims in plans (sections: levels via API); no leaders yet
 - [x] Materials with cut/surface patterns — graphics only; appearance (textures) and thermal properties later
 - [x] Visibility/Graphics, filters, view templates — visible / halftone / line colour overrides; no line weights or patterns overrides yet
-- [ ] Sheets, title blocks, viewports, vector PDF export
+- [x] Sheets, title blocks, viewports, vector PDF export — built-in title block; no 3D viewports or schedules on sheets yet
 
-## Phase 3 — Families & parameters
+## Phase 3 — Families & parameters (next)
 - Family editor: reference planes, sketches, extrude/revolve/sweep/blend/void
 - 2D constraint solver (dimensions drive geometry) — evaluate PlaneGCS (FreeCAD's solver) compiled to WASM
 - Formulas, conditionals, type catalogs, nested/shared families

@@ -1,6 +1,7 @@
 import {
   Cat,
   levels,
+  renameGrid,
   totalThickness,
   wallLength,
   wallThickness,
@@ -8,6 +9,7 @@ import {
   type Element,
   type ElementId,
   type FloorParams,
+  type GridParams,
   type LayeredTypeParams,
   type LevelParams,
   type Params,
@@ -109,6 +111,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   const counts = h("div", { class: "section" }, h("h3", {}, "Model"));
   counts.append(row("Walls", String(doc.byCategory(Cat.Wall).length)));
   counts.append(row("Floors", String(doc.byCategory(Cat.Floor).length)));
+  counts.append(row("Grids", String(doc.byCategory(Cat.Grid).length)));
 
   root.replaceChildren(lv, types, counts);
 }
@@ -170,6 +173,14 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Type", select(typeOpts(Cat.FloorType), el.typeId ?? "", (v) => edit(ctx, "Change floor type", (tx) => tx.setType(el.id, v)))),
         row("Level", select(levelOpts, p.levelId, (v) => update<FloorParams>("Change floor level", { levelId: v }))),
         row("Height offset", numberInput(p.offset, (v) => update<FloorParams>("Change floor offset", { offset: v }))),
+      );
+      break;
+    }
+    case Cat.Grid: {
+      const { start, end } = el.params as GridParams;
+      sec.append(
+        row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename grid", (tx) => renameGrid(tx, doc, el.id, v)))),
+        row("Length", `${Math.round(Math.hypot(end.x - start.x, end.y - start.y))} mm`),
       );
       break;
     }

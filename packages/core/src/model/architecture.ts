@@ -11,6 +11,7 @@ export const Cat = {
   WallType: "WallType",
   Floor: "Floor",
   FloorType: "FloorType",
+  Grid: "Grid",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

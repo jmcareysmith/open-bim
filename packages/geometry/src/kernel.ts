@@ -8,6 +8,7 @@ import {
   type Vec2,
   type Wall,
 } from "@open-bim/core";
+import { buildGridLines, type LineData } from "./datums.ts";
 import { joinedWallFootprint } from "./joins.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
 
@@ -19,9 +20,12 @@ import { extrudePolygon, type MeshData } from "./mesh.ts";
 export interface GeometryKernel {
   /** Returns null for elements without 3D geometry (levels, types…). */
   build(doc: Document, el: Element): MeshData | null;
+  /** Line work for datums (grids…). Null for elements drawn as solids or not at all. */
+  buildLines(doc: Document, el: Element): LineData | null;
 }
 
 type Builder = (doc: Document, el: Element) => MeshData | null;
+type LineBuilder = (doc: Document, el: Element) => LineData | null;
 
 /** Plan footprint of a straight, unjoined wall: rectangle around its location line. */
 export function wallFootprint(start: Vec2, end: Vec2, thickness: number): Vec2[] {
@@ -59,11 +63,21 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.Floor, buildFloor],
   ]);
 
+  private lineBuilders = new Map<string, LineBuilder>([[Cat.Grid, buildGridLines]]);
+
   register(category: string, builder: Builder): void {
     this.builders.set(category, builder);
   }
 
+  registerLines(category: string, builder: LineBuilder): void {
+    this.lineBuilders.set(category, builder);
+  }
+
   build(doc: Document, el: Element): MeshData | null {
     return this.builders.get(el.category)?.(doc, el) ?? null;
+  }
+
+  buildLines(doc: Document, el: Element): LineData | null {
+    return this.lineBuilders.get(el.category)?.(doc, el) ?? null;
   }
 }

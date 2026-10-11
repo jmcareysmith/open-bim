@@ -40,7 +40,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Working: levels, wall/floor types with layers, walls, floors, undo/redo, regeneration,
   3D viewport (middle = pan, right = orbit, wheel = zoom), wall tool (W) with grid/ortho/endpoint snap,
   select + delete, properties panel, project browser, save/open `.obim`,
-  automatic wall joins (L/T/X mitres, tee stems stop at face; `core/model/joins.ts`, `geometry/src/joins.ts`).
+  automatic wall joins (L/T/X mitres, tee stems stop at face; `core/model/joins.ts`, `geometry/src/joins.ts`),
+  grids (G tool, auto-named, unique names, drawn on the active level; walls snap to grid lines/intersections).
 - Known gaps: joins are whole-wall (no per-layer cleanup); no "disallow join"; walls crossing
-  mid-span overlap; very acute mitres are squared off; no wall attach top/base; no 2D views.
-- Next: Phase 1 — grids, then floor sketch tool, then OpenCascade kernel + doors/windows.
+  mid-span overlap; very acute mitres are squared off; no wall attach top/base; no 2D views;
+  grids are straight only (no arc/multi-segment), no bubble on/off per end, can't drag grid ends.
+- Next: Phase 1 — reference planes, then floor sketch tool, then OpenCascade kernel + doors/windows.

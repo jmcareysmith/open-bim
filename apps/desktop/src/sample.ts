@@ -1,4 +1,4 @@
-import { applyResidentialTemplate, createFloor, createWall, type Document, type Vec2 } from "@open-bim/core";
+import { applyResidentialTemplate, createFloor, createGrid, createWall, type Document, type Vec2 } from "@open-bim/core";
 
 /** A small two-storey box so the app opens with something to look at. */
 export function buildSample(doc: Document): void {
@@ -27,5 +27,11 @@ export function buildSample(doc: Document): void {
     // Interior partitions, ground floor
     createWall(tx, ids.wallTypes.interior, { x: 4000, y: 0 }, { x: 4000, y: 5000 }, ground, { topLevelId: first });
     createWall(tx, ids.wallTypes.interior, { x: 4000, y: 5000 }, { x: W, y: 5000 }, ground, { topLevelId: first });
+  });
+
+  const ext = 1500; // grids run past the building
+  doc.transact("Sample grids", (tx) => {
+    [0, 4000, W].forEach((x, i) => createGrid(tx, doc, { x, y: -ext }, { x, y: D + ext }, String(i + 1)));
+    [0, 5000, D].forEach((y, i) => createGrid(tx, doc, { x: -ext, y }, { x: W + ext, y }, "ABC"[i]));
   });
 }

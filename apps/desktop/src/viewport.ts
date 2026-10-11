@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { Cat, type ChangeSet, type Document, type ElementId, type Vec2 } from "@open-bim/core";
-import { type GeometryKernel, type MeshData } from "@open-bim/geometry";
+import { GRID_BUBBLE_RADIUS, type GeometryKernel, type LineData, type MeshData } from "@open-bim/geometry";
 
 // Model space is millimetres with Z up (Revit convention).
 THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
@@ -9,9 +9,12 @@ THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
 const COLORS: Record<string, number> = {
   [Cat.Wall]: 0xd9d4c7,
   [Cat.Floor]: 0x9aa3ad,
+  [Cat.Grid]: 0xb8c7d6,
 };
 const SELECTED = 0x3d8bfd;
 const PREVIEW = 0x5fb3ff;
+/** Datum line work sits just above the work plane so floor tops at the level don't hide it. */
+const DATUM_LIFT = 10;
 
 export function toGeometry(mesh: MeshData): THREE.BufferGeometry {
   const g = new THREE.BufferGeometry();
@@ -31,6 +34,10 @@ export class Viewport {
   private objects = new Map<ElementId, THREE.Group>();
   private selected = new Set<ElementId>();
   private preview: THREE.Group | null = null;
+  private previewLines: THREE.Group | null = null;
+  /** Datums (grids) are drawn at the work plane, like a plan view of the active level. */
+  private datums = new Set<ElementId>();
+  private workPlaneZ = 0;
   private raycaster = new THREE.Raycaster();
   private grid: THREE.GridHelper;
   private needsRender = true;
@@ -94,21 +101,27 @@ export class Viewport {
     this.scene.remove(obj);
     disposeGroup(obj);
     this.objects.delete(id);
+    this.datums.delete(id);
   }
 
   private rebuild(id: ElementId): void {
     this.remove(id);
     const el = this.doc.get(id);
     if (!el) return;
-    let mesh: MeshData | null;
+    let group: THREE.Group;
     try {
-      mesh = this.kernel.build(this.doc, el);
+      const mesh = this.kernel.build(this.doc, el);
+      const lines = mesh ? null : this.kernel.buildLines(this.doc, el);
+      if (mesh) group = makeGroup(mesh, COLORS[el.category] ?? 0xcccccc);
+      else if (lines) {
+        group = makeLineGroup(lines, COLORS[el.category] ?? 0xcccccc);
+        group.position.z = this.workPlaneZ;
+        this.datums.add(id);
+      } else return;
     } catch (err) {
       console.warn(`Could not build ${el.category} ${id}`, err);
       return;
     }
-    if (!mesh) return;
-    const group = makeGroup(mesh, COLORS[el.category] ?? 0xcccccc);
     group.userData.elementId = id;
     this.objects.set(id, group);
     this.scene.add(group);
@@ -129,7 +142,7 @@ export class Viewport {
     const g = this.objects.get(id);
     const el = this.doc.get(id);
     if (!g || !el) return;
-    const mesh = g.children[0] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>;
+    const mesh = g.children[0] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial | THREE.LineBasicMaterial>;
     mesh.material.color.setHex(this.selected.has(id) ? SELECTED : (COLORS[el.category] ?? 0xcccccc));
   }
 
@@ -144,6 +157,8 @@ export class Viewport {
   /** Element under the cursor, nearest first. */
   pick(ev: { clientX: number; clientY: number }): ElementId | null {
     this.setRay(ev);
+    // Line picking tolerance in mm, scaled with zoom so grids stay easy to hit.
+    this.raycaster.params.Line.threshold = this.camera.position.distanceTo(this.controls.target) * 0.006;
     const meshes = [...this.objects.values()].map((g) => g.children[0]!);
     const hit = this.raycaster.intersectObjects(meshes, false)[0];
     return (hit?.object.parent?.userData.elementId as ElementId | undefined) ?? null;
@@ -159,6 +174,9 @@ export class Viewport {
 
   setWorkPlane(elevation: number): void {
     this.grid.position.z = elevation;
+    this.workPlaneZ = elevation;
+    for (const id of this.datums) this.objects.get(id)!.position.z = elevation;
+    if (this.previewLines) this.previewLines.position.z = elevation;
     this.needsRender = true;
   }
 
@@ -173,6 +191,21 @@ export class Viewport {
     if (mesh) {
       this.preview = makeGroup(mesh, PREVIEW, 0.45);
       this.scene.add(this.preview);
+    }
+    this.needsRender = true;
+  }
+
+  /** Line-work preview (e.g. a grid being drawn), placed on the work plane. */
+  setPreviewLines(lines: LineData | null): void {
+    if (this.previewLines) {
+      this.scene.remove(this.previewLines);
+      disposeGroup(this.previewLines);
+      this.previewLines = null;
+    }
+    if (lines) {
+      this.previewLines = makeLineGroup(lines, PREVIEW);
+      this.previewLines.position.z = this.workPlaneZ;
+      this.scene.add(this.previewLines);
     }
     this.needsRender = true;
   }
@@ -232,11 +265,46 @@ function makeGroup(mesh: MeshData, color: number, opacity = 1): THREE.Group {
   return g;
 }
 
+function makeLineGroup(lines: LineData, color: number): THREE.Group {
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute("position", new THREE.BufferAttribute(lines.segments, 3));
+  geom.computeBoundingSphere();
+  const g = new THREE.Group();
+  const segs = new THREE.LineSegments(geom, new THREE.LineBasicMaterial({ color }));
+  segs.position.z = DATUM_LIFT;
+  g.add(segs);
+  for (const label of lines.labels) {
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture(label.text), transparent: true }));
+    sprite.position.set(label.position[0], label.position[1], label.position[2] + DATUM_LIFT);
+    sprite.scale.setScalar(GRID_BUBBLE_RADIUS * 1.6);
+    g.add(sprite);
+  }
+  return g;
+}
+
+function labelTexture(text: string): THREE.CanvasTexture {
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const c = canvas.getContext("2d")!;
+  c.fillStyle = "#d7dee6";
+  c.textAlign = "center";
+  c.textBaseline = "middle";
+  c.font = `600 ${text.length > 2 ? 40 : 60}px system-ui, sans-serif`;
+  c.fillText(text, size / 2, size / 2 + 2);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 function disposeGroup(g: THREE.Group): void {
   g.traverse((o) => {
     if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) {
       o.geometry.dispose();
       (o.material as THREE.Material).dispose();
+    } else if (o instanceof THREE.Sprite) {
+      o.material.map?.dispose();
+      o.material.dispose();
     }
   });
 }

@@ -18,7 +18,8 @@ Each phase ends with something usable. Work one feature per session; tick items 
 ## Phase 1 — Architectural modelling (current)
 - [ ] Wall drawing tool (click-click in plan/3D work plane), snapping, ortho — 3D work plane done; plan needs 2D views
 - [x] Wall joins (L, T, X) — whole-wall mitres; per-layer cleanup comes with layered geometry
-- [ ] Grids, reference planes
+- [x] Grids — straight; arc and multi-segment grids later
+- [ ] Reference planes
 - [ ] Floors and ceilings from sketch boundary (polygon with holes)
 - [ ] Roofs by footprint with per-edge slope
 - [ ] OpenCascade (opencascade.js) kernel: booleans for openings

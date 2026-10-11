@@ -22,7 +22,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Feature | Phase | Status |
 |---|---|---|
 | Levels | 0 | 🟨 |
-| Grids | 1 | ⬜ |
+| Grids | 1 | 🟨 |
 | Reference planes | 1 | ⬜ |
 | Scope boxes | 2 | ⬜ |
 

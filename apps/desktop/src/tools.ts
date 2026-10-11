@@ -1,7 +1,13 @@
 import {
   Cat,
+  closestPointOnGrid,
+  createGrid,
   createWall,
+  gridIntersection,
   levels,
+  nextGridName,
+  type Grid,
+  type GridParams,
   type Document,
   type ElementId,
   type LevelParams,
@@ -11,7 +17,7 @@ import {
   totalThickness,
   type LayeredTypeParams,
 } from "@open-bim/core";
-import { extrudePolygon, wallFootprint } from "@open-bim/geometry";
+import { buildGridLines, extrudePolygon, wallFootprint } from "@open-bim/geometry";
 import type { Viewport } from "./viewport.ts";
 
 export interface ToolContext {
@@ -76,11 +82,104 @@ export class SelectTool implements Tool {
   }
 }
 
-// ---- Wall -----------------------------------------------------------------
+// ---- Snapping ---------------------------------------------------------------
 
-const GRID = 50; // mm snap increment
-const ENDPOINT_SNAP = 300; // mm
+const INCREMENT = 50; // mm snap increment
+const POINT_SNAP = 300; // mm, wall/grid endpoints and grid intersections
+const LINE_SNAP = 200; // mm, onto grid lines
 const ORTHO_DEG = 4;
+
+export interface Snapped {
+  p: Vec2;
+  /** What the point snapped to, for status feedback. */
+  kind: "endpoint" | "intersection" | "grid" | "increment";
+}
+
+/**
+ * Snap a plan point. Priority: wall endpoints on the active level and grid endpoints,
+ * grid intersections, grid lines (staying ortho to `start` when ortho applies), then the
+ * 50 mm increment. `free` (Shift) turns off ortho.
+ */
+export function snapPoint(ctx: ToolContext, p: Vec2, start: Vec2 | null, free: boolean): Snapped {
+  const grids = ctx.doc.byCategory<GridParams>(Cat.Grid);
+  const nearest = (pts: Vec2[]) => {
+    let best: Vec2 | null = null;
+    let bestD = POINT_SNAP;
+    for (const q of pts) {
+      const d = Math.hypot(q.x - p.x, q.y - p.y);
+      if (d < bestD) [best, bestD] = [q, d];
+    }
+    return best;
+  };
+
+  // 1. Endpoints
+  const ends: Vec2[] = grids.flatMap((g) => [g.params.start, g.params.end]);
+  for (const w of ctx.doc.byCategory<WallParams>(Cat.Wall)) {
+    if (w.params.baseLevelId === ctx.activeLevelId()) ends.push(w.params.start, w.params.end);
+  }
+  const end = nearest(ends);
+  if (end) return { p: { ...end }, kind: "endpoint" };
+
+  // 2. Grid intersections
+  const crossings: Vec2[] = [];
+  for (let i = 0; i < grids.length; i++) {
+    for (let j = i + 1; j < grids.length; j++) {
+      const x = gridIntersection(grids[i]!, grids[j]!);
+      if (x) crossings.push(x);
+    }
+  }
+  const cross = nearest(crossings);
+  if (cross) return { p: cross, kind: "intersection" };
+
+  // 3. Ortho to start point
+  let q = { ...p };
+  let locked: "x" | "y" | null = null; // coordinate held equal to the start point's
+  if (start && !free) {
+    const dx = p.x - start.x;
+    const dy = p.y - start.y;
+    const ang = Math.abs((Math.atan2(dy, dx) * 180) / Math.PI) % 90;
+    if (ang < ORTHO_DEG || ang > 90 - ORTHO_DEG) {
+      if (Math.abs(dx) > Math.abs(dy)) [q, locked] = [{ x: p.x, y: start.y }, "y"];
+      else [q, locked] = [{ x: start.x, y: p.y }, "x"];
+    }
+  }
+
+  // 4. Onto a grid line (along the ortho line when locked)
+  for (const g of grids) {
+    const c = closestPointOnGrid(g, q);
+    if (Math.hypot(c.x - q.x, c.y - q.y) > LINE_SNAP) continue;
+    if (!locked) return { p: c, kind: "grid" };
+    const on = orthoOnGrid(g, start!, locked);
+    if (on && Math.hypot(on.x - q.x, on.y - q.y) <= LINE_SNAP) return { p: on, kind: "grid" };
+  }
+
+  // 5. Increment
+  const r = (v: number) => Math.round(v / INCREMENT) * INCREMENT;
+  if (locked === "x") return { p: { x: q.x, y: r(q.y) }, kind: "increment" };
+  if (locked === "y") return { p: { x: r(q.x), y: q.y }, kind: "increment" };
+  return { p: { x: r(q.x), y: r(q.y) }, kind: "increment" };
+}
+
+/** Where the ortho line through `start` (with coordinate `locked` held) crosses grid `g`. */
+function orthoOnGrid(g: Grid, start: Vec2, locked: "x" | "y"): Vec2 | null {
+  const { start: a, end: b } = g.params;
+  const free = locked === "x" ? "y" : "x";
+  const d = b[locked] - a[locked];
+  if (Math.abs(d) < 1e-9) return null; // grid parallel to the ortho line
+  const t = (start[locked] - a[locked]) / d;
+  if (t < 0 || t > 1) return null;
+  const v = a[free] + (b[free] - a[free]) * t;
+  return locked === "x" ? { x: start.x, y: v } : { x: v, y: start.y };
+}
+
+const SNAP_LABEL: Record<Snapped["kind"], string> = {
+  endpoint: " · snap: endpoint",
+  intersection: " · snap: grid intersection",
+  grid: " · snap: grid",
+  increment: "",
+};
+
+// ---- Wall -----------------------------------------------------------------
 
 export class WallTool implements Tool {
   readonly name = "wall";
@@ -109,43 +208,12 @@ export class WallTool implements Tool {
     return all[i + 1]?.id ?? null;
   }
 
-  private snap(p: Vec2, free: boolean): Vec2 {
-    // 1. Wall endpoints on this level
-    let best: Vec2 | null = null;
-    let bestD = ENDPOINT_SNAP;
-    for (const w of this.ctx.doc.byCategory<WallParams>(Cat.Wall)) {
-      if (w.params.baseLevelId !== this.ctx.activeLevelId()) continue;
-      for (const q of [w.params.start, w.params.end]) {
-        const d = Math.hypot(q.x - p.x, q.y - p.y);
-        if (d < bestD) {
-          bestD = d;
-          best = q;
-        }
-      }
-    }
-    if (best) return { ...best };
-
-    // 2. Orthogonal to start point
-    let q = { ...p };
-    if (this.start && !free) {
-      const dx = p.x - this.start.x;
-      const dy = p.y - this.start.y;
-      const ang = Math.abs((Math.atan2(dy, dx) * 180) / Math.PI) % 90;
-      if (ang < ORTHO_DEG || ang > 90 - ORTHO_DEG) {
-        if (Math.abs(dx) > Math.abs(dy)) q = { x: p.x, y: this.start.y };
-        else q = { x: this.start.x, y: p.y };
-      }
-    }
-    // 3. Grid increment
-    const r = (v: number) => Math.round(v / GRID) * GRID;
-    if (this.start && q.x === this.start.x) return { x: q.x, y: r(q.y) };
-    if (this.start && q.y === this.start.y) return { x: r(q.x), y: q.y };
-    return { x: r(q.x), y: r(q.y) };
-  }
+  private snapped: Snapped | null = null;
 
   private point(ev: PointerEvent): Vec2 | null {
     const p = this.ctx.viewport.pickPlane(ev, this.levelElevation());
-    return p && this.snap(p, ev.shiftKey);
+    this.snapped = p && snapPoint(this.ctx, p, this.start, ev.shiftKey);
+    return this.snapped?.p ?? null;
   }
 
   pointerMove(ev: PointerEvent): void {
@@ -164,7 +232,7 @@ export class WallTool implements Tool {
     const top = this.topLevelId();
     const z1 = top ? this.ctx.doc.require<LevelParams>(top).params.elevation : z0 + 2400;
     this.ctx.viewport.setPreview(extrudePolygon(wallFootprint(this.start, p, totalThickness(type)), [], z0, z1));
-    this.ctx.status(`Wall length: ${Math.round(len)} mm`);
+    this.ctx.status(`Wall length: ${Math.round(len)} mm${SNAP_LABEL[this.snapped!.kind]}`);
   }
 
   click(ev: PointerEvent): void {
@@ -191,6 +259,75 @@ export class WallTool implements Tool {
       this.start = null;
       this.ctx.viewport.setPreview(null);
       this.ctx.status("Wall: click start point.");
+      return true;
+    }
+    return false;
+  }
+}
+
+// ---- Grid -----------------------------------------------------------------
+
+export class GridTool implements Tool {
+  readonly name = "grid";
+  private start: Vec2 | null = null;
+
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.start = null;
+    this.prompt();
+  }
+
+  deactivate(): void {
+    this.start = null;
+    this.ctx.viewport.setPreviewLines(null);
+  }
+
+  private prompt(): void {
+    this.ctx.status(`Grid ${nextGridName(this.ctx.doc)}: click start point, then end point. Shift = free angle.`);
+  }
+
+  private point(ev: PointerEvent): Snapped | null {
+    const elevation = this.ctx.doc.require<LevelParams>(this.ctx.activeLevelId()).params.elevation;
+    const p = this.ctx.viewport.pickPlane(ev, elevation);
+    return p && snapPoint(this.ctx, p, this.start, ev.shiftKey);
+  }
+
+  pointerMove(ev: PointerEvent): void {
+    const s = this.point(ev);
+    const len = s && this.start ? Math.hypot(s.p.x - this.start.x, s.p.y - this.start.y) : 0;
+    if (!s || !this.start || len < 1) {
+      this.ctx.viewport.setPreviewLines(null);
+      return;
+    }
+    const name = nextGridName(this.ctx.doc);
+    const preview: Grid = { id: "preview", category: Cat.Grid, name, params: { start: this.start, end: s.p } };
+    this.ctx.viewport.setPreviewLines(buildGridLines(this.ctx.doc, preview));
+    this.ctx.status(`Grid ${name} length: ${Math.round(len)} mm${SNAP_LABEL[s.kind]}`);
+  }
+
+  click(ev: PointerEvent): void {
+    const s = this.point(ev);
+    if (!s) return;
+    if (!this.start) {
+      this.start = s.p;
+      return;
+    }
+    if (Math.hypot(s.p.x - this.start.x, s.p.y - this.start.y) < 10) return;
+    const start = this.start;
+    const { doc } = this.ctx;
+    const grid = doc.transact("Create grid", (tx) => createGrid(tx, doc, start, s.p));
+    this.start = null;
+    this.ctx.viewport.setPreviewLines(null);
+    this.ctx.setSelection([grid.id]);
+    this.prompt();
+  }
+
+  key(ev: KeyboardEvent): boolean {
+    if (ev.key === "Escape" && this.start) {
+      this.start = null;
+      this.ctx.viewport.setPreviewLines(null);
+      this.prompt();
       return true;
     }
     return false;

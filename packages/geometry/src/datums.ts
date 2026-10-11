@@ -1,10 +1,12 @@
-import type { Document, Element, Grid } from "@open-bim/core";
+import type { Document, Element, Grid, ReferencePlane } from "@open-bim/core";
 
 /** Line work for datums and annotation, model mm, Z up. */
 export interface LineData {
   /** Segment pairs: [x0, y0, z0, x1, y1, z1, …]. */
   segments: Float32Array;
   labels: { text: string; position: [number, number, number] }[];
+  /** Draw dashed (reference planes) rather than solid. */
+  dashed?: boolean;
 }
 
 /** Grid head (bubble) radius, mm. ~8 mm on paper at 1:100. */
@@ -39,3 +41,17 @@ export function buildGridLines(_doc: Document, el: Element): LineData {
   }
   return { segments: new Float32Array(seg), labels };
 }
+
+/** Reference plane: dashed line at z = 0; its name, if any, labels the end. */
+export function buildReferencePlaneLines(_doc: Document, el: Element): LineData {
+  const { start, end } = (el as ReferencePlane).params;
+  const labels: LineData["labels"] = [];
+  if (el.name) {
+    const len = Math.hypot(end.x - start.x, end.y - start.y);
+    const off = REF_PLANE_LABEL_OFFSET / len;
+    labels.push({ text: el.name, position: [end.x + (end.x - start.x) * off, end.y + (end.y - start.y) * off, 0] });
+  }
+  return { segments: new Float32Array([start.x, start.y, 0, end.x, end.y, 0]), labels, dashed: true };
+}
+
+const REF_PLANE_LABEL_OFFSET = 300; // mm beyond the end

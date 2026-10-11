@@ -2,6 +2,7 @@ import {
   Cat,
   levels,
   renameGrid,
+  renameReferencePlane,
   totalThickness,
   wallLength,
   wallThickness,
@@ -132,6 +133,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   counts.append(row("Walls", String(doc.byCategory(Cat.Wall).length)));
   counts.append(row("Floors", String(doc.byCategory(Cat.Floor).length)));
   counts.append(row("Grids", String(doc.byCategory(Cat.Grid).length)));
+  counts.append(row("Reference planes", String(doc.byCategory(Cat.ReferencePlane).length)));
 
   root.replaceChildren(views, lv, types, counts);
 }
@@ -200,6 +202,17 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       const { start, end } = el.params as GridParams;
       sec.append(
         row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename grid", (tx) => renameGrid(tx, doc, el.id, v)))),
+        row("Length", `${Math.round(Math.hypot(end.x - start.x, end.y - start.y))} mm`),
+      );
+      break;
+    }
+    case Cat.ReferencePlane: {
+      const { start, end } = el.params as GridParams;
+      sec.append(
+        row(
+          "Name",
+          textInput(el.name ?? "", (v) => edit(ctx, "Rename reference plane", (tx) => renameReferencePlane(tx, doc, el.id, v))),
+        ),
         row("Length", `${Math.round(Math.hypot(end.x - start.x, end.y - start.y))} mm`),
       );
       break;

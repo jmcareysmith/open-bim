@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Document, applyResidentialTemplate, createGrid } from "@open-bim/core";
+import { Document, applyResidentialTemplate, createGrid, createReferencePlane } from "@open-bim/core";
 import { GRID_BUBBLE_RADIUS, SimpleKernel } from "../src/index.ts";
 
 describe("grid line work", () => {
@@ -30,5 +30,22 @@ describe("grid line work", () => {
     const doc = new Document();
     const ids = applyResidentialTemplate(doc);
     expect(new SimpleKernel().buildLines(doc, doc.require(ids.levels.ground))).toBeNull();
+  });
+});
+
+describe("reference plane line work", () => {
+  it("is a single dashed segment, labelled only when named", () => {
+    const doc = new Document();
+    applyResidentialTemplate(doc);
+    const [plain, named] = doc.transact("RP", (tx) => [
+      createReferencePlane(tx, doc, { x: 0, y: 0 }, { x: 1000, y: 0 }),
+      createReferencePlane(tx, doc, { x: 0, y: 500 }, { x: 0, y: 1500 }, "Centre"),
+    ]);
+    const k = new SimpleKernel();
+    const a = k.buildLines(doc, plain!)!;
+    expect(a.dashed).toBe(true);
+    expect(Array.from(a.segments)).toEqual([0, 0, 0, 1000, 0, 0]);
+    expect(a.labels).toEqual([]);
+    expect(k.buildLines(doc, named!)!.labels).toEqual([{ text: "Centre", position: [0, 1800, 0] }]);
   });
 });

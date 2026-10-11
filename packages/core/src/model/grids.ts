@@ -72,28 +72,3 @@ export function renameGrid(tx: Transaction, doc: Document, id: ElementId, name: 
   if (gridNameInUse(doc, name, id)) throw new Error(`Grid name "${name}" is already in use`);
   tx.setName(id, name);
 }
-
-// ---- plan geometry helpers (used for snapping) ------------------------------
-
-/** Intersection of two grid lines within both segments, or null. */
-export function gridIntersection(a: Grid, b: Grid): Vec2 | null {
-  const p = a.params.start;
-  const r = { x: a.params.end.x - p.x, y: a.params.end.y - p.y };
-  const q = b.params.start;
-  const s = { x: b.params.end.x - q.x, y: b.params.end.y - q.y };
-  const den = r.x * s.y - r.y * s.x;
-  if (Math.abs(den) < 1e-9) return null;
-  const t = ((q.x - p.x) * s.y - (q.y - p.y) * s.x) / den;
-  const u = ((q.x - p.x) * r.y - (q.y - p.y) * r.x) / den;
-  if (t < 0 || t > 1 || u < 0 || u > 1) return null;
-  return { x: p.x + r.x * t, y: p.y + r.y * t };
-}
-
-/** Closest point on the grid line (segment) to `p`. */
-export function closestPointOnGrid(grid: Grid, p: Vec2): Vec2 {
-  const { start, end } = grid.params;
-  const dx = end.x - start.x;
-  const dy = end.y - start.y;
-  const t = Math.max(0, Math.min(1, ((p.x - start.x) * dx + (p.y - start.y) * dy) / (dx * dx + dy * dy)));
-  return { x: start.x + dx * t, y: start.y + dy * t };
-}

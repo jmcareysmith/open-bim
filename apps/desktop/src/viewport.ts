@@ -18,6 +18,7 @@ const COLORS: Record<string, number> = {
   [Cat.Wall]: 0xd9d4c7,
   [Cat.Floor]: 0x9aa3ad,
   [Cat.Grid]: 0xb8c7d6,
+  [Cat.ReferencePlane]: 0x4caf50,
 };
 const SELECTED = 0x3d8bfd;
 const PREVIEW = 0x5fb3ff;
@@ -374,7 +375,11 @@ function makeLineGroup(lines: LineData, color: number): THREE.Group {
   geom.setAttribute("position", new THREE.BufferAttribute(lines.segments, 3));
   geom.computeBoundingSphere();
   const g = new THREE.Group();
-  const segs = new THREE.LineSegments(geom, new THREE.LineBasicMaterial({ color }));
+  const segs = new THREE.LineSegments(
+    geom,
+    lines.dashed ? new THREE.LineDashedMaterial({ color, dashSize: 400, gapSize: 200 }) : new THREE.LineBasicMaterial({ color }),
+  );
+  if (lines.dashed) segs.computeLineDistances();
   segs.position.z = DATUM_LIFT;
   g.add(segs);
   for (const label of lines.labels) {

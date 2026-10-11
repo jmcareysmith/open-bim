@@ -12,6 +12,7 @@ export const Cat = {
   Floor: "Floor",
   FloorType: "FloorType",
   Grid: "Grid",
+  ReferencePlane: "ReferencePlane",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

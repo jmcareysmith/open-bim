@@ -19,7 +19,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Wall drawing tool (click-click in plan/3D work plane), snapping, ortho — plan is a clipped top-down view; true 2D plans in Phase 2
 - [x] Wall joins (L, T, X) — whole-wall mitres; per-layer cleanup comes with layered geometry
 - [x] Grids — straight; arc and multi-segment grids later
-- [ ] Reference planes
+- [x] Reference planes
 - [ ] Floors and ceilings from sketch boundary (polygon with holes)
 - [ ] Roofs by footprint with per-edge slope
 - [ ] OpenCascade (opencascade.js) kernel: booleans for openings

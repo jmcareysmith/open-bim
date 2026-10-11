@@ -23,7 +23,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 |---|---|---|
 | Levels | 0 | 🟨 |
 | Grids | 1 | 🟨 |
-| Reference planes | 1 | ⬜ |
+| Reference planes | 1 | ✅ |
 | Scope boxes | 2 | ⬜ |
 
 ## 3. Architectural modelling

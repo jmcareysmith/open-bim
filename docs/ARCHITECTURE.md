@@ -73,7 +73,7 @@ Datums (grids, later reference planes) have no solid; `buildLines()` returns `Li
 (segment pairs + text labels) drawn at z = 0. Datums span every level, so the view
 places them — the 3D viewport draws them on the active level's work plane.
 
-**Grids** — `Grid` elements hold a plan line; the element name is the grid label and must be
+**Grids & reference planes** — Datum lines (`datumLines()`); tools snap to both. `Grid` elements hold a plan line; the element name is the grid label and must be
 unique. New grids continue the latest series (1→2, A→B, skipping I and O). The wall and grid
 tools snap to grid endpoints, intersections and lines.
 

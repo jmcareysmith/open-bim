@@ -3,9 +3,9 @@ import {
   Cat,
   Document,
   applyResidentialTemplate,
-  closestPointOnGrid,
+  closestPointOnDatum,
   createGrid,
-  gridIntersection,
+  datumIntersection,
   incrementGridName,
   nextGridName,
   renameGrid,
@@ -88,9 +88,9 @@ describe("grids", () => {
     const v = grid(p(4000, -1000), p(4000, 9000));
     const h = grid(p(-1000, 5000), p(11000, 5000));
     const short = grid(p(0, 0), p(1000, 0));
-    expect(gridIntersection(v, h)).toEqual(p(4000, 5000));
-    expect(gridIntersection(v, short)).toBeNull();
-    expect(closestPointOnGrid(v, p(4300, 2000))).toEqual(p(4000, 2000));
-    expect(closestPointOnGrid(v, p(4000, 20000))).toEqual(p(4000, 9000));
+    expect(datumIntersection(v, h)).toEqual(p(4000, 5000));
+    expect(datumIntersection(v, short)).toBeNull();
+    expect(closestPointOnDatum(v, p(4300, 2000))).toEqual(p(4000, 2000));
+    expect(closestPointOnDatum(v, p(4000, 20000))).toEqual(p(4000, 9000));
   });
 });

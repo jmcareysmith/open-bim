@@ -1,14 +1,18 @@
 import {
   Cat,
-  closestPointOnGrid,
+  closestPointOnDatum,
   createGrid,
   createWall,
-  gridIntersection,
+  createReferencePlane,
+  datumIntersection,
+  datumLines,
   levels,
   nextGridName,
   type Grid,
-  type GridParams,
+  type DatumLine,
   type Document,
+  type Element,
+  type Transaction,
   type ElementId,
   type LevelParams,
   type Vec2,
@@ -17,7 +21,7 @@ import {
   totalThickness,
   type LayeredTypeParams,
 } from "@open-bim/core";
-import { buildGridLines, extrudePolygon, wallFootprint } from "@open-bim/geometry";
+import { buildGridLines, buildReferencePlaneLines, extrudePolygon, wallFootprint, type LineData } from "@open-bim/geometry";
 import type { Viewport } from "./viewport.ts";
 
 export interface ToolContext {
@@ -101,7 +105,7 @@ export interface Snapped {
  * 50 mm increment. `free` (Shift) turns off ortho.
  */
 export function snapPoint(ctx: ToolContext, p: Vec2, start: Vec2 | null, free: boolean): Snapped {
-  const grids = ctx.doc.byCategory<GridParams>(Cat.Grid);
+  const grids = datumLines(ctx.doc); // grids and reference planes
   const nearest = (pts: Vec2[]) => {
     let best: Vec2 | null = null;
     let bestD = POINT_SNAP;
@@ -124,7 +128,7 @@ export function snapPoint(ctx: ToolContext, p: Vec2, start: Vec2 | null, free: b
   const crossings: Vec2[] = [];
   for (let i = 0; i < grids.length; i++) {
     for (let j = i + 1; j < grids.length; j++) {
-      const x = gridIntersection(grids[i]!, grids[j]!);
+      const x = datumIntersection(grids[i]!, grids[j]!);
       if (x) crossings.push(x);
     }
   }
@@ -146,7 +150,7 @@ export function snapPoint(ctx: ToolContext, p: Vec2, start: Vec2 | null, free: b
 
   // 4. Onto a grid line (along the ortho line when locked)
   for (const g of grids) {
-    const c = closestPointOnGrid(g, q);
+    const c = closestPointOnDatum(g, q);
     if (Math.hypot(c.x - q.x, c.y - q.y) > LINE_SNAP) continue;
     if (!locked) return { p: c, kind: "grid" };
     const on = orthoOnGrid(g, start!, locked);
@@ -161,7 +165,7 @@ export function snapPoint(ctx: ToolContext, p: Vec2, start: Vec2 | null, free: b
 }
 
 /** Where the ortho line through `start` (with coordinate `locked` held) crosses grid `g`. */
-function orthoOnGrid(g: Grid, start: Vec2, locked: "x" | "y"): Vec2 | null {
+function orthoOnGrid(g: DatumLine, start: Vec2, locked: "x" | "y"): Vec2 | null {
   const { start: a, end: b } = g.params;
   const free = locked === "x" ? "y" : "x";
   const d = b[locked] - a[locked];
@@ -175,7 +179,7 @@ function orthoOnGrid(g: Grid, start: Vec2, locked: "x" | "y"): Vec2 | null {
 const SNAP_LABEL: Record<Snapped["kind"], string> = {
   endpoint: " · snap: endpoint",
   intersection: " · snap: grid intersection",
-  grid: " · snap: grid",
+  grid: " · snap: grid / reference plane",
   increment: "",
 };
 
@@ -265,13 +269,28 @@ export class WallTool implements Tool {
   }
 }
 
-// ---- Grid -----------------------------------------------------------------
+// ---- Datum lines (grids, reference planes) -----------------------------------
 
-export class GridTool implements Tool {
-  readonly name = "grid";
+interface DatumLineKind {
+  readonly name: string;
+  /** Label for status prompts, e.g. "Grid 4" or "Reference plane". */
+  label(doc: Document): string;
+  preview(doc: Document, start: Vec2, end: Vec2): LineData;
+  create(tx: Transaction, doc: Document, start: Vec2, end: Vec2): Element;
+  readonly txName: string;
+}
+
+/** Click a start point, then an end point. Snaps like the wall tool; no chaining. */
+class DatumLineTool implements Tool {
+  readonly name: string;
   private start: Vec2 | null = null;
 
-  constructor(private ctx: ToolContext) {}
+  constructor(
+    private ctx: ToolContext,
+    private kind: DatumLineKind,
+  ) {
+    this.name = kind.name;
+  }
 
   activate(): void {
     this.start = null;
@@ -284,7 +303,7 @@ export class GridTool implements Tool {
   }
 
   private prompt(): void {
-    this.ctx.status(`Grid ${nextGridName(this.ctx.doc)}: click start point, then end point. Shift = free angle.`);
+    this.ctx.status(`${this.kind.label(this.ctx.doc)}: click start point, then end point. Shift = free angle.`);
   }
 
   private point(ev: PointerEvent): Snapped | null {
@@ -300,10 +319,8 @@ export class GridTool implements Tool {
       this.ctx.viewport.setPreviewLines(null);
       return;
     }
-    const name = nextGridName(this.ctx.doc);
-    const preview: Grid = { id: "preview", category: Cat.Grid, name, params: { start: this.start, end: s.p } };
-    this.ctx.viewport.setPreviewLines(buildGridLines(this.ctx.doc, preview));
-    this.ctx.status(`Grid ${name} length: ${Math.round(len)} mm${SNAP_LABEL[s.kind]}`);
+    this.ctx.viewport.setPreviewLines(this.kind.preview(this.ctx.doc, this.start, s.p));
+    this.ctx.status(`${this.kind.label(this.ctx.doc)} length: ${Math.round(len)} mm${SNAP_LABEL[s.kind]}`);
   }
 
   click(ev: PointerEvent): void {
@@ -316,10 +333,10 @@ export class GridTool implements Tool {
     if (Math.hypot(s.p.x - this.start.x, s.p.y - this.start.y) < 10) return;
     const start = this.start;
     const { doc } = this.ctx;
-    const grid = doc.transact("Create grid", (tx) => createGrid(tx, doc, start, s.p));
+    const el = doc.transact(this.kind.txName, (tx) => this.kind.create(tx, doc, start, s.p));
     this.start = null;
     this.ctx.viewport.setPreviewLines(null);
-    this.ctx.setSelection([grid.id]);
+    this.ctx.setSelection([el.id]);
     this.prompt();
   }
 
@@ -331,5 +348,31 @@ export class GridTool implements Tool {
       return true;
     }
     return false;
+  }
+}
+
+export class GridTool extends DatumLineTool {
+  constructor(ctx: ToolContext) {
+    super(ctx, {
+      name: "grid",
+      txName: "Create grid",
+      label: (doc) => `Grid ${nextGridName(doc)}`,
+      preview: (doc, start, end) =>
+        buildGridLines(doc, { id: "preview", category: Cat.Grid, name: nextGridName(doc), params: { start, end } } as Grid),
+      create: (tx, doc, start, end) => createGrid(tx, doc, start, end),
+    });
+  }
+}
+
+export class ReferencePlaneTool extends DatumLineTool {
+  constructor(ctx: ToolContext) {
+    super(ctx, {
+      name: "refplane",
+      txName: "Create reference plane",
+      label: () => "Reference plane",
+      preview: (doc, start, end) =>
+        buildReferencePlaneLines(doc, { id: "preview", category: Cat.ReferencePlane, params: { start, end } }),
+      create: (tx, doc, start, end) => createReferencePlane(tx, doc, start, end),
+    });
   }
 }

@@ -11,7 +11,7 @@ import { SimpleKernel } from "@open-bim/geometry";
 import { openProject, saveProject } from "./io.ts";
 import { renderBrowser, renderProperties, type PanelContext } from "./panels.ts";
 import { buildSample } from "./sample.ts";
-import { GridTool, SelectTool, WallTool, type Tool, type ToolContext } from "./tools.ts";
+import { GridTool, ReferencePlaneTool, SelectTool, WallTool, type Tool, type ToolContext } from "./tools.ts";
 import { Viewport, type ViewMode } from "./viewport.ts";
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
@@ -55,7 +55,9 @@ const ctx: ToolContext & PanelContext = {
 
 // ---- tools ----------------------------------------------------------------
 
-const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new WallTool(ctx), grid: new GridTool(ctx) };
+const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new WallTool(ctx), grid: new GridTool(ctx),
+  refplane: new ReferencePlaneTool(ctx),
+};
 let tool: Tool = tools.select!;
 
 function setTool(name: string): void {
@@ -160,6 +162,7 @@ window.addEventListener("keydown", (ev) => {
   if (ev.key === "Escape") return setTool("select");
   if (ev.key.toLowerCase() === "w") return setTool("wall");
   if (ev.key.toLowerCase() === "g") return setTool("grid");
+  if (ev.key.toLowerCase() === "r") return setTool("refplane");
   if (ev.key.toLowerCase() === "f") return run(ev, "fit");
 });
 

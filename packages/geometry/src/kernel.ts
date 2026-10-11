@@ -8,7 +8,7 @@ import {
   type Vec2,
   type Wall,
 } from "@open-bim/core";
-import { buildGridLines, type LineData } from "./datums.ts";
+import { buildGridLines, buildReferencePlaneLines, type LineData } from "./datums.ts";
 import { joinedWallFootprint } from "./joins.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
 
@@ -63,7 +63,10 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.Floor, buildFloor],
   ]);
 
-  private lineBuilders = new Map<string, LineBuilder>([[Cat.Grid, buildGridLines]]);
+  private lineBuilders = new Map<string, LineBuilder>([
+    [Cat.Grid, buildGridLines],
+    [Cat.ReferencePlane, buildReferencePlaneLines],
+  ]);
 
   register(category: string, builder: Builder): void {
     this.builders.set(category, builder);

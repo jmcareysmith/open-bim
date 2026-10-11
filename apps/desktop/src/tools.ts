@@ -17,6 +17,8 @@ import {
   DEFAULT_ROOF_SLOPE,
   normaliseFootprint,
   regionFromLoops,
+  formatLength,
+  projectUnits,
   datumIntersection,
   datumLines,
   levels,
@@ -301,7 +303,7 @@ export class WallTool implements Tool {
     const top = this.topLevelId();
     const z1 = top ? this.ctx.doc.require<LevelParams>(top).params.elevation : z0 + 2400;
     this.ctx.viewport.setPreview(extrudePolygon(wallFootprint(this.start, p, totalThickness(type)), [], z0, z1));
-    this.ctx.status(`Wall length: ${Math.round(len)} mm${SNAP_LABEL[this.snapped!.kind]}`);
+    this.ctx.status(`Wall length: ${formatLength(len, projectUnits(this.ctx.doc))}${SNAP_LABEL[this.snapped!.kind]}`);
   }
 
   click(ev: PointerEvent): void {
@@ -387,7 +389,7 @@ class DatumLineTool implements Tool {
       return;
     }
     this.ctx.viewport.setPreviewLines(this.kind.preview(this.ctx.doc, this.start, s.p));
-    this.ctx.status(`${this.kind.label(this.ctx.doc)} length: ${Math.round(len)} mm${SNAP_LABEL[s.kind]}`);
+    this.ctx.status(`${this.kind.label(this.ctx.doc)} length: ${formatLength(len, projectUnits(this.ctx.doc))}${SNAP_LABEL[s.kind]}`);
   }
 
   click(ev: PointerEvent): void {

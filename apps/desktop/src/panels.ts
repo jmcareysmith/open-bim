@@ -2,6 +2,19 @@ import {
   Cat,
   levels,
   regionArea,
+  angleInputValue,
+  ensureProjectSettings,
+  formatArea,
+  formatLength,
+  lengthInputValue,
+  parseAngle,
+  parseLength,
+  projectSettings,
+  projectUnits,
+  DEFAULT_UNITS,
+  MM_EXACT_DECIMALS,
+  type ProjectSettingsParams,
+  type UnitsSettings,
   validateHosted,
   doorPlacement,
   hostedPlacement,
@@ -73,11 +86,29 @@ function edit(ctx: PanelContext, name: string, fn: Parameters<Document["transact
 const row = (label: string, control: Node | string) =>
   h("div", { class: "row" }, h("span", {}, label), typeof control === "string" ? h("span", { class: "value" }, control) : control);
 
+/** Units for the panel being rendered (set at the start of each render). */
+let units: UnitsSettings = DEFAULT_UNITS;
+const len = (mm: number) => formatLength(mm, units);
+
+/** Length in the project unit; a typed suffix ("2.4m") overrides it. Stores mm. */
 function numberInput(value: number, onCommit: (v: number) => void): HTMLInputElement {
-  const input = h("input", { type: "number", step: "10", value: String(Math.round(value)) });
+  const input = h("input", { type: "text", value: lengthInputValue(value, units), title: `Length in ${units.length.unit}` });
   input.onchange = () => {
-    const v = Number(input.value);
-    if (Number.isFinite(v)) onCommit(v);
+    const v = parseLength(input.value, units);
+    if (v === null) {
+      input.value = lengthInputValue(value, units);
+      return;
+    }
+    onCommit(v);
+  };
+  return input;
+}
+
+function intInput(value: number, min: number, max: number, onCommit: (v: number) => void): HTMLInputElement {
+  const input = h("input", { type: "number", min: String(min), max: String(max), step: "1", value: String(value) });
+  input.onchange = () => {
+    const v = Math.round(Number(input.value));
+    if (Number.isFinite(v) && v >= min && v <= max) onCommit(v);
   };
   return input;
 }
@@ -95,15 +126,81 @@ function select(options: { value: string; label: string }[], value: string, onCh
   return s;
 }
 
-/** Slope in degrees; empty = no slope. Stored as radians. */
+/** Slope in the project angle unit; empty = no slope. Stored as radians. */
 function slopeInput(rad: number | null, onCommit: (v: number | null) => void): HTMLInputElement {
-  const input = h("input", { type: "number", step: "0.5", min: "0", max: "89", value: rad === null ? "" : (rad * 180 / Math.PI).toFixed(1) });
+  const input = h("input", { type: "text", value: rad === null ? "" : angleInputValue(rad, units) });
   input.onchange = () => {
     if (input.value.trim() === "") return onCommit(null);
-    const d = Number(input.value);
-    if (Number.isFinite(d) && d > 0 && d < 90) onCommit((d * Math.PI) / 180);
+    const r = parseAngle(input.value, units);
+    if (r !== null && r > 0 && r < Math.PI / 2) onCommit(r);
   };
   return input;
+}
+
+/** Project Information and Project Units editors. */
+function settingsSections(ctx: PanelContext, id: ElementId, p: ProjectSettingsParams): HTMLElement[] {
+  const set = (name: string, patch: Partial<ProjectSettingsParams>) =>
+    edit(ctx, name, (tx) => tx.update<ProjectSettingsParams>(id, patch));
+  const setInfo = (key: keyof ProjectSettingsParams["info"], v: string) =>
+    set("Edit project information", { info: { ...p.info, [key]: v } });
+  const setUnits = (patch: Partial<UnitsSettings>) => set("Change project units", { units: { ...p.units, ...patch } });
+
+  const info = h("div", { class: "section" }, h("h3", {}, "Project Information"));
+  for (const [key, label] of [
+    ["name", "Project name"],
+    ["number", "Project number"],
+    ["client", "Client"],
+    ["address", "Address"],
+  ] as const) {
+    info.append(row(label, textInput(p.info[key], (v) => setInfo(key, v))));
+  }
+
+  const u = p.units;
+  const unitsSec = h("div", { class: "section" }, h("h3", {}, "Project Units"));
+  unitsSec.append(
+    row(
+      "Length",
+      select(
+        [
+          { value: "mm", label: "Millimetres" },
+          { value: "cm", label: "Centimetres" },
+          { value: "m", label: "Metres" },
+        ],
+        u.length.unit,
+        (v) => {
+          const unit = v as UnitsSettings["length"]["unit"];
+          setUnits({ length: { unit, decimals: MM_EXACT_DECIMALS[unit] } });
+        },
+      ),
+    ),
+    row("Length decimals", intInput(u.length.decimals, 0, 6, (v) => setUnits({ length: { ...u.length, decimals: v } }))),
+    row(
+      "Area",
+      select(
+        [
+          { value: "m2", label: "Square metres" },
+          { value: "mm2", label: "Square millimetres" },
+        ],
+        u.area.unit,
+        (v) => setUnits({ area: { ...u.area, unit: v as UnitsSettings["area"]["unit"] } }),
+      ),
+    ),
+    row("Area decimals", intInput(u.area.decimals, 0, 6, (v) => setUnits({ area: { ...u.area, decimals: v } }))),
+    row(
+      "Angle",
+      select(
+        [
+          { value: "deg", label: "Degrees" },
+          { value: "rad", label: "Radians" },
+        ],
+        u.angle.unit,
+        (v) => setUnits({ angle: { ...u.angle, unit: v as UnitsSettings["angle"]["unit"] } }),
+      ),
+    ),
+    row("Angle decimals", intInput(u.angle.decimals, 0, 6, (v) => setUnits({ angle: { ...u.angle, decimals: v } }))),
+    row("Example", `${len(12500)} \u00b7 ${formatArea(24.16e6, units)}`),
+  );
+  return [info, unitsSec];
 }
 
 function editBoundaryButton(ctx: PanelContext, id: ElementId): HTMLElement {
@@ -116,6 +213,7 @@ function editBoundaryButton(ctx: PanelContext, id: ElementId): HTMLElement {
 
 export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   const { doc } = ctx;
+  units = projectUnits(doc);
   const sel = new Set(ctx.selection());
   const item = (el: Element, right: string, onClick: () => void, active = false) => {
     const div = h(
@@ -149,7 +247,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   const lv = h("div", { class: "section" }, h("h3", {}, "Levels"));
   for (const l of levels(doc)) {
     lv.append(
-      item(l, `${l.params.elevation} mm`, () => {
+      item(l, len(l.params.elevation), () => {
         ctx.setActiveLevel(l.id);
         ctx.setSelection([l.id]);
       }, l.id === ctx.activeLevelId()),
@@ -159,7 +257,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   const types = h("div", { class: "section" }, h("h3", {}, "Types"));
   for (const cat of [Cat.WallType, Cat.FloorType, Cat.CeilingType, Cat.RoofType]) {
     for (const t of doc.byCategory<LayeredTypeParams>(cat)) {
-      types.append(item(t, `${totalThickness(t)} mm`, () => ctx.setSelection([t.id])));
+      types.append(item(t, len(totalThickness(t)), () => ctx.setSelection([t.id])));
     }
   }
   for (const t of doc.byCategory<DoorTypeParams>(Cat.DoorType)) {
@@ -180,13 +278,35 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   counts.append(row("Grids", String(doc.byCategory(Cat.Grid).length)));
   counts.append(row("Reference planes", String(doc.byCategory(Cat.ReferencePlane).length)));
 
-  root.replaceChildren(views, lv, types, counts);
+  // Project: information and units live on one settings element (created on demand for old files).
+  const project = h("div", { class: "section" }, h("h3", {}, "Project"));
+  const settings = projectSettings(doc);
+  const openSettings = () => {
+    let id = settings?.id;
+    if (!id) {
+      try {
+        id = doc.transact("Create project settings", (tx) => ensureProjectSettings(tx, doc)).id;
+      } catch (err) {
+        return ctx.status(`\u26a0 ${(err as Error).message}`);
+      }
+    }
+    ctx.setSelection([id]);
+  };
+  const info = h("div", { class: `list-item${settings && sel.has(settings.id) ? " selected" : ""}` },
+    h("span", {}, "Project Information & Units"),
+    h("span", { class: "muted" }, units.length.unit),
+  );
+  info.onclick = openSettings;
+  project.append(info);
+
+  root.replaceChildren(project, views, lv, types, counts);
 }
 
 // ---- Properties -----------------------------------------------------------
 
 export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
   const { doc } = ctx;
+  units = projectUnits(doc);
   const ids = ctx.selection().filter((id) => doc.has(id));
   if (ids.length === 0) {
     root.replaceChildren(h("div", { class: "empty" }, "Nothing selected"));
@@ -229,8 +349,8 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         p.topLevelId
           ? row("Top offset", numberInput(p.topOffset, (v) => update<WallParams>("Change top offset", { topOffset: v })))
           : row("Unconnected height", numberInput(p.height, (v) => update<WallParams>("Change wall height", { height: v }))),
-        row("Length", `${Math.round(wallLength(w))} mm`),
-        row("Thickness", `${wallThickness(doc, w)} mm`),
+        row("Length", len(wallLength(w))),
+        row("Thickness", len(wallThickness(doc, w))),
       );
       break;
     }
@@ -240,7 +360,7 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Type", select(typeOpts(Cat.FloorType), el.typeId ?? "", (v) => edit(ctx, "Change floor type", (tx) => tx.setType(el.id, v)))),
         row("Level", select(levelOpts, p.levelId, (v) => update<FloorParams>("Change floor level", { levelId: v }))),
         row("Height offset", numberInput(p.offset, (v) => update<FloorParams>("Change floor offset", { offset: v }))),
-        row("Area", `${(regionArea(p) / 1e6).toFixed(2)} m²`),
+        row("Area", formatArea(regionArea(p), units)),
         editBoundaryButton(ctx, el.id),
       );
       break;
@@ -251,7 +371,7 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Type", select(typeOpts(Cat.CeilingType), el.typeId ?? "", (v) => edit(ctx, "Change ceiling type", (tx) => tx.setType(el.id, v)))),
         row("Level", select(levelOpts, p.levelId, (v) => update<CeilingParams>("Change ceiling level", { levelId: v }))),
         row("Height offset", numberInput(p.offset, (v) => update<CeilingParams>("Change ceiling height", { offset: v }))),
-        row("Area", `${(regionArea(p) / 1e6).toFixed(2)} m²`),
+        row("Area", formatArea(regionArea(p), units)),
         editBoundaryButton(ctx, el.id),
       );
       break;
@@ -260,7 +380,7 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       const { start, end } = el.params as GridParams;
       sec.append(
         row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename grid", (tx) => renameGrid(tx, doc, el.id, v)))),
-        row("Length", `${Math.round(Math.hypot(end.x - start.x, end.y - start.y))} mm`),
+        row("Length", len(Math.hypot(end.x - start.x, end.y - start.y))),
       );
       break;
     }
@@ -271,7 +391,7 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
           "Name",
           textInput(el.name ?? "", (v) => edit(ctx, "Rename reference plane", (tx) => renameReferencePlane(tx, doc, el.id, v))),
         ),
-        row("Length", `${Math.round(Math.hypot(end.x - start.x, end.y - start.y))} mm`),
+        row("Length", len(Math.hypot(end.x - start.x, end.y - start.y))),
       );
       break;
     }
@@ -284,17 +404,17 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Type", select(typeOpts(Cat.RoofType), el.typeId ?? "", (v) => edit(ctx, "Change roof type", (tx) => tx.setType(el.id, v)))),
         row("Base level", select(levelOpts, p.levelId, (v) => update<RoofParams>("Change roof level", { levelId: v }))),
         row("Base offset", numberInput(p.baseOffset, (v) => update<RoofParams>("Change roof offset", { baseOffset: v }))),
-        row("Base elevation", `${Math.round(roofBaseElevation(doc, r))} mm`),
+        row("Base elevation", len(roofBaseElevation(doc, r))),
         row(
-          "Slope, all sloped edges (°)",
+          `Slope, all sloped edges (${units.angle.unit === "deg" ? "°" : "rad"})`,
           slopeInput(sloped.length ? sloped[0]! : null, (v) => v !== null && setSlopes(p.slopes.map((s) => (s === null ? null : v)))),
         ),
         h("h3", {}, "Edges (blank = no slope / gable)"),
         ...p.slopes.map((s, i) => {
           const a = p.boundary[i]!;
           const b = p.boundary[(i + 1) % p.boundary.length]!;
-          const len = Math.round(Math.hypot(b.x - a.x, b.y - a.y));
-          return row(`Edge ${i + 1} (${len} mm)`, slopeInput(s, (v) => setSlopes(p.slopes.map((x, j) => (j === i ? v : x)))));
+          const edgeLen = Math.hypot(b.x - a.x, b.y - a.y);
+          return row(`Edge ${i + 1} (${len(edgeLen)})`, slopeInput(s, (v) => setSlopes(p.slopes.map((x, j) => (j === i ? v : x)))));
         }),
         editBoundaryButton(ctx, el.id),
       );
@@ -376,7 +496,7 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       const t = el as Element<LayeredTypeParams>;
       sec.append(
         row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename type", (tx) => tx.setName(el.id, v || undefined)))),
-        row("Total", `${totalThickness(t)} mm`),
+        row("Total", len(totalThickness(t))),
       );
       t.params.layers.forEach((layer, i) => {
         sec.append(
@@ -391,6 +511,11 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       });
       break;
     }
+  }
+
+  if (el.category === Cat.ProjectSettings) {
+    root.replaceChildren(...settingsSections(ctx, el.id, el.params as ProjectSettingsParams));
+    return;
   }
 
   const del = h("button", { class: "danger", textContent: "Delete" });

@@ -15,7 +15,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Run on Windows PC via `npm run tauri dev`
 - [ ] App icon + CI (GitHub Actions: tests + build)
 
-## Phase 1 — Architectural modelling (current)
+## Phase 1 — Architectural modelling (done)
 - [x] Wall drawing tool (click-click in plan/3D work plane), snapping, ortho — plan is a clipped top-down view; true 2D plans in Phase 2
 - [x] Wall joins (L, T, X) — whole-wall mitres; per-layer cleanup comes with layered geometry
 - [x] Grids — straight; arc and multi-segment grids later
@@ -25,7 +25,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] OpenCascade (opencascade.js) kernel: booleans for openings — wall openings; floor/roof openings later
 - [x] Doors and windows hosted in walls, cutting openings — parametric types; loadable families in Phase 3
 - [x] Selection, properties panel, type selector, temporary hide/isolate
-- [ ] Project units & settings
+- [x] Project units & settings
 
 ## Phase 2 — Views & drawing production
 - View system: each view = camera + view range + visibility rules + detail level

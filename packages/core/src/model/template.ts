@@ -2,6 +2,7 @@ import type { Document } from "../document.ts";
 import type { ElementId } from "../element.ts";
 import { Cat, createLevel, type LayeredTypeParams } from "./architecture.ts";
 import type { DoorTypeParams, WindowTypeParams } from "./doors.ts";
+import { createProjectSettings } from "./settings.ts";
 
 export interface TemplateIds {
   levels: { ground: ElementId; first: ElementId; roof: ElementId };
@@ -16,6 +17,7 @@ export interface TemplateIds {
 /** Starter project: NZ residential levels and common NZS 3604-style assemblies. */
 export function applyResidentialTemplate(doc: Document): TemplateIds {
   return doc.transact("New project from template", (tx) => {
+    createProjectSettings(tx, doc);
     const ground = createLevel(tx, "Ground Floor", 0).id;
     const first = createLevel(tx, "First Floor", 2700).id;
     const roof = createLevel(tx, "Roof", 5400).id;

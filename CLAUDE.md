@@ -47,8 +47,12 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   footprint roofs (Roof tool; per-edge slope or gable in properties; sample has a hipped roof),
   OpenCascade kernel (loads async; cuts wall openings), Opening tool (click a wall),
   doors (D) and windows (N): parametric types, hosted, cut walls, door swing in plan, flip facing/hand,
-  box select, toolbar type selector (per tool / retype selection), temporary hide/isolate (H, I, Shift+H/I, U).
+  box select, toolbar type selector (per tool / retype selection), temporary hide/isolate (H, I, Shift+H/I, U),
+  project information + units (browser → Project; mm/cm/m, typed suffixes like "2.4m").
+- Phase 1 done (all roadmap items ticked; see notes on each for what's deferred).
 - Known gaps: joins are whole-wall (no per-layer cleanup); no "disallow join"; walls crossing
-  mid-span overlap; very acute mitres are squared off; no wall attach top/base; no 2D views;
-  grids are straight only (no arc/multi-segment), no bubble on/off per end, can't drag grid ends.
-- Next: Phase 1 — project units & settings (last Phase 1 item), then Phase 2 views.
+  mid-span overlap; very acute mitres are squared off; walls don't attach to floors/roofs; plan is a
+  clipped 3D view, not true 2D; grids straight only, no bubble toggles, no grip editing (drag ends);
+  floors have no "pick walls" / slope arrows; roofs exact only for convex/L/T/U footprints;
+  doors/windows are parametric (no families); grids drawn over walls win picks (no Tab-cycling).
+- Next: Phase 2 — view system (views as elements: camera + view range + visibility), then true 2D plans via OCCT HLR.

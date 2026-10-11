@@ -23,6 +23,7 @@ export const Cat = {
   DoorType: "DoorType",
   Window: "Window",
   WindowType: "WindowType",
+  ProjectSettings: "ProjectSettings",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

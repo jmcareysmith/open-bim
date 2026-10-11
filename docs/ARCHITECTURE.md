@@ -67,6 +67,12 @@ typical L/T/U plans; a full weighted straight skeleton is needed only for split 
 Geometry cuts the footprint along every line where the lowest plane can change, so each convex
 cell is one plane, then extrudes the surface by the type thickness (vertical).
 
+**Project settings** — one `ProjectSettings` element per document holds Project Information
+(name, number, client, address) and Project Units (length mm/cm/m, area, angle, decimals).
+Values stay in mm / radians; units only drive `formatLength`/`parseLength` etc. in the UI. Typed
+suffixes override the unit ("2.4m"); inputs never round coarser than 1 mm. Older files without
+the element use defaults and get one on demand.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

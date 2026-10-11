@@ -6,6 +6,7 @@ import {
   isWallCutter,
   levels,
   planViewRange,
+  projectSettings,
   typeCategoryOf,
   validateHosted,
   type CeilingParams,
@@ -363,7 +364,8 @@ function refreshAll(): void {
 
 function updateTitle(): void {
   const name = filePath?.split(/[\\/]/).pop() ?? "Untitled";
-  document.title = `${dirty ? "• " : ""}${name} — Open-BIM`;
+  const project = projectSettings(doc)?.params.info.name;
+  document.title = `${dirty ? "• " : ""}${name}${project ? ` (${project})` : ""} — Open-BIM`;
 }
 
 doc.on((c) => {

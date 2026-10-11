@@ -10,4 +10,5 @@ export * from "./model/sketch.ts";
 export * from "./model/roofs.ts";
 export * from "./model/openings.ts";
 export * from "./model/doors.ts";
+export * from "./model/settings.ts";
 export * from "./model/template.ts";

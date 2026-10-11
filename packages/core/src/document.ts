@@ -201,7 +201,10 @@ export class Document {
   // ---- internals ---------------------------------------------------------
 
   private depsOf(el: Element): ElementId[] {
-    return getCategory(el.category).dependencies(el);
+    // Group members depend on their group (deleting a group deletes its members).
+    const group = (el.params as { groupId?: unknown }).groupId;
+    const deps = getCategory(el.category).dependencies(el);
+    return typeof group === "string" ? [...deps, group] : deps;
   }
 
   private put(id: ElementId, el: Element | undefined): void {

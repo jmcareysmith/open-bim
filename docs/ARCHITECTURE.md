@@ -186,6 +186,12 @@ separately). `RevisionCloud`s are view- or sheet-owned annotation on a revision 
 are locked). A sheet's revisions are those clouded on it or in its placed views, plus `revisionIds`
 added by hand; the title block shows the current revision and a revision schedule.
 
+**Groups** — a `GroupType` plus `Group` instances (origin, rotation). Members are ordinary
+elements with `params.groupId`, which `Document` treats as a dependency of any element, so deleting
+a group deletes its members. Placing a group copies the source instance's members through a rigid
+plan transform (`transformedParams`), remapping host ids; "apply to all" re-copies one instance into
+the others. Clicking a member selects its group (Alt+click: the member).
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

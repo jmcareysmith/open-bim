@@ -47,7 +47,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Rooms, areas, area plans — room separators, room bounding; GFA/NLA area schemes, boundaries from walls
 - [x] Tags, keynotes, legends — tag by category, keynote files/tags, legend views with type swatches and keynote legends
 - [x] Schedules + material takeoffs, CSV/XLSX export — not yet on sheets; no calculated fields or in-table editing
-- [ ] Revisions, groups
+- [x] Revisions, groups — model groups (place copies, apply to all instances); detail groups later
 - [ ] Plugin API + scripting console
 
 ## Phase 5 — Interoperability

@@ -35,6 +35,9 @@ import {
   loadFamily,
   familyFile,
   readFamilyFile,
+  createGroup,
+  groupMembers,
+  GROUPABLE,
   tableCsv,
   tableXlsx,
   type Schedule,
@@ -75,6 +78,7 @@ import {
   DetailLineTool,
   DimensionTool,
   RoomTool,
+  PlaceGroupTool,
   RoomSeparatorTool,
   AreaTool,
   TagTool,
@@ -220,6 +224,7 @@ const ctx: ToolContext & PanelContext = {
       status(`\u26a0 ${(err as Error).message}`);
     }
   },
+  placeGroupCopy: () => void commands.placeGroupCopy?.(),
   async exportSchedule(id: ElementId, format: "csv" | "xlsx") {
     try {
       const s = doc.require(id) as Schedule;
@@ -290,7 +295,8 @@ const ctx: ToolContext & PanelContext = {
   selection: () => selection,
   setSelection(ids) {
     selection = ids;
-    viewport.setSelection(ids);
+    // A selected group highlights its members.
+    viewport.setSelection(ids.flatMap((id) => (doc.get(id)?.category === Cat.Group ? [id, ...groupMembers(doc, id).map((m) => m.id)] : [id])));
     refreshPanels();
   },
   setActiveLevel(id) {
@@ -347,6 +353,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   text: new TextTool(ctx),
   dimension: new DimensionTool(ctx),
   room: new RoomTool(ctx),
+  placegroup: new PlaceGroupTool(ctx),
   roomseparator: new RoomSeparatorTool(ctx),
   area: new AreaTool(ctx),
   tag: new TagTool(ctx, "category"),
@@ -461,6 +468,26 @@ const commands: Record<string, () => void | Promise<void>> = {
   },
   fit() {
     viewport.zoomToFit();
+  },
+  group() {
+    if (!selection.length) return status("Group: select walls, floors, components or rooms first.");
+    // Datums, views and annotation can't be in model groups: leave them out.
+    const ids = selection.filter((id) => GROUPABLE.has(doc.get(id)?.category ?? ""));
+    const skipped = selection.length - ids.length;
+    if (!ids.length) return status("Group: none of the selection can be grouped (walls, floors, roofs, components, rooms).");
+    try {
+      const g = doc.transact("Create group", (tx) => createGroup(tx, doc, ids));
+      ctx.setSelection([g.id]);
+      status(`Created ${doc.get(g.typeId!)?.name}${skipped ? ` (${skipped} element(s) left out)` : ""}. Click a member to select the group; Alt+click for one element.`);
+    } catch (err) {
+      status(`\u26a0 ${(err as Error).message}`);
+    }
+  },
+  placeGroupCopy() {
+    const g = selection.map((id) => doc.get(id)).find((e) => e?.category === Cat.Group);
+    if (!g) return status("Select a group first.");
+    (tools.placegroup as PlaceGroupTool).source = g.id;
+    setTool("placegroup");
   },
   // Temporary hide/isolate (Revit HH / HI / HC / IC / HR). Category variants act on the selection's categories.
   hide() {
@@ -627,6 +654,7 @@ window.addEventListener("keydown", (ev) => {
   if (mod && ev.key.toLowerCase() === "s") return run(ev, "save");
   if (mod && ev.key.toLowerCase() === "o") return run(ev, "open");
   if (mod && ev.key.toLowerCase() === "n") return run(ev, "new");
+  if (mod && ev.key.toLowerCase() === "g") return run(ev, "group");
   if (mod) return;
   if (tool.key?.(ev)) return ev.preventDefault();
   if (ev.key === "Escape") return setTool("select");

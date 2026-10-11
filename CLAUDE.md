@@ -70,4 +70,6 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   legends (Views → New legend; add components / keynote legend in its properties).
 - Schedules/Quantities and material takeoffs (browser → Schedules; fields, filter, sort/group,
   totals; Export CSV / Excel). Not yet placeable on sheets; no calculated fields.
-- Next: Phase 4 — revisions/groups, then plugin API + scripting console.
+- Revisions (browser → Revisions; Cloud tool; sheet revision schedule) and model groups (Group /
+  Ctrl+G; Place copy; Apply to other instances; Ungroup).
+- Next: Phase 4 — plugin API + scripting console (last Phase 4 item).

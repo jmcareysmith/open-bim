@@ -15,7 +15,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Shared coordinates, project base point, survey point, true north | 5 | ⬜ |
 | Phasing (existing / new / demolished, phase filters) | 6 | ⬜ |
 | Design options | 6 | ⬜ |
-| Groups (model & detail) | 4 | ⬜ |
+| Groups (model & detail) | 4 | 🟨 |
 | Links (linked models) | 5 | ⬜ |
 
 ## 2. Datums

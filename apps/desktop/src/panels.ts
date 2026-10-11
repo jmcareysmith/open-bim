@@ -11,6 +11,12 @@ import {
   createLegend,
   createSchedule,
   createRevision,
+  groupInstances,
+  groupMembers,
+  moveGroup,
+  syncGroupInstances,
+  ungroup,
+  type GroupParams,
   moveRevision,
   revisionNumber,
   revisions,
@@ -195,6 +201,8 @@ export interface PanelContext {
   importKeynotes(): void;
   exportKeynotes(): void;
   exportSchedule(id: ElementId, format: "csv" | "xlsx"): void;
+  /** Start placing copies of a selected group. */
+  placeGroupCopy(): void;
   /** Family editor: the project's loaded families, and copying one in to nest it. */
   projectFamilies(): FamilyDef[];
   nestFamily(defId: ElementId): void;
@@ -1586,6 +1594,32 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         ),
         row("X", numberInput(p.position.x, (v) => update<KeynoteLegendParams>("Move keynote legend", { position: { ...p.position, x: v } }))),
         row("Y", numberInput(p.position.y, (v) => update<KeynoteLegendParams>("Move keynote legend", { position: { ...p.position, y: v } }))),
+      );
+      break;
+    }
+    case Cat.Group: {
+      const p = el.params as GroupParams;
+      const type = el.typeId ? doc.get(el.typeId) : undefined;
+      const others = el.typeId ? groupInstances(doc, el.typeId).length - 1 : 0;
+      const move = (origin: { x: number; y: number }, rotation?: number) => edit(ctx, "Move group", (tx) => moveGroup(tx, doc, el.id, origin, rotation));
+      const place = h("button", { textContent: "Place copy" });
+      place.onclick = () => ctx.placeGroupCopy();
+      const apply = h("button", { textContent: `Apply to ${others} other instance${others === 1 ? "" : "s"}`, disabled: others === 0 });
+      apply.title = "Make every other instance of this group match this one";
+      apply.onclick = () => edit(ctx, "Apply group changes", (tx) => syncGroupInstances(tx, doc, el.id));
+      const ungroupBtn = h("button", { textContent: "Ungroup" });
+      ungroupBtn.onclick = () =>
+        edit(ctx, "Ungroup", (tx) => {
+          const ids = ungroup(tx, doc, el.id);
+          queueMicrotask(() => ctx.setSelection(ids));
+        });
+      sec.append(
+        row("Group", textInput(type?.name ?? "", (v) => (v && type ? edit(ctx, "Rename group", (tx) => tx.setName(type.id, v)) : undefined))),
+        row("Members", String(groupMembers(doc, el.id).length)),
+        row("Origin X", numberInput(p.origin.x, (v) => move({ ...p.origin, x: v }))),
+        row("Origin Y", numberInput(p.origin.y, (v) => move({ ...p.origin, y: v }))),
+        row("Rotation (\u00b0)", numberInput(Math.round((p.rotation * 180) / Math.PI * 100) / 100, (v) => move(p.origin, (v * Math.PI) / 180))),
+        row("", h("div", { class: "buttons wrap" }, place, apply, ungroupBtn)),
       );
       break;
     }

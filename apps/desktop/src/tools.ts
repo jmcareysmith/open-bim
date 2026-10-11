@@ -60,6 +60,8 @@ import {
   type Room,
   createArea,
   createAreaBoundary,
+  groupOf,
+  placeGroup,
   createRevisionCloud,
   revisionNumber,
   revisions,
@@ -148,7 +150,16 @@ export class SelectTool implements Tool {
     this.dragFrom = null;
     if (!from || !this.band) return this.endBand();
     this.endBand();
-    const ids = this.ctx.viewport.elementsInRect({ x0: from.x, y0: from.y, x1: ev.clientX, y1: ev.clientY }, ev.clientX < from.x);
+    // Grouped elements select as their group.
+    const ids = [
+      ...new Set(
+        this.ctx.viewport.elementsInRect({ x0: from.x, y0: from.y, x1: ev.clientX, y1: ev.clientY }, ev.clientX < from.x).map((id) => {
+          const el = this.ctx.doc.get(id);
+          const g = el && groupOf(el);
+          return g && this.ctx.doc.has(g) ? g : id;
+        }),
+      ),
+    ];
     this.ctx.setSelection(ev.shiftKey ? [...new Set([...this.ctx.selection(), ...ids])] : ids);
     this.ctx.status(`${ids.length} element(s) in box`);
   }
@@ -159,7 +170,11 @@ export class SelectTool implements Tool {
   }
 
   click(ev: PointerEvent): void {
-    const id = this.ctx.viewport.pick(ev);
+    let id = this.ctx.viewport.pick(ev);
+    // Clicking a group member selects the group; Alt+click selects the member itself.
+    const el = id ? this.ctx.doc.get(id) : undefined;
+    const g = el && groupOf(el);
+    if (g && this.ctx.doc.has(g) && !ev.altKey) id = g;
     if (!id) {
       if (!ev.shiftKey) this.ctx.setSelection([]);
       return;
@@ -823,6 +838,33 @@ export class RoomSeparatorTool extends DatumLineTool {
       preview: (_doc, start, end) => linePreview(start, end),
       create: (tx, doc, start, end) => createRoomSeparator(tx, doc, ctx.activeLevelId(), start, end),
     });
+  }
+}
+
+/** Place a copy of a group: click where its origin goes. */
+export class PlaceGroupTool implements Tool {
+  readonly name = "placegroup";
+  source: ElementId | null = null;
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.ctx.status(this.source ? "Place group: click where the copy's origin goes. Esc to finish." : "Select a group first, then Place copy.");
+  }
+
+  click(ev: PointerEvent): void {
+    const { doc } = this.ctx;
+    if (!this.source || !doc.has(this.source)) return this.ctx.status("Select a group first, then Place copy.");
+    const elevation = doc.require<LevelParams>(this.ctx.activeLevelId()).params.elevation;
+    const raw = this.ctx.viewport.pickPlane(ev, elevation);
+    if (!raw) return;
+    const p = snapPoint(this.ctx, raw, null, ev.shiftKey).p;
+    const src = this.source;
+    try {
+      const g = doc.transact("Place group", (tx) => placeGroup(tx, doc, src, p));
+      this.ctx.setSelection([g.id]);
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
   }
 }
 

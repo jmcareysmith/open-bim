@@ -54,6 +54,8 @@ export const Cat = {
   Schedule: "Schedule",
   Revision: "Revision",
   RevisionCloud: "RevisionCloud",
+  GroupType: "GroupType",
+  Group: "Group",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

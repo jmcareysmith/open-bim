@@ -29,6 +29,12 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Small, focused commits. Update docs when architecture changes.
 - NZ context: metric, NZS 3604 / H1 relevant later; use NZ English in UI text.
 
+## Session tips
+- Run /mcp first to check context7 and playwright are connected.
+- Claude Pro has usage limits that reset every few hours: do one feature per session, check it with
+  `npm run tauri dev`, then start the next feature fresh.
+- End each session by updating the "Current state" section below and pushing to GitHub.
+
 ## Current state (update at the end of each session)
 - Phase 0 done except CI green (runs on Windows via `npm run tauri dev`).
 - Working: levels, wall/floor types with layers, walls, floors, undo/redo, regeneration,

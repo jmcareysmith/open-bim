@@ -58,8 +58,11 @@ import {
   createRoomSeparator,
   nextRoomNumber,
   type Room,
+  createArea,
+  createAreaBoundary,
+  type ViewParams,
 } from "@open-bim/core";
-import { buildGridLines, buildReferencePlaneLines, buildRoomLines, extrudePolygon, roomBoundary, wallFootprint, type LineData } from "@open-bim/geometry";
+import { areaBoundary, buildGridLines, buildReferencePlaneLines, buildRoomLines, extrudePolygon, roomBoundary, wallFootprint, type LineData } from "@open-bim/geometry";
 import type { Viewport } from "./viewport.ts";
 
 export interface ToolContext {
@@ -799,6 +802,56 @@ export class RoomSeparatorTool extends DatumLineTool {
       preview: (_doc, start, end) => linePreview(start, end),
       create: (tx, doc, start, end) => createRoomSeparator(tx, doc, ctx.activeLevelId(), start, end),
     });
+  }
+}
+
+/** The open area plan, or null (with a hint). */
+function requireAreaPlan(ctx: ToolContext): ElementId | null {
+  const id = ctx.activeViewId();
+  const v = id ? ctx.doc.get<ViewParams>(id) : undefined;
+  if (v?.params.kind !== "areaPlan") {
+    ctx.status("Areas go in area plans. Create one in the browser (Views \u2192 New area plan).");
+    return null;
+  }
+  return v.id;
+}
+
+/** Area boundary line: click start and end in an area plan. */
+export class AreaBoundaryTool extends DatumLineTool {
+  constructor(ctx: ToolContext) {
+    super(ctx, {
+      name: "areaboundary",
+      txName: "Create area boundary",
+      label: () => "Area boundary",
+      preview: (_doc, start, end) => linePreview(start, end),
+      create: (tx, doc, start, end) => {
+        const viewId = requireAreaPlan(ctx);
+        if (!viewId) throw new Error("Open an area plan first");
+        return createAreaBoundary(tx, doc, viewId, start, end);
+      },
+    });
+  }
+}
+
+/** Area: click inside area boundary lines in an area plan. */
+export class AreaTool implements Tool {
+  readonly name = "area";
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.ctx.status("Area: click inside area boundary lines (in an area plan).");
+  }
+
+  click(ev: PointerEvent): void {
+    const viewId = requireAreaPlan(this.ctx);
+    if (!viewId) return;
+    const { doc } = this.ctx;
+    const elevation = doc.require<LevelParams>(this.ctx.activeLevelId()).params.elevation;
+    const p = this.ctx.viewport.pickPlane(ev, elevation);
+    if (!p) return;
+    const area = doc.transact("Create area", (tx) => createArea(tx, doc, viewId, p));
+    this.ctx.setSelection([area.id]);
+    this.ctx.status(areaBoundary(doc, area) ? `Area ${area.params.number} placed.` : "\u26a0 Area is not enclosed by area boundary lines.");
   }
 }
 

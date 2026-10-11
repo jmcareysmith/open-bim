@@ -64,5 +64,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   parameters driving element values (browser → Parameters; element properties).
 - Family library: Browser → Families → Load from library (`packages/library`) or Load family file;
   family editor → Save Family File (`.obim-family`, open JSON).
-- Next: Phase 4 — rooms/areas/area plans, then tags/keynotes/legends, schedules + takeoffs + CSV/XLSX,
+- Rooms (Room / Separator tools, plans) and area plans (browser → New area plan; GFA/NLA,
+  boundaries from walls; Area / Area Boundary tools).
+- Next: Phase 4 — tags/keynotes/legends, schedules + takeoffs + CSV/XLSX,
   revisions/groups, plugin API + scripting console.

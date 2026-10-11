@@ -44,7 +44,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Family library (doors, windows, furniture) in an open format — `packages/library`, `.obim-family` JSON files
 
 ## Phase 4 — Data & documentation (current)
-- [ ] Rooms, areas, area plans
+- [x] Rooms, areas, area plans — room separators, room bounding; GFA/NLA area schemes, boundaries from walls
 - [ ] Tags, keynotes, legends
 - [ ] Schedules + material takeoffs, CSV/XLSX export
 - [ ] Revisions, groups

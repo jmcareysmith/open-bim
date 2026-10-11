@@ -73,7 +73,7 @@ export function createViewTemplate(tx: Transaction, doc: Document, name: string,
   return tx.create<ViewTemplateParams>(
     Cat.ViewTemplate,
     {
-      forKind: p.kind === "callout" ? "floorPlan" : p.kind,
+      forKind: p.kind === "callout" || p.kind === "areaPlan" ? "floorPlan" : p.kind,
       scale: p.scale,
       detailLevel: p.detailLevel,
       hiddenCategories: [...p.hiddenCategories],

@@ -43,7 +43,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Components / furniture (loadable families) | 3 | ✅ |
 | Model in-place | 3 | ⬜ |
 | Rooms, room separation, room bounding | 4 | ✅ |
-| Areas & area plans (GFA, NLA) | 4 | ⬜ |
+| Areas & area plans (GFA, NLA) | 4 | ✅ |
 | Toposolid / topography, building pads, site components | 6 | ⬜ |
 
 ## 4. Structural

@@ -46,6 +46,8 @@ export const Cat = {
   GlobalParameter: "GlobalParameter",
   Room: "Room",
   RoomSeparator: "RoomSeparator",
+  Area: "Area",
+  AreaBoundary: "AreaBoundary",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

@@ -94,3 +94,50 @@ describe("rooms", () => {
     expect(texts(ids.levels.first)).not.toContain("Lounge");
   });
 });
+
+describe("area plans", () => {
+  it("GFA to the outside face, NLA to the inside face of external walls", async () => {
+    const { createAreaPlan, createArea, createAreaBoundary } = await import("@open-bim/core");
+    const { areaLoopsFromWalls, areaBoundary } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const walls = box(doc, ids, 6000, 4000);
+    const t = wallThickness(doc, walls[0]!);
+    // An internal wall doesn't change either area.
+    doc.transact("Mid", (tx) =>
+      createWall(tx, ids.wallTypes.interior, { x: 3000, y: 0 }, { x: 3000, y: 4000 }, ids.levels.ground, { topLevelId: ids.levels.first }),
+    );
+    const areaOf = (scheme: "gross" | "rentable") => {
+      const plan = doc.transact("Plan", (tx) => createAreaPlan(tx, doc, ids.levels.ground, scheme));
+      const loops = areaLoopsFromWalls(doc, ids.levels.ground, scheme);
+      expect(loops).toHaveLength(1);
+      expect(loops[0]).toHaveLength(4);
+      const area = doc.transact("Bounds", (tx) => {
+        loops[0]!.forEach((a, i) => createAreaBoundary(tx, doc, plan.id, a, loops[0]![(i + 1) % 4]!));
+        return createArea(tx, doc, plan.id, { x: 1000, y: 1000 });
+      });
+      return { plan, a: areaBoundary(doc, area)!.area };
+    };
+    const gross = areaOf("gross");
+    const nla = areaOf("rentable");
+    expect(gross.plan.name).toBe("Ground Floor GFA");
+    expect(gross.a).toBeCloseTo((6000 + t) * (4000 + t), -3);
+    expect(nla.a).toBeCloseTo((6000 - t) * (4000 - t), -3);
+  });
+
+  it("areas only exist in area plans, and draw only there", async () => {
+    const { createAreaPlan, createArea } = await import("@open-bim/core");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const plan = floorPlanFor(doc, ids.levels.ground)!;
+    expect(() => doc.transact("A", (tx) => createArea(tx, doc, plan.id, { x: 0, y: 0 }))).toThrow(/area plans/);
+    const ap = doc.transact("AP", (tx) => createAreaPlan(tx, doc, ids.levels.ground, "gross"));
+    doc.transact("A", (tx) => createArea(tx, doc, ap.id, { x: 0, y: 0 }, { name: "Level 0" }));
+    doc.transact("Room", (tx) => createRoom(tx, doc, ids.levels.ground, { x: 0, y: 0 }, { name: "Lounge" }));
+    const k = new SimpleKernel();
+    const texts = (v: typeof plan) => viewDrawing(doc, k, v).texts.map((t) => t.text);
+    expect(texts(ap)).toContain("Level 0");
+    expect(texts(ap)).not.toContain("Lounge");
+    expect(texts(plan)).not.toContain("Level 0");
+  });
+});

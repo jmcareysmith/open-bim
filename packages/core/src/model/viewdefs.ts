@@ -8,7 +8,7 @@ import type { AppliedFilter, GraphicOverride } from "./graphics.ts";
 // Views are elements, as in Revit: saved with the project, listed in the browser, each with its
 // own range, scale, detail level and visibility. Sections, elevations and sheets build on this.
 
-export type ViewKind = "floorPlan" | "3d" | "section" | "elevation" | "callout";
+export type ViewKind = "floorPlan" | "3d" | "section" | "elevation" | "callout" | "areaPlan";
 export type DetailLevel = "coarse" | "medium" | "fine";
 
 /** Revit view range, as offsets from the view's level, mm. */
@@ -55,6 +55,8 @@ export type ViewParams = {
    * its views with their own settings rather than deleting them.
    */
   templateId?: ElementId | null;
+  /** Area plans: their area scheme. */
+  areaScheme?: "gross" | "rentable" | null;
 };
 export type View = Element<ViewParams>;
 
@@ -131,7 +133,7 @@ export function renameView(tx: Transaction, doc: Document, id: ElementId, name: 
 /** Absolute Z range a plan view shows: from its view depth up to its cut plane. */
 export function viewRange(doc: Document, view: View): ViewRange {
   const p = view.params;
-  if ((p.kind !== "floorPlan" && p.kind !== "callout") || !p.levelId || !p.range) throw new Error("Only plan views have a view range");
+  if (!isPlanView(view) || !p.levelId || !p.range) throw new Error("Only plan views have a view range");
   const elevation = doc.require<LevelParams>(p.levelId).params.elevation;
   return { bottom: elevation + Math.min(p.range.bottom, p.range.depth), cut: elevation + p.range.cut };
 }
@@ -300,7 +302,7 @@ export function isDrawingView(view: View): boolean {
   return view.params.kind === "section" || view.params.kind === "elevation";
 }
 
-/** Views drawn as plans (floor plans and callouts). */
+/** Views drawn as plans (floor plans, callouts and area plans). */
 export function isPlanView(view: View): boolean {
-  return view.params.kind === "floorPlan" || view.params.kind === "callout";
+  return view.params.kind === "floorPlan" || view.params.kind === "callout" || view.params.kind === "areaPlan";
 }

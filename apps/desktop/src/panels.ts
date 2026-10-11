@@ -1,8 +1,13 @@
-import { roomBoundary } from "@open-bim/geometry";
+import { areaBoundary, areaLoopsFromWalls, roomBoundary } from "@open-bim/geometry";
 import {
   Cat,
   levels,
   roomExtent,
+  AREA_SCHEMES,
+  createAreaBoundary,
+  type Area,
+  type AreaParams,
+  type AreaScheme,
   type Room,
   type RoomParams,
   regionArea,
@@ -157,6 +162,8 @@ export interface PanelContext {
   libraryFamilies(): { name: string; category: FamilyCategory; description: string }[];
   loadLibraryFamily(name: string): void;
   loadFamilyFile(): void;
+  /** Create an area plan (with boundaries from walls) and open it. */
+  newAreaPlan(levelId: ElementId, scheme: AreaScheme): void;
   /** Family editor: the project's loaded families, and copying one in to nest it. */
   projectFamilies(): FamilyDef[];
   nestFamily(defId: ElementId): void;
@@ -240,7 +247,7 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
   const { doc } = ctx;
   const p = view.params;
   const set = (name: string, patch: Partial<ViewParams>) => edit(ctx, name, (tx) => tx.update<ViewParams>(view.id, patch));
-  const title = { floorPlan: "Floor Plan", "3d": "3D View", section: "Section", elevation: "Elevation", callout: "Callout" }[p.kind];
+  const title = { floorPlan: "Floor Plan", "3d": "3D View", section: "Section", elevation: "Elevation", callout: "Callout", areaPlan: "Area Plan" }[p.kind];
   const sec = h("div", { class: "section" }, h("h3", {}, title));
   if (view.id !== ctx.activeViewId()) {
     const open = h("button", { textContent: "Open view" });
@@ -291,7 +298,20 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
       row("Crop top", numberInput(z.top, (v) => setZ("top", v))),
     );
   }
-  if (p.kind === "floorPlan" && p.range && p.levelId) {
+  if (p.kind === "areaPlan" && p.levelId && p.areaScheme) {
+    const levelId = p.levelId;
+    const scheme = p.areaScheme;
+    const fromWalls = h("button", { textContent: "Boundaries from walls" });
+    fromWalls.title = scheme === "gross" ? "Area boundary lines on the outside face of the building" : "Area boundary lines on the inside face of external walls";
+    fromWalls.onclick = () =>
+      edit(ctx, "Area boundaries from walls", (tx) => {
+        const loops = areaLoopsFromWalls(doc, levelId, scheme);
+        if (!loops.length) throw new Error("No walls on this level to take boundaries from");
+        for (const l of loops) l.forEach((a, i) => createAreaBoundary(tx, doc, view.id, a, l[(i + 1) % l.length]!));
+      });
+    sec.append(row("Area scheme", AREA_SCHEMES[scheme].label), row("", fromWalls));
+  }
+  if ((p.kind === "floorPlan" || p.kind === "areaPlan") && p.range && p.levelId) {
     const range = p.range;
     const setRange = (key: keyof ViewRangeOffsets, v: number) =>
       edit(ctx, "Change view range", (tx) => {
@@ -696,6 +716,8 @@ const VG_CATEGORIES: [string, string][] = [
   [Cat.WallOpening, "Openings"],
   [Cat.Room, "Rooms"],
   [Cat.RoomSeparator, "Room separators"],
+  [Cat.Area, "Areas"],
+  [Cat.AreaBoundary, "Area boundaries"],
   [Cat.Grid, "Grids"],
   [Cat.ReferencePlane, "Reference planes"],
   [Cat.View, "View markers"],
@@ -936,6 +958,12 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
         .sort((a, b) => (levelOrder.get(a.params.levelId!) ?? 0) - (levelOrder.get(b.params.levelId!) ?? 0)),
     ],
     ["Callouts", allViews.filter((v) => v.params.kind === "callout")],
+    ...(Object.keys(AREA_SCHEMES) as AreaScheme[]).map((s): [string, View[]] => [
+      `Area Plans (${AREA_SCHEMES[s].short})`,
+      allViews
+        .filter((v) => v.params.kind === "areaPlan" && v.params.areaScheme === s)
+        .sort((a, b) => (levelOrder.get(a.params.levelId!) ?? 0) - (levelOrder.get(b.params.levelId!) ?? 0)),
+    ]),
     ["Sections", allViews.filter((v) => v.params.kind === "section")],
     ["Elevations", allViews.filter((v) => v.params.kind === "elevation")],
     ["3D Views", allViews.filter((v) => v.params.kind === "3d")],
@@ -949,6 +977,25 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
       viewsSec.append(div);
     }
   }
+  viewsSec.append(
+    row(
+      "New area plan",
+      select(
+        [
+          { value: "", label: "Level\u2026" },
+          ...(Object.keys(AREA_SCHEMES) as AreaScheme[]).flatMap((s) =>
+            levels(doc).map((l) => ({ value: `${s}|${l.id}`, label: `${AREA_SCHEMES[s].short}: ${l.name ?? l.id}` })),
+          ),
+        ],
+        "",
+        (v) => {
+          if (!v) return;
+          const [s, id] = v.split("|");
+          ctx.newAreaPlan(id!, s as AreaScheme);
+        },
+      ),
+    ),
+  );
   const views = viewsSec;
 
   const lv = h("div", { class: "section" }, h("h3", {}, "Levels"));
@@ -1235,6 +1282,19 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Perimeter", b ? len(b.perimeter) : "—"),
         row("Unbounded height", len(top - bottom)),
         row("Volume", b ? `${((b.area * (top - bottom)) / 1e9).toFixed(2)} m³` : "—"),
+      );
+      break;
+    }
+    case Cat.Area: {
+      const a = el as Area;
+      const b = areaBoundary(doc, a);
+      const plan = doc.get<ViewParams>(a.params.viewId);
+      sec.append(
+        row("Name", textInput(a.name ?? "", (v) => edit(ctx, "Rename area", (tx) => tx.setName(a.id, v || undefined)))),
+        row("Number", textInput(a.params.number, (v) => update<AreaParams>("Change area number", { number: v }))),
+        row("Area scheme", plan?.params.areaScheme ? AREA_SCHEMES[plan.params.areaScheme].label : ""),
+        row("Area", b ? formatArea(b.area, units) : "Not enclosed"),
+        row("Perimeter", b ? len(b.perimeter) : "\u2014"),
       );
       break;
     }

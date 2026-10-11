@@ -34,6 +34,10 @@ import {
   loadFamily,
   familyFile,
   readFamilyFile,
+  createAreaPlan,
+  createAreaBoundary,
+  isPlanView,
+  type AreaScheme,
   enableFamilyFlex,
   copyFamilyDef,
   enableGlobalParameters,
@@ -48,7 +52,7 @@ import {
   type FamilyCategory,
   type FamilyDef,
 } from "@open-bim/core";
-import { OcctKernel, SimpleKernel, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
+import { OcctKernel, SimpleKernel, areaLoopsFromWalls, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
 import gcsWasmUrl from "@salusoft89/planegcs/dist/planegcs_dist/planegcs.wasm?url";
 import { LIBRARY } from "@open-bim/library";
@@ -64,6 +68,8 @@ import {
   DimensionTool,
   RoomTool,
   RoomSeparatorTool,
+  AreaTool,
+  AreaBoundaryTool,
   HostedTool,
   TextTool,
   OpeningTool,
@@ -205,6 +211,19 @@ const ctx: ToolContext & PanelContext = {
       status(`\u26a0 ${(err as Error).message}`);
     }
   },
+  newAreaPlan(levelId: ElementId, scheme: AreaScheme) {
+    try {
+      const plan = doc.transact("Create area plan", (tx) => {
+        const v = createAreaPlan(tx, doc, levelId, scheme);
+        for (const l of areaLoopsFromWalls(doc, levelId, scheme)) l.forEach((a, i) => createAreaBoundary(tx, doc, v.id, a, l[(i + 1) % l.length]!));
+        return v;
+      });
+      ctx.setActiveView(plan.id);
+      status(`${plan.name}: boundaries from walls added. Place areas with the Area tool.`);
+    } catch (err) {
+      status(`\u26a0 ${(err as Error).message}`);
+    }
+  },
   libraryFamilies: () => LIBRARY.map((f) => ({ name: f.name, category: f.category, description: f.description })),
   loadLibraryFamily(name: string) {
     const lib = LIBRARY.find((f) => f.name === name);
@@ -286,6 +305,8 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   dimension: new DimensionTool(ctx),
   room: new RoomTool(ctx),
   roomseparator: new RoomSeparatorTool(ctx),
+  area: new AreaTool(ctx),
+  areaboundary: new AreaBoundaryTool(ctx),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
 const DRAWING_TOOLS = new Set(["select", "detailline", "region", "text", "extrusion", "blend", "revolution"]);
@@ -524,7 +545,7 @@ function applyView(): void {
   if (!activeView()) activeViewId = views(doc).find((v) => v.params.kind === "3d")?.id ?? views(doc)[0]?.id;
   const v = activeView();
   if (!v) return viewport.setViewMode("3d");
-  if (v.params.kind === "floorPlan" || v.params.kind === "callout") {
+  if (isPlanView(v)) {
     viewport.setPlanRange(viewRange(doc, v));
     viewport.setViewMode("plan");
     viewport.setPlanCrop(v.params.kind === "callout" ? (v.params.crop ?? null) : null);
@@ -537,7 +558,8 @@ function applyView(): void {
   const g = effectiveGraphics(doc, v);
   viewport.setGraphicsResolver((el) => elementGraphics(doc, g, el));
   viewport.setAnnotationView(v.id);
-  viewport.setPlanLevel(viewport.viewMode === "plan" ? (v.params.levelId ?? undefined) : undefined);
+  // Rooms show in floor plans and callouts of their level (area plans show areas instead).
+  viewport.setPlanLevel(viewport.viewMode === "plan" && v.params.kind !== "areaPlan" ? (v.params.levelId ?? undefined) : undefined);
   viewport.setViewGraphics({ detailLevel: g.detailLevel, scale: g.scale });
   if (viewport.viewMode === "drawing" && !DRAWING_TOOLS.has(tool.name)) setTool("select");
 }

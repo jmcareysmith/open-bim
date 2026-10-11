@@ -83,7 +83,7 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
     if (owner && owner !== view.id) return false;
     // Rooms and separators: only in plans of their level.
     const lvl = planLevelOf(el);
-    if (lvl && (!isPlanView(view) || (view.params as ViewParams).levelId !== lvl)) return false;
+    if (lvl && (!isPlanView(view) || view.params.kind === "areaPlan" || (view.params as ViewParams).levelId !== lvl)) return false;
     return elementGraphics(doc, g, el).visible;
   };
   const els = doc.all().filter(shown);

@@ -149,10 +149,15 @@ Picking prefers solids under the cursor over line work, and line work over floor
 
 **Rooms** — a `Room` is a point on a level plus number, upper limit and offsets; its boundary is
 derived, never stored: `geometry/src/rooms.ts` subtracts room-bounding walls' joined footprints
-(tested at 1200 mm above the room base) and `RoomSeparator` lines (1 mm strips) from the plan with
+(tested at 1200 mm above the room base) and `RoomSeparator` lines (0.02 mm strips) from the plan with
 polygon-clipping, and takes the free region containing the point (null when it reaches the outside).
 Walls and separators list every room as `related`, so boundaries, areas and tags follow edits.
 Rooms and separators are level-scoped (`planLevelOf`): drawn only in plans of their level.
+
+**Area plans** — a `View` of kind `areaPlan` with an `areaScheme` (gross = GFA, rentable = NLA).
+`Area`s and `AreaBoundary` lines are owned by the area plan (annotation-style); an area is the
+region of its plan's boundary lines around its point. `areaLoopsFromWalls` derives boundaries:
+the outside of the wall union (GFA) or the inside face of external walls (NLA, PCNZ).
 
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.

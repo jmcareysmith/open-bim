@@ -68,11 +68,13 @@ const COLORS: Record<string, number> = {
   [Cat.FilledRegion]: 0x1f2328,
   [Cat.Room]: 0x7a8fa6,
   [Cat.RoomSeparator]: 0x1f2328,
+  [Cat.Area]: 0x9a6b2f,
+  [Cat.AreaBoundary]: 0x9a3fb5,
 };
 const SELECTED = 0x3d8bfd;
 const VOID_COLOR = 0xff8c1a;
 /** Large surfaces that lose picks to line work drawn over them. */
-const BACKGROUND_CATEGORIES = new Set<string>([Cat.Floor, Cat.Ceiling, Cat.Roof, Cat.FilledRegion, Cat.Room]);
+const BACKGROUND_CATEGORIES = new Set<string>([Cat.Floor, Cat.Ceiling, Cat.Roof, Cat.FilledRegion, Cat.Room, Cat.Area]);
 /** Halftone fades colours towards the (white) background. */
 const HALFTONE_TOWARD = 0xffffff;
 /** Backgrounds: white for plans, sections, elevations (Revit default); very light grey for 3D. */

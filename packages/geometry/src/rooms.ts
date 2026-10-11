@@ -9,6 +9,11 @@ import {
   type Element,
   type Room,
   type RoomSeparatorParams,
+  areaBoundariesIn,
+  type Area,
+  type AreaScheme,
+  type ElementId,
+  type LevelParams,
   type Vec2,
   type Wall,
   type WallParams,
@@ -22,8 +27,8 @@ import { joinedWallFootprint } from "./joins.ts";
 
 /** Revit's room computation height: walls are tested at this height above the room's base. */
 export const ROOM_COMPUTATION_HEIGHT = 1200;
-/** Half-width of a room separation line as an obstacle, mm (its effect on area is negligible). */
-const SEPARATOR_HALF = 0.5;
+/** Half-width of a separation/boundary line as an obstacle, mm (thin enough not to affect areas). */
+const SEPARATOR_HALF = 0.01;
 /** Model text height of room tags, mm (2.5 mm at 1:100). */
 const TAG_SIZE = 250;
 
@@ -40,17 +45,7 @@ export interface RoomBoundary {
 export function roomBoundary(doc: Document, room: Room): RoomBoundary | null {
   const { bottom, top } = roomExtent(doc, room);
   const z = bottom + Math.min(ROOM_COMPUTATION_HEIGHT, (top - bottom) / 2);
-  const obstacles: Polygon[] = [];
-  for (const w of doc.byCategory<WallParams>(Cat.Wall) as Wall[]) {
-    if (w.params.roomBounding === false) continue;
-    const e = wallExtent(doc, w);
-    if (e.bottom > z || e.top <= z) continue;
-    try {
-      obstacles.push([ring(joinedWallFootprint(doc, w))]);
-    } catch {
-      // A wall that can't be built doesn't bound.
-    }
-  }
+  const obstacles: Polygon[] = boundingWalls(doc, z).map((w) => [w.ring]);
   for (const s of doc.byCategory<RoomSeparatorParams>(Cat.RoomSeparator)) {
     if (s.params.levelId === room.params.levelId) obstacles.push([ring(thinRect(s.params.start, s.params.end))]);
   }
@@ -101,6 +96,73 @@ export function enclosingRegion(obstacles: Polygon[], p: Vec2): RoomBoundary | n
   return null;
 }
 
+/** Room-bounding walls cut at height z, as footprint rings. */
+function boundingWalls(doc: Document, z: number): { wall: Wall; ring: Ring }[] {
+  const out: { wall: Wall; ring: Ring }[] = [];
+  for (const w of doc.byCategory<WallParams>(Cat.Wall) as Wall[]) {
+    if (w.params.roomBounding === false) continue;
+    const e = wallExtent(doc, w);
+    if (e.bottom > z || e.top <= z) continue;
+    try {
+      out.push({ wall: w, ring: ring(joinedWallFootprint(doc, w)) });
+    } catch {
+      // A wall that can't be built doesn't bound.
+    }
+  }
+  return out;
+}
+
+/** Area of an Area: the region of its plan's area boundary lines around its point. */
+export function areaBoundary(doc: Document, area: Area): RoomBoundary | null {
+  const lines = areaBoundariesIn(doc, area.params.viewId).map((b): Polygon => [ring(thinRect(b.params.start, b.params.end))]);
+  return enclosingRegion(lines, area.params.point);
+}
+
+/**
+ * Area boundary loops from the walls on a level: the outside face of the building (GFA), or the
+ * inside face of its external walls (NLA). External walls are those on the outside of the wall union.
+ */
+export function areaLoopsFromWalls(doc: Document, levelId: ElementId, scheme: AreaScheme): Vec2[][] {
+  const z = doc.require<LevelParams>(levelId).params.elevation + ROOM_COMPUTATION_HEIGHT;
+  const walls = boundingWalls(doc, z);
+  if (!walls.length) return [];
+  const polys = walls.map((w): Polygon => [w.ring]);
+  const union = polygonClipping.union(polys[0]!, ...polys.slice(1));
+  const outers = union.map((poly) => poly[0]!);
+  if (scheme === "gross") return outers.map((r) => simplify(loop(r)));
+  const out: Vec2[][] = [];
+  for (const outer of outers) {
+    const o = loop(outer);
+    const external = walls.filter((w) => w.ring.some(([x, y]) => onLoop({ x, y }, o)));
+    if (!external.length) continue;
+    const inner = polygonClipping.difference([outer], ...external.map((w): Polygon => [w.ring]));
+    for (const poly of inner) out.push(simplify(loop(poly[0]!)));
+  }
+  return out;
+}
+
+/** Plan line work for an Area: filled region and tag (name, area). */
+export function buildAreaLines(doc: Document, el: Element): LineData {
+  const area = el as Area;
+  const b = areaBoundary(doc, area);
+  const { x, y } = area.params.point;
+  const labels: LineData["labels"] = [
+    { text: area.name ?? "Area", position: [x, y + TAG_SIZE * 0.7, 0], size: TAG_SIZE },
+    { text: b ? formatArea(b.area, projectUnits(doc)) : "Not Enclosed", position: [x, y - TAG_SIZE * 0.7, 0], size: TAG_SIZE * 0.8 },
+  ];
+  if (!b) {
+    const c = TAG_SIZE;
+    return { segments: new Float32Array([x - c, y - c, 0, x + c, y + c, 0, x - c, y + c, 0, x + c, y - c, 0]), labels };
+  }
+  // Fill only: the boundary lines draw the edges.
+  return { segments: new Float32Array([x, y, 0, x + 1, y, 0]), labels, fill: { loops: [b.outer, ...b.holes], color: 0xf3e2c4 } };
+}
+
+export function buildAreaBoundaryLines(_doc: Document, el: Element): LineData {
+  const { start, end } = el.params as { start: Vec2; end: Vec2 };
+  return { segments: new Float32Array([start.x, start.y, 0, end.x, end.y, 0]), labels: [] };
+}
+
 /** Plan line work: the boundary (filled) and the tag (name, number, area in m²). */
 export function buildRoomLines(doc: Document, el: Element): LineData | null {
   const room = el as Room;
@@ -144,6 +206,27 @@ function thinRect(a: Vec2, b: Vec2): Vec2[] {
 }
 
 const ring = (pts: Vec2[]): Ring => pts.map((p) => [p.x, p.y]);
+
+function onLoop(p: Vec2, l: Vec2[]): boolean {
+  return l.some((a, i) => {
+    const b = l[(i + 1) % l.length]!;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
+    return Math.hypot(a.x + dx * t - p.x, a.y + dy * t - p.y) < 0.5;
+  });
+}
+
+/** Drop collinear (and duplicate) vertices. */
+function simplify(l: Vec2[]): Vec2[] {
+  const out = l.filter((p, i) => {
+    const a = l[(i - 1 + l.length) % l.length]!;
+    const b = l[(i + 1) % l.length]!;
+    const cross = (p.x - a.x) * (b.y - p.y) - (p.y - a.y) * (b.x - p.x);
+    return Math.abs(cross) > 1e-3 * Math.hypot(b.x - a.x, b.y - a.y);
+  });
+  return out.length >= 3 ? out : l;
+}
 
 /** polygon-clipping ring (closed, first = last) to an open loop. */
 function loop(r: Ring): Vec2[] {

@@ -32,8 +32,10 @@ export function buildSample(doc: Document): void {
       [ground, first],
       [first, roof],
     ] as const) {
+      // Clockwise, so each wall's exterior (left) side faces out: west, north, east, south.
+      const cw = [outline[0]!, outline[3]!, outline[2]!, outline[1]!];
       for (let i = 0; i < 4; i++) {
-        exterior[base]!.push(createWall(tx, ids.wallTypes.exterior, outline[i]!, outline[(i + 1) % 4]!, base, { topLevelId: top }).id);
+        exterior[base]!.push(createWall(tx, ids.wallTypes.exterior, cw[i]!, cw[(i + 1) % 4]!, base, { topLevelId: top }).id);
       }
     }
     // Interior partitions, ground floor
@@ -52,15 +54,16 @@ export function buildSample(doc: Document): void {
 
   // Front (south) wall: door and windows; first floor windows on the south and east.
   doc.transact("Sample doors and windows", (tx) => {
-    const [south, east] = exterior[ground]!;
-    const [south1, east1] = exterior[first]!;
-    createDoor(tx, doc, ids.doorTypes.single860, south!, 6000);
-    createWindow(tx, doc, ids.windowTypes.w1800x1200, south!, 2000);
-    createWindow(tx, doc, ids.windowTypes.w1200x1200, south!, 8500);
-    createWindow(tx, doc, ids.windowTypes.w1200x1200, east!, 2500);
-    createWindow(tx, doc, ids.windowTypes.w1800x1200, south1!, 2500);
-    createWindow(tx, doc, ids.windowTypes.w1800x1200, south1!, 7500);
-    createWindow(tx, doc, ids.windowTypes.w600x600, east1!, 6000);
+    // Walls run clockwise: south goes east -> west from x = W, east goes north -> south from y = D.
+    const [, , east, south] = exterior[ground]!;
+    const [, , east1, south1] = exterior[first]!;
+    createDoor(tx, doc, ids.doorTypes.single860, south!, W - 6000, { facingFlipped: true }); // swings in
+    createWindow(tx, doc, ids.windowTypes.w1800x1200, south!, W - 2000);
+    createWindow(tx, doc, ids.windowTypes.w1200x1200, south!, W - 8500);
+    createWindow(tx, doc, ids.windowTypes.w1200x1200, east!, D - 2500);
+    createWindow(tx, doc, ids.windowTypes.w1800x1200, south1!, W - 2500);
+    createWindow(tx, doc, ids.windowTypes.w1800x1200, south1!, W - 7500);
+    createWindow(tx, doc, ids.windowTypes.w600x600, east1!, D - 6000);
   });
 
   const ext = 1500; // grids run past the building

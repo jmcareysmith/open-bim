@@ -5,8 +5,10 @@ import {
   createDoor,
   createWall,
   createWindow,
+  flipWall,
   wallCuts,
   type ChangeSet,
+  type DoorParams,
   type DoorTypeParams,
   type Vec2,
 } from "../src/index.ts";
@@ -60,5 +62,21 @@ describe("doors and windows", () => {
     doc.transact("W", (tx) => createWindow(tx, doc, ids.windowTypes.w600x600, wall.id, 2000));
     doc.transact("Delete type", (tx) => tx.delete(ids.windowTypes.w600x600));
     expect(wallCuts(doc, wall)).toEqual([]);
+  });
+});
+
+describe("flipping a wall", () => {
+  it("swaps its ends but keeps doors and windows where they are", () => {
+    const { doc, ids, wall } = setup();
+    const d = doc.transact("D", (tx) => createDoor(tx, doc, ids.doorTypes.single810, wall.id, 1000));
+    const w = doc.transact("W", (tx) => createWindow(tx, doc, ids.windowTypes.w1200x1200, wall.id, 3500));
+    doc.transact("Flip", (tx) => flipWall(tx, doc, wall.id));
+    const flipped = doc.require(wall.id).params as { start: Vec2 };
+    expect(flipped.start).toEqual(p(5000, 0));
+    expect((doc.require(d.id).params as DoorParams).position).toBe(4000);
+    expect((doc.require(d.id).params as DoorParams).facingFlipped).toBe(true);
+    expect((doc.require(w.id).params as { position: number }).position).toBe(1500);
+    doc.undo();
+    expect((doc.require(d.id).params as DoorParams).position).toBe(1000);
   });
 });

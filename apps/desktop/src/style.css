@@ -73,3 +73,4 @@ aside h2 {
 .select-band.crossing { border-style: dashed; }
 .subhead { color: var(--muted); font-size: 11px; margin: 6px 0 2px; text-transform: uppercase; letter-spacing: 0.04em; }
 .list-item.indent { padding-left: 14px; }
+.swatch { width: 12px; height: 12px; border-radius: 2px; border: 1px solid var(--line); flex: none; align-self: center; }

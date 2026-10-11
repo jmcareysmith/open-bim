@@ -330,6 +330,7 @@ function applyView(): void {
   }
   viewport.setViewHiddenCategories(v.params.hiddenCategories);
   viewport.setAnnotationView(v.id);
+  viewport.setViewGraphics({ detailLevel: v.params.detailLevel, scale: v.params.scale });
   if (viewport.viewMode === "drawing" && !DRAWING_TOOLS.has(tool.name)) setTool("select");
 }
 

@@ -29,6 +29,7 @@ export const Cat = {
   FilledRegion: "FilledRegion",
   TextNote: "TextNote",
   Dimension: "Dimension",
+  Material: "Material",
 } as const;
 
 // ---- Level ---------------------------------------------------------------
@@ -45,10 +46,17 @@ export type LayerFunction = "structure" | "substrate" | "thermal" | "membrane" |
 
 export type Layer = {
   function: LayerFunction;
+  /** Material name (kept for display and for files from before materials were elements). */
   material: string;
+  /** Material element, when assigned. */
+  materialId?: ElementId;
   /** mm */
   thickness: number;
 };
+
+/** Layered types depend on their layers' materials (so material edits regenerate instances). */
+export const layerMaterialDeps = (el: Element): ElementId[] =>
+  ((el.params as LayeredTypeParams).layers ?? []).flatMap((l) => (l.materialId ? [l.materialId] : []));
 
 export type LayeredTypeParams = {
   /** Exterior → interior (walls) or top → bottom (floors). */
@@ -147,9 +155,9 @@ export function ceilingExtent(doc: Document, ceiling: Ceiling): { bottom: number
 const typeDeps = (el: Element): ElementId[] => (el.typeId ? [el.typeId] : []);
 
 registerCategory({ name: Cat.Level, dependencies: () => [], cascadeDelete: false, isType: false });
-registerCategory({ name: Cat.WallType, dependencies: () => [], cascadeDelete: false, isType: true });
-registerCategory({ name: Cat.FloorType, dependencies: () => [], cascadeDelete: false, isType: true });
-registerCategory({ name: Cat.CeilingType, dependencies: () => [], cascadeDelete: false, isType: true });
+registerCategory({ name: Cat.WallType, dependencies: layerMaterialDeps, cascadeDelete: false, isType: true });
+registerCategory({ name: Cat.FloorType, dependencies: layerMaterialDeps, cascadeDelete: false, isType: true });
+registerCategory({ name: Cat.CeilingType, dependencies: layerMaterialDeps, cascadeDelete: false, isType: true });
 
 registerCategory({
   name: Cat.Wall,

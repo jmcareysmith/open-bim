@@ -80,6 +80,15 @@ grid, reference plane, level, or a fixed point) with the pick point; each regene
 the pick onto the reference's current position, so dimensions are live, and referenced elements are
 dependencies (moving them regenerates the dimension; deleting them deletes it).
 
+**Materials** — `Material` elements (shading colour, cut pattern, surface pattern). Type layers
+reference them by `materialId` (name kept for display and legacy files) and depend on them, so
+material edits regenerate instances and used materials can't be deleted. Patterns are line families
+(`patterns.ts`): drafting patterns in paper mm × view scale, model patterns at real size. At
+Medium/Fine detail, cut regions split into layers (`layerRegions`: layer boundary planes mapped
+into the view frame) and get their material's cut pattern; surface patterns are hatched on faces
+facing the viewer and hidden with the same exact HLR test. Wall layers: exterior on the wall's
+left (draw clockwise, as in Revit); `flipWall` swaps sides and keeps hosted elements in place.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

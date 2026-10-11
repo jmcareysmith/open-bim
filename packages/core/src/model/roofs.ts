@@ -1,7 +1,7 @@
 import { registerCategory } from "../categories.ts";
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
-import { Cat, type LevelParams } from "./architecture.ts";
+import { Cat, layerMaterialDeps, type LevelParams } from "./architecture.ts";
 import { polygonArea, validateRegion } from "./sketch.ts";
 
 // Footprint roofs (Revit "Roof by Footprint"): a boundary loop where each edge either defines
@@ -24,7 +24,7 @@ export type Roof = Element<RoofParams>;
 /** 25°, a common NZ pitch for long-run steel roofs. */
 export const DEFAULT_ROOF_SLOPE = (25 * Math.PI) / 180;
 
-registerCategory({ name: Cat.RoofType, dependencies: () => [], cascadeDelete: false, isType: true });
+registerCategory({ name: Cat.RoofType, dependencies: layerMaterialDeps, cascadeDelete: false, isType: true });
 registerCategory({
   name: Cat.Roof,
   dependencies: (el) => [(el.params as RoofParams).levelId, ...(el.typeId ? [el.typeId] : [])],

@@ -120,3 +120,23 @@ export function createWallOpening(
   validateHosted(doc, params);
   return tx.create<WallOpeningParams>(Cat.WallOpening, params);
 }
+
+/**
+ * Flip a wall's orientation (Revit's flip arrows): swaps its ends so the exterior face changes side.
+ * Hosted elements keep their physical place; doors keep their swing and hinge side.
+ */
+export function flipWall(tx: Transaction, doc: Document, wallId: ElementId): void {
+  const wall = doc.require<WallParams>(wallId) as Wall;
+  if (wall.category !== Cat.Wall) throw new Error("Only walls can be flipped");
+  const len = wallLength(wall);
+  tx.update<WallParams>(wallId, { start: wall.params.end, end: wall.params.start });
+  for (const e of doc.all()) {
+    if (!cutters.has(e.category)) continue;
+    const p = e.params as { hostId?: ElementId; position: number; facingFlipped?: boolean; handFlipped?: boolean };
+    if (p.hostId !== wallId) continue;
+    const patch: Record<string, number | boolean> = { position: len - p.position };
+    if (typeof p.facingFlipped === "boolean") patch.facingFlipped = !p.facingFlipped;
+    if (typeof p.handFlipped === "boolean") patch.handFlipped = !p.handFlipped;
+    tx.update(e.id, patch);
+  }
+}

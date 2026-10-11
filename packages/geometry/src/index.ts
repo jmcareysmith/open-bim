@@ -8,3 +8,5 @@ export * from "./doors.ts";
 export * from "./hlr.ts";
 export * from "./sections.ts";
 export * from "./annotations.ts";
+export * from "./patterns.ts";
+export * from "./layers.ts";

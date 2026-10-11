@@ -59,4 +59,5 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Plans are true 2D drawings (cut + hidden-line projection, `geometry/src/hlr.ts`).
 - Sections (S tool), building elevations (Elevations button) and callouts (2D, HLR, levels + grids annotated).
 - Annotation: aligned dimensions (M, live), detail lines (L), filled regions, text (T); view-owned.
-- Next: Phase 2 — materials with cut/surface patterns.
+- Materials: cut patterns per layer at Medium/Fine, surface patterns in elevations, 3D colours; wall Flip.
+- Next: Phase 2 — Visibility/Graphics, filters, view templates.

@@ -1,6 +1,7 @@
 import type { Document } from "../document.ts";
 import type { ElementId } from "../element.ts";
-import { Cat, createLevel, type LayeredTypeParams } from "./architecture.ts";
+import { Cat, createLevel, type Layer, type LayeredTypeParams } from "./architecture.ts";
+import { createMaterial, type MaterialParams } from "./materials.ts";
 import type { DoorTypeParams, WindowTypeParams } from "./doors.ts";
 import { createProjectSettings } from "./settings.ts";
 import { create3DView, createFloorPlan } from "./viewdefs.ts";
@@ -25,10 +26,26 @@ export function applyResidentialTemplate(doc: Document): TemplateIds {
     for (const id of [ground, first, roof]) createFloorPlan(tx, doc, id);
     create3DView(tx, doc);
 
-    const wt = (name: string, layers: LayeredTypeParams["layers"]) =>
-      tx.create<LayeredTypeParams>(Cat.WallType, { layers }, { name }).id;
-    const ft = (name: string, layers: LayeredTypeParams["layers"]) =>
-      tx.create<LayeredTypeParams>(Cat.FloorType, { layers }, { name }).id;
+    // Materials: shading colour, cut pattern (plans/sections), surface pattern (elevations).
+    const mats: [string, Partial<MaterialParams>][] = [
+      ["Weatherboard", { color: 0xe4e0d4, cutPattern: "timber", surfacePattern: "weatherboard" }],
+      ["Cavity Battens", { color: 0xb08a5a, cutPattern: "timber" }],
+      ["Building Wrap", { color: 0x5b6670, cutPattern: "none" }],
+      ["Timber Frame 90x45", { color: 0xc9a46b, cutPattern: "insulation" }],
+      ["Plasterboard", { color: 0xf1efe9, cutPattern: "diagonal" }],
+      ["Concrete", { color: 0xa7a8a6, cutPattern: "concrete" }],
+      ["Plywood", { color: 0xc59a5b, cutPattern: "timber" }],
+      ["Timber Joists 240x45", { color: 0xb88f55, cutPattern: "crosshatch" }],
+      ["Ceiling Battens", { color: 0xb08a5a, cutPattern: "timber" }],
+      ["Long-run Steel", { color: 0x5f6b75, cutPattern: "solid" }],
+      ["Purlins 70x45", { color: 0xb08a5a, cutPattern: "timber" }],
+      ["Rafters 140x45", { color: 0xb88f55, cutPattern: "crosshatch" }],
+    ];
+    const matId = new Map(mats.map(([name, p]) => [name, createMaterial(tx, doc, name, p).id]));
+    const link = (layers: Layer[]): Layer[] => layers.map((l) => ({ ...l, materialId: matId.get(l.material)! }));
+
+    const wt = (name: string, layers: Layer[]) => tx.create<LayeredTypeParams>(Cat.WallType, { layers: link(layers) }, { name }).id;
+    const ft = (name: string, layers: Layer[]) => tx.create<LayeredTypeParams>(Cat.FloorType, { layers: link(layers) }, { name }).id;
 
     const exterior = wt("Exterior - Weatherboard, 90 Timber Frame", [
       { function: "finish1", material: "Weatherboard", thickness: 18 },
@@ -51,10 +68,10 @@ export function applyResidentialTemplate(doc: Document): TemplateIds {
     const plasterboard = tx.create<LayeredTypeParams>(
       Cat.CeilingType,
       {
-        layers: [
+        layers: link([
           { function: "finish1", material: "Plasterboard", thickness: 13 },
           { function: "substrate", material: "Ceiling Battens", thickness: 35 },
-        ],
+        ]),
       },
       { name: "Ceiling - 13 Plasterboard on Battens" },
     ).id;
@@ -62,11 +79,11 @@ export function applyResidentialTemplate(doc: Document): TemplateIds {
     const steel = tx.create<LayeredTypeParams>(
       Cat.RoofType,
       {
-        layers: [
+        layers: link([
           { function: "finish1", material: "Long-run Steel", thickness: 1 },
           { function: "substrate", material: "Purlins 70x45", thickness: 70 },
           { function: "structure", material: "Rafters 140x45", thickness: 140 },
-        ],
+        ]),
       },
       { name: "Roof - Long-run Steel on Purlins and Rafters" },
     ).id;

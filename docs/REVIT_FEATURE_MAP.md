@@ -86,7 +86,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Sections & callouts | 2 | 🟨 |
 | Drafting views | 2 | ⬜ |
 | Legends | 4 | ⬜ |
-| Detail levels (coarse/medium/fine) | 2 | ⬜ |
+| Detail levels (coarse/medium/fine) | 2 | 🟨 |
 | Visibility/Graphics overrides, filters | 2 | ⬜ |
 | View templates | 2 | ⬜ |
 | Hidden-line, shaded, realistic styles | 2 | 🟨 |
@@ -118,8 +118,8 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 10. Materials & visualisation
 | Feature | Phase | Status |
 |---|---|---|
-| Materials (graphics, appearance, physical, thermal) | 2 | ⬜ |
-| Surface / cut patterns | 2 | ⬜ |
+| Materials (graphics, appearance, physical, thermal) | 2 | 🟨 |
+| Surface / cut patterns | 2 | ✅ |
 | Realistic rendering | 7 | ⬜ |
 | AI render (Gemini-style) | 7 | ⬜ |
 | Sun & shadow studies | 7 | ⬜ |

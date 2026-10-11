@@ -1,6 +1,7 @@
 import earcut from "earcut";
 import type { ElementId, Vec2 } from "@open-bim/core";
 import type { MeshData } from "./mesh.ts";
+import { hatch, type LineFamily } from "./patterns.ts";
 
 // Plan drawings from meshes: cut linework at the cut plane plus hidden-line-removed projection of
 // everything between the view depth and the cut, seen from above. Exact for planar-faced meshes.
@@ -18,7 +19,12 @@ export interface PlanLinework {
   cutLoops: Vec2[][];
   /** Visible projected edges below the cut: [x0, y0, x1, y1, …]. */
   projection: number[];
+  /** Visible surface-pattern lines on faces facing the viewer: [x0, y0, x1, y1, …]. */
+  surface: number[];
 }
+
+/** Faces this close to facing the viewer get surface patterns (cos of the angle). */
+const FACING = 0.999;
 
 /** Edges whose adjacent faces differ by more than this are drawn (matches the 3D view's edges). */
 const CREASE_DEG = 20;
@@ -38,15 +44,20 @@ interface Occluder {
   maxY: number;
 }
 
-export function planLinework(items: { id: ElementId; mesh: MeshData }[], range: PlanRange): PlanLinework[] {
+export function planLinework(
+  items: { id: ElementId; mesh: MeshData; surface?: LineFamily[] | null }[],
+  range: PlanRange,
+): PlanLinework[] {
   const out: PlanLinework[] = [];
   const occluders: Occluder[] = [];
   const edgesById = new Map<ElementId, [V3, V3][]>();
+  const surfaceById = new Map<ElementId, [V3, V3][]>();
 
-  for (const { id, mesh } of items) {
+  for (const { id, mesh, surface } of items) {
     const tris = triangles(mesh);
     const cutLoops = chainLoops(cutSegments(tris, range.cut));
-    out.push({ id, cutLoops, projection: [] });
+    out.push({ id, cutLoops, projection: [], surface: [] });
+    if (surface?.length) surfaceById.set(id, surfaceSegments(tris, surface, range));
 
     for (const t of tris) {
       for (const piece of clipBelow(t, range.cut)) {
@@ -62,6 +73,11 @@ export function planLinework(items: { id: ElementId; mesh: MeshData }[], range: 
 
   const grid = new OccluderGrid(occluders);
   for (const lw of out) {
+    for (const [a, b] of surfaceById.get(lw.id) ?? []) {
+      for (const [t0, t1] of visibleIntervals(a, b, grid)) {
+        lw.surface.push(a[0] + (b[0] - a[0]) * t0, a[1] + (b[1] - a[1]) * t0, a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1);
+      }
+    }
     for (const [a, b] of edgesById.get(lw.id) ?? []) {
       if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 1e-6) continue; // vertical edge: a point in plan
       for (const [t0, t1] of visibleIntervals(a, b, grid)) {
@@ -72,6 +88,27 @@ export function planLinework(items: { id: ElementId; mesh: MeshData }[], range: 
           a[1] + (b[1] - a[1]) * t1,
         );
       }
+    }
+  }
+  return out;
+}
+
+/**
+ * Pattern lines on triangles facing the viewer (+z) inside the range, lifted onto each triangle's
+ * plane so they can be hidden by whatever is in front.
+ */
+function surfaceSegments(tris: Tri[], families: LineFamily[], range: PlanRange): [V3, V3][] {
+  const out: [V3, V3][] = [];
+  for (const t of tris) {
+    if (normal(t)[2] < FACING) continue;
+    const z = (t[0][2] + t[1][2] + t[2][2]) / 3;
+    if (z > range.cut + 1e-6 || z < range.bottom) continue;
+    const seg = hatch([t.map((p) => ({ x: p[0], y: p[1] }))], families);
+    for (let i = 0; i < seg.length; i += 4) {
+      out.push([
+        [seg[i]!, seg[i + 1]!, z],
+        [seg[i + 2]!, seg[i + 3]!, z],
+      ]);
     }
   }
   return out;

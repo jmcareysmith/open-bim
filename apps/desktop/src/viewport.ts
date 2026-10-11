@@ -5,7 +5,11 @@ import {
   PLAN_CUT_HEIGHT,
   TemporaryVisibility,
   annotationView,
+  elementMaterial,
   isDrawingView,
+  viewFrame,
+  type DetailLevel,
+  type MaterialParams,
   type ViewParams,
   type ChangeSet,
   type Document,
@@ -18,6 +22,10 @@ import {
 import {
   GRID_BUBBLE_RADIUS,
   fillLoops,
+  layerRegions,
+  patternFamilies,
+  hatch,
+  planFrame,
   planLinework,
   sectionAnnotations,
   sectionLinework,
@@ -48,6 +56,9 @@ const SYMBOL = 0xd7dee6;
 const CUT_LINE = 0xf2f4f7;
 const POCHE = 0x6b717a;
 const BEYOND = 0x8a919b;
+/** Cut-pattern hatching and surface patterns. */
+const HATCH = 0xaab2bc;
+const SURFACE = 0x5d646e;
 /** Drawn with plan symbols rather than cut/projection (like Revit door and window families). */
 const SYMBOLIC_IN_PLAN = new Set<string>([Cat.Door, Cat.Window]);
 const PREVIEW = 0x5fb3ff;
@@ -86,6 +97,8 @@ export class Viewport {
   private drawExtras: THREE.Group | null = null;
   /** Callouts: plan crop rectangle. */
   private planCrop: Rect | null = null;
+  /** Active view graphics: detail level (coarse = solid poché, else layers + patterns) and scale. */
+  private graphics: { detailLevel: DetailLevel; scale: number } = { detailLevel: "coarse", scale: 100 };
   private mode: ViewMode = "3d";
   private planRange: ViewRange = { bottom: 0, cut: PLAN_CUT_HEIGHT };
   private planFramed = false;
@@ -208,7 +221,9 @@ export class Viewport {
       const lines = this.kernel.buildLines(this.doc, el);
       if (mesh) {
         this.meshes.set(id, mesh);
-        group = makeGroup(mesh, COLORS[el.category] ?? 0xcccccc);
+        const material = elementMaterial(this.doc, el);
+        group = makeGroup(mesh, material?.params.color ?? COLORS[el.category] ?? 0xcccccc);
+        group.userData.baseColor = material?.params.color;
         group.userData.solid = true;
         // Symbols drawn with a solid (door swings) ride along in the same group.
         if (lines) group.add(makeLineGroup(lines, SYMBOL));
@@ -260,7 +275,8 @@ export class Viewport {
     }
     if (!g || !el) return;
     const mesh = g.children[0] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial | THREE.LineBasicMaterial>;
-    mesh.material.color.setHex(this.selected.has(id) ? SELECTED : (COLORS[el.category] ?? 0xcccccc));
+    const base = (g.userData.baseColor as number | undefined) ?? COLORS[el.category] ?? 0xcccccc;
+    mesh.material.color.setHex(this.selected.has(id) ? SELECTED : base);
   }
 
   // ---- picking ------------------------------------------------------------
@@ -452,6 +468,13 @@ export class Viewport {
     if (reframe) this.zoomToFit();
   }
 
+  /** Detail level and scale of the active view (they change how cut and surface patterns draw). */
+  setViewGraphics(g: { detailLevel: DetailLevel; scale: number }): void {
+    if (g.detailLevel === this.graphics.detailLevel && g.scale === this.graphics.scale) return;
+    this.graphics = g;
+    this.drawingDirty = true;
+  }
+
   /** Callouts crop their plan to a rectangle; null for an uncropped plan. */
   setPlanCrop(crop: Rect | null): void {
     const changed = JSON.stringify(crop) !== JSON.stringify(this.planCrop);
@@ -514,7 +537,11 @@ export class Viewport {
         if (!el || !this.objects.get(id)?.visible) return false;
         return drawingMode || !SYMBOLIC_IN_PLAN.has(el.category); // plans use door/window symbols
       })
-      .map(([id, mesh]) => ({ id, mesh }));
+      .map(([id, mesh]) => {
+        // Surface patterns (e.g. weatherboard lines in elevation) from the element's material.
+        const m = elementMaterial(this.doc, this.doc.require(id));
+        return { id, mesh, surface: m ? patternFamilies(m.params.surfacePattern, this.graphics.scale) : null };
+      });
     let linework: PlanLinework[];
     try {
       linework = drawingMode ? sectionLinework(items, this.drawingView!) : planLinework(items, this.planRange);
@@ -524,8 +551,20 @@ export class Viewport {
     }
     const target = drawingMode ? this.drawScene : this.scene;
     const z = drawingMode ? 0 : this.planRange.cut - 0.5;
+    const frame = drawingMode ? viewFrame(this.drawingView!) : planFrame(this.planRange.cut);
+    const detailed = this.graphics.detailLevel !== "coarse";
     for (const lw of linework) {
-      const g = makeDrawingGroup(lw, z);
+      const el = this.doc.require(lw.id);
+      // Medium/fine: split cuts into layers, each hatched with its material's cut pattern.
+      const regions = detailed
+        ? layerRegions(this.doc, el, lw.cutLoops, frame).map((r) => {
+            const m = r.materialId ? this.doc.get<MaterialParams>(r.materialId) : undefined;
+            const pattern = m?.params.cutPattern ?? "diagonal";
+            const fam = patternFamilies(pattern, this.graphics.scale);
+            return { loop: r.loop, solid: pattern === "solid", hatch: fam ? hatch([r.loop], fam) : [] };
+          })
+        : null;
+      const g = makeDrawingGroup(lw, z, regions);
       g.userData.elementId = lw.id;
       this.drawing.set(lw.id, g);
       target.add(g);
@@ -685,7 +724,21 @@ function makeGroup(mesh: MeshData, color: number, opacity = 1): THREE.Group {
  * Plan linework for one element at the cut plane height: poché fill, then projection lines, then
  * cut outlines on top. Drawn without depth testing so draw order decides what's on top.
  */
-function makeDrawingGroup(lw: PlanLinework, z: number): THREE.Group {
+type CutRegion = { loop: Vec2[]; solid: boolean; hatch: number[] };
+
+function segmentsGeom(seg: number[], z: number): THREE.BufferGeometry {
+  const pos: number[] = [];
+  for (let i = 0; i < seg.length; i += 4) pos.push(seg[i]!, seg[i + 1]!, z, seg[i + 2]!, seg[i + 3]!, z);
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pos), 3));
+  return geom;
+}
+
+/**
+ * Plan/section linework for one element: poché (coarse) or layer regions with cut patterns
+ * (medium/fine), projection and surface-pattern lines, then cut outlines on top.
+ */
+function makeDrawingGroup(lw: PlanLinework, z: number, regions: CutRegion[] | null = null): THREE.Group {
   const g = new THREE.Group();
   const flat = (o: THREE.Object3D, color: number, order: number) => {
     o.userData.baseColor = color;
@@ -697,7 +750,18 @@ function makeDrawingGroup(lw: PlanLinework, z: number): THREE.Group {
     m.depthWrite = false;
     return m;
   };
-  const tris = fillLoops(lw.cutLoops);
+  const tris = regions ? fillLoops(regions.filter((r) => r.solid).map((r) => r.loop)) : fillLoops(lw.cutLoops);
+  if (regions) {
+    for (const r of regions) {
+      if (r.hatch.length) flat(new THREE.LineSegments(segmentsGeom(r.hatch, z), mat(new THREE.LineBasicMaterial({ color: HATCH }))), HATCH, -2);
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(r.loop.flatMap((p) => [p.x, p.y, z])), 3));
+      flat(new THREE.LineLoop(geom, mat(new THREE.LineBasicMaterial({ color: BEYOND }))), BEYOND, -2);
+    }
+  }
+  if (lw.surface?.length) {
+    flat(new THREE.LineSegments(segmentsGeom(lw.surface, z), mat(new THREE.LineBasicMaterial({ color: SURFACE }))), SURFACE, -2.5);
+  }
   if (tris.length) {
     const pos = new Float32Array(tris.flatMap((t) => t.flatMap((p) => [p.x, p.y, z])));
     const geom = new THREE.BufferGeometry();

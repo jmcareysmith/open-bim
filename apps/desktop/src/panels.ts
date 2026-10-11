@@ -24,6 +24,12 @@ import {
   renameView,
   validateViewRange,
   dimensionLayout,
+  flipWall,
+  materials as materialElements,
+  layerMaterial,
+  PATTERNS,
+  type MaterialParams,
+  type PatternName,
   type DetailLineParams,
   type Dimension,
   type DimensionParams,
@@ -349,6 +355,15 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
     );
   }
 
+  const mats = h("div", { class: "section" }, h("h3", {}, "Materials"));
+  for (const m of materialElements(doc)) {
+    const swatch = h("span", { class: "swatch" });
+    swatch.style.background = `#${m.params.color.toString(16).padStart(6, "0")}`;
+    const div = h("div", { class: `list-item${sel.has(m.id) ? " selected" : ""}` }, h("span", {}, m.name ?? m.id), swatch);
+    div.onclick = () => ctx.setSelection([m.id]);
+    mats.append(div);
+  }
+
   const types = h("div", { class: "section" }, h("h3", {}, "Types"));
   for (const cat of [Cat.WallType, Cat.FloorType, Cat.CeilingType, Cat.RoofType]) {
     for (const t of doc.byCategory<LayeredTypeParams>(cat)) {
@@ -394,7 +409,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   info.onclick = openSettings;
   project.append(info);
 
-  root.replaceChildren(project, views, lv, types, counts);
+  root.replaceChildren(project, views, lv, types, mats, counts);
 }
 
 // ---- Properties -----------------------------------------------------------
@@ -433,6 +448,9 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
     case Cat.Wall: {
       const w = el as Wall;
       const p = w.params;
+      const flip = h("button", { textContent: "Flip (swap exterior side)" });
+      flip.onclick = () => edit(ctx, "Flip wall", (tx) => flipWall(tx, doc, w.id));
+      sec.append(row("Orientation", flip));
       sec.append(
         row("Type", select(typeOpts(Cat.WallType), w.typeId ?? "", (v) => edit(ctx, "Change wall type", (tx) => tx.setType(w.id, v)))),
         row("Base level", select(levelOpts, p.baseLevelId, (v) => update<WallParams>("Change base level", { baseLevelId: v }))),
@@ -514,6 +532,22 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
           return row(`Edge ${i + 1} (${len(edgeLen)})`, slopeInput(s, (v) => setSlopes(p.slopes.map((x, j) => (j === i ? v : x)))));
         }),
         editBoundaryButton(ctx, el.id),
+      );
+      break;
+    }
+    case Cat.Material: {
+      const p = el.params as MaterialParams;
+      const colour = h("input", { type: "color", value: `#${p.color.toString(16).padStart(6, "0")}` });
+      colour.onchange = () => update<MaterialParams>("Change material colour", { color: parseInt(colour.value.slice(1), 16) });
+      const patternOpts = PATTERNS.map((n) => ({ value: n, label: n[0]!.toUpperCase() + n.slice(1) }));
+      sec.append(
+        row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename material", (tx) => tx.setName(el.id, v || undefined)))),
+        row("Shading colour", colour),
+        row("Cut pattern", select(patternOpts, p.cutPattern, (v) => update<MaterialParams>("Change cut pattern", { cutPattern: v as PatternName }))),
+        row(
+          "Surface pattern",
+          select(patternOpts, p.surfacePattern, (v) => update<MaterialParams>("Change surface pattern", { surfacePattern: v as PatternName })),
+        ),
       );
       break;
     }
@@ -635,15 +669,21 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename type", (tx) => tx.setName(el.id, v || undefined)))),
         row("Total", len(totalThickness(t))),
       );
+      const matOpts = materialElements(doc).map((m) => ({ value: m.id, label: m.name ?? m.id }));
+      sec.append(h("h3", {}, "Layers (exterior / top first)"));
       t.params.layers.forEach((layer, i) => {
+        const setLayer = (name: string, patch: Partial<typeof layer>) =>
+          update<LayeredTypeParams>(name, { layers: t.params.layers.map((l, j) => (j === i ? { ...l, ...patch } : l)) });
+        const current = layerMaterial(doc, layer)?.id ?? "";
         sec.append(
           row(
-            `${i + 1}. ${layer.material}`,
-            numberInput(layer.thickness, (v) => {
-              const layers = t.params.layers.map((l, j) => (j === i ? { ...l, thickness: Math.max(0, v) } : l));
-              update<LayeredTypeParams>("Edit layer thickness", { layers });
+            `${i + 1}. ${layer.function}`,
+            select(current ? matOpts : [{ value: "", label: layer.material }, ...matOpts], current, (v) => {
+              const m = doc.get(v);
+              if (m) setLayer("Change layer material", { materialId: m.id, material: m.name ?? layer.material });
             }),
           ),
+          row("", numberInput(layer.thickness, (v) => setLayer("Edit layer thickness", { thickness: Math.max(0, v) }))),
         );
       });
       break;

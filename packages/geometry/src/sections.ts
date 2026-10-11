@@ -15,6 +15,7 @@ import {
 } from "@open-bim/core";
 import { GRID_BUBBLE_RADIUS, type LineData } from "./datums.ts";
 import { planLinework, type PlanLinework } from "./hlr.ts";
+import type { LineFamily } from "./patterns.ts";
 import type { MeshData } from "./mesh.ts";
 
 // Sections and elevations reuse the plan HLR: meshes are moved into view coordinates (x along the
@@ -39,25 +40,28 @@ export function meshToView(mesh: MeshData, f: ViewFrame): MeshData {
 }
 
 /** Linework of a section/elevation in drawing coordinates (x along the view, y = absolute Z), cropped. */
-export function sectionLinework(items: { id: ElementId; mesh: MeshData }[], view: View): PlanLinework[] {
+export function sectionLinework(items: { id: ElementId; mesh: MeshData; surface?: LineFamily[] | null }[], view: View): PlanLinework[] {
   const f = viewFrame(view);
   const far = view.params.farClip ?? 10_000;
   const lw = planLinework(
-    items.map((it) => ({ id: it.id, mesh: meshToView(it.mesh, f) })),
+    items.map((it) => ({ id: it.id, mesh: meshToView(it.mesh, f), surface: it.surface ?? null })),
     { bottom: -far, cut: 0 },
   );
-  return lw.map((l) => cropLinework(l, viewCrop(view))).filter((l) => l.cutLoops.length || l.projection.length);
+  return lw.map((l) => cropLinework(l, viewCrop(view))).filter((l) => l.cutLoops.length || l.projection.length || l.surface.length);
 }
 
 /** Clip linework to a rectangle: loops by Sutherland–Hodgman, segments by Liang–Barsky. */
-export function cropLinework(lw: PlanLinework, r: Rect): PlanLinework {
+export function cropLinework(lw: Omit<PlanLinework, "surface"> & { surface?: number[] }, r: Rect): PlanLinework {
   const cutLoops = lw.cutLoops.map((l) => clipPolygon(l, r)).filter((l) => l.length >= 3);
-  const projection: number[] = [];
-  for (let i = 0; i < lw.projection.length; i += 4) {
-    const s = clipSegment(lw.projection[i]!, lw.projection[i + 1]!, lw.projection[i + 2]!, lw.projection[i + 3]!, r);
-    if (s) projection.push(...s);
-  }
-  return { id: lw.id, cutLoops, projection };
+  const clip = (src: number[]) => {
+    const dst: number[] = [];
+    for (let i = 0; i < src.length; i += 4) {
+      const s = clipSegment(src[i]!, src[i + 1]!, src[i + 2]!, src[i + 3]!, r);
+      if (s) dst.push(...s);
+    }
+    return dst;
+  };
+  return { id: lw.id, cutLoops, projection: clip(lw.projection), surface: clip(lw.surface ?? []) };
 }
 
 function clipPolygon(poly: Vec2[], r: Rect): Vec2[] {

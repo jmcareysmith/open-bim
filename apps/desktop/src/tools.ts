@@ -3,7 +3,10 @@ import {
   closestPointOnDatum,
   createGrid,
   createWall,
+  createCeiling,
+  createFloor,
   createReferencePlane,
+  regionFromLoops,
   datumIntersection,
   datumLines,
   levels,
@@ -104,7 +107,7 @@ export interface Snapped {
  * grid intersections, grid lines (staying ortho to `start` when ortho applies), then the
  * 50 mm increment. `free` (Shift) turns off ortho.
  */
-export function snapPoint(ctx: ToolContext, p: Vec2, start: Vec2 | null, free: boolean): Snapped {
+export function snapPoint(ctx: ToolContext, p: Vec2, start: Vec2 | null, free: boolean, extra: Vec2[] = []): Snapped {
   const grids = datumLines(ctx.doc); // grids and reference planes
   const nearest = (pts: Vec2[]) => {
     let best: Vec2 | null = null;
@@ -117,7 +120,7 @@ export function snapPoint(ctx: ToolContext, p: Vec2, start: Vec2 | null, free: b
   };
 
   // 1. Endpoints
-  const ends: Vec2[] = grids.flatMap((g) => [g.params.start, g.params.end]);
+  const ends: Vec2[] = [...extra, ...grids.flatMap((g) => [g.params.start, g.params.end])];
   for (const w of ctx.doc.byCategory<WallParams>(Cat.Wall)) {
     if (w.params.baseLevelId === ctx.activeLevelId()) ends.push(w.params.start, w.params.end);
   }
@@ -374,5 +377,161 @@ export class ReferencePlaneTool extends DatumLineTool {
         buildReferencePlaneLines(doc, { id: "preview", category: Cat.ReferencePlane, params: { start, end } }),
       create: (tx, doc, start, end) => createReferencePlane(tx, doc, start, end),
     });
+  }
+}
+
+// ---- Sketch (floors, ceilings) --------------------------------------------
+
+type SketchKind = "floor" | "ceiling";
+
+const SKETCH: Record<SketchKind, { category: string; typeCategory: string; label: string }> = {
+  floor: { category: Cat.Floor, typeCategory: Cat.FloorType, label: "Floor" },
+  ceiling: { category: Cat.Ceiling, typeCategory: Cat.CeilingType, label: "Ceiling" },
+};
+
+/**
+ * Revit-style boundary sketch: click corners, click the first point to close a loop.
+ * Further loops become holes. Enter finishes, Backspace removes the last point, Esc cancels.
+ * `edit(id)` re-sketches an existing element's boundary.
+ */
+export class SketchTool implements Tool {
+  readonly name: SketchKind;
+  private loops: Vec2[][] = [];
+  private current: Vec2[] = [];
+  private cursor: Vec2 | null = null;
+  private editing: ElementId | null = null;
+
+  constructor(
+    private ctx: ToolContext,
+    kind: SketchKind,
+  ) {
+    this.name = kind;
+  }
+
+  private get def() {
+    return SKETCH[this.name];
+  }
+
+  activate(): void {
+    this.reset();
+    this.prompt();
+  }
+
+  deactivate(): void {
+    this.reset();
+    this.ctx.viewport.setPreviewLines(null);
+  }
+
+  /** Start re-sketching the boundary of an existing floor/ceiling (replaces it on finish). */
+  edit(id: ElementId): void {
+    this.reset();
+    this.editing = id;
+    this.prompt();
+  }
+
+  private reset(): void {
+    this.loops = [];
+    this.current = [];
+    this.cursor = null;
+    this.editing = null;
+  }
+
+  private prompt(): void {
+    const what = this.editing ? `Edit ${this.def.label.toLowerCase()} boundary` : `${this.def.label} sketch`;
+    const n = this.loops.length;
+    const loops = n ? ` · ${n} loop${n > 1 ? "s" : ""} closed (extra loops become holes)` : "";
+    this.ctx.status(
+      `${what}: click corners, click the first point to close. Enter = finish, Backspace = undo point, Esc = cancel${loops}`,
+    );
+  }
+
+  private point(ev: PointerEvent): Vec2 | null {
+    const elevation = this.ctx.doc.require<LevelParams>(this.ctx.activeLevelId()).params.elevation;
+    const p = this.ctx.viewport.pickPlane(ev, elevation);
+    const extra = [...this.loops.flat(), ...this.current];
+    return p && snapPoint(this.ctx, p, this.current.at(-1) ?? null, ev.shiftKey, extra).p;
+  }
+
+  private redraw(): void {
+    const seg: number[] = [];
+    const add = (a: Vec2, b: Vec2) => seg.push(a.x, a.y, 0, b.x, b.y, 0);
+    for (const loop of this.loops) loop.forEach((p, i) => add(p, loop[(i + 1) % loop.length]!));
+    for (let i = 1; i < this.current.length; i++) add(this.current[i - 1]!, this.current[i]!);
+    const last = this.current.at(-1);
+    if (last && this.cursor) add(last, this.cursor);
+    this.ctx.viewport.setPreviewLines(seg.length ? { segments: new Float32Array(seg), labels: [] } : null);
+  }
+
+  pointerMove(ev: PointerEvent): void {
+    this.cursor = this.point(ev);
+    this.redraw();
+  }
+
+  click(ev: PointerEvent): void {
+    const p = this.point(ev);
+    if (!p) return;
+    const first = this.current[0];
+    if (first && this.current.length >= 3 && p.x === first.x && p.y === first.y) {
+      this.loops.push(this.current);
+      this.current = [];
+      this.prompt();
+    } else {
+      const last = this.current.at(-1);
+      if (!last || Math.hypot(p.x - last.x, p.y - last.y) >= 10) this.current.push(p);
+    }
+    this.redraw();
+  }
+
+  key(ev: KeyboardEvent): boolean {
+    if (ev.key === "Enter") {
+      this.finish();
+      return true;
+    }
+    if (ev.key === "Backspace") {
+      if (this.current.length) this.current.pop();
+      else if (this.loops.length) this.current = this.loops.pop()!;
+      this.redraw();
+      return true;
+    }
+    if (ev.key === "Escape" && (this.current.length || this.loops.length || this.editing)) {
+      this.reset();
+      this.redraw();
+      this.prompt();
+      return true;
+    }
+    return false;
+  }
+
+  private finish(): void {
+    const loops = this.current.length >= 3 ? [...this.loops, this.current] : this.loops;
+    const { doc } = this.ctx;
+    try {
+      const region = regionFromLoops(loops);
+      const editing = this.editing;
+      let id: ElementId;
+      if (editing) {
+        doc.transact(`Edit ${this.def.label.toLowerCase()} boundary`, (tx) => tx.update(editing, { ...region }));
+        id = editing;
+      } else {
+        const typeId = doc.byCategory(this.def.typeCategory)[0]?.id;
+        if (!typeId) throw new Error(`No ${this.def.label.toLowerCase()} types in this project`);
+        const levelId = this.ctx.activeLevelId();
+        id = doc.transact(`Create ${this.def.label.toLowerCase()}`, (tx) =>
+          this.name === "floor"
+            ? createFloor(tx, typeId, levelId, region.boundary, { holes: region.holes })
+            : createCeiling(tx, typeId, levelId, region.boundary, { holes: region.holes }),
+        ).id;
+      }
+      this.reset();
+      this.redraw();
+      this.ctx.setSelection([id]);
+      this.ctx.status(
+        this.name === "ceiling" && this.ctx.viewport.viewMode === "plan"
+          ? "Ceiling created. It is above the plan cut plane, so see it in 3D."
+          : `${this.def.label} ${editing ? "updated" : "created"}.`,
+      );
+    } catch (err) {
+      this.ctx.status(`⚠ ${(err as Error).message}`);
+    }
   }
 }

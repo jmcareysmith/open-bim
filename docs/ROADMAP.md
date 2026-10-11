@@ -20,7 +20,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Wall joins (L, T, X) — whole-wall mitres; per-layer cleanup comes with layered geometry
 - [x] Grids — straight; arc and multi-segment grids later
 - [x] Reference planes
-- [ ] Floors and ceilings from sketch boundary (polygon with holes)
+- [x] Floors and ceilings from sketch boundary (polygon with holes) — no "pick walls" or slope arrows yet
 - [ ] Roofs by footprint with per-edge slope
 - [ ] OpenCascade (opencascade.js) kernel: booleans for openings
 - [ ] Doors and windows hosted in walls, cutting openings

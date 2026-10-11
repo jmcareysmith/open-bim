@@ -56,6 +56,10 @@ Walls only join if they overlap vertically. `joinedWallFootprint()` in geometry 
 corners, stops tee stems at the through wall's face, and splits multi-wall junctions into
 wedges; neighbours compute identical cut points so footprints tile with no overlap.
 
+**Sketches** — floor/ceiling (later roof) boundaries are closed loops. `regionFromLoops()` takes the
+largest loop as the boundary and the rest as holes; `validateRegion()` rejects self-crossing loops,
+holes outside the boundary and overlapping holes, and normalises winding (boundary CCW, holes CW).
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

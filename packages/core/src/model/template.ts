@@ -6,6 +6,7 @@ export interface TemplateIds {
   levels: { ground: ElementId; first: ElementId; roof: ElementId };
   wallTypes: { exterior: ElementId; interior: ElementId };
   floorTypes: { slab: ElementId; timber: ElementId };
+  ceilingTypes: { plasterboard: ElementId };
 }
 
 /** Starter project: NZ residential levels and common NZS 3604-style assemblies. */
@@ -38,10 +39,22 @@ export function applyResidentialTemplate(doc: Document): TemplateIds {
       { function: "structure", material: "Timber Joists 240x45", thickness: 240 },
     ]);
 
+    const plasterboard = tx.create<LayeredTypeParams>(
+      Cat.CeilingType,
+      {
+        layers: [
+          { function: "finish1", material: "Plasterboard", thickness: 13 },
+          { function: "substrate", material: "Ceiling Battens", thickness: 35 },
+        ],
+      },
+      { name: "Ceiling - 13 Plasterboard on Battens" },
+    ).id;
+
     return {
       levels: { ground, first, roof },
       wallTypes: { exterior, interior },
       floorTypes: { slab, timber },
+      ceilingTypes: { plasterboard },
     };
   });
 }

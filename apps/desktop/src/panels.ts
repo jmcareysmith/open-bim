@@ -1,6 +1,7 @@
 import {
   Cat,
   levels,
+  regionArea,
   renameGrid,
   renameReferencePlane,
   totalThickness,
@@ -9,6 +10,7 @@ import {
   type Document,
   type Element,
   type ElementId,
+  type CeilingParams,
   type FloorParams,
   type GridParams,
   type LayeredTypeParams,
@@ -39,6 +41,8 @@ export interface PanelContext {
   setSelection(ids: ElementId[]): void;
   activeLevelId(): ElementId;
   setActiveLevel(id: ElementId): void;
+  /** Re-sketch a floor or ceiling boundary. */
+  editBoundary(id: ElementId): void;
   viewMode(): "3d" | "plan";
   setViewMode(mode: "3d" | "plan"): void;
   status(text: string): void;
@@ -76,6 +80,12 @@ function select(options: { value: string; label: string }[], value: string, onCh
   for (const o of options) s.append(h("option", { value: o.value, textContent: o.label, selected: o.value === value }));
   s.onchange = () => onChange(s.value);
   return s;
+}
+
+function editBoundaryButton(ctx: PanelContext, id: ElementId): HTMLElement {
+  const b = h("button", { textContent: "Edit boundary" });
+  b.onclick = () => ctx.editBoundary(id);
+  return h("div", { class: "row" }, h("span", {}), b);
 }
 
 // ---- Project browser ------------------------------------------------------
@@ -123,7 +133,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   }
 
   const types = h("div", { class: "section" }, h("h3", {}, "Types"));
-  for (const cat of [Cat.WallType, Cat.FloorType]) {
+  for (const cat of [Cat.WallType, Cat.FloorType, Cat.CeilingType]) {
     for (const t of doc.byCategory<LayeredTypeParams>(cat)) {
       types.append(item(t, `${totalThickness(t)} mm`, () => ctx.setSelection([t.id])));
     }
@@ -132,6 +142,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   const counts = h("div", { class: "section" }, h("h3", {}, "Model"));
   counts.append(row("Walls", String(doc.byCategory(Cat.Wall).length)));
   counts.append(row("Floors", String(doc.byCategory(Cat.Floor).length)));
+  counts.append(row("Ceilings", String(doc.byCategory(Cat.Ceiling).length)));
   counts.append(row("Grids", String(doc.byCategory(Cat.Grid).length)));
   counts.append(row("Reference planes", String(doc.byCategory(Cat.ReferencePlane).length)));
 
@@ -195,6 +206,19 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Type", select(typeOpts(Cat.FloorType), el.typeId ?? "", (v) => edit(ctx, "Change floor type", (tx) => tx.setType(el.id, v)))),
         row("Level", select(levelOpts, p.levelId, (v) => update<FloorParams>("Change floor level", { levelId: v }))),
         row("Height offset", numberInput(p.offset, (v) => update<FloorParams>("Change floor offset", { offset: v }))),
+        row("Area", `${(regionArea(p) / 1e6).toFixed(2)} m²`),
+        editBoundaryButton(ctx, el.id),
+      );
+      break;
+    }
+    case Cat.Ceiling: {
+      const p = el.params as CeilingParams;
+      sec.append(
+        row("Type", select(typeOpts(Cat.CeilingType), el.typeId ?? "", (v) => edit(ctx, "Change ceiling type", (tx) => tx.setType(el.id, v)))),
+        row("Level", select(levelOpts, p.levelId, (v) => update<CeilingParams>("Change ceiling level", { levelId: v }))),
+        row("Height offset", numberInput(p.offset, (v) => update<CeilingParams>("Change ceiling height", { offset: v }))),
+        row("Area", `${(regionArea(p) / 1e6).toFixed(2)} m²`),
+        editBoundaryButton(ctx, el.id),
       );
       break;
     }
@@ -218,7 +242,8 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       break;
     }
     case Cat.WallType:
-    case Cat.FloorType: {
+    case Cat.FloorType:
+    case Cat.CeilingType: {
       const t = el as Element<LayeredTypeParams>;
       sec.append(
         row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename type", (tx) => tx.setName(el.id, v || undefined)))),

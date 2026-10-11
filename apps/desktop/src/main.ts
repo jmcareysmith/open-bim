@@ -4,14 +4,16 @@ import {
   applyResidentialTemplate,
   levels,
   planViewRange,
+  type CeilingParams,
   type ElementId,
+  type FloorParams,
   type LevelParams,
 } from "@open-bim/core";
 import { SimpleKernel } from "@open-bim/geometry";
 import { openProject, saveProject } from "./io.ts";
 import { renderBrowser, renderProperties, type PanelContext } from "./panels.ts";
 import { buildSample } from "./sample.ts";
-import { GridTool, ReferencePlaneTool, SelectTool, WallTool, type Tool, type ToolContext } from "./tools.ts";
+import { GridTool, ReferencePlaneTool, SelectTool, SketchTool, WallTool, type Tool, type ToolContext } from "./tools.ts";
 import { Viewport, type ViewMode } from "./viewport.ts";
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
@@ -45,6 +47,14 @@ const ctx: ToolContext & PanelContext = {
     activeLevelId = id;
     refreshAll();
   },
+  editBoundary(id) {
+    const el = doc.require<FloorParams | CeilingParams>(id);
+    const name = el.category === Cat.Ceiling ? "ceiling" : "floor";
+    activeLevelId = el.params.levelId;
+    setTool(name);
+    refreshAll();
+    (tools[name] as SketchTool).edit(id);
+  },
   viewMode: () => viewport.viewMode,
   setViewMode(mode: ViewMode) {
     viewport.setViewMode(mode);
@@ -57,6 +67,8 @@ const ctx: ToolContext & PanelContext = {
 
 const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new WallTool(ctx), grid: new GridTool(ctx),
   refplane: new ReferencePlaneTool(ctx),
+  floor: new SketchTool(ctx, "floor"),
+  ceiling: new SketchTool(ctx, "ceiling"),
 };
 let tool: Tool = tools.select!;
 

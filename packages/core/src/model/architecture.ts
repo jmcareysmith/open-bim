@@ -2,6 +2,7 @@ import { registerCategory } from "../categories.ts";
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
 import { relatedWalls } from "./joins.ts";
+import { validateRegion } from "./sketch.ts";
 
 // ---- categories ----------------------------------------------------------
 
@@ -13,6 +14,8 @@ export const Cat = {
   FloorType: "FloorType",
   Grid: "Grid",
   ReferencePlane: "ReferencePlane",
+  Ceiling: "Ceiling",
+  CeilingType: "CeilingType",
 } as const;
 
 // ---- Level ---------------------------------------------------------------
@@ -106,6 +109,26 @@ export function floorExtent(doc: Document, floor: Floor): { bottom: number; top:
   return { top, bottom: top - floorThickness(doc, floor) };
 }
 
+// ---- Ceiling -------------------------------------------------------------
+
+export type CeilingParams = {
+  levelId: ElementId;
+  /** Height of the ceiling underside above its level, mm (Revit "Height Offset From Level"). */
+  offset: number;
+  /** Closed outer boundary, counter-clockwise, plan mm. */
+  boundary: Vec2[];
+  holes: Vec2[][];
+};
+export type Ceiling = Element<CeilingParams>;
+
+/** Absolute Z of ceiling underside and top, mm. Layers build upwards from the underside. */
+export function ceilingExtent(doc: Document, ceiling: Ceiling): { bottom: number; top: number } {
+  if (!ceiling.typeId) throw new Error("Ceiling has no type");
+  const level = doc.require<LevelParams>(ceiling.params.levelId).params.elevation;
+  const bottom = level + ceiling.params.offset;
+  return { bottom, top: bottom + totalThickness(doc.require<LayeredTypeParams>(ceiling.typeId)) };
+}
+
 // ---- registration --------------------------------------------------------
 
 const typeDeps = (el: Element): ElementId[] => (el.typeId ? [el.typeId] : []);
@@ -113,6 +136,7 @@ const typeDeps = (el: Element): ElementId[] => (el.typeId ? [el.typeId] : []);
 registerCategory({ name: Cat.Level, dependencies: () => [], cascadeDelete: false, isType: false });
 registerCategory({ name: Cat.WallType, dependencies: () => [], cascadeDelete: false, isType: true });
 registerCategory({ name: Cat.FloorType, dependencies: () => [], cascadeDelete: false, isType: true });
+registerCategory({ name: Cat.CeilingType, dependencies: () => [], cascadeDelete: false, isType: true });
 
 registerCategory({
   name: Cat.Wall,
@@ -128,6 +152,13 @@ registerCategory({
 registerCategory({
   name: Cat.Floor,
   dependencies: (el) => [(el.params as FloorParams).levelId, ...typeDeps(el)],
+  cascadeDelete: true,
+  isType: false,
+});
+
+registerCategory({
+  name: Cat.Ceiling,
+  dependencies: (el) => [(el.params as CeilingParams).levelId, ...typeDeps(el)],
   cascadeDelete: true,
   isType: false,
 });
@@ -170,11 +201,20 @@ export function createFloor(
   opts: { offset?: number; holes?: Vec2[][] } = {},
 ): Floor {
   if (boundary.length < 3) throw new Error("Floor boundary needs at least 3 points");
-  return tx.create<FloorParams>(
-    Cat.Floor,
-    { levelId, boundary, offset: opts.offset ?? 0, holes: opts.holes ?? [] },
-    { typeId },
-  );
+  const region = validateRegion({ boundary, holes: opts.holes ?? [] });
+  return tx.create<FloorParams>(Cat.Floor, { levelId, offset: opts.offset ?? 0, ...region }, { typeId });
+}
+
+/** Ceiling from a sketched region. Default height 2400 mm above the level. */
+export function createCeiling(
+  tx: Transaction,
+  typeId: ElementId,
+  levelId: ElementId,
+  boundary: Vec2[],
+  opts: { offset?: number; holes?: Vec2[][] } = {},
+): Ceiling {
+  const region = validateRegion({ boundary, holes: opts.holes ?? [] });
+  return tx.create<CeilingParams>(Cat.Ceiling, { levelId, offset: opts.offset ?? 2400, ...region }, { typeId });
 }
 
 /** Sorted by elevation, lowest first. */

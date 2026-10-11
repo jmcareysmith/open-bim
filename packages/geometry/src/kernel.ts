@@ -1,8 +1,10 @@
 import {
   Cat,
+  ceilingExtent,
   floorExtent,
   wallExtent,
   type Document,
+  type Ceiling,
   type Element,
   type Floor,
   type Vec2,
@@ -57,10 +59,17 @@ export function buildFloor(doc: Document, el: Element): MeshData | null {
   return extrudePolygon(floor.params.boundary, floor.params.holes, bottom, top);
 }
 
+export function buildCeiling(doc: Document, el: Element): MeshData | null {
+  const ceiling = el as Ceiling;
+  const { bottom, top } = ceilingExtent(doc, ceiling);
+  return extrudePolygon(ceiling.params.boundary, ceiling.params.holes, bottom, top);
+}
+
 export class SimpleKernel implements GeometryKernel {
   private builders = new Map<string, Builder>([
     [Cat.Wall, buildWall],
     [Cat.Floor, buildFloor],
+    [Cat.Ceiling, buildCeiling],
   ]);
 
   private lineBuilders = new Map<string, LineBuilder>([

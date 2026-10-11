@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Document, applyResidentialTemplate, createFloor, createWall } from "@open-bim/core";
+import { Document, applyResidentialTemplate, createCeiling, createFloor, createWall } from "@open-bim/core";
 import { SimpleKernel, boundingBox, extrudePolygon, meshVolume, wallFootprint } from "../src/index.ts";
 
 const square = [
@@ -65,5 +65,25 @@ describe("SimpleKernel", () => {
     expect(boundingBox(fm).min[2]).toBe(-100);
 
     expect(k.build(doc, doc.require(ids.levels.ground))).toBeNull();
+  });
+});
+
+describe("ceilings", () => {
+  it("extrude upwards from the ceiling height, minus holes", () => {
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const hole = [
+      { x: 250, y: 250 },
+      { x: 750, y: 250 },
+      { x: 750, y: 750 },
+      { x: 250, y: 750 },
+    ];
+    const c = doc.transact("C", (tx) =>
+      createCeiling(tx, ids.ceilingTypes.plasterboard, ids.levels.ground, square, { holes: [hole] }),
+    );
+    const m = new SimpleKernel().build(doc, c)!;
+    expect(boundingBox(m).min[2]).toBe(2400);
+    expect(boundingBox(m).max[2]).toBe(2448);
+    expect(meshVolume(m)).toBeCloseTo((1e6 - 250_000) * 48, -2);
   });
 });

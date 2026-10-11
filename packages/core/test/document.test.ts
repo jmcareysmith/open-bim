@@ -136,8 +136,8 @@ describe("regeneration", () => {
       }),
       floor: createFloor(tx, ids.floorTypes.slab, ids.levels.ground, [
         { x: 0, y: 0 },
-        { x: 1, y: 0 },
-        { x: 1, y: 1 },
+        { x: 1000, y: 0 },
+        { x: 1000, y: 1000 },
       ]),
     }));
     let last: ChangeSet | undefined;

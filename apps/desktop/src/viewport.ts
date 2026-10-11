@@ -49,15 +49,24 @@ const COLORS: Record<string, number> = {
   [Cat.Floor]: 0x9aa3ad,
   [Cat.Ceiling]: 0xe8e6df,
   [Cat.Roof]: 0x7d8a96,
-  [Cat.WallOpening]: 0xf0a040,
+  [Cat.WallOpening]: 0xd9822b,
   [Cat.Door]: 0xa0764f,
   [Cat.Window]: 0x9cc3d9,
-  [Cat.Grid]: 0xb8c7d6,
-  [Cat.ReferencePlane]: 0x4caf50,
+  [Cat.Grid]: 0x4a5560,
+  [Cat.ReferencePlane]: 0x2e8b57,
+  [Cat.View]: 0x2b2f36,
+  [Cat.DetailLine]: 0x1f2328,
+  [Cat.Dimension]: 0x1f2328,
+  [Cat.TextNote]: 0x1f2328,
+  [Cat.FilledRegion]: 0x1f2328,
 };
 const SELECTED = 0x3d8bfd;
-/** Halftone fades colours towards the background. */
-const HALFTONE_TOWARD = 0x1b1e23;
+/** Halftone fades colours towards the (white) background. */
+const HALFTONE_TOWARD = 0xffffff;
+/** Backgrounds: white for plans, sections, elevations (Revit default); very light grey for 3D. */
+const BG_DRAWING = 0xffffff;
+const BG_3D = 0xe6e8eb;
+const BG_SHEET = 0xd5d8dc;
 
 function blend(a: number, b: number, t: number): number {
   const ch = (c: number, s: number) => (c >> s) & 0xff;
@@ -65,17 +74,17 @@ function blend(a: number, b: number, t: number): number {
   return mix(16) | mix(8) | mix(0);
 }
 /** Plan symbols (door swings) drawn alongside a solid. */
-const SYMBOL = 0xd7dee6;
+const SYMBOL = 0x2b2f36;
 /** Plan drawing: cut outlines, poché fill and projection (beyond) lines. */
-const CUT_LINE = 0xf2f4f7;
-const POCHE = 0x6b717a;
-const BEYOND = 0x8a919b;
+const CUT_LINE = 0x111111;
+const POCHE = 0x9a9ea4;
+const BEYOND = 0x555b63;
 /** Cut-pattern hatching and surface patterns. */
-const HATCH = 0xaab2bc;
-const SURFACE = 0x5d646e;
+const HATCH = 0x80868e;
+const SURFACE = 0xa3a8ae;
 /** Drawn with plan symbols rather than cut/projection (like Revit door and window families). */
 const SYMBOLIC_IN_PLAN = new Set<string>([Cat.Door, Cat.Window]);
-const PREVIEW = 0x5fb3ff;
+const PREVIEW = 0x2f8cff;
 /** 3D model view, plan (top-down, clipped) or drawing (section/elevation in its own 2D space). */
 export type ViewMode = "3d" | "plan" | "drawing";
 type Rect = { min: Vec2; max: Vec2 };
@@ -147,7 +156,7 @@ export class Viewport {
   ) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(window.devicePixelRatio);
-    this.renderer.setClearColor(0x1b1e23);
+    this.renderer.setClearColor(BG_3D);
     container.appendChild(this.renderer.domElement);
 
     this.camera3d = new THREE.PerspectiveCamera(45, 1, 50, 2_000_000);
@@ -189,7 +198,7 @@ export class Viewport {
     sun.position.set(-1, -2, 3);
     this.scene.add(sun);
 
-    this.grid = new THREE.GridHelper(60000, 60, 0x3a414c, 0x2a2f37);
+    this.grid = new THREE.GridHelper(60000, 60, 0xc4c9cf, 0xd6dadf);
     this.grid.rotation.x = Math.PI / 2; // GridHelper is XZ; rotate into XY
     this.scene.add(this.grid);
 
@@ -497,9 +506,15 @@ export class Viewport {
     const reframe = this.drawingView?.id !== view.id || this.sheet !== null;
     this.drawingView = view;
     this.sheet = null;
+    this.applyBackground();
     this.setViewMode("drawing");
     this.drawingDirty = true;
     if (reframe) this.zoomToFit();
+  }
+
+  private applyBackground(): void {
+    this.renderer.setClearColor(this.mode === "3d" ? BG_3D : this.mode === "drawing" && this.sheet ? BG_SHEET : BG_DRAWING);
+    this.needsRender = true;
   }
 
   /** Show a sheet: paper with title block and viewports (drawing mode, paper mm). */
@@ -508,6 +523,7 @@ export class Viewport {
     this.sheet = sheet;
     this.drawingView = null;
     this.setViewMode("drawing");
+    this.applyBackground();
     this.drawingDirty = true;
     if (reframe) this.zoomToFit();
   }
@@ -543,6 +559,7 @@ export class Viewport {
     this.controls3d.enabled = mode === "3d";
     this.controlsPlan.enabled = mode === "plan";
     this.controlsDraw.enabled = mode === "drawing";
+    this.applyBackground();
     this.grid.visible = mode === "3d"; // the work-plane grid fights with floor tops in plan
     for (const g of this.objects.values()) this.applyPlanOnly(g);
     this.drawingDirty = true;
@@ -645,11 +662,11 @@ export class Viewport {
     }
     if (drawingMode) {
       const view = this.drawingView!;
-      const extras = makeLineGroup(sectionAnnotations(this.doc, view), 0xb8c7d6);
+      const extras = makeLineGroup(sectionAnnotations(this.doc, view), 0x4a5560);
       const crop = viewCrop(view);
       const frame = new THREE.LineSegments(
         new THREE.EdgesGeometry(new THREE.PlaneGeometry(crop.max.x - crop.min.x, crop.max.y - crop.min.y)),
-        new THREE.LineDashedMaterial({ color: 0x4b525c, dashSize: 300, gapSize: 200 }),
+        new THREE.LineDashedMaterial({ color: 0xa0a6ad, dashSize: 300, gapSize: 200 }),
       );
       frame.computeLineDistances();
       frame.position.set((crop.min.x + crop.max.x) / 2, (crop.min.y + crop.max.y) / 2, -1);
@@ -907,7 +924,7 @@ function makeLineGroup(lines: LineData, color: number): THREE.Group {
 }
 
 /** Text texture. Bubble labels are square; free text is as wide as it needs (`aspect` = width / height). */
-function labelTexture(text: string, free: boolean, color = "#d7dee6"): { texture: THREE.CanvasTexture; aspect: number } {
+function labelTexture(text: string, free: boolean, color = "#1f2328"): { texture: THREE.CanvasTexture; aspect: number } {
   const h = 128;
   const canvas = document.createElement("canvas");
   const c0 = canvas.getContext("2d")!;
@@ -999,7 +1016,7 @@ function renderDrawing(d: Drawing): THREE.Group {
 /** White paper with a drop shadow, plus the sheet's own linework (border, title block, titles). */
 function renderPaper(d: Drawing & { width: number; height: number; viewports: { id: ElementId }[] }): THREE.Group {
   const g = new THREE.Group();
-  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(d.width, d.height), new THREE.MeshBasicMaterial({ color: 0x0c0d10 }));
+  const shadow = new THREE.Mesh(new THREE.PlaneGeometry(d.width, d.height), new THREE.MeshBasicMaterial({ color: 0x9da2a8 }));
   shadow.position.set(d.width / 2 + 3, d.height / 2 - 3, -2);
   const paper = new THREE.Mesh(new THREE.PlaneGeometry(d.width, d.height), new THREE.MeshBasicMaterial({ color: 0xffffff }));
   paper.position.set(d.width / 2, d.height / 2, -1);

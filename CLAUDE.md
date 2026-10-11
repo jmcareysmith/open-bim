@@ -58,4 +58,5 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Views are elements (floor plan per level + {3D}); view properties show when nothing is selected.
 - Plans are true 2D drawings (cut + hidden-line projection, `geometry/src/hlr.ts`).
 - Sections (S tool), building elevations (Elevations button) and callouts (2D, HLR, levels + grids annotated).
-- Next: Phase 2 — detail lines, filled regions, text, dimensions.
+- Annotation: aligned dimensions (M, live), detail lines (L), filled regions, text (T); view-owned.
+- Next: Phase 2 — materials with cut/surface patterns.

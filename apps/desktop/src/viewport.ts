@@ -4,6 +4,9 @@ import {
   Cat,
   PLAN_CUT_HEIGHT,
   TemporaryVisibility,
+  annotationView,
+  isDrawingView,
+  type ViewParams,
   type ChangeSet,
   type Document,
   type ElementId,
@@ -101,6 +104,8 @@ export class Viewport {
   readonly visibility = new TemporaryVisibility();
   /** Categories the active view hides (its Visibility/Graphics settings). */
   private viewHidden = new Set<string>();
+  /** Annotations are drawn only in the view that owns them. */
+  private annotationViewId: ElementId | undefined;
   private workPlaneZ = 0;
   private raycaster = new THREE.Raycaster();
   private grid: THREE.GridHelper;
@@ -186,7 +191,7 @@ export class Viewport {
   private remove(id: ElementId): void {
     const obj = this.objects.get(id);
     if (!obj) return;
-    this.scene.remove(obj);
+    obj.removeFromParent();
     disposeGroup(obj);
     this.objects.delete(id);
     this.meshes.delete(id);
@@ -209,7 +214,12 @@ export class Viewport {
         if (lines) group.add(makeLineGroup(lines, SYMBOL));
       } else if (lines) {
         group = makeLineGroup(lines, COLORS[el.category] ?? 0xcccccc);
-        if (lines.placement !== "model") {
+        const owner = annotationView(el);
+        const ownerView = owner ? this.doc.get<ViewParams>(owner) : undefined;
+        if (ownerView && isDrawingView(ownerView as View)) {
+          // Section/elevation annotation: lives in the 2D drawing scene.
+          group.userData.inDrawing = true;
+        } else if (lines.placement !== "model") {
           group.position.z = this.workPlaneZ;
           this.datums.add(id);
         }
@@ -222,7 +232,7 @@ export class Viewport {
     group.visible = this.isShown(el);
     this.applyPlanOnly(group);
     this.objects.set(id, group);
-    this.scene.add(group);
+    (group.userData.inDrawing ? this.drawScene : this.scene).add(group);
     this.applyHighlight(id);
   }
 
@@ -272,8 +282,11 @@ export class Viewport {
     // Line picking tolerance: a few pixels, in mm at the current zoom.
     this.raycaster.params.Line.threshold = this.mmPerPixel() * 6;
     if (this.mode === "drawing") {
-      // Sections/elevations: pick the drawn linework. `point` is in drawing coordinates.
-      const parts = [...this.drawing.entries()].filter(([id]) => !filter || filter(id)).flatMap(([, g]) => g.children);
+      // Sections/elevations: pick the drawn linework and annotations. `point` is in drawing coordinates.
+      const annotations = [...this.objects.entries()].filter(([, g]) => g.userData.inDrawing && g.visible);
+      const parts = [...this.drawing.entries(), ...annotations]
+        .filter(([id]) => !filter || filter(id))
+        .flatMap(([, g]) => g.children.filter((c) => !(c instanceof THREE.Sprite)));
       const hit = this.raycaster.intersectObjects(parts, false)[0];
       const id = hit?.object.parent?.userData.elementId as ElementId | undefined;
       return hit && id ? { id, point: { x: hit.point.x, y: hit.point.y } } : null;
@@ -297,8 +310,24 @@ export class Viewport {
     this.refreshVisibility();
   }
 
-  private isShown(el: { id: ElementId; category: string }): boolean {
+  private isShown(el: { id: ElementId; category: string; params: unknown }): boolean {
+    const owner = annotationView(el as never);
+    if (owner && owner !== this.annotationViewId) return false;
     return !this.viewHidden.has(el.category) && this.visibility.isVisible(el);
+  }
+
+  /** The active view: its own annotations are shown, other views' are hidden. */
+  setAnnotationView(id: ElementId | undefined): void {
+    if (id === this.annotationViewId) return;
+    this.annotationViewId = id;
+    this.refreshVisibility();
+  }
+
+  /** Point under the cursor in a section/elevation's drawing coordinates. */
+  pickDrawing(ev: { clientX: number; clientY: number }): Vec2 | null {
+    this.setRay(ev);
+    const p = this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 0, 1), 0), new THREE.Vector3());
+    return p ? { x: p.x, y: p.y } : null;
   }
 
   refreshVisibility(): void {
@@ -320,7 +349,10 @@ export class Viewport {
     const [xa, xb] = [Math.min(r.x0, r.x1), Math.max(r.x0, r.x1)];
     const [ya, yb] = [Math.min(r.y0, r.y1), Math.max(r.y0, r.y1)];
     const out: ElementId[] = [];
-    const source = this.mode === "drawing" ? this.drawing : this.objects;
+    const source: [ElementId, THREE.Group][] =
+      this.mode === "drawing"
+        ? [...this.drawing.entries(), ...[...this.objects.entries()].filter(([, g]) => g.userData.inDrawing)]
+        : [...this.objects.entries()].filter(([, g]) => !g.userData.inDrawing);
     for (const [id, g] of source) {
       if (!g.visible) continue;
       const box = new THREE.Box3().setFromObject(g);
@@ -385,14 +417,18 @@ export class Viewport {
   /** Line-work preview (e.g. a grid being drawn), placed on the work plane. */
   setPreviewLines(lines: LineData | null): void {
     if (this.previewLines) {
-      this.scene.remove(this.previewLines);
+      this.previewLines.removeFromParent();
       disposeGroup(this.previewLines);
       this.previewLines = null;
     }
     if (lines) {
       this.previewLines = makeLineGroup(lines, PREVIEW);
-      this.previewLines.position.z = this.workPlaneZ;
-      this.scene.add(this.previewLines);
+      if (this.mode === "drawing") {
+        this.drawScene.add(this.previewLines);
+      } else {
+        this.previewLines.position.z = this.workPlaneZ;
+        this.scene.add(this.previewLines);
+      }
     }
     this.needsRender = true;
   }
@@ -698,6 +734,20 @@ function makeLineGroup(lines: LineData, color: number): THREE.Group {
   if (lines.dashed) segs.computeLineDistances();
   segs.position.z = DATUM_LIFT;
   g.add(segs);
+  if (lines.fill) {
+    // Filled regions: translucent fill under the outline. Added after it, so child 0 stays the
+    // outline (picking and highlighting use child 0).
+    const tris = fillLoops(lines.fill.loops);
+    const fillGeom = new THREE.BufferGeometry();
+    fillGeom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(tris.flatMap((t) => t.flatMap((p) => [p.x, p.y, 0]))), 3));
+    const fill = new THREE.Mesh(
+      fillGeom,
+      new THREE.MeshBasicMaterial({ color: lines.fill.color, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }),
+    );
+    fill.position.z = DATUM_LIFT - 0.5;
+    fill.renderOrder = -4;
+    g.add(fill);
+  }
   for (const label of lines.labels) {
     const { texture, aspect } = labelTexture(label.text, label.size !== undefined);
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));

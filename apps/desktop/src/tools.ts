@@ -9,6 +9,11 @@ import {
   createRoof,
   createSection,
   createCallout,
+  createDetailLine,
+  createFilledRegion,
+  createTextNote,
+  createDimension,
+  type DimRef,
   createWallOpening,
   createDoor,
   createWindow,
@@ -452,12 +457,13 @@ export class ReferencePlaneTool extends DatumLineTool {
 
 // ---- Sketch (floors, ceilings) --------------------------------------------
 
-type SketchKind = "floor" | "ceiling" | "roof";
+type SketchKind = "floor" | "ceiling" | "roof" | "region";
 
 const SKETCH: Record<SketchKind, { category: string; typeCategory: string; label: string }> = {
   floor: { category: Cat.Floor, typeCategory: Cat.FloorType, label: "Floor" },
   ceiling: { category: Cat.Ceiling, typeCategory: Cat.CeilingType, label: "Ceiling" },
   roof: { category: Cat.Roof, typeCategory: Cat.RoofType, label: "Roof" },
+  region: { category: Cat.FilledRegion, typeCategory: "", label: "Filled region" },
 };
 
 /**
@@ -517,10 +523,7 @@ export class SketchTool implements Tool {
   }
 
   private point(ev: PointerEvent): Vec2 | null {
-    const elevation = this.ctx.doc.require<LevelParams>(this.ctx.activeLevelId()).params.elevation;
-    const p = this.ctx.viewport.pickPlane(ev, elevation);
-    const extra = [...this.loops.flat(), ...this.current];
-    return p && snapPoint(this.ctx, p, this.current.at(-1) ?? null, ev.shiftKey, extra).p;
+    return viewPoint(this.ctx, ev, this.current.at(-1) ?? null, [...this.loops.flat(), ...this.current]);
   }
 
   private redraw(): void {
@@ -590,6 +593,16 @@ export class SketchTool implements Tool {
         doc.transact(`Edit ${this.def.label.toLowerCase()} boundary`, (tx) => tx.update(editing, patch));
         id = editing;
       } else {
+        if (this.name === "region") {
+          const viewId = this.ctx.activeViewId();
+          if (!viewId) throw new Error("Open a plan, section or elevation first");
+          const r = doc.transact("Create filled region", (tx) => createFilledRegion(tx, doc, viewId, region.boundary, { holes: region.holes }));
+          this.reset();
+          this.redraw();
+          this.ctx.setSelection([r.id]);
+          this.ctx.status("Filled region created.");
+          return;
+        }
         const typeId = this.ctx.activeTypeId(this.def.typeCategory);
         if (!typeId) throw new Error(`No ${this.def.label.toLowerCase()} types in this project`);
         const levelId = this.ctx.activeLevelId();
@@ -783,6 +796,178 @@ export class CalloutTool implements Tool {
     if (ev.key === "Escape" && this.start) {
       this.start = null;
       this.ctx.viewport.setPreviewLines(null);
+      return true;
+    }
+    return false;
+  }
+}
+
+// ---- Annotation ---------------------------------------------------------------------
+
+/**
+ * Cursor point in the active view's 2D space: plan XY (full snapping) or, in sections/elevations,
+ * drawing coordinates (endpoints in `extra`, ortho and the 50 mm increment).
+ */
+export function viewPoint(ctx: ToolContext, ev: PointerEvent, start: Vec2 | null, extra: Vec2[] = []): Vec2 | null {
+  if (ctx.viewport.viewMode !== "drawing") {
+    const elevation = ctx.doc.require<LevelParams>(ctx.activeLevelId()).params.elevation;
+    const p = ctx.viewport.pickPlane(ev, elevation);
+    return p && snapPoint(ctx, p, start, ev.shiftKey, extra).p;
+  }
+  const p = ctx.viewport.pickDrawing(ev);
+  if (!p) return null;
+  for (const q of extra) if (Math.hypot(q.x - p.x, q.y - p.y) < POINT_SNAP) return { ...q };
+  let x = p.x;
+  let y = p.y;
+  if (start && !ev.shiftKey) {
+    if (Math.abs(p.x - start.x) > Math.abs(p.y - start.y)) y = start.y;
+    else x = start.x;
+  }
+  const r = (v: number) => Math.round(v / INCREMENT) * INCREMENT;
+  return { x: start && y === start.y ? r(x) : start && x === start.x ? x : r(x), y: start && x === start.x ? r(y) : start && y === start.y ? y : r(y) };
+}
+
+function requireAnnotView(ctx: ToolContext): ElementId | null {
+  const id = ctx.activeViewId();
+  const v = id ? ctx.doc.get(id) : undefined;
+  if (!v || (v.params as { kind: string }).kind === "3d") {
+    ctx.status("Annotations go in plans, sections and elevations. Open one first.");
+    return null;
+  }
+  return v.id;
+}
+
+/** Detail lines: click points; lines chain until Esc. */
+export class DetailLineTool implements Tool {
+  readonly name = "detailline";
+  private start: Vec2 | null = null;
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.start = null;
+    this.ctx.status("Detail line: click start, then each next point. Esc to finish. Drawn in this view only.");
+  }
+
+  deactivate(): void {
+    this.start = null;
+    this.ctx.viewport.setPreviewLines(null);
+  }
+
+  pointerMove(ev: PointerEvent): void {
+    const p = viewPoint(this.ctx, ev, this.start);
+    if (!p || !this.start) return this.ctx.viewport.setPreviewLines(null);
+    this.ctx.viewport.setPreviewLines(linePreview(this.start, p));
+  }
+
+  click(ev: PointerEvent): void {
+    const viewId = requireAnnotView(this.ctx);
+    if (!viewId) return;
+    const p = viewPoint(this.ctx, ev, this.start);
+    if (!p) return;
+    if (!this.start) {
+      this.start = p;
+      return;
+    }
+    if (Math.hypot(p.x - this.start.x, p.y - this.start.y) < 1) return;
+    const { doc } = this.ctx;
+    const a = this.start;
+    const line = doc.transact("Create detail line", (tx) => createDetailLine(tx, doc, viewId, a, p));
+    this.ctx.setSelection([line.id]);
+    this.start = p;
+  }
+
+  key(ev: KeyboardEvent): boolean {
+    if (ev.key === "Escape" && this.start) {
+      this.start = null;
+      this.ctx.viewport.setPreviewLines(null);
+      return true;
+    }
+    return false;
+  }
+}
+
+/** Text: click to place a note, then edit its text in Properties. */
+export class TextTool implements Tool {
+  readonly name = "text";
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.ctx.status("Text: click to place a note; type its text in Properties.");
+  }
+
+  click(ev: PointerEvent): void {
+    const viewId = requireAnnotView(this.ctx);
+    if (!viewId) return;
+    const p = viewPoint(this.ctx, ev, null);
+    if (!p) return;
+    const { doc } = this.ctx;
+    const t = doc.transact("Create text", (tx) => createTextNote(tx, doc, viewId, p, "Text"));
+    this.ctx.setSelection([t.id]);
+  }
+}
+
+/**
+ * Aligned dimension (plans): click walls (nearest face), grids or reference planes in turn,
+ * then click empty space to place the dimension line. Esc clears the picks.
+ */
+export class DimensionTool implements Tool {
+  readonly name = "dimension";
+  private refs: DimRef[] = [];
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.refs = [];
+    this.ctx.status("Dimension: click walls, grids or reference planes, then click empty space to place.");
+  }
+
+  deactivate(): void {
+    this.refs = [];
+  }
+
+  click(ev: PointerEvent): void {
+    const viewId = requireAnnotView(this.ctx);
+    if (!viewId) return;
+    const { doc, viewport } = this.ctx;
+    if (viewport.viewMode === "drawing") return this.ctx.status("Dimensions in sections are coming; use plans for now.");
+    const pickable = new Set<string>([Cat.Wall, Cat.Grid, Cat.ReferencePlane]);
+    const hit = viewport.pickHit(ev, (id) => pickable.has(doc.get(id)?.category ?? ""));
+    if (hit) {
+      const el = doc.require(hit.id);
+      if (el.category === Cat.Wall) {
+        const w = el as Wall;
+        const { start, end } = w.params;
+        const len = Math.hypot(end.x - start.x, end.y - start.y);
+        const off = ((end.x - start.x) * (hit.point.y - start.y) - (end.y - start.y) * (hit.point.x - start.x)) / len;
+        const half = totalThickness(doc.require<LayeredTypeParams>(w.typeId!)) / 2;
+        // Nearest of the two faces and the centreline.
+        const side = Math.abs(off) < half / 3 ? "centre" : off > 0 ? "left" : "right";
+        this.refs.push({ kind: "wallFace", id: w.id, side, pick: hit.point });
+      } else {
+        this.refs.push({ kind: "datum", id: el.id, pick: hit.point });
+      }
+      this.ctx.setSelection(this.refs.flatMap((r) => (r.kind === "point" ? [] : [r.id])));
+      this.ctx.status(`Dimension: ${this.refs.length} reference(s). Click more, or click empty space to place.`);
+      return;
+    }
+    if (this.refs.length < 2) return this.ctx.status("Dimension: pick at least two walls, grids or reference planes first.");
+    const at = viewPoint(this.ctx, ev, null);
+    if (!at) return;
+    const refs = this.refs;
+    this.refs = [];
+    try {
+      const dim = doc.transact("Create dimension", (tx) => createDimension(tx, doc, viewId, refs, at));
+      this.ctx.setSelection([dim.id]);
+      this.activate();
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
+  }
+
+  key(ev: KeyboardEvent): boolean {
+    if (ev.key === "Escape" && this.refs.length) {
+      this.refs = [];
+      this.ctx.setSelection([]);
+      this.activate();
       return true;
     }
     return false;

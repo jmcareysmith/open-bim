@@ -96,11 +96,11 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 8. Annotation & documentation
 | Feature | Phase | Status |
 |---|---|---|
-| Dimensions (aligned, linear, angular, radial, spot) | 2 | ⬜ |
-| Text, leaders | 2 | ⬜ |
+| Dimensions (aligned, linear, angular, radial, spot) | 2 | 🟨 |
+| Text, leaders | 2 | 🟨 |
 | Tags (by category, multi-category, material) | 4 | ⬜ |
 | Keynotes | 4 | ⬜ |
-| Detail lines, filled regions, detail components, insulation | 2 | ⬜ |
+| Detail lines, filled regions, detail components, insulation | 2 | 🟨 |
 | Symbols, north arrow, section/elevation heads | 2 | ⬜ |
 | Revision clouds & revisions | 4 | ⬜ |
 | Sheets, title blocks, viewports | 2 | ⬜ |

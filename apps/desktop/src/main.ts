@@ -30,7 +30,10 @@ import { buildSample } from "./sample.ts";
 import {
   GridTool,
   CalloutTool,
+  DetailLineTool,
+  DimensionTool,
   HostedTool,
+  TextTool,
   OpeningTool,
   SectionTool,
   ReferencePlaneTool,
@@ -105,8 +108,9 @@ const ctx: ToolContext & PanelContext = {
   },
   editBoundary(id) {
     const el = doc.require<FloorParams | CeilingParams | RoofParams>(id);
-    const name = el.category === Cat.Ceiling ? "ceiling" : el.category === Cat.Roof ? "roof" : "floor";
-    activeLevelId = el.params.levelId;
+    const name = { [Cat.Ceiling]: "ceiling", [Cat.Roof]: "roof", [Cat.FilledRegion]: "region" }[el.category] ?? "floor";
+    // Filled regions belong to a view, not a level.
+    if (el.params.levelId) activeLevelId = el.params.levelId;
     setTool(name);
     refreshAll();
     (tools[name] as SketchTool).edit(id);
@@ -126,9 +130,13 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   window: new HostedTool(ctx, "window"),
   section: new SectionTool(ctx),
   callout: new CalloutTool(ctx),
+  detailline: new DetailLineTool(ctx),
+  region: new SketchTool(ctx, "region"),
+  text: new TextTool(ctx),
+  dimension: new DimensionTool(ctx),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
-const DRAWING_TOOLS = new Set(["select"]);
+const DRAWING_TOOLS = new Set(["select", "detailline", "region", "text"]);
 let tool: Tool = tools.select!;
 
 function setTool(name: string): void {
@@ -321,6 +329,7 @@ function applyView(): void {
     viewport.setViewMode("3d");
   }
   viewport.setViewHiddenCategories(v.params.hiddenCategories);
+  viewport.setAnnotationView(v.id);
   if (viewport.viewMode === "drawing" && !DRAWING_TOOLS.has(tool.name)) setTool("select");
 }
 
@@ -342,6 +351,9 @@ window.addEventListener("keydown", (ev) => {
   if (ev.key.toLowerCase() === "d") return setTool("door");
   if (ev.key.toLowerCase() === "n") return setTool("window");
   if (ev.key.toLowerCase() === "s") return setTool("section");
+  if (ev.key.toLowerCase() === "l") return setTool("detailline");
+  if (ev.key.toLowerCase() === "t") return setTool("text");
+  if (ev.key.toLowerCase() === "m") return setTool("dimension");
   if (ev.key.toLowerCase() === "f") return run(ev, "fit");
   if (ev.key.toLowerCase() === "h") return run(ev, ev.shiftKey ? "hideCategory" : "hide");
   if (ev.key.toLowerCase() === "i") return run(ev, ev.shiftKey ? "isolateCategory" : "isolate");

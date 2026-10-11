@@ -31,7 +31,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] View system: each view = camera + view range + visibility rules + detail level — 3D camera not yet saved per view
 - [x] Floor plans via cut plane + hidden-line removal → 2D vector — exact mesh-based HLR (not OCCT); line weights come with materials
 - [x] Sections, elevations, callouts — straight sections only (no jogs); callouts of floor plans
-- [ ] Detail lines, filled regions, text, dimensions (live, associative)
+- [x] Detail lines, filled regions, text, dimensions (live, associative) — aligned dims in plans (sections: levels via API); no leaders yet
 - [ ] Materials with cut/surface patterns
 - [ ] Visibility/Graphics, filters, view templates
 - [ ] Sheets, title blocks, viewports, vector PDF export

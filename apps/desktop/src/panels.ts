@@ -23,6 +23,13 @@ import {
   renameGrid,
   renameView,
   validateViewRange,
+  dimensionLayout,
+  type DetailLineParams,
+  type Dimension,
+  type DimensionParams,
+  type FilledRegionParams,
+  type LineStyle,
+  type TextNoteParams,
   views as viewElements,
   SCALES,
   type View,
@@ -508,6 +515,42 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         }),
         editBoundaryButton(ctx, el.id),
       );
+      break;
+    }
+    case Cat.DetailLine: {
+      const p = el.params as DetailLineParams;
+      sec.append(
+        row(
+          "Line style",
+          select(
+            (["thin", "medium", "wide", "hidden"] as const).map((s) => ({ value: s, label: s[0]!.toUpperCase() + s.slice(1) })),
+            p.style,
+            (v) => update<DetailLineParams>("Change line style", { style: v as LineStyle }),
+          ),
+        ),
+        row("Length", len(Math.hypot(p.end.x - p.start.x, p.end.y - p.start.y))),
+      );
+      break;
+    }
+    case Cat.FilledRegion: {
+      const p = el.params as FilledRegionParams;
+      const colour = h("input", { type: "color", value: `#${p.color.toString(16).padStart(6, "0")}` });
+      colour.onchange = () => update<FilledRegionParams>("Change region colour", { color: parseInt(colour.value.slice(1), 16) });
+      sec.append(row("Colour", colour), row("Area", formatArea(regionArea(p), units)), editBoundaryButton(ctx, el.id));
+      break;
+    }
+    case Cat.TextNote: {
+      const p = el.params as TextNoteParams;
+      sec.append(
+        row("Text", textInput(p.text, (v) => (v ? update<TextNoteParams>("Edit text", { text: v }) : ctx.status("\u26a0 Text can't be empty")))),
+        row("Text size (paper mm)", h("span", { class: "value" }, String(p.size))),
+      );
+      break;
+    }
+    case Cat.Dimension: {
+      const d = el as Dimension;
+      const values = dimensionLayout(doc, d).values.map((v) => len(v));
+      sec.append(row("Values", values.join(" + ")), row("References", String((d.params as DimensionParams).refs.length)));
       break;
     }
     case Cat.View: {

@@ -25,6 +25,10 @@ export const Cat = {
   WindowType: "WindowType",
   ProjectSettings: "ProjectSettings",
   View: "View",
+  DetailLine: "DetailLine",
+  FilledRegion: "FilledRegion",
+  TextNote: "TextNote",
+  Dimension: "Dimension",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

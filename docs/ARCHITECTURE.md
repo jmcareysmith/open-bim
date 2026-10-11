@@ -73,6 +73,13 @@ Values stay in mm / radians; units only drive `formatLength`/`parseLength` etc. 
 suffixes override the unit ("2.4m"); inputs never round coarser than 1 mm. Older files without
 the element use defaults and get one on demand.
 
+**Annotation** — detail lines, filled regions, text notes and dimensions are view-owned elements
+(`viewId`, cascade with the view) in that view's 2D space; the viewport shows them only in their
+view. Text sizes are paper mm × view scale. Dimensions store references (wall face / centre,
+grid, reference plane, level, or a fixed point) with the pick point; each regeneration projects
+the pick onto the reference's current position, so dimensions are live, and referenced elements are
+dependencies (moving them regenerates the dimension; deleting them deletes it).
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

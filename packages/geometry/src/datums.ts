@@ -7,6 +7,7 @@ import {
   type Grid,
   type HostedParams,
   type ReferencePlane,
+  type Vec2,
   type Wall,
 } from "@open-bim/core";
 
@@ -25,6 +26,8 @@ export interface LineData {
   placement?: "workplane" | "model";
   /** Only drawn in plan views (e.g. door swings). */
   planOnly?: boolean;
+  /** Filled areas (filled regions), as loops with even-odd nesting. */
+  fill?: { loops: Vec2[][]; color: number };
 }
 
 /** Grid head (bubble) radius, mm. ~8 mm on paper at 1:100. */

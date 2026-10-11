@@ -21,6 +21,14 @@ import {
   windowPlacement,
   roofBaseElevation,
   renameGrid,
+  renameView,
+  validateViewRange,
+  views as viewElements,
+  SCALES,
+  type View,
+  type ViewParams,
+  type ViewRangeOffsets,
+  type DetailLevel,
   renameReferencePlane,
   totalThickness,
   wallLength,
@@ -69,8 +77,8 @@ export interface PanelContext {
   setActiveLevel(id: ElementId): void;
   /** Re-sketch a floor or ceiling boundary. */
   editBoundary(id: ElementId): void;
-  viewMode(): "3d" | "plan";
-  setViewMode(mode: "3d" | "plan"): void;
+  activeViewId(): ElementId | undefined;
+  setActiveView(id: ElementId): void;
   status(text: string): void;
 }
 
@@ -135,6 +143,51 @@ function slopeInput(rad: number | null, onCommit: (v: number | null) => void): H
     if (r !== null && r > 0 && r < Math.PI / 2) onCommit(r);
   };
   return input;
+}
+
+/** Properties of a view: identity, graphics and (plans) view range. */
+function viewSection(ctx: PanelContext, view: View): HTMLElement {
+  const { doc } = ctx;
+  const p = view.params;
+  const set = (name: string, patch: Partial<ViewParams>) => edit(ctx, name, (tx) => tx.update<ViewParams>(view.id, patch));
+  const sec = h("div", { class: "section" }, h("h3", {}, p.kind === "floorPlan" ? "Floor Plan" : "3D View"));
+  sec.append(
+    row("View name", textInput(view.name ?? "", (v) => edit(ctx, "Rename view", (tx) => renameView(tx, doc, view.id, v)))),
+    row(
+      "View scale",
+      select(
+        SCALES.map((s) => ({ value: String(s), label: `1 : ${s}` })),
+        String(p.scale),
+        (v) => set("Change view scale", { scale: Number(v) }),
+      ),
+    ),
+    row(
+      "Detail level",
+      select(
+        (["coarse", "medium", "fine"] as const).map((d) => ({ value: d, label: d[0]!.toUpperCase() + d.slice(1) })),
+        p.detailLevel,
+        (v) => set("Change detail level", { detailLevel: v as DetailLevel }),
+      ),
+    ),
+  );
+  if (p.kind === "floorPlan" && p.range && p.levelId) {
+    const range = p.range;
+    const setRange = (key: keyof ViewRangeOffsets, v: number) =>
+      edit(ctx, "Change view range", (tx) => {
+        const next = { ...range, [key]: v };
+        validateViewRange(next);
+        tx.update<ViewParams>(view.id, { range: next });
+      });
+    sec.append(
+      row("Associated level", doc.get(p.levelId)?.name ?? ""),
+      h("h3", {}, "View range (offsets from level)"),
+      row("Top", numberInput(range.top, (v) => setRange("top", v))),
+      row("Cut plane", numberInput(range.cut, (v) => setRange("cut", v))),
+      row("Bottom", numberInput(range.bottom, (v) => setRange("bottom", v))),
+      row("View depth", numberInput(range.depth, (v) => setRange("depth", v))),
+    );
+  }
+  return sec;
 }
 
 /** Project Information and Project Units editors. */
@@ -226,23 +279,29 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
     return div;
   };
 
-  // Views: Revit-style "Floor Plans" per level plus the default 3D view.
-  const views = h("div", { class: "section" }, h("h3", {}, "Views"));
-  const viewItem = (label: string, active: boolean, onClick: () => void) => {
-    const div = h("div", { class: `list-item${active ? " selected" : ""}` }, h("span", {}, label));
-    div.onclick = onClick;
-    return div;
-  };
-  for (const l of levels(doc)) {
-    const active = ctx.viewMode() === "plan" && l.id === ctx.activeLevelId();
-    views.append(
-      viewItem(`Floor Plan: ${l.name ?? l.id}`, active, () => {
-        ctx.setActiveLevel(l.id);
-        ctx.setViewMode("plan");
-      }),
-    );
+  // Views, grouped Revit-style. Floor plans are listed in level order.
+  const viewsSec = h("div", { class: "section" }, h("h3", {}, "Views"));
+  const allViews = viewElements(doc);
+  const levelOrder = new Map(levels(doc).map((l, i) => [l.id, i]));
+  const groups: [string, View[]][] = [
+    [
+      "Floor Plans",
+      allViews
+        .filter((v) => v.params.kind === "floorPlan")
+        .sort((a, b) => (levelOrder.get(a.params.levelId!) ?? 0) - (levelOrder.get(b.params.levelId!) ?? 0)),
+    ],
+    ["3D Views", allViews.filter((v) => v.params.kind === "3d")],
+  ];
+  for (const [title, list] of groups) {
+    if (!list.length) continue;
+    viewsSec.append(h("div", { class: "subhead" }, title));
+    for (const v of list) {
+      const div = h("div", { class: `list-item indent${v.id === ctx.activeViewId() ? " selected" : ""}` }, h("span", {}, v.name ?? v.id));
+      div.onclick = () => ctx.setActiveView(v.id);
+      viewsSec.append(div);
+    }
   }
-  views.append(viewItem("3D View", ctx.viewMode() === "3d", () => ctx.setViewMode("3d")));
+  const views = viewsSec;
 
   const lv = h("div", { class: "section" }, h("h3", {}, "Levels"));
   for (const l of levels(doc)) {
@@ -309,7 +368,9 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
   units = projectUnits(doc);
   const ids = ctx.selection().filter((id) => doc.has(id));
   if (ids.length === 0) {
-    root.replaceChildren(h("div", { class: "empty" }, "Nothing selected"));
+    // Nothing selected: show the active view's properties, as Revit does.
+    const view = ctx.activeViewId() ? doc.get<ViewParams>(ctx.activeViewId()!) : undefined;
+    root.replaceChildren(view ? viewSection(ctx, view as View) : h("div", { class: "empty" }, "Nothing selected"));
     return;
   }
   if (ids.length > 1) {

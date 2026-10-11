@@ -55,4 +55,5 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   clipped 3D view, not true 2D; grids straight only, no bubble toggles, no grip editing (drag ends);
   floors have no "pick walls" / slope arrows; roofs exact only for convex/L/T/U footprints;
   doors/windows are parametric (no families); grids drawn over walls win picks (no Tab-cycling).
-- Next: Phase 2 — view system (views as elements: camera + view range + visibility), then true 2D plans via OCCT HLR.
+- Views are elements (floor plan per level + {3D}); view properties show when nothing is selected.
+- Next: Phase 2 — true 2D floor plans (cut + projection linework, OCCT HLR), then sections/elevations.

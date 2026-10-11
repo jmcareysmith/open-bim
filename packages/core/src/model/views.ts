@@ -2,8 +2,7 @@ import type { Document } from "../document.ts";
 import type { Element, ElementId } from "../element.ts";
 import { Cat, type LevelParams } from "./architecture.ts";
 
-// Minimal view concepts for Phase 1. Phase 2 turns views into elements with their own
-// view range, visibility and detail level.
+// View-related helpers that aren't elements. View elements themselves live in viewdefs.ts.
 
 /** Revit's default floor plan cut plane height above the level, mm. */
 export const PLAN_CUT_HEIGHT = 1200;

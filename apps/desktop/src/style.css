@@ -71,3 +71,5 @@ aside h2 {
 }
 .select-band { position: fixed; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); pointer-events: none; z-index: 10; }
 .select-band.crossing { border-style: dashed; }
+.subhead { color: var(--muted); font-size: 11px; margin: 6px 0 2px; text-transform: uppercase; letter-spacing: 0.04em; }
+.list-item.indent { padding-left: 14px; }

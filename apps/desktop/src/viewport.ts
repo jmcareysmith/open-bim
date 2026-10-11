@@ -65,6 +65,8 @@ export class Viewport {
   private datums = new Set<ElementId>();
   /** Temporary hide/isolate state for this view. */
   readonly visibility = new TemporaryVisibility();
+  /** Categories the active view hides (its Visibility/Graphics settings). */
+  private viewHidden = new Set<string>();
   private workPlaneZ = 0;
   private raycaster = new THREE.Raycaster();
   private grid: THREE.GridHelper;
@@ -169,7 +171,7 @@ export class Viewport {
       return;
     }
     group.userData.elementId = id;
-    group.visible = this.visibility.isVisible(el);
+    group.visible = this.isShown(el);
     this.applyPlanOnly(group);
     this.objects.set(id, group);
     this.scene.add(group);
@@ -225,10 +227,20 @@ export class Viewport {
   }
 
   /** Re-apply temporary hide/isolate after changing `visibility`. */
+  /** Categories hidden by the active view. */
+  setViewHiddenCategories(categories: Iterable<string>): void {
+    this.viewHidden = new Set(categories);
+    this.refreshVisibility();
+  }
+
+  private isShown(el: { id: ElementId; category: string }): boolean {
+    return !this.viewHidden.has(el.category) && this.visibility.isVisible(el);
+  }
+
   refreshVisibility(): void {
     for (const [id, g] of this.objects) {
       const el = this.doc.get(id);
-      g.visible = !!el && this.visibility.isVisible(el);
+      g.visible = !!el && this.isShown(el);
     }
     this.container.classList.toggle("temp-visibility", this.visibility.active);
     this.needsRender = true;

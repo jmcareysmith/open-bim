@@ -109,8 +109,11 @@ tools snap to grid endpoints, intersections and lines.
 ## Desktop app (`apps/desktop`)
 
 - three.js scene; one `THREE.Object3D` per element, keyed by element id.
-- Two views share the scene: 3D (perspective, orbit) and Plan (orthographic, top-down, clipped to
-  the level's `planViewRange` — level to 1200 mm cut plane). Tools work the same in both.
+- Views are `View` elements (core `viewdefs.ts`): kind (floorPlan | 3d), level, Revit view range
+  (top / cut / bottom / depth offsets), scale, detail level, hidden categories. The browser lists
+  them; the active view drives the viewport. With nothing selected, Properties shows the view.
+- Two viewport modes share the scene: 3D (perspective, orbit) and Plan (orthographic, top-down, clipped to
+  the view's range — view depth up to the cut plane). Tools work the same in both.
 - Listens to `doc.on('changed')` and rebuilds only regenerated elements.
 - Tools (wall tool, select tool…) are state machines that turn pointer input into transactions.
 - Select: click, Shift+click, box select (left→right = fully inside, right→left = crossing).

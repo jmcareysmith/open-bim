@@ -3,6 +3,7 @@ import type { ElementId } from "../element.ts";
 import { Cat, createLevel, type LayeredTypeParams } from "./architecture.ts";
 import type { DoorTypeParams, WindowTypeParams } from "./doors.ts";
 import { createProjectSettings } from "./settings.ts";
+import { create3DView, createFloorPlan } from "./viewdefs.ts";
 
 export interface TemplateIds {
   levels: { ground: ElementId; first: ElementId; roof: ElementId };
@@ -21,6 +22,8 @@ export function applyResidentialTemplate(doc: Document): TemplateIds {
     const ground = createLevel(tx, "Ground Floor", 0).id;
     const first = createLevel(tx, "First Floor", 2700).id;
     const roof = createLevel(tx, "Roof", 5400).id;
+    for (const id of [ground, first, roof]) createFloorPlan(tx, doc, id);
+    create3DView(tx, doc);
 
     const wt = (name: string, layers: LayeredTypeParams["layers"]) =>
       tx.create<LayeredTypeParams>(Cat.WallType, { layers }, { name }).id;

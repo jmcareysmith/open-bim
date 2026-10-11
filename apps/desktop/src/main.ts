@@ -5,8 +5,13 @@ import {
   hostedPlacement,
   isWallCutter,
   levels,
-  planViewRange,
+  ensureDefaultViews,
+  floorPlanFor,
   projectSettings,
+  viewRange,
+  views,
+  type View,
+  type ViewParams,
   typeCategoryOf,
   validateHosted,
   type CeilingParams,
@@ -42,6 +47,8 @@ buildSample(doc);
 
 let selection: ElementId[] = [];
 let activeLevelId: ElementId = levels(doc)[0]!.id;
+/** The view shown in the viewport (a View element). Starts on the 3D view. */
+let activeViewId: ElementId | undefined = views(doc).find((v) => v.params.kind === "3d")?.id;
 /** Type selector state: the type each placing tool uses, per type category. */
 const activeTypes = new Map<string, ElementId>();
 /** Type category each placing tool creates. */
@@ -78,6 +85,18 @@ const ctx: ToolContext & PanelContext = {
   },
   setActiveLevel(id) {
     activeLevelId = id;
+    // In a plan, picking another level opens that level's plan.
+    if (activeView()?.params.kind === "floorPlan") {
+      const plan = floorPlanFor(doc, id);
+      if (plan) activeViewId = plan.id;
+    }
+    refreshAll();
+  },
+  activeViewId: () => activeViewId,
+  setActiveView(id) {
+    activeViewId = id;
+    const v = activeView();
+    if (v?.params.levelId) activeLevelId = v.params.levelId;
     refreshAll();
   },
   editBoundary(id) {
@@ -87,11 +106,6 @@ const ctx: ToolContext & PanelContext = {
     setTool(name);
     refreshAll();
     (tools[name] as SketchTool).edit(id);
-  },
-  viewMode: () => viewport.viewMode,
-  setViewMode(mode: ViewMode) {
-    viewport.setViewMode(mode);
-    refreshAll();
   },
   status,
 };
@@ -221,11 +235,14 @@ function afterVisibility(message: string): void {
 
 function loadInto(json: ReturnType<Document["toJSON"]>, path: string | null): void {
   doc.load(json);
+  // Files from before views were elements: give them plans and a 3D view.
+  if (doc.byCategory(Cat.View).length === 0) doc.transact("Create default views", (tx) => ensureDefaultViews(tx, doc));
   filePath = path;
   dirty = false;
   selection = [];
   activeLevelId = levels(doc)[0]?.id ?? "";
   activeTypes.clear();
+  activeViewId = views(doc).find((v) => v.params.kind === "3d")?.id;
   viewport.visibility.reset();
   viewport.refreshVisibility();
   viewport.setSelection([]);
@@ -245,9 +262,36 @@ document.querySelectorAll<HTMLButtonElement>("[data-cmd]").forEach((b) => {
 document.querySelectorAll<HTMLButtonElement>("[data-tool]").forEach((b) => {
   b.onclick = () => setTool(b.dataset.tool!);
 });
+// Toolbar Plan / 3D: jump to the active level's plan, or the first 3D view.
 document.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((b) => {
-  b.onclick = () => ctx.setViewMode(b.dataset.view as ViewMode);
+  b.onclick = () => {
+    const target =
+      (b.dataset.view as ViewMode) === "plan"
+        ? floorPlanFor(doc, activeLevelId)
+        : views(doc).find((v) => v.params.kind === "3d");
+    if (target) ctx.setActiveView(target.id);
+    else status(`\u26a0 No ${b.dataset.view === "plan" ? "floor plan for this level" : "3D view"} in this project`);
+  };
 });
+
+function activeView(): View | undefined {
+  const v = activeViewId ? doc.get<ViewParams>(activeViewId) : undefined;
+  return v as View | undefined;
+}
+
+/** Push the active view's settings (mode, range, hidden categories) into the viewport. */
+function applyView(): void {
+  if (!activeView()) activeViewId = views(doc).find((v) => v.params.kind === "3d")?.id ?? views(doc)[0]?.id;
+  const v = activeView();
+  if (!v) return viewport.setViewMode("3d");
+  if (v.params.kind === "floorPlan") {
+    viewport.setPlanRange(viewRange(doc, v));
+    viewport.setViewMode("plan");
+  } else {
+    viewport.setViewMode("3d");
+  }
+  viewport.setViewHiddenCategories(v.params.hiddenCategories);
+}
 
 window.addEventListener("keydown", (ev) => {
   const target = ev.target as HTMLElement;
@@ -296,8 +340,8 @@ function refreshToolbar(): void {
   const lv = doc.get<LevelParams>(activeLevelId);
   if (lv) {
     viewport.setWorkPlane(lv.params.elevation);
-    viewport.setPlanRange(planViewRange(doc, activeLevelId));
   }
+  applyView();
   document.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((b) => {
     b.classList.toggle("active", b.dataset.view === viewport.viewMode);
   });

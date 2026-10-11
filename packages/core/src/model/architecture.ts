@@ -24,6 +24,7 @@ export const Cat = {
   Window: "Window",
   WindowType: "WindowType",
   ProjectSettings: "ProjectSettings",
+  View: "View",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

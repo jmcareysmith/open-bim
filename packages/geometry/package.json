@@ -1,0 +1,2 @@
+{ "name": "@open-bim/geometry", "version": "0.1.0", "type": "module", "private": true, "exports": { ".": "./src/index.ts" },
+  "dependencies": { "@open-bim/core": "0.1.0", "earcut": "^3.0.2" } }

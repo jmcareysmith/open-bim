@@ -39,7 +39,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 ## Phase 3 — Families & parameters (current)
 - [x] Family editor: reference planes, sketches, extrude/revolve/sweep/blend/void — profiles editable as formula points; no graphical profile editing after creation yet
 - [x] 2D constraint solver (dimensions drive geometry) — PlaneGCS adopted: labelled + EQ dimensions flex reference planes; forms follow planes by name. Sketch-level locks/angles later
-- [ ] Formulas, conditionals, type catalogs, nested/shared families — formulas + conditionals done (expr.ts)
+- [x] Formulas, conditionals, type catalogs, nested/shared families — nested with parameter associations; "shared" nested (scheduled separately) later
 - [ ] Project, shared and global parameters
 - [ ] Family library (doors, windows, furniture) in an open format
 

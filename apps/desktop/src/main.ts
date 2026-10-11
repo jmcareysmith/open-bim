@@ -33,6 +33,9 @@ import {
   familyTypeNames,
   loadFamily,
   enableFamilyFlex,
+  copyFamilyDef,
+  importTypeCatalog,
+  typeCatalogCsv,
   setFamilySolver,
   type FamilyCategory,
   type FamilyDef,
@@ -40,7 +43,7 @@ import {
 import { OcctKernel, SimpleKernel, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
 import gcsWasmUrl from "@salusoft89/planegcs/dist/planegcs_dist/planegcs.wasm?url";
-import { openProject, savePdf, saveProject } from "./io.ts";
+import { openProject, openText, savePdf, saveProject, saveText } from "./io.ts";
 import { renderBrowser, renderProperties, type PanelContext } from "./panels.ts";
 import { buildSample } from "./sample.ts";
 import {
@@ -130,6 +133,36 @@ const ctx: ToolContext & PanelContext = {
     while (familyDefs(doc).some((f) => f.name === `${category} ${n}`)) n++;
     applyFamilyTemplate(fam, category, `${category} ${n}`);
     openFamily(fam);
+  },
+  projectFamilies: () => (projectSession ? familyDefs(projectSession.doc) : []),
+  nestFamily(defId: ElementId) {
+    const s = projectSession;
+    if (!s) return;
+    const def = s.doc.require(defId) as FamilyDef;
+    try {
+      doc.transact(`Load ${def.name} into family`, (tx) => copyFamilyDef(tx, doc, def));
+      status(`${def.name} loaded into this family. Place it with Component (C); associate its parameters in Properties.`);
+    } catch (err) {
+      status(`\u26a0 ${(err as Error).message}`);
+    }
+  },
+  async exportCatalog() {
+    try {
+      const path = await saveText(typeCatalogCsv(doc), `${familyName(doc)}.txt`, { name: "Type catalog", extensions: ["txt", "csv"] });
+      if (path) status(`Type catalog saved to ${path}`);
+    } catch (err) {
+      status(`\u26a0 ${(err as Error).message}`);
+    }
+  },
+  async importCatalog() {
+    try {
+      const text = await openText({ name: "Type catalog", extensions: ["txt", "csv"] });
+      if (!text) return;
+      const types = doc.transact("Import type catalog", (tx) => importTypeCatalog(tx, doc, text));
+      status(`Loaded ${types.length} type(s) from the catalog.`);
+    } catch (err) {
+      status(`\u26a0 ${(err as Error).message}`);
+    }
   },
   editFamily(defId: ElementId) {
     const def = doc.require(defId) as FamilyDef;
@@ -460,7 +493,7 @@ window.addEventListener("keydown", (ev) => {
   if (ev.key.toLowerCase() === "l") return setTool("detailline");
   if (ev.key.toLowerCase() === "t") return setTool("text");
   if (ev.key.toLowerCase() === "m") return setTool("dimension");
-  if (ev.key.toLowerCase() === "c") return setTool(projectSession ? "select" : "component");
+  if (ev.key.toLowerCase() === "c") return setTool("component");
   if (ev.key.toLowerCase() === "f") return run(ev, "fit");
   if (ev.key.toLowerCase() === "h") return run(ev, ev.shiftKey ? "hideCategory" : "hide");
   if (ev.key.toLowerCase() === "i") return run(ev, ev.shiftKey ? "isolateCategory" : "isolate");

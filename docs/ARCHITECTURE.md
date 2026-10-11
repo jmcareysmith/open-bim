@@ -125,6 +125,12 @@ puts the outer planes' midpoint on the middle one. `enableFamilyFlex` runs the s
 back. Named planes are formula variables (x of vertical planes, y of horizontal), and
 `familyValues` re-solves per type, so instances of every type get their own plane positions.
 
+**Type catalogs & nesting** — `typeCatalogCsv` / `importTypeCatalog` read and write Revit-style
+catalogs (`Name##length##millimeters` headers, unit conversion). Families can contain FamilyDefs and
+FamilyInstances of other families; a nested instance's `associations` map its parameters to
+formulas over the host's, evaluated per host type (`instanceValues(doc, inst, hostValues)`), and
+`familyMesh` includes nested instance meshes.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

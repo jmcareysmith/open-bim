@@ -1,4 +1,5 @@
 import {
+  Cat,
   familyDocument,
   instanceValues,
   wallDirection,
@@ -70,9 +71,17 @@ export function placeMeshData(m: MeshData, pl: Placement): MeshData {
   return { positions, normals, indices: m.indices };
 }
 
-export function buildFamilyInstance(doc: Document, el: Element, mesher: FamilyMesher): MeshData | null {
+/** An instance's mesh in `doc`'s coordinates. `hostValues`: when `doc` is a family, its values. */
+export function buildFamilyInstance(doc: Document, el: Element, mesher: FamilyMesher, hostValues?: Values): MeshData | null {
   const inst = el as FamilyInstance;
   const def = doc.require(inst.params.familyId) as FamilyDef;
-  const local = familyMeshCached(def, instanceValues(doc, inst), mesher);
+  const local = familyMeshCached(def, instanceValues(doc, inst, hostValues), mesher);
   return local ? placeMeshData(local, instancePlacement(doc, inst)) : null;
+}
+
+/** Meshes of the family instances nested in a family document, for the host's values. */
+export function nestedMeshes(familyDoc: Document, values: Values, mesher: FamilyMesher): MeshData[] {
+  return familyDoc
+    .byCategory(Cat.FamilyInstance)
+    .flatMap((inst) => buildFamilyInstance(familyDoc, inst, mesher, values) ?? []);
 }

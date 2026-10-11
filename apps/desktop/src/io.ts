@@ -58,3 +58,35 @@ export async function savePdf(bytes: Uint8Array, defaultName: string): Promise<s
   URL.revokeObjectURL(url);
   return defaultName;
 }
+
+/** Save a text file (e.g. a type catalog). */
+export async function saveText(text: string, defaultName: string, filter: { name: string; extensions: string[] }): Promise<string | null> {
+  if (isTauri()) {
+    const { save } = await import("@tauri-apps/plugin-dialog");
+    const { writeTextFile } = await import("@tauri-apps/plugin-fs");
+    const path = await save({ filters: [filter], defaultPath: defaultName });
+    if (!path) return null;
+    await writeTextFile(path, text);
+    return path;
+  }
+  const url = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: defaultName });
+  a.click();
+  URL.revokeObjectURL(url);
+  return defaultName;
+}
+
+/** Pick and read a text file. */
+export async function openText(filter: { name: string; extensions: string[] }): Promise<string | null> {
+  if (isTauri()) {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const { readTextFile } = await import("@tauri-apps/plugin-fs");
+    const path = await open({ filters: [filter], multiple: false, directory: false });
+    return path ? readTextFile(path) : null;
+  }
+  return new Promise((resolve) => {
+    const input = Object.assign(document.createElement("input"), { type: "file", accept: filter.extensions.map((e) => `.${e}`).join(",") });
+    input.onchange = async () => resolve(input.files?.[0] ? await input.files[0].text() : null);
+    input.click();
+  });
+}

@@ -1,7 +1,7 @@
 import { registerCategory } from "../categories.ts";
 import { Document, type DocumentJSON, type Transaction } from "../document.ts";
 import type { Element, ElementId, ParamValue, Vec2 } from "../element.ts";
-import type { Values } from "../expr.ts";
+import { evaluate, type Values } from "../expr.ts";
 import { Cat, type LevelParams, type WallParams } from "./architecture.ts";
 import { familyInfo, familyValues, type FamilyCategory, type FamilyHosting } from "./family.ts";
 import { registerWallCutter, validateHosted, type HostedParams } from "./openings.ts";
@@ -33,6 +33,11 @@ export type FamilyInstanceParams = {
   sillHeight: number;
   /** Hosted only: flip to the wall's other face. */
   flipped: boolean;
+  /**
+   * Nested in a family: formulas over the host family's parameters driving this instance's
+   * parameters (Revit's "associate family parameter"), e.g. { Height: "Height - 30" }.
+   */
+  associations?: Record<string, string> | null;
 };
 export type FamilyInstance = Element<FamilyInstanceParams>;
 
@@ -98,10 +103,30 @@ export function loadFamily(tx: Transaction, project: Document, family: Document,
   return tx.create<FamilyDefParams>(Cat.FamilyDef, params, { name });
 }
 
-/** Parameter values of an instance: its type's, then its overrides, then formulas. */
-export function instanceValues(doc: Document, inst: FamilyInstance): Values {
+/**
+ * Parameter values of an instance: its type's, then its overrides, then (nested in a family) its
+ * associations evaluated against the host's values — `hostValues`, or the host family's current type.
+ */
+export function instanceValues(doc: Document, inst: FamilyInstance, hostValues?: Values): Values {
   const def = doc.require<FamilyDefParams>(inst.params.familyId) as FamilyDef;
-  return familyValues(familyDocument(def), inst.params.typeName, inst.params.overrides);
+  const overrides = { ...inst.params.overrides };
+  const assoc = inst.params.associations;
+  if (assoc && Object.keys(assoc).length) {
+    const host = hostValues ?? (familyInfo(doc) ? familyValues(doc) : {});
+    for (const [name, formula] of Object.entries(assoc)) {
+      try {
+        overrides[name] = evaluate(formula, host);
+      } catch (err) {
+        throw new Error(`Nested ${def.name} ${name}: ${(err as Error).message}`);
+      }
+    }
+  }
+  return familyValues(familyDocument(def), inst.params.typeName, overrides);
+}
+
+/** Copy a loaded family from one document into another (e.g. a project family into a family, to nest it). */
+export function copyFamilyDef(tx: Transaction, target: Document, def: FamilyDef): FamilyDef {
+  return loadFamily(tx, target, familyDocument(def), def.name ?? "Family");
 }
 
 /** Cut a hosted family makes in its wall: Width × Height from its parameters. */

@@ -15,7 +15,7 @@ import {
 } from "@open-bim/core";
 import { mergeMeshes } from "./doors.ts";
 import { formMesh } from "./forms.ts";
-import { buildFamilyInstance } from "./components.ts";
+import { buildFamilyInstance, nestedMeshes } from "./components.ts";
 import type { LineData } from "./datums.ts";
 import { joinedWallFootprint } from "./joins.ts";
 import { SimpleKernel, type GeometryKernel } from "./kernel.ts";
@@ -65,10 +65,10 @@ export class OcctKernel implements GeometryKernel {
     const forms = familyDoc.all().filter((e) => isFormCategory(e.category));
     const solids = forms.filter((f) => !(f.params as { isVoid?: boolean }).isVoid).map((f) => formMesh(f, values));
     const voids = forms.filter((f) => (f.params as { isVoid?: boolean }).isVoid).map((f) => formMesh(f, values));
-    if (!solids.length) return null;
-    if (!voids.length) return this.simple.familyMesh(familyDoc, values);
-    const parts = solids.map((s) => this.cutMeshes(s, voids));
-    return mergeMeshes(parts);
+    const nested = nestedMeshes(familyDoc, values, (fd, v) => this.familyMesh(fd, v));
+    if (!solids.length && !nested.length) return null;
+    if (!voids.length) return mergeMeshes([...solids, ...nested]);
+    return mergeMeshes([...solids.map((s) => this.cutMeshes(s, voids)), ...nested]);
   }
 
   /** Boolean difference of closed triangle meshes (each sewn into an OCCT solid first). */

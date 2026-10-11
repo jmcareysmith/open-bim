@@ -58,5 +58,6 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Component tool (C) places them (free-standing, or in walls for Door/Window families).
 - Family constraints: label a dimension between reference planes with a parameter, or set EQ;
   planes flex (PlaneGCS) on every edit; forms use plane names in formulas (e.g. x = Left).
-- Next: Phase 3 — type catalogs / nested + shared families, then project/shared/global
-  parameters, then the family library.
+- Type catalogs (import/export CSV in Family Types); nested families (Load from project → Component,
+  associate parameters with host formulas).
+- Next: Phase 3 — project/shared/global parameters, then the family library.

@@ -18,7 +18,7 @@ import { joinedWallFootprint } from "./joins.ts";
 import { buildRoof } from "./roof.ts";
 import { buildForm, formMesh } from "./forms.ts";
 import { mergeMeshes } from "./doors.ts";
-import { buildFamilyInstance } from "./components.ts";
+import { buildFamilyInstance, nestedMeshes } from "./components.ts";
 import { buildViewMarker } from "./sections.ts";
 import { buildAnnotationLines } from "./annotations.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
@@ -126,6 +126,7 @@ export class SimpleKernel implements GeometryKernel {
       .all()
       .filter((e) => isFormCategory(e.category) && !(e.params as { isVoid?: boolean }).isVoid)
       .map((e) => formMesh(e, values));
-    return solids.length ? mergeMeshes(solids) : null;
+    const parts = [...solids, ...nestedMeshes(familyDoc, values, (fd, v) => this.familyMesh(fd, v))];
+    return parts.length ? mergeMeshes(parts) : null;
   }
 }

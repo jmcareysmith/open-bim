@@ -34,6 +34,7 @@ import {
   familyParameters,
   familyTypeNames,
   familyValues,
+  instanceValues,
   isFormCategory,
   setFamilyValue,
   type FamilyCategory,
@@ -135,6 +136,11 @@ export interface PanelContext {
   newFamily(category: FamilyCategory): void;
   /** Open a loaded family in the family editor. */
   editFamily(defId: ElementId): void;
+  /** Family editor: the project's loaded families, and copying one in to nest it. */
+  projectFamilies(): FamilyDef[];
+  nestFamily(defId: ElementId): void;
+  exportCatalog(): void;
+  importCatalog(): void;
 }
 
 /** Run an edit, surfacing validation errors in the status bar instead of throwing. */
@@ -380,6 +386,11 @@ function familyTypesSection(ctx: PanelContext): HTMLElement {
       ),
     ),
   );
+  const exportCat = h("button", { textContent: "Export type catalog" });
+  exportCat.onclick = () => ctx.exportCatalog();
+  const importCat = h("button", { textContent: "Import type catalog" });
+  importCat.onclick = () => ctx.importCatalog();
+  sec.append(row("", h("div", { class: "buttons" }, importCat, exportCat)));
   const newType = h("button", { textContent: "New type" });
   newType.onclick = () =>
     edit(ctx, "New family type", (tx) => {
@@ -456,8 +467,27 @@ function instanceRows(ctx: PanelContext, inst: FamilyInstance): HTMLElement[] {
       ),
     );
   }
-  // Instance parameters: overrides of the type's value.
+  // Nested in a family: associate the nested family's parameters with the host's (formulas).
   const fam = familyDocument(def);
+  if (familyInfo(doc)) {
+    rows.push(h("h3", {}, "Associate with host parameters (formulas)"));
+    for (const fp of familyParameters(fam).filter((x) => !x.params.formula)) {
+      const name = fp.name ?? "";
+      const current = p.associations?.[name] ?? "";
+      const input = h("input", { type: "text", value: current, placeholder: "e.g. Height - 30" });
+      input.onchange = () => {
+        const next = { ...(p.associations ?? {}) };
+        if (input.value.trim()) next[name] = input.value.trim();
+        else delete next[name];
+        edit(ctx, `Associate ${name}`, (tx) => {
+          tx.update<FamilyInstanceParams>(inst.id, { associations: next });
+          instanceValues(doc, doc.require(inst.id) as FamilyInstance); // reject bad formulas
+        });
+      };
+      rows.push(row(name, input));
+    }
+  }
+  // Instance parameters: overrides of the type's value.
   const instParams = familyParameters(fam).filter((fp) => fp.params.instance && !fp.params.formula);
   if (instParams.length) {
     rows.push(h("h3", {}, "Instance parameters"));
@@ -488,9 +518,25 @@ function renderFamilyBrowser(root: HTMLElement, ctx: PanelContext): void {
     forms.append(div);
   }
   if (!forms.children[1]) forms.append(h("div", { class: "empty" }, "No forms yet: use Extrusion, Blend, Revolve or Sweep."));
+  // Nested families: copied from the project, placed with Component.
+  const nested = h("div", { class: "section" }, h("h3", {}, "Nested families"));
+  for (const f of familyDefs(doc)) {
+    const div = h("div", { class: `list-item${sel.has(f.id) ? " selected" : ""}` }, h("span", {}, f.name ?? f.id));
+    div.onclick = () => ctx.setSelection([f.id]);
+    nested.append(div);
+  }
+  const fromProject = ctx.projectFamilies().filter((f) => !familyDefs(doc).some((d) => d.name === f.name));
+  if (fromProject.length) {
+    nested.append(
+      row(
+        "Load from project",
+        select([{ value: "", label: "Choose\u2026" }, ...fromProject.map((f) => ({ value: f.id, label: f.name ?? f.id }))], "", (v) => v && ctx.nestFamily(v)),
+      ),
+    );
+  }
   const info = familyInfo(doc)!;
   const summary = h("div", { class: "section" }, h("h3", {}, "Family"), row("Name", info.name ?? ""), row("Types", String(info.params.types.length)));
-  root.replaceChildren(summary, viewsSec, forms);
+  root.replaceChildren(summary, viewsSec, forms, nested);
 }
 
 /** Sheet properties: title block fields, paper size, placing views. */

@@ -52,7 +52,6 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   don't attach to floors/roofs; grids straight only, no grip editing (no drag-to-edit anywhere yet);
   floors lack pick-walls/slope arrows; roofs exact for convex/L/T/U only; doors/windows parametric;
   dimensions only in plans via the tool; no 3D view camera saved per view; viewport (interactive)
-  and sheet/PDF drawing paths are separate (fold the viewport onto `viewDrawing` later); edges of
-  internal triangulation are hidden but walls joined at corners show a seam line in 3D.
+  and sheet/PDF drawing paths are separate (fold the viewport onto `viewDrawing` later).
 - Next: Phase 3 — family editor (reference planes, sketches, extrude/revolve/sweep/blend/void), then
   the 2D constraint solver (evaluate PlaneGCS).

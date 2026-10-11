@@ -16,15 +16,15 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [ ] App icon + CI (GitHub Actions: tests + build)
 
 ## Phase 1 — Architectural modelling (current)
-- Wall drawing tool (click-click in plan/3D work plane), snapping, ortho
-- Wall joins (L, T, X) with mitred layers
-- Grids, reference planes
-- Floors and ceilings from sketch boundary (polygon with holes)
-- Roofs by footprint with per-edge slope
-- OpenCascade (opencascade.js) kernel: booleans for openings
-- Doors and windows hosted in walls, cutting openings
-- Selection, properties panel, type selector, temporary hide/isolate
-- Project units & settings
+- [ ] Wall drawing tool (click-click in plan/3D work plane), snapping, ortho — 3D work plane done; plan needs 2D views
+- [x] Wall joins (L, T, X) — whole-wall mitres; per-layer cleanup comes with layered geometry
+- [ ] Grids, reference planes
+- [ ] Floors and ceilings from sketch boundary (polygon with holes)
+- [ ] Roofs by footprint with per-edge slope
+- [ ] OpenCascade (opencascade.js) kernel: booleans for openings
+- [ ] Doors and windows hosted in walls, cutting openings
+- [ ] Selection, properties panel, type selector, temporary hide/isolate
+- [ ] Project units & settings
 
 ## Phase 2 — Views & drawing production
 - View system: each view = camera + view range + visibility rules + detail level

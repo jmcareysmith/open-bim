@@ -33,6 +33,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Phase 0 done except CI green (runs on Windows via `npm run tauri dev`).
 - Working: levels, wall/floor types with layers, walls, floors, undo/redo, regeneration,
   3D viewport (middle = pan, right = orbit, wheel = zoom), wall tool (W) with grid/ortho/endpoint snap,
-  select + delete, properties panel, project browser, save/open `.obim`.
-- Known gaps: walls overlap at corners (no joins yet); no 2D views.
-- Next: Phase 1 — wall joins, then grids, then floor sketch tool, then OpenCascade kernel + doors/windows.
+  select + delete, properties panel, project browser, save/open `.obim`,
+  automatic wall joins (L/T/X mitres, tee stems stop at face; `core/model/joins.ts`, `geometry/src/joins.ts`).
+- Known gaps: joins are whole-wall (no per-layer cleanup); no "disallow join"; walls crossing
+  mid-span overlap; very acute mitres are squared off; no wall attach top/base; no 2D views.
+- Next: Phase 1 — grids, then floor sketch tool, then OpenCascade kernel + doors/windows.

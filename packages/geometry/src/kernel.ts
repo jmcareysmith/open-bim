@@ -2,13 +2,13 @@ import {
   Cat,
   floorExtent,
   wallExtent,
-  wallThickness,
   type Document,
   type Element,
   type Floor,
   type Vec2,
   type Wall,
 } from "@open-bim/core";
+import { joinedWallFootprint } from "./joins.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
 
 /**
@@ -23,7 +23,7 @@ export interface GeometryKernel {
 
 type Builder = (doc: Document, el: Element) => MeshData | null;
 
-/** Plan footprint of a straight wall: rectangle around its location line. */
+/** Plan footprint of a straight, unjoined wall: rectangle around its location line. */
 export function wallFootprint(start: Vec2, end: Vec2, thickness: number): Vec2[] {
   const dx = end.x - start.x;
   const dy = end.y - start.y;
@@ -44,8 +44,7 @@ export function buildWall(doc: Document, el: Element): MeshData | null {
   const wall = el as Wall;
   const { bottom, top } = wallExtent(doc, wall);
   if (top <= bottom) return null;
-  const fp = wallFootprint(wall.params.start, wall.params.end, wallThickness(doc, wall));
-  return extrudePolygon(fp, [], bottom, top);
+  return extrudePolygon(joinedWallFootprint(doc, wall), [], bottom, top);
 }
 
 export function buildFloor(doc: Document, el: Element): MeshData | null {

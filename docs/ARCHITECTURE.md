@@ -44,6 +44,18 @@ an exception rolls back. Undo/redo replays snapshots. Nothing edits the store di
 declared by each category (e.g. a Wall depends on its base level, top level and type).
 The viewport rebuilds geometry only for the `regenerate` set.
 
+Some relationships are spatial rather than stored references — e.g. walls whose ends meet.
+A category can declare `related(doc, el)`; regeneration adds one hop of related elements,
+evaluated on both the old and new state of each change (so a wall moved away from a corner
+still regenerates the wall it left). Related elements never cascade deletes.
+
+**Wall joins** — derived from geometry, not stored (Revit's default auto-join). `wallJoins()`
+in core classifies each wall end: *corner* (other wall ends within 1 mm: two = L, three or
+more = T/X junction) or *tee* (end lies within another wall's thickness, clear of its ends).
+Walls only join if they overlap vertically. `joinedWallFootprint()` in geometry mitres L
+corners, stops tee stems at the through wall's face, and splits multi-wall junctions into
+wedges; neighbours compute identical cut points so footprints tile with no overlap.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

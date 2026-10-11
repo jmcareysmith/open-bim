@@ -308,6 +308,16 @@ export class Document {
       regen.add(id);
       for (const d of reverse.get(id) ?? []) queue.push(d);
     }
+    // One hop of spatial relations (wall joins), from both the old and new state of each element,
+    // so a wall that moved away from a join still regenerates the wall it left.
+    const related = new Set<ElementId>();
+    const addRelated = (el: Element | undefined) => {
+      if (!el) return;
+      for (const r of getCategory(el.category).related?.(this, el) ?? []) related.add(r);
+    };
+    for (const c of changes) addRelated(c.before);
+    for (const id of regen) addRelated(this.elements.get(id));
+    for (const id of related) regen.add(id);
     const regenerate = [...regen].filter((id) => this.elements.has(id));
 
     const set: ChangeSet = { name, added, modified, removed, regenerate };

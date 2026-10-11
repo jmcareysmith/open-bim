@@ -1,6 +1,7 @@
 import { registerCategory } from "../categories.ts";
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
+import { relatedWalls } from "./joins.ts";
 
 // ---- categories ----------------------------------------------------------
 
@@ -117,6 +118,7 @@ registerCategory({
     const p = el.params as WallParams;
     return [p.baseLevelId, ...(p.topLevelId ? [p.topLevelId] : []), ...typeDeps(el)];
   },
+  related: (doc, el) => relatedWalls(doc, el as Wall),
   cascadeDelete: true,
   isType: false,
 });

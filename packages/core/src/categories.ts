@@ -1,3 +1,4 @@
+import type { Document } from "./document.ts";
 import type { Element, ElementId } from "./element.ts";
 
 /**
@@ -8,6 +9,13 @@ export interface CategoryDef {
   readonly name: string;
   /** Elements this element depends on. If any of them change, this element regenerates. */
   dependencies(el: Element): ElementId[];
+  /**
+   * Elements whose geometry depends on this one through spatial relationships rather than
+   * stored references (e.g. walls joined at a corner). Regeneration only — unlike dependencies,
+   * these never cascade deletes. `el` may be a pre-change snapshot no longer in `doc`,
+   * so implementations must tolerate missing levels/types.
+   */
+  related?(doc: Document, el: Element): ElementId[];
   /**
    * If true, deleting a dependency deletes this element too
    * (Revit: deleting a level deletes walls on it).

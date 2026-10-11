@@ -34,6 +34,12 @@ import {
   loadFamily,
   enableFamilyFlex,
   copyFamilyDef,
+  enableGlobalParameters,
+  parseSharedParameters,
+  createProjectParameter,
+  shareProjectParameters,
+  writeSharedParameters,
+  projectParameters,
   importTypeCatalog,
   typeCatalogCsv,
   setFamilySolver,
@@ -73,6 +79,8 @@ const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)
 /** The document being edited: the project, or a family open in the family editor. */
 let doc = new Document();
 buildSample(doc);
+// Global parameters drive element values inside every transaction of the project.
+enableGlobalParameters(doc);
 /** While a family is open, the project's state to return to. */
 let projectSession: Session | null = null;
 interface Session {
@@ -142,6 +150,34 @@ const ctx: ToolContext & PanelContext = {
     try {
       doc.transact(`Load ${def.name} into family`, (tx) => copyFamilyDef(tx, doc, def));
       status(`${def.name} loaded into this family. Place it with Component (C); associate its parameters in Properties.`);
+    } catch (err) {
+      status(`\u26a0 ${(err as Error).message}`);
+    }
+  },
+  async importSharedParameters() {
+    try {
+      const text = await openText({ name: "Shared parameters", extensions: ["txt"] });
+      if (!text) return;
+      const defs = parseSharedParameters(text);
+      const have = new Set(projectParameters(doc).map((p) => p.params.guid));
+      const fresh = defs.filter((d) => !have.has(d.guid));
+      doc.transact("Add shared parameters", (tx) => {
+        for (const d of fresh) {
+          let name = d.name;
+          for (let i = 2; projectParameters(doc).some((p) => p.name === name); i++) name = `${d.name} (${i})`;
+          createProjectParameter(tx, doc, name, { dataType: d.dataType, guid: d.guid, group: d.group });
+        }
+      });
+      status(`Added ${fresh.length} shared parameter(s). Tick their categories in Properties.`);
+    } catch (err) {
+      status(`\u26a0 ${(err as Error).message}`);
+    }
+  },
+  async exportSharedParameters() {
+    try {
+      const defs = doc.transact("Share project parameters", (tx) => shareProjectParameters(tx, doc));
+      const path = await saveText(writeSharedParameters(defs), "Shared Parameters.txt", { name: "Shared parameters", extensions: ["txt"] });
+      if (path) status(`Shared parameter file saved to ${path}`);
     } catch (err) {
       status(`\u26a0 ${(err as Error).message}`);
     }

@@ -3,6 +3,7 @@ import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, ParamValue } from "../element.ts";
 import { Cat } from "./architecture.ts";
 import type { DetailLevel, ViewParams } from "./viewdefs.ts";
+import { customValue } from "./parameters.ts";
 
 // Visibility/Graphics: per-view category visibility and overrides, rule-based filters, and view
 // templates that several views share (Revit V/G, Filters, View Templates).
@@ -104,7 +105,7 @@ function fieldValue(doc: Document, el: Element, field: string): string | number 
   if (field === "name") return el.name ?? "";
   if (field === "category") return el.category;
   if (field === "type") return el.typeId ? (doc.get(el.typeId)?.name ?? "") : "";
-  const v: ParamValue | undefined = (el.params as Record<string, ParamValue>)[field];
+  const v: ParamValue | undefined = (el.params as Record<string, ParamValue>)[field] ?? customValue(doc, el, field);
   if (typeof v === "number") return v;
   if (typeof v === "string") {
     // References (levels, hosts…) also match by the referenced element's name.

@@ -60,4 +60,6 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   planes flex (PlaneGCS) on every edit; forms use plane names in formulas (e.g. x = Left).
 - Type catalogs (import/export CSV in Family Types); nested families (Load from project → Component,
   associate parameters with host formulas).
-- Next: Phase 3 — project/shared/global parameters, then the family library.
+- Parameters: project parameters (per category, instance/type), shared parameter files, global
+  parameters driving element values (browser → Parameters; element properties).
+- Next: Phase 3 — family library (doors, windows, furniture) in an open format (last Phase 3 item).

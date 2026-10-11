@@ -73,7 +73,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Formulas & conditionals in parameters | 3 | ✅ |
 | Nested & shared families | 3 | 🟨 |
 | Type catalogs | 3 | ✅ |
-| Shared parameters, project parameters, global parameters | 3 | ⬜ |
+| Shared parameters, project parameters, global parameters | 3 | ✅ |
 | Family visibility (detail level, view direction) | 3 | ⬜ |
 
 ## 7. Views

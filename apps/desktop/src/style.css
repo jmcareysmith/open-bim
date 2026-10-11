@@ -96,3 +96,4 @@ textarea.points { width: 100%; min-height: 70px; font: 12px/1.35 ui-monospace, C
 .param { display: grid; grid-template-columns: 1fr 70px 1fr auto auto; gap: 4px; align-items: center; margin: 3px 0; }
 .param > span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
 input.invalid { outline: 1px solid var(--danger); }
+.buttons.wrap { flex-wrap: wrap; margin-top: 4px; }

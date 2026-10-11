@@ -68,6 +68,8 @@ const COLORS: Record<string, number> = {
 };
 const SELECTED = 0x3d8bfd;
 const VOID_COLOR = 0xff8c1a;
+/** Large surfaces that lose picks to line work drawn over them. */
+const BACKGROUND_CATEGORIES = new Set<string>([Cat.Floor, Cat.Ceiling, Cat.Roof, Cat.FilledRegion]);
 /** Halftone fades colours towards the (white) background. */
 const HALFTONE_TOWARD = 0xffffff;
 /** Backgrounds: white for plans, sections, elevations (Revit default); very light grey for 3D. */
@@ -366,13 +368,23 @@ export class Viewport {
     const meshes = [...this.objects.entries()]
       .filter(([id, g]) => g.visible && (!filter || filter(id)))
       .map(([, g]) => g.children[0]!);
+    // Lines are picked with a few pixels' tolerance, so a grid along a wall would always win. Prefer
+    // solids actually under the cursor, then line work, then big background surfaces.
+    const rank = (o: THREE.Object3D, id: ElementId) => {
+      if (!(o instanceof THREE.Mesh)) return 1;
+      return BACKGROUND_CATEGORIES.has(this.doc.get(id)?.category ?? "") ? 2 : 0;
+    };
+    let best: { id: ElementId; point: Vec2; rank: number } | null = null;
     for (const hit of this.raycaster.intersectObjects(meshes, false)) {
       // Respect plan clipping: ignore hits on geometry that isn't drawn.
       if (this.renderer.clippingPlanes.some((pl) => pl.distanceToPoint(hit.point) < 0)) continue;
       const id = hit.object.parent?.userData.elementId as ElementId | undefined;
-      if (id) return { id, point: { x: hit.point.x, y: hit.point.y } };
+      if (!id) continue;
+      const r = rank(hit.object, id);
+      if (!best || r < best.rank) best = { id, point: { x: hit.point.x, y: hit.point.y }, rank: r };
+      if (r === 0) break; // hits are nearest-first
     }
-    return null;
+    return best && { id: best.id, point: best.point };
   }
 
   /** Re-apply temporary hide/isolate after changing `visibility`. */

@@ -25,6 +25,19 @@ import {
   validateViewRange,
   dimensionLayout,
   flipWall,
+  associateGlobal,
+  createGlobalParameter,
+  createProjectParameter,
+  customValue,
+  globalAssociations,
+  globalParameters,
+  globalValues,
+  parametersFor,
+  projectParameters,
+  setCustomValue,
+  type GlobalParameterParams,
+  type ParamDataType,
+  type ProjectParameterParams,
   createFamilyParameter,
   createFamilyType,
   evaluate,
@@ -141,6 +154,8 @@ export interface PanelContext {
   nestFamily(defId: ElementId): void;
   exportCatalog(): void;
   importCatalog(): void;
+  importSharedParameters(): void;
+  exportSharedParameters(): void;
 }
 
 /** Run an edit, surfacing validation errors in the status bar instead of throwing. */
@@ -537,6 +552,51 @@ function renderFamilyBrowser(root: HTMLElement, ctx: PanelContext): void {
   const info = familyInfo(doc)!;
   const summary = h("div", { class: "section" }, h("h3", {}, "Family"), row("Name", info.name ?? ""), row("Types", String(info.params.types.length)));
   root.replaceChildren(summary, viewsSec, forms, nested);
+}
+
+/** Project parameter values and global-parameter associations for an element. */
+function parameterSections(ctx: PanelContext, el: Element): HTMLElement[] {
+  const { doc } = ctx;
+  const out: HTMLElement[] = [];
+  const ps = parametersFor(doc, el.category);
+  if (ps.length) {
+    const sec = h("div", { class: "section" }, h("h3", {}, "Project parameters"));
+    for (const p of ps) {
+      const name = p.name ?? "";
+      const v = customValue(doc, el, name);
+      const set = (val: string | number | boolean) => edit(ctx, `Set ${name}`, (tx) => setCustomValue(tx, doc, el, name, val));
+      let control: HTMLElement;
+      if (p.params.dataType === "yesno") {
+        const cb = h("input", { type: "checkbox", checked: v === true });
+        cb.onchange = () => set(cb.checked);
+        control = cb;
+      } else if (p.params.dataType === "length") {
+        control = numberInput(typeof v === "number" ? v : 0, (n) => set(n));
+      } else {
+        control = textInput(v === undefined ? "" : String(v), (t) => set(t));
+      }
+      sec.append(row(`${name}${p.params.binding === "type" ? " (type)" : ""}`, control));
+    }
+    out.push(sec);
+  }
+  const globals = globalParameters(doc);
+  const numeric = Object.entries(el.params).filter(([, v]) => typeof v === "number").map(([k]) => k);
+  if (globals.length && numeric.length && !familyInfo(doc)) {
+    const sec = h("div", { class: "section" }, h("h3", {}, "Driven by global parameters"));
+    const assoc = globalAssociations(el);
+    for (const key of numeric) {
+      sec.append(
+        row(
+          key,
+          select([{ value: "", label: "\u2014" }, ...globals.map((g) => ({ value: g.name ?? "", label: g.name ?? "" }))], assoc[key] ?? "", (v) =>
+            edit(ctx, `Associate ${key}`, (tx) => associateGlobal(tx, doc, el.id, key, v || null)),
+          ),
+        ),
+      );
+    }
+    out.push(sec);
+  }
+  return out;
 }
 
 /** Sheet properties: title block fields, paper size, placing views. */
@@ -1007,7 +1067,57 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
     ),
   );
 
-  root.replaceChildren(project, views, sheetsSec, fams, lv, types, mats, vg, counts);
+  // Project, shared and global parameters.
+  const paramsSec = h("div", { class: "section" }, h("h3", {}, "Parameters"));
+  for (const p of projectParameters(doc)) {
+    const div = h(
+      "div",
+      { class: `list-item${sel.has(p.id) ? " selected" : ""}` },
+      h("span", {}, p.name ?? p.id),
+      h("span", { class: "muted" }, p.params.guid ? "shared" : "project"),
+    );
+    div.onclick = () => ctx.setSelection([p.id]);
+    paramsSec.append(div);
+  }
+  for (const g of globalParameters(doc)) {
+    const v = (() => {
+      try {
+        return len(globalValues(doc)[g.name ?? ""] ?? 0);
+      } catch {
+        return "error";
+      }
+    })();
+    const div = h("div", { class: `list-item${sel.has(g.id) ? " selected" : ""}` }, h("span", {}, `\u2295 ${g.name}`), h("span", { class: "muted" }, v));
+    div.onclick = () => ctx.setSelection([g.id]);
+    paramsSec.append(div);
+  }
+  const uniq = (base: string, taken: (n: string) => boolean) => {
+    let n = 1;
+    while (taken(`${base} ${n}`)) n++;
+    return `${base} ${n}`;
+  };
+  const newProj = h("button", { textContent: "New project parameter" });
+  newProj.onclick = () =>
+    edit(ctx, "New project parameter", (tx) => {
+      const p = createProjectParameter(tx, doc, uniq("Parameter", (n) => projectParameters(doc).some((x) => x.name === n)), { categories: [Cat.Wall] });
+      queueMicrotask(() => ctx.setSelection([p.id]));
+    });
+  const newGlobal = h("button", { textContent: "New global parameter" });
+  newGlobal.onclick = () =>
+    edit(ctx, "New global parameter", (tx) => {
+      const g = createGlobalParameter(tx, doc, uniq("Global", (n) => globalParameters(doc).some((x) => x.name === n)), { value: 2400 });
+      queueMicrotask(() => ctx.setSelection([g.id]));
+    });
+  const imp = h("button", { textContent: "Import shared" });
+  imp.onclick = () => ctx.importSharedParameters();
+  const exp = h("button", { textContent: "Export shared" });
+  exp.onclick = () => ctx.exportSharedParameters();
+  paramsSec.append(
+    h("div", { class: "buttons wrap" }, newProj, newGlobal),
+    h("div", { class: "buttons wrap" }, imp, exp),
+  );
+
+  root.replaceChildren(project, views, sheetsSec, fams, paramsSec, lv, types, mats, vg, counts);
 }
 
 // ---- Properties -----------------------------------------------------------
@@ -1180,6 +1290,63 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("", open),
         row("Centre X (paper mm)", numberInput(p.centre.x, (val) => setCentre("x", val))),
         row("Centre Y (paper mm)", numberInput(p.centre.y, (val) => setCentre("y", val))),
+      );
+      break;
+    }
+    case Cat.ProjectParameter: {
+      const p = el.params as ProjectParameterParams;
+      const set = (name: string, patch: Partial<ProjectParameterParams>) => update<ProjectParameterParams>(name, patch);
+      sec.append(
+        row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename parameter", (tx) => tx.setName(el.id, v || undefined)))),
+        row(
+          "Data type",
+          select(
+            (["text", "length", "number", "area", "yesno"] as const).map((t) => ({ value: t, label: t === "yesno" ? "Yes/No" : t[0]!.toUpperCase() + t.slice(1) })),
+            p.dataType,
+            (v) => set("Change parameter type", { dataType: v as ParamDataType }),
+          ),
+        ),
+        row(
+          "Binding",
+          select(
+            [
+              { value: "instance", label: "Instance" },
+              { value: "type", label: "Type" },
+            ],
+            p.binding,
+            (v) => set("Change binding", { binding: v as "instance" | "type" }),
+          ),
+        ),
+        row("Group", textInput(p.group, (v) => set("Change group", { group: v }))),
+        row("Shared GUID", p.guid ?? "(not shared)"),
+        h("h3", {}, "Categories"),
+      );
+      for (const [cat, label] of VG_CATEGORIES.filter(([c]) => ![Cat.View, Cat.Dimension, Cat.TextNote, Cat.DetailLine].includes(c as never))) {
+        const cb = h("input", { type: "checkbox", checked: p.categories.includes(cat) });
+        cb.onchange = () => set("Change categories", { categories: cb.checked ? [...p.categories, cat] : p.categories.filter((c) => c !== cat) });
+        sec.append(h("label", { class: "check" }, cb, label));
+      }
+      break;
+    }
+    case Cat.GlobalParameter: {
+      const g = el.params as GlobalParameterParams;
+      let current = "";
+      try {
+        current = len(globalValues(doc)[el.name ?? ""] ?? 0);
+      } catch (err) {
+        current = `\u26a0 ${(err as Error).message}`;
+      }
+      const formula = h("input", { type: "text", value: g.formula ?? "", placeholder: "formula (optional)" });
+      formula.onchange = () =>
+        edit(ctx, "Global formula", (tx) => {
+          tx.update<GlobalParameterParams>(el.id, { formula: formula.value.trim() || null });
+          globalValues(doc);
+        });
+      sec.append(
+        row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename global", (tx) => tx.setName(el.id, v || undefined)))),
+        g.formula ? row("Value", current) : row("Value", numberInput(g.value, (v) => update<GlobalParameterParams>("Set global", { value: v }))),
+        row("Formula", formula),
+        row("Driving", String(doc.all().filter((e) => Object.values(globalAssociations(e)).includes(el.name ?? "")).length) + " element(s)"),
       );
       break;
     }
@@ -1372,7 +1539,8 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
     return;
   }
 
+  const extra = parameterSections(ctx, el);
   const del = h("button", { class: "danger", textContent: "Delete" });
   del.onclick = () => edit(ctx, `Delete ${el.category}`, (tx) => tx.delete(el.id));
-  root.replaceChildren(sec, h("div", { class: "section" }, del));
+  root.replaceChildren(sec, ...extra, h("div", { class: "section" }, del));
 }

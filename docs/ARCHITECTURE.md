@@ -131,6 +131,13 @@ FamilyInstances of other families; a nested instance's `associations` map its pa
 formulas over the host's, evaluated per host type (`instanceValues(doc, inst, hostValues)`), and
 `familyMesh` includes nested instance meshes.
 
+**Parameters** — `ProjectParameter` (name, data type, categories, instance/type binding, optional
+shared GUID) stores values under `params.custom` on the element or its type; filters can test them.
+Shared parameter files (Revit's tab-separated *META/*GROUP/*PARAM format) import as project
+parameters and export with GUIDs. `GlobalParameter`s (value or formula) drive numeric element
+parameters through `params.globals` associations, re-applied by a commit hook in every transaction.
+Picking prefers solids under the cursor over line work, and line work over floors/ceilings/roofs.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

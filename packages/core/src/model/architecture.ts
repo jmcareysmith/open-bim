@@ -42,6 +42,8 @@ export const Cat = {
   Sweep: "Sweep",
   FamilyDef: "FamilyDef",
   FamilyInstance: "FamilyInstance",
+  ProjectParameter: "ProjectParameter",
+  GlobalParameter: "GlobalParameter",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

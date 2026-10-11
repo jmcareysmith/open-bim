@@ -15,6 +15,7 @@ export * from "./model/sheets.ts";
 export * from "./model/family.ts";
 export * from "./model/components.ts";
 export * from "./model/catalog.ts";
+export * from "./model/parameters.ts";
 export * from "./model/sketch.ts";
 export * from "./model/roofs.ts";
 export * from "./model/openings.ts";

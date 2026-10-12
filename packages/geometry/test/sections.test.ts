@@ -90,8 +90,16 @@ describe("view markers in plan", () => {
     const dashed = segs(c.id);
     doc.transact("Solid", (tx) => tx.update<ViewParams>(c.id, { markerLine: "solid" }));
     expect(segs(c.id)).toBeLessThan(dashed);
-    // Section ends carry solid bars.
-    expect(k.buildLines(doc, s)!.fill?.loops.length).toBeGreaterThanOrEqual(3);
+    // Filled: the head's pointer and a bar at the tail, pointing the way the view looks (+Y here).
+    const loops = k.buildLines(doc, s)!.fill!.loops;
+    expect(loops).toHaveLength(2);
+    const bar = loops[1]!;
+    expect(Math.min(...bar.map((q) => q.y))).toBeCloseTo(4000);
+    expect(Math.max(...bar.map((q) => q.y))).toBeCloseTo(4600);
+    expect(bar.every((q) => Math.abs(q.x - 10000) < 50)).toBe(true);
+    // Marks scale with the view: at 1:50 the bar is half as long.
+    const half = k.buildLines(doc, s, 50)!.fill!.loops[1]!;
+    expect(Math.max(...half.map((q) => q.y))).toBeCloseTo(4300);
     expect(k.buildLines(doc, floorPlanFor(doc, ids.levels.ground)!)).toBeNull();
   });
 });

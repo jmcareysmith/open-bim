@@ -38,21 +38,23 @@ const BUBBLE_SEGMENTS = 32;
  * Grid line with a labelled bubble beyond each end, drawn at z = 0.
  * Grids span every level, so the view places them at the level it shows.
  */
-export function buildGridLines(_doc: Document, el: Element): LineData {
+/** Grid: sizes are for 1:100 and scale with the view (`scale` = n of 1:n), as Revit's do. */
+export function buildGridLines(_doc: Document, el: Element, scale = 100): LineData {
   const g = el as Grid;
   const { start, end } = g.params;
   const len = Math.hypot(end.x - start.x, end.y - start.y);
   const ux = (end.x - start.x) / len;
   const uy = (end.y - start.y) / len;
-  const r = GRID_BUBBLE_RADIUS;
+  const k = scale / 100;
+  const r = GRID_BUBBLE_RADIUS * k;
   // Dash-dot-dash centre line with short solid ends at the bubbles (Revit's default grid).
   const seg: number[] = [];
   const at = (t: number) => [start.x + ux * t, start.y + uy * t, 0];
-  const ends = len > 4 * GRID_END ? GRID_END : 0;
+  const ends = len > 4 * GRID_END * k ? GRID_END * k : 0;
   if (ends) seg.push(...at(0), ...at(ends), ...at(len - ends), ...at(len));
   let t = ends;
   for (let i = 0; t < len - ends; i++) {
-    const d = GRID_DASH[i % GRID_DASH.length]!;
+    const d = GRID_DASH[i % GRID_DASH.length]! * k;
     if (i % 2 === 0) seg.push(...at(t), ...at(Math.min(len - ends, t + d)));
     t += d;
   }
@@ -68,7 +70,7 @@ export function buildGridLines(_doc: Document, el: Element): LineData {
       const a1 = ((i + 1) / BUBBLE_SEGMENTS) * 2 * Math.PI;
       seg.push(cx + r * Math.cos(a0), cy + r * Math.sin(a0), 0, cx + r * Math.cos(a1), cy + r * Math.sin(a1), 0);
     }
-    labels.push({ text: g.name ?? "", position: [cx, cy, 0] });
+    labels.push({ text: g.name ?? "", position: [cx, cy, 0], ...(k !== 1 ? { size: r * 0.75 } : {}) });
   }
   return { segments: new Float32Array(seg), labels };
 }
@@ -79,12 +81,12 @@ const GRID_DASH = [1200, 300, 150, 300];
 const GRID_END = 800;
 
 /** Reference plane: dashed line at z = 0; its name, if any, labels the end. */
-export function buildReferencePlaneLines(_doc: Document, el: Element): LineData {
+export function buildReferencePlaneLines(_doc: Document, el: Element, scale = 100): LineData {
   const { start, end } = (el as ReferencePlane).params;
   const labels: LineData["labels"] = [];
   if (el.name) {
     const len = Math.hypot(end.x - start.x, end.y - start.y);
-    const off = REF_PLANE_LABEL_OFFSET / len;
+    const off = (REF_PLANE_LABEL_OFFSET * scale) / 100 / len;
     labels.push({ text: el.name, position: [end.x + (end.x - start.x) * off, end.y + (end.y - start.y) * off, 0] });
   }
   return { segments: new Float32Array([start.x, start.y, 0, end.x, end.y, 0]), labels, dashed: true };

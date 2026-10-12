@@ -86,6 +86,8 @@ const COLORS: Record<string, number> = {
   [Cat.PadFooting]: 0xa7a8a6,
   [Cat.StripFooting]: 0xa7a8a6,
 };
+/** Model elements whose plan marks scale with the view (bubbles, heads, labels). */
+const SCALED_MARKS = new Set<string>([Cat.Grid, Cat.ReferencePlane, Cat.View]);
 /** Hidden elements while revealing them (Revit shows them magenta). */
 const REVEALED = 0xd0389c;
 const SELECTED = 0x3d8bfd;
@@ -294,7 +296,7 @@ export class Viewport {
     let group: THREE.Group;
     try {
       const mesh = this.kernel.build(this.doc, el);
-      const lines = this.kernel.buildLines(this.doc, el);
+      const lines = this.kernel.buildLines(this.doc, el, this.graphics.scale);
       if (mesh) {
         this.meshes.set(id, mesh);
         const material = elementMaterial(this.doc, el);
@@ -709,8 +711,11 @@ export class Viewport {
   /** Detail level and scale of the active view (they change how cut and surface patterns draw). */
   setViewGraphics(g: { detailLevel: DetailLevel; scale: number }): void {
     if (g.detailLevel === this.graphics.detailLevel && g.scale === this.graphics.scale) return;
+    const rescale = g.scale !== this.graphics.scale;
     this.graphics = g;
     this.drawingDirty = true;
+    // Grid bubbles and view markers are sized for the view scale: redraw them.
+    if (rescale) for (const el of this.doc.all()) if (SCALED_MARKS.has(el.category)) this.rebuild(el.id);
   }
 
   /** Callouts crop their plan to a rectangle; null for an uncropped plan. */

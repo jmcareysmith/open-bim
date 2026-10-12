@@ -99,7 +99,7 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
   if (view.params.kind === "legend") {
     // Legends hold no model: only their own annotation and legend components.
     for (const el of els.filter((e) => annotationView(e) === view.id)) {
-      const lines = kernel.buildLines(doc, el);
+      const lines = kernel.buildLines(doc, el, g.scale);
       const r = elementGraphics(doc, g, el);
       if (lines) addLineData(out, lines, "annotation", { color: r.color ?? undefined, halftone: r.halftone, id: el.id });
     }
@@ -160,7 +160,7 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
   for (const el of lineEls) {
     const owner = annotationView(el);
     if (section && !owner) continue; // sections draw their own level/grid annotations below
-    const lines = kernel.buildLines(doc, el);
+    const lines = kernel.buildLines(doc, el, g.scale);
     if (!lines) continue;
     if (lines.planOnly && section) continue;
     const r = elementGraphics(doc, g, el);

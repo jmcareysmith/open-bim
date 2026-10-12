@@ -143,8 +143,8 @@ export class OcctKernel implements GeometryKernel {
     return keep(fix.Solid());
   }
 
-  buildLines(doc: Document, el: Element): LineData | null {
-    return this.simple.buildLines(doc, el);
+  buildLines(doc: Document, el: Element, scale?: number): LineData | null {
+    return this.simple.buildLines(doc, el, scale);
   }
 
   private buildWallWithCuts(doc: Document, wall: Wall, cuts: WallCut[]): MeshData | null {

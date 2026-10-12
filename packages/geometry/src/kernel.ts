@@ -51,13 +51,14 @@ export interface GeometryKernel {
   /** Returns null for elements without 3D geometry (levels, types…). */
   build(doc: Document, el: Element): MeshData | null;
   /** Line work: datums (grids…), opening outlines, plan symbols (door swings). May accompany a mesh. */
-  buildLines(doc: Document, el: Element): LineData | null;
+  /** Plan line work; `scale` (the view's 1:n) sizes annotation-like parts such as grid bubbles. */
+  buildLines(doc: Document, el: Element, scale?: number): LineData | null;
   /** A family document's geometry (solids minus voids where supported) for given parameter values. */
   familyMesh(familyDoc: Document, values: Values): MeshData | null;
 }
 
 type Builder = (doc: Document, el: Element) => MeshData | null;
-type LineBuilder = (doc: Document, el: Element) => LineData | null;
+type LineBuilder = (doc: Document, el: Element, scale: number) => LineData | null;
 
 /** Plan footprint of a straight, unjoined wall: rectangle around its location line. */
 export function wallFootprint(start: Vec2, end: Vec2, thickness: number): Vec2[] {
@@ -168,8 +169,8 @@ export class SimpleKernel implements GeometryKernel {
     return this.builders.get(el.category)?.(doc, el) ?? null;
   }
 
-  buildLines(doc: Document, el: Element): LineData | null {
-    return this.lineBuilders.get(el.category)?.(doc, el) ?? null;
+  buildLines(doc: Document, el: Element, scale = 100): LineData | null {
+    return this.lineBuilders.get(el.category)?.(doc, el, scale) ?? null;
   }
 
   /** All solid forms of a family document as one mesh. Voids need the OCCT kernel and are skipped. */

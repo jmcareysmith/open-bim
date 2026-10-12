@@ -167,7 +167,9 @@ function crossing(view: View, a: Vec2, b: Vec2): number | null {
  * - elevation: a bubble with the name, and a filled pointer towards what it looks at;
  * - callout: a box with rounded corners and a named head bubble on a short leader.
  */
-export function buildViewMarker(doc: Document, el: Element): LineData | null {
+export function buildViewMarker(doc: Document, el: Element, scale = 100): LineData | null {
+  // Marker sizes are paper mm × the scale of the view they're drawn in (Revit's annotation scaling).
+  const K = scale;
   const v = el as View;
   const p = el.params as ViewParams;
   const seg: number[] = [];
@@ -203,8 +205,8 @@ export function buildViewMarker(doc: Document, el: Element): LineData | null {
     loops.push(pts);
   };
   const labels: LineData["labels"] = [];
-  const R = 400; // bubble radius
-  const TEXT = 230;
+  const R = 4 * K; // bubble radius: 4 mm on paper
+  const TEXT = 2.3 * K;
   // Bubbles show a short reference, as Revit's do: the view's number ("Section 3" → "3").
   const name = viewNumber(el.name ?? "");
   /** Draw a View Marker family at `o`, its +Y along the view direction and +X along `along`. */
@@ -245,20 +247,11 @@ export function buildViewMarker(doc: Document, el: Element): LineData | null {
     const dir = { x: f.dir[0], y: f.dir[1] };
     const along = { x: f.right[0], y: f.right[1] };
     if (p.kind === "section") {
-      // Heavy bars at both ends, the patterned line between.
-      const L = Math.hypot(end.x - start.x, end.y - start.y);
-      const ends = Math.min(END * K, L / 3);
-      bar(start, along, ends);
-      bar(end, { x: -along.x, y: -along.y }, ends);
-      patterned(add(start, along, ends), add(end, along, -ends));
+      patterned(start, end);
       // Head: bubble just beyond the start, on the line (or the head family, origin at the start).
       if (!family("sectionHead", start, dir, along)) bubble(add(start, along, -R), dir);
-      // Tail: a short flag showing the view direction.
-      if (!family("sectionTail", end, dir, along)) {
-        const flag = add(end, dir, R * 1.2);
-        line(end, flag);
-        loops.push([flag, add(flag, dir, -R * 0.5), add(add(flag, dir, -R * 0.25), along, R * 0.45)]);
-      }
+      // Tail: a heavy bar at the end, pointing the way the view looks.
+      if (!family("sectionTail", end, dir, along)) bar(end, dir, END * K);
     } else {
       const m = p.marker ?? { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
       if (!family("elevation", m, dir, along)) bubble(m, dir);
@@ -289,8 +282,6 @@ export function buildViewMarker(doc: Document, el: Element): LineData | null {
   return { segments: new Float32Array(seg), labels, planOnly: true, ...(loops.length ? { fill: { loops, color: 0x111111, opaque: true } } : {}) };
 }
 
-/** Marker families are drawn in paper mm; the built-in marks are sized for 1:100. */
-const K = 100;
 /** Length of the heavy bars at a section line's ends, paper mm. */
 const END = 6;
 /** Dash patterns, paper mm: on, off, on, off… (solid draws one line). */

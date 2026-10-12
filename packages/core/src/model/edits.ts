@@ -117,7 +117,7 @@ const alongKey = (el: Element) => (el.category === Cat.FamilyInstance ? "along" 
 const hostedWidth = (doc: Document, el: Element) => (isWallCutter(el.category) ? hostedPlacement(doc, el).width : 0);
 
 /** Move one end of a linear element, keeping hosted elements where they are. */
-function setEnds(tx: Transaction, doc: Document, el: Element, start: Vec2, end: Vec2): void {
+export function setLineEnds(tx: Transaction, doc: Document, el: Element, start: Vec2, end: Vec2): void {
   if (Math.hypot(end.x - start.x, end.y - start.y) < 1) throw new Error("That would leave the element with no length");
   if (el.category === Cat.Wall) {
     const old = elementLine(el);
@@ -144,8 +144,8 @@ export function trimExtend(tx: Transaction, doc: Document, id: ElementId, keep: 
   const { start, end } = seg(el);
   // Keep the side of the intersection the user clicked: the end beyond it is trimmed back, or
   // the end short of it extended.
-  if (along(l, keep) <= along(l, x)) setEnds(tx, doc, el, start, x);
-  else setEnds(tx, doc, el, x, end);
+  if (along(l, keep) <= along(l, x)) setLineEnds(tx, doc, el, start, x);
+  else setLineEnds(tx, doc, el, x, end);
 }
 
 /** Trim/Extend to corner: both elements meet at their lines' intersection. */

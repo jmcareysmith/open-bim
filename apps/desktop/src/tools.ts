@@ -79,6 +79,8 @@ import {
   levelAbove,
   type StairRun,
   groupOf,
+  transformElements,
+  translation,
   placeGroup,
   createRevisionCloud,
   revisionNumber,
@@ -127,6 +129,9 @@ export class SelectTool implements Tool {
   readonly name = "select";
   private dragFrom: { x: number; y: number } | null = null;
   private band: HTMLDivElement | null = null;
+  /** Drag to move: pressed on a selected element. */
+  private moveFrom: Vec2 | null = null;
+  private moveTo: Vec2 | null = null;
 
   constructor(private ctx: ToolContext) {}
 
@@ -141,10 +146,30 @@ export class SelectTool implements Tool {
   }
 
   pointerDown(ev: PointerEvent): void {
-    if (ev.button === 0) this.dragFrom = { x: ev.clientX, y: ev.clientY };
+    if (ev.button !== 0) return;
+    this.dragFrom = { x: ev.clientX, y: ev.clientY };
+    // Pressing on something already selected drags the selection instead of starting a box.
+    const id = ev.shiftKey ? null : this.ctx.viewport.pick(ev);
+    const el = id ? this.ctx.doc.get(id) : undefined;
+    const sel = new Set(this.ctx.selection());
+    if (el && (sel.has(el.id) || sel.has(groupOf(el) ?? ""))) {
+      this.moveFrom = viewPoint(this.ctx, ev, null);
+      this.moveTo = null;
+    }
   }
 
   pointerMove(ev: PointerEvent): void {
+    if (this.moveFrom && ev.buttons & 1) {
+      const from = this.dragFrom!;
+      if (!this.moveTo && Math.hypot(ev.clientX - from.x, ev.clientY - from.y) < 5) return;
+      const p = viewPoint(this.ctx, ev, this.moveFrom);
+      if (!p) return;
+      this.moveTo = p;
+      const a = this.moveFrom;
+      this.ctx.viewport.setPreviewLines({ segments: new Float32Array([a.x, a.y, 0, p.x, p.y, 0]), labels: [] });
+      this.ctx.status(`Move: ${Math.round(Math.hypot(p.x - a.x, p.y - a.y))} mm (release to drop)`);
+      return;
+    }
     if (!this.dragFrom || !(ev.buttons & 1)) return;
     const { x, y } = this.dragFrom;
     if (!this.band && Math.hypot(ev.clientX - x, ev.clientY - y) < 5) return;
@@ -166,6 +191,22 @@ export class SelectTool implements Tool {
   pointerUp(ev: PointerEvent): void {
     const from = this.dragFrom;
     this.dragFrom = null;
+    if (this.moveFrom) {
+      const [a, b] = [this.moveFrom, this.moveTo];
+      this.moveFrom = this.moveTo = null;
+      if (!b) return;
+      this.ctx.viewport.setPreviewLines(null);
+      const { doc } = this.ctx;
+      const ids = this.ctx.selection();
+      try {
+        doc.transact("Move", (tx) => transformElements(tx, doc, ids, translation({ x: b.x - a.x, y: b.y - a.y })));
+        this.ctx.setSelection(ids);
+        this.ctx.status("Moved. Ctrl+Z to undo.");
+      } catch (e) {
+        this.ctx.status(`⚠ ${(e as Error).message}`);
+      }
+      return;
+    }
     if (!from || !this.band) return this.endBand();
     this.endBand();
     // Grouped elements select as their group.

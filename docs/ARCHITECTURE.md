@@ -287,6 +287,10 @@ walls drags joined wall ends (corners and tees) unless `disjoin`. App: `apps/des
 centreline and both faces; trims keep hosted elements in place (shifting positions when the start
 moves) and refuse to cut through them; splits move hosted elements past the cut to the new wall.
 App: `apps/desktop/src/edittools.ts`.
+`model/grips.ts`: `elementGrips` lists an element's drag handles (line ends, sketch vertices, run
+ends, a door's slide, a move handle); `dragGrip` applies one; `setLineLength` backs temporary
+dimensions. The app's `GripLayer` (`apps/desktop/src/grips.ts`) draws them as HTML over the view,
+placed each frame with `Viewport.toScreen` / `onFrame`.
 
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.

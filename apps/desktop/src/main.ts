@@ -118,6 +118,7 @@ import { openRender } from "./render.ts";
 import { renderNzChecks } from "./nzchecks.ts";
 import { ModifyTool, type ModifyToolContext, type ToolOption } from "./modifytools.ts";
 import { AlignTool, OffsetTool, SplitTool, TrimTool } from "./edittools.ts";
+import { GripLayer } from "./grips.ts";
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 
@@ -414,6 +415,8 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
 const DRAWING_TOOLS = new Set(["select", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution"]);
 let tool: Tool = tools.select!;
+/** Grips and temporary dimensions for the selection (Select tool only). */
+let grips: GripLayer | undefined = new GripLayer(ctx, $("#viewport"));
 
 function setTool(name: string): void {
   if (viewport.viewMode === "drawing" && !DRAWING_TOOLS.has(name)) {
@@ -427,6 +430,7 @@ function setTool(name: string): void {
   tool.deactivate?.();
   tool = tools[name] ?? tools.select!;
   tool.activate?.();
+  grips?.setEnabled(tool.name === "select");
   document.querySelectorAll<HTMLButtonElement>("[data-tool]").forEach((b) => {
     b.classList.toggle("active", b.dataset.tool === tool.name);
   });
@@ -991,6 +995,7 @@ function refreshTypeSelector(): void {
 }
 
 function refreshPanels(): void {
+  grips?.refresh();
   refreshTypeSelector();
   renderBrowser($("#browser-body"), ctx);
   renderProperties($("#properties-body"), ctx);

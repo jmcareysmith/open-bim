@@ -53,8 +53,10 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Modify: Move/Copy/Rotate/Mirror/Array (MV, CO, RO, MM, AR; toolbar). Type a value + Enter; options
   strip (Copy, Multiple, Disjoin, Number) top-left of the view. Mirror by drawn axis only.
   Align (AL), Offset (OF), Trim/Extend (TR; corner or to boundary), Split (SL) — plans/3D only.
+  Grips on the selection (Select tool, plans/sections/sheets): drag ends/vertices; click a line's
+  length label to type a new length; press on a selected element and drag to move it.
 - Known gaps: joins whole-wall (no per-layer cleanup), no disallow-join, crossing walls overlap; walls
-  don't attach to floors/roofs; grids straight only, no grip editing (no drag-to-edit anywhere yet);
+  don't attach to floors/roofs; grids straight only;
   floors lack pick-walls/slope arrows; roofs exact for convex/L/T/U only; doors/windows parametric;
   dimensions only in plans via the tool; no 3D view camera saved per view; viewport (interactive)
   and sheet/PDF drawing paths are separate (fold the viewport onto `viewDrawing` later).

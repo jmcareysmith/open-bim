@@ -879,8 +879,24 @@ export class Viewport {
     if (this.needsRender) {
       this.renderer.render(this.mode === "drawing" ? this.drawScene : this.scene, this.camera);
       this.needsRender = false;
+      for (const fn of this.frameListeners) fn();
     }
   };
+
+  private frameListeners = new Set<() => void>();
+
+  /** Called after each redraw (camera moves, model changes), e.g. to place overlays. */
+  onFrame(fn: () => void): () => void {
+    this.frameListeners.add(fn);
+    return () => this.frameListeners.delete(fn);
+  }
+
+  /** Client (page) coordinates of a plan point on the work plane, or a drawing/sheet point. */
+  toScreen(p: Vec2): { x: number; y: number } {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    const v = new THREE.Vector3(p.x, p.y, this.mode === "drawing" ? 0 : this.workPlaneZ).project(this.camera);
+    return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+  }
 }
 
 function makeGroup(mesh: MeshData, color: number, opacity = 1): THREE.Group {

@@ -3,6 +3,9 @@ import {
   Document,
   applyResidentialTemplate,
   createDetailComponent,
+  createSection,
+  markerRole,
+  type ViewParams,
   createWall,
   familyFile,
   familyInfo,
@@ -14,7 +17,7 @@ import {
   wallCuts,
   type FamilyInstance,
 } from "@open-bim/core";
-import { OcctKernel, SimpleKernel, boundingBox, buildDetailComponentLines, meshVolume } from "@open-bim/geometry";
+import { OcctKernel, SimpleKernel, boundingBox, buildDetailComponentLines, buildViewMarker, meshVolume } from "@open-bim/geometry";
 import { LIBRARY, baseCabinet, casementWindow, roundTable } from "../src/index.ts";
 
 let occt: OcctKernel;
@@ -37,6 +40,19 @@ describe("family library", () => {
 
     const { doc, ids } = project();
     const def = doc.transact("Load", (tx) => loadFamily(tx, doc, back, lib.name));
+    if (lib.category === "ViewMarker") {
+      // Drawn by the views that pick it: a section with this family as its head or tail.
+      const role = markerRole(def)!;
+      expect(["elevation", "sectionHead", "sectionTail", "calloutHead"]).toContain(role);
+      const sec = doc.transact("S", (tx) => createSection(tx, doc, { x: 0, y: 0 }, { x: 5000, y: 0 }, { name: "Section 7" }));
+      if (role === "sectionHead" || role === "sectionTail") {
+        doc.transact("Pick", (tx) => tx.update<ViewParams>(sec.id, role === "sectionHead" ? { headFamilyId: def.id } : { tailFamilyId: def.id }));
+        const lines = buildViewMarker(doc, doc.require(sec.id))!;
+        if (role === "sectionHead") expect(lines.labels.map((l) => l.text)).toContain("7");
+      }
+      expect(() => doc.transact("P", (tx) => placeFamilyInstance(tx, doc, def.id, "Default", { levelId: ids.levels.ground }))).toThrow(/view marker/);
+      return;
+    }
     if (lib.category === "DetailItem") {
       // 2D: placed in a view as a detail component; it must draw something.
       const plan = views(doc).find((v) => v.params.kind === "floorPlan")!;

@@ -66,7 +66,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   (true north option), scale bar or break line. Detail → Component ▾ places Detail Item
   families (library or your own: New family → Detail Item, draw detail lines/regions). Detail Group (or
   Ctrl+G on one view's drafting) makes a detail group; Place Group puts copies in the open view. Options bar under the ribbon holds Level/Type.
-- View markers: bubbles with the view's number and a filled arrow; Elevation tool places one
+- View markers: bubbles with the view's number and a filled arrow, or a View Marker family picked in
+  the view's Properties (library: several heads/tails/marks; New family → View Marker for your own); Elevation tool places one
   elevation facing the nearest wall (Elevation ▾: N/E/S/W set). Sections, callouts, grids and
   ref planes place by two clicks or press-drag-release.
 - Double-click: section/elevation/callout marker opens its view; sheet viewport opens its view;

@@ -1,7 +1,7 @@
 import { registerCategory } from "../categories.ts";
 import { Document, type DocumentJSON, type Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
-import type { DetailLineParams, FilledRegionParams, LineStyle } from "./annotations.ts";
+import type { DetailLineParams, FilledRegionParams, LineStyle, TextNoteParams } from "./annotations.ts";
 import { Cat } from "./architecture.ts";
 import type { FamilyDef, FamilyDefParams } from "./components.ts";
 import type { ViewParams } from "./viewdefs.ts";
@@ -36,6 +36,8 @@ registerCategory({
 export interface DetailContent {
   lines: { start: Vec2; end: Vec2; style: LineStyle }[];
   regions: { boundary: Vec2[]; holes: Vec2[][]; color: number }[];
+  /** Text notes; `size` is their height in family units (paper mm × the family view's scale). */
+  texts: { position: Vec2; text: string; size: number }[];
 }
 
 const cache = new WeakMap<object, DetailContent>();
@@ -49,6 +51,11 @@ export function detailContent(def: FamilyDef): DetailContent {
   const content: DetailContent = {
     lines: fam.byCategory<DetailLineParams>(Cat.DetailLine).map((l) => ({ start: l.params.start, end: l.params.end, style: l.params.style })),
     regions: fam.byCategory<FilledRegionParams>(Cat.FilledRegion).map((r) => ({ boundary: r.params.boundary, holes: r.params.holes, color: r.params.color })),
+    texts: fam.byCategory<TextNoteParams>(Cat.TextNote).map((t) => ({
+      position: t.params.position,
+      text: t.params.text,
+      size: t.params.size * ((fam.get(t.params.viewId)?.params as ViewParams | undefined)?.scale ?? 1),
+    })),
   };
   cache.set(json, content);
   return content;

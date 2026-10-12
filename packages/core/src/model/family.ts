@@ -14,7 +14,10 @@ import { create3DView, createElevation, createFloorPlan } from "./viewdefs.ts";
 // insertion point, X right, Y back, Z up) with formulas over the family parameters.
 
 /** "DetailItem": a 2D detail component (drawn with detail lines and regions in its plan view). */
-export type FamilyCategory = "GenericModel" | "Furniture" | "Casework" | "Door" | "Window" | "DetailItem";
+/** "ViewMarker": an elevation mark, section head/tail or callout head (2D, drawn at paper size). */
+export type FamilyCategory = "GenericModel" | "Furniture" | "Casework" | "Door" | "Window" | "DetailItem" | "ViewMarker";
+/** What a View Marker family draws. */
+export type MarkerRole = "elevation" | "sectionHead" | "sectionTail" | "calloutHead";
 export type FamilyHosting = "none" | "wall";
 
 export type FamilyTypeValues = { name: string; values: Values };
@@ -25,6 +28,8 @@ export type FamilyInfoParams = {
   types: FamilyTypeValues[];
   /** Type whose values drive the geometry shown in the editor. */
   currentType: string;
+  /** View Marker families: which marker they are. */
+  markerRole?: MarkerRole;
 };
 export type FamilyInfo = Element<FamilyInfoParams>;
 
@@ -267,6 +272,7 @@ const STARTER: Record<FamilyCategory, [string, number][]> = {
     ["Height", 1200],
   ],
   DetailItem: [],
+  ViewMarker: [],
 };
 
 /** New family document: reference level, views, centre reference planes, starter parameters. */
@@ -274,9 +280,14 @@ export function applyFamilyTemplate(doc: Document, category: FamilyCategory = "G
   return doc.transact(`New ${category} family`, (tx) => {
     createProjectSettings(tx, doc);
     const level = createLevel(tx, "Ref. Level", 0);
-    // Detail items are 2D: drawn full size (mm) in one plan view, shown at 1:5 for drawing.
-    createFloorPlan(tx, doc, level.id, { name: category === "DetailItem" ? "Detail" : "Ref. Level", ...(category === "DetailItem" ? { scale: 5 } : {}) });
-    if (category !== "DetailItem") {
+    // Detail items and view markers are 2D, in one plan view. Detail items are drawn full size (shown
+    // at 1:5); markers are drawn at paper size (mm on the sheet), so their view is 1:1.
+    const flat = category === "DetailItem" || category === "ViewMarker";
+    createFloorPlan(tx, doc, level.id, {
+      name: category === "DetailItem" ? "Detail" : category === "ViewMarker" ? "Marker" : "Ref. Level",
+      ...(category === "DetailItem" ? { scale: 5 } : category === "ViewMarker" ? { scale: 1 } : {}),
+    });
+    if (!flat) {
       createElevation(tx, doc, { x: -3000, y: -3000 }, { x: 3000, y: -3000 }, { name: "Front", farClip: 8000, zRange: { bottom: -500, top: 3000 } });
       createElevation(tx, doc, { x: 3000, y: -3000 }, { x: 3000, y: 3000 }, { name: "Right", farClip: 8000, zRange: { bottom: -500, top: 3000 } });
       create3DView(tx, doc, "{3D}");
@@ -293,6 +304,7 @@ export function applyFamilyTemplate(doc: Document, category: FamilyCategory = "G
       hosting: category === "Door" || category === "Window" ? "wall" : "none",
       types: [{ name: "Default", values: Object.fromEntries(STARTER[category]) }],
       currentType: "Default",
+      ...(category === "ViewMarker" ? { markerRole: "elevation" as MarkerRole } : {}),
     }, { name });
     for (const [param] of STARTER[category]) {
       tx.create<FamilyParameterParams>(Cat.FamilyParameter, { kind: "length", instance: false, formula: null }, { name: param });

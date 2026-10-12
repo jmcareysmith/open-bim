@@ -185,6 +185,9 @@ import {
   type LineStyle,
   type TextNoteParams,
   type SymbolParams,
+  type MarkerRole,
+  MARKER_SLOTS,
+  markerFamilies,
   type DetailComponentParams,
   type SymbolKind,
   SYMBOL_KINDS,
@@ -251,7 +254,7 @@ export interface PanelContext {
   /** Open a loaded family in the family editor. */
   editFamily(defId: ElementId): void;
   /** The built-in family library, and loading from it or from an .obim-family file. */
-  libraryFamilies(): { name: string; category: FamilyCategory; description: string }[];
+  libraryFamilies(): { name: string; category: FamilyCategory; description: string; markerRole?: MarkerRole }[];
   loadLibraryFamily(name: string): void;
   loadFamilyFile(): void;
   /** Create an area plan (with boundaries from walls) and open it. */
@@ -573,6 +576,41 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
       row("View depth", numberInput(range.depth, (v) => setRange("depth", v))),
     );
   }
+  // Marker families: which head/tail/mark draws this view in plans (Revit's type properties).
+  for (const slot of MARKER_SLOTS[p.kind] ?? []) {
+    const loaded = markerFamilies(doc, slot.role);
+    const lib = ctx.libraryFamilies().filter((f) => f.markerRole === slot.role && !loaded.some((d) => d.name === f.name));
+    const current = p[slot.key] && doc.has(p[slot.key] as ElementId) ? (p[slot.key] as string) : "";
+    sec.append(
+      row(
+        slot.label,
+        select(
+          [{ value: "", label: "Built-in" }, ...loaded.map((d) => ({ value: d.id, label: d.name ?? d.id })), ...lib.map((f) => ({ value: `lib:${f.name}`, label: `${f.name} (load from library)` }))],
+          current,
+          (v) => {
+            let id = v;
+            if (v.startsWith("lib:")) {
+              const name = v.slice(4);
+              ctx.loadLibraryFamily(name);
+              id = markerFamilies(doc, slot.role).find((d) => d.name === name)?.id ?? "";
+            }
+            edit(ctx, slot.label, (tx) => tx.update<ViewParams>(view.id, { [slot.key]: id || null }));
+          },
+        ),
+      ),
+    );
+  }
+  if (MARKER_SLOTS[p.kind]) {
+    const all = h("button", { textContent: `Use these marks for all ${p.kind === "callout" ? "callouts" : `${p.kind}s`}` });
+    all.onclick = () =>
+      edit(ctx, "Apply marks", (tx) => {
+        for (const other of doc.byCategory<ViewParams>(Cat.View)) {
+          if (other.params.kind !== p.kind || other.id === view.id) continue;
+          tx.update<ViewParams>(other.id, Object.fromEntries((MARKER_SLOTS[p.kind] ?? []).map((s) => [s.key, p[s.key] ?? null])));
+        }
+      });
+    sec.append(row("", all));
+  }
   if (!template) sec.append(visibilityGraphics(ctx, view.id, p));
   return sec;
 }
@@ -792,6 +830,24 @@ function familyTypesSection(ctx: PanelContext): HTMLElement {
   sec.append(
     row("Family name", textInput(info.name ?? "", (v) => edit(ctx, "Rename family", (tx) => tx.setName(info.id, v || undefined)))),
     row("Category", p.category + (p.hosting === "wall" ? " (wall hosted)" : "")),
+    ...(p.category === "ViewMarker"
+      ? [
+          row(
+            "Marker role",
+            select(
+              [
+                { value: "elevation", label: "Elevation mark" },
+                { value: "sectionHead", label: "Section head" },
+                { value: "sectionTail", label: "Section tail" },
+                { value: "calloutHead", label: "Callout head" },
+              ],
+              p.markerRole ?? "elevation",
+              (v) => edit(ctx, "Marker role", (tx) => tx.update<FamilyInfoParams>(info.id, { markerRole: v as MarkerRole })),
+            ),
+          ),
+          h("p", { class: "muted" }, "Draw at paper size (mm) about the origin, looking along +Y (up). Text can use {n} (view number), {name} and {sheet}."),
+        ]
+      : []),
     row(
       "Type",
       select(p.types.map((t) => ({ value: t.name, label: t.name })), p.currentType, (v) =>

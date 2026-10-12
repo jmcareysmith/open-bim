@@ -51,6 +51,10 @@ export type ViewParams = {
   line?: { start: Vec2; end: Vec2 } | null;
   /** Elevations: where the marker sits in plan (default: the line's midpoint). */
   marker?: Vec2 | null;
+  /** View Marker families (model/markers.ts): section head/tail, or the elevation/callout mark. */
+  headFamilyId?: ElementId | null;
+  tailFamilyId?: ElementId | null;
+  markerFamilyId?: ElementId | null;
   /** Sections/elevations: how far beyond the line the view sees, mm. */
   farClip?: number | null;
   /** Sections/elevations: absolute Z crop, mm. */

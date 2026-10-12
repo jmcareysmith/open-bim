@@ -307,6 +307,10 @@ walls; `wallExtent` applies them through a hook set from wallattach.ts (keeps ar
 roof imports). Sloped tops: `wallTopBreaks` finds kinks; `geometry/src/wallattach.ts` builds a closed
 sliced mesh (OCCT sews it to cut openings). Roofs/floors/ceilings list attached walls as `related`.
 
+**View marker families** — `model/markers.ts`: View Marker families (role in FamilyInfo) drawn at paper
+size, look direction +Y; views store `headFamilyId`/`tailFamilyId`/`markerFamilyId`; `buildViewMarker`
+falls back to the built-in marks. FamilyDefs list the views using them as `related`.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

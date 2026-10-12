@@ -12,6 +12,11 @@ import {
   type View,
   type ViewFrame,
   type ViewParams,
+  detailContent,
+  markerText,
+  viewMarkerFamily,
+  viewNumber,
+  type MarkerRole,
 } from "@open-bim/core";
 import { GRID_BUBBLE_RADIUS, type LineData } from "./datums.ts";
 import { planLinework, type PlanLinework } from "./hlr.ts";
@@ -179,7 +184,25 @@ export function buildViewMarker(doc: Document, el: Element): LineData | null {
   const R = 400; // bubble radius
   const TEXT = 230;
   // Bubbles show a short reference, as Revit's do: the view's number ("Section 3" → "3").
-  const name = markerLabel(el.name ?? "");
+  const name = viewNumber(el.name ?? "");
+  /** Draw a View Marker family at `o`, its +Y along the view direction and +X along `along`. */
+  const family = (role: MarkerRole, o: Vec2, dir: Vec2, along: Vec2): boolean => {
+    const def = viewMarkerFamily(doc, v, role);
+    if (!def) return false;
+    const { lines, regions, texts } = detailContent(def);
+    const map = (q: Vec2): Vec2 => ({ x: o.x + (along.x * q.x + dir.x * q.y) * K, y: o.y + (along.y * q.x + dir.y * q.y) * K });
+    for (const l of lines) line(map(l.start), map(l.end));
+    for (const r of regions) {
+      const rings = [r.boundary, ...r.holes].map((ring) => ring.map(map));
+      rings.forEach((ring) => poly(ring));
+      loops.push(...rings);
+    }
+    for (const t of texts) {
+      const at = map(t.position);
+      labels.push({ text: markerText(doc, v, t.text), position: [at.x, at.y, 0], size: t.size * K });
+    }
+    return true;
+  };
 
   /** Bubble at `c` with a filled pointer towards `dir` (the view direction). */
   const bubble = (c: Vec2, dir: Vec2) => {
@@ -201,15 +224,17 @@ export function buildViewMarker(doc: Document, el: Element): LineData | null {
     const along = { x: f.right[0], y: f.right[1] };
     if (p.kind === "section") {
       line(start, end);
-      // Head: bubble just beyond the start, on the line.
-      bubble(add(start, along, -R), dir);
+      // Head: bubble just beyond the start, on the line (or the head family, origin at the start).
+      if (!family("sectionHead", start, dir, along)) bubble(add(start, along, -R), dir);
       // Tail: a short flag showing the view direction.
-      const flag = add(end, dir, R * 1.2);
-      line(end, flag);
-      loops.push([flag, add(flag, dir, -R * 0.5), add(add(flag, dir, -R * 0.25), along, R * 0.45)]);
+      if (!family("sectionTail", end, dir, along)) {
+        const flag = add(end, dir, R * 1.2);
+        line(end, flag);
+        loops.push([flag, add(flag, dir, -R * 0.5), add(add(flag, dir, -R * 0.25), along, R * 0.45)]);
+      }
     } else {
       const m = p.marker ?? { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
-      bubble(m, dir);
+      if (!family("elevation", m, dir, along)) bubble(m, dir);
     }
   } else if (p.kind === "callout" && p.crop) {
     const { min, max } = p.crop;
@@ -225,8 +250,10 @@ export function buildViewMarker(doc: Document, el: Element): LineData | null {
     const corner = { x: max.x - r * 0.3, y: max.y - r * 0.3 };
     const c = { x: max.x + R * 1.6, y: max.y + R * 1.6 };
     line(corner, add(c, { x: -Math.SQRT1_2, y: -Math.SQRT1_2 }, R));
-    poly(arc(c, R, 0, 2 * Math.PI, 32));
-    labels.push({ text: name, position: [c.x, c.y, 0], size: TEXT });
+    if (!family("calloutHead", c, { x: 0, y: 1 }, { x: 1, y: 0 })) {
+      poly(arc(c, R, 0, 2 * Math.PI, 32));
+      labels.push({ text: name, position: [c.x, c.y, 0], size: TEXT });
+    }
   } else {
     return null;
   }
@@ -234,8 +261,5 @@ export function buildViewMarker(doc: Document, el: Element): LineData | null {
   return { segments: new Float32Array(seg), labels, planOnly: true, dashed: p.kind === "callout", ...(loops.length ? { fill: { loops, color: 0x2b2f36 } } : {}) };
 }
 
-/** Short bubble text for a view: its trailing number, else its first few characters. */
-export function markerLabel(name: string): string {
-  const m = /(\d+)\s*$/.exec(name);
-  return m ? m[1]! : name.slice(0, 3);
-}
+/** Marker families are drawn in paper mm; the built-in marks are sized for 1:100. */
+const K = 100;

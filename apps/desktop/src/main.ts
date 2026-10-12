@@ -350,7 +350,7 @@ const ctx: ModifyToolContext & PanelContext = {
       status(`\u26a0 ${(err as Error).message}`);
     }
   },
-  libraryFamilies: () => LIBRARY.map((f) => ({ name: f.name, category: f.category, description: f.description })),
+  libraryFamilies: () => LIBRARY.map((f) => ({ name: f.name, category: f.category, description: f.description, ...(f.markerRole ? { markerRole: f.markerRole } : {}) })),
   loadLibraryFamily(name: string) {
     const lib = LIBRARY.find((f) => f.name === name);
     if (lib) loadFamilyIntoProject(lib.build(), lib.name);
@@ -654,9 +654,9 @@ const commands: Record<string, () => void | Promise<void>> = {
     const name = familyName(fam);
     closeFamilyEditor();
     try {
-      doc.transact(`Load family ${name}`, (tx) => loadFamily(tx, doc, fam, name));
+      const def = doc.transact(`Load family ${name}`, (tx) => loadFamily(tx, doc, fam, name));
       activeComponentKey = undefined;
-      status(`Loaded ${name}. Place it with the Component tool (C).`);
+      status(`Loaded ${name}. ${placeHint(def.params.category)}`);
     } catch (err) {
       status(`\u26a0 ${(err as Error).message}`);
     }
@@ -1479,7 +1479,19 @@ function openFamily(fam: Document): void {
   // Labelled/EQ dimensions move reference planes after every edit, within the same undo step.
   stopFlex = enableFamilyFlex(fam);
   switchDocument(fam);
-  status(`Family editor: ${familyName(fam)}. Sketch forms with Extrusion / Blend / Revolve / Sweep; set parameters and types in Properties.`);
+  const cat = familyInfo(fam)?.params.category;
+  status(
+    cat === "DetailItem" || cat === "ViewMarker"
+      ? `Family editor: ${familyName(fam)}. Draw with Annotate → Detail Line, Region and Text${cat === "ViewMarker" ? " (paper mm; {n}, {name}, {sheet} in text)" : " (full size)"}.`
+      : `Family editor: ${familyName(fam)}. Sketch forms with Extrusion / Blend / Revolve / Sweep; set parameters and types in Properties.`,
+  );
+}
+
+/** Where a newly loaded family gets used. */
+function placeHint(category: string): string {
+  if (category === "DetailItem") return "Place it with Annotate → Detail → Component.";
+  if (category === "ViewMarker") return "Pick it in a section's, elevation's or callout's Properties.";
+  return "Place it with the Component tool (C).";
 }
 
 let stopFlex: () => void = () => {};
@@ -1490,8 +1502,8 @@ function loadFamilyIntoProject(fam: Document, name: string): void {
   try {
     const reload = familyDefs(doc).some((f) => f.name === name);
     const def = doc.transact(`${reload ? "Reload" : "Load"} family ${name}`, (tx) => loadFamily(tx, doc, fam, name));
-    activeComponentKey = `${def.id}|${familyTypeNames(def)[0] ?? ""}`;
-    status(`${reload ? "Reloaded" : "Loaded"} ${name}. Place it with the Component tool (C).`);
+    if (def.params.category !== "DetailItem" && def.params.category !== "ViewMarker") activeComponentKey = `${def.id}|${familyTypeNames(def)[0] ?? ""}`;
+    status(`${reload ? "Reloaded" : "Loaded"} ${name}. ${placeHint(def.params.category)}`);
   } catch (err) {
     status(`⚠ ${(err as Error).message}`);
   }

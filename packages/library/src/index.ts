@@ -4,6 +4,9 @@ import {
   createDetailLine,
   createExtrusion,
   createFilledRegion,
+  createTextNote,
+  familyInfo as infoOf,
+  type MarkerRole,
   createFamilyParameter,
   createRevolution,
   familyInfo,
@@ -26,6 +29,8 @@ export interface LibraryFamily {
   name: string;
   category: FamilyCategory;
   description: string;
+  /** View Marker families: what they draw. */
+  markerRole?: MarkerRole;
   build(): Document;
 }
 
@@ -345,6 +350,92 @@ export const steelAngle: LibraryFamily = {
     ),
 };
 
+// ---- view markers (2D, paper mm; the view looks along +Y) -------------------------------------
+
+type Draw = { line(a: Vec2, b: Vec2): void; region(boundary: Vec2[], color?: number): void; text(at: Vec2, text: string, size?: number): void };
+
+function markerFamily(name: string, role: MarkerRole, draw: (d: Draw) => void): Document {
+  const doc = new Document();
+  applyFamilyTemplate(doc, "ViewMarker", name);
+  const view = views(doc)[0]!;
+  doc.transact("Draw marker", (tx) => {
+    tx.update(infoOf(doc)!.id, { markerRole: role });
+    draw({
+      line: (a, b) => void createDetailLine(tx, doc, view.id, a, b),
+      region: (boundary, color = 0x2b2f36) => void createFilledRegion(tx, doc, view.id, boundary, { color }),
+      text: (at, text, size = 2.3) => void createTextNote(tx, doc, view.id, at, text, size),
+    });
+  });
+  return doc;
+}
+const circlePts = (c: Vec2, r: number, a0 = 0, a1 = 2 * Math.PI, n = 24): Vec2[] =>
+  Array.from({ length: n + 1 }, (_, i) => ({ x: c.x + r * Math.cos(a0 + ((a1 - a0) * i) / n), y: c.y + r * Math.sin(a0 + ((a1 - a0) * i) / n) }));
+const ring = (d: Draw, c: Vec2, r: number) => {
+  const pts = circlePts(c, r);
+  for (let i = 0; i + 1 < pts.length; i++) d.line(pts[i]!, pts[i + 1]!);
+};
+/** A filled pointer from a bubble at `c` (radius r) out along +Y. */
+const pointer = (d: Draw, c: Vec2, r: number) => {
+  const tip = { x: c.x, y: c.y + r * 1.75 };
+  const a = { x: c.x + r * 0.7, y: c.y + r * 0.71 };
+  const b = { x: c.x - r * 0.7, y: c.y + r * 0.71 };
+  d.line(tip, a);
+  d.line(tip, b);
+  d.region([b, a, tip]);
+};
+const marker = (name: string, role: MarkerRole, description: string, draw: (d: Draw) => void): LibraryFamily => ({
+  name,
+  category: "ViewMarker",
+  description,
+  markerRole: role,
+  build: () => markerFamily(name, role, draw),
+});
+
+export const VIEW_MARKERS: LibraryFamily[] = [
+  marker("Elevation Mark - Filled Pointer", "elevation", "Circle with the view number and a filled pointer", (d) => {
+    ring(d, { x: 0, y: 0 }, 4);
+    pointer(d, { x: 0, y: 0 }, 4);
+    d.text({ x: 0, y: 0 }, "{n}");
+  }),
+  marker("Elevation Mark - Half Filled", "elevation", "Circle, filled on the side it looks to, with the view number", (d) => {
+    ring(d, { x: 0, y: 0 }, 4);
+    d.line({ x: -4, y: 0 }, { x: 4, y: 0 });
+    d.region(circlePts({ x: 0, y: 0 }, 4, 0, Math.PI, 16));
+    d.text({ x: 0, y: -1.9 }, "{n}", 2);
+  }),
+  marker("Section Head - Filled Pointer", "sectionHead", "Bubble before the line with the view number and a filled pointer", (d) => {
+    ring(d, { x: -4, y: 0 }, 4);
+    pointer(d, { x: -4, y: 0 }, 4);
+    d.text({ x: -4, y: 0 }, "{n}");
+  }),
+  marker("Section Head - Number over Sheet", "sectionHead", "Split bubble: view number over the sheet it's on, with a filled pointer", (d) => {
+    ring(d, { x: -5, y: 0 }, 5);
+    d.line({ x: -10, y: 0 }, { x: 0, y: 0 });
+    pointer(d, { x: -5, y: 0 }, 5);
+    d.text({ x: -5, y: 2 }, "{n}", 2.2);
+    d.text({ x: -5, y: -2.2 }, "{sheet}", 2);
+  }),
+  marker("Section Tail - Flag", "sectionTail", "A short flag showing the view direction", (d) => {
+    d.line({ x: 0, y: 0 }, { x: 0, y: 4.8 });
+    d.region([
+      { x: 0, y: 4.8 },
+      { x: 0, y: 2.8 },
+      { x: 1.8, y: 3.8 },
+    ]);
+  }),
+  marker("Section Tail - None", "sectionTail", "No tail symbol: the line just ends", () => {}),
+  marker("Callout Head - Circle", "calloutHead", "Circle with the view number", (d) => {
+    ring(d, { x: 0, y: 0 }, 4);
+    d.text({ x: 0, y: 0 }, "{n}");
+  }),
+  marker("Callout Head - Number over Sheet", "calloutHead", "Split circle: view number over the sheet it's on", (d) => {
+    ring(d, { x: 0, y: 0 }, 5);
+    d.line({ x: -5, y: 0 }, { x: 5, y: 0 });
+    d.text({ x: 0, y: 2 }, "{n}", 2.2);
+    d.text({ x: 0, y: -2.2 }, "{sheet}", 2);
+  }),
+];
+
 export const LIBRARY: LibraryFamily[] = [
   singleDoor,
   casementWindow,
@@ -358,4 +449,5 @@ export const LIBRARY: LibraryFamily[] = [
   timberSection(190, 45),
   concreteBlock,
   steelAngle,
+  ...VIEW_MARKERS,
 ];

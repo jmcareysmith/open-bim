@@ -41,7 +41,21 @@ export type FamilyInstanceParams = {
 };
 export type FamilyInstance = Element<FamilyInstanceParams>;
 
-registerCategory({ name: Cat.FamilyDef, dependencies: () => [], cascadeDelete: false, isType: true });
+registerCategory({
+  name: Cat.FamilyDef,
+  dependencies: () => [],
+  // Views drawing their markers with this family redraw when it's reloaded or deleted.
+  related: (doc, el) =>
+    doc
+      .byCategory(Cat.View)
+      .filter((v) => {
+        const p = v.params as { headFamilyId?: unknown; tailFamilyId?: unknown; markerFamilyId?: unknown };
+        return p.headFamilyId === el.id || p.tailFamilyId === el.id || p.markerFamilyId === el.id;
+      })
+      .map((v) => v.id),
+  cascadeDelete: false,
+  isType: true,
+});
 registerCategory({
   name: Cat.FamilyInstance,
   dependencies: (el) => {
@@ -166,6 +180,7 @@ export function placeFamilyInstance(
   const def = doc.require<FamilyDefParams>(familyId) as FamilyDef;
   if (def.category !== Cat.FamilyDef) throw new Error("Not a loaded family");
   if (def.params.category === "DetailItem") throw new Error(`${def.name} is a detail item: place it with Annotate → Detail → Component`);
+  if (def.params.category === "ViewMarker") throw new Error(`${def.name} is a view marker: pick it in a section's, elevation's or callout's Properties`);
   if (!familyTypeNames(def).includes(typeName)) throw new Error(`${def.name} has no type "${typeName}"`);
   let levelId = opts.levelId;
   if (def.params.hosting === "wall") {

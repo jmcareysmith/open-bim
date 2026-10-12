@@ -3,6 +3,7 @@ import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
 import { Cat, type LevelParams } from "./architecture.ts";
 import { DEFAULT_STAIR_TYPE, stairLayout, type Stair, type StairTypeParams } from "./stairs.ts";
+import { rampLayout, type Ramp } from "./ramps.ts";
 
 // Railings (Revit: Railing — sketch path, or placed on a stair). A railing follows a 3D path: a
 // sketched plan path at its level, or a stair's side edge along the nosing line and landings.
@@ -54,8 +55,8 @@ export function createRailing(tx: Transaction, doc: Document, typeId: ElementId,
   return tx.create<RailingParams>(Cat.Railing, { levelId, baseOffset: 0, path: path.map((p) => ({ ...p })), hostId: null, side: "left" }, { typeId }) as Railing;
 }
 
-/** Railings on both sides of a stair. */
-export function createStairRailings(tx: Transaction, doc: Document, typeId: ElementId, stair: Stair): Railing[] {
+/** Railings on both sides of a stair or ramp. */
+export function createStairRailings(tx: Transaction, doc: Document, typeId: ElementId, stair: Stair | Ramp): Railing[] {
   return (["left", "right"] as const).map(
     (side) => tx.create<RailingParams>(Cat.Railing, { levelId: stair.params.baseLevelId, baseOffset: 0, path: [], hostId: stair.id, side }, { typeId }) as Railing,
   );
@@ -65,6 +66,18 @@ export function createStairRailings(tx: Transaction, doc: Document, typeId: Elem
 export function railingPath(doc: Document, r: Railing): { x: number; y: number; z: number }[] {
   const p = r.params;
   const host = p.hostId ? (doc.get(p.hostId) as Stair | undefined) : undefined;
+  if (host && host.category === Cat.Ramp) {
+    const L = rampLayout(doc, host as unknown as Ramp);
+    const off = (L.width / 2 - EDGE_INSET) * (p.side === "left" ? 1 : -1);
+    return L.runs.flatMap((run) => {
+      const n = { x: -run.dir.y, y: run.dir.x };
+      const at = (u: number) => ({ x: run.start.x + run.dir.x * u + n.x * off, y: run.start.y + run.dir.y * u + n.y * off });
+      return [
+        { ...at(0), z: run.z0 },
+        { ...at(run.length), z: run.z1 },
+      ];
+    });
+  }
   if (host && host.category === Cat.Stair) {
     const L = stairLayout(doc, host);
     const width = (host.typeId ? doc.get<StairTypeParams>(host.typeId)?.params.width : undefined) ?? DEFAULT_STAIR_TYPE.width;

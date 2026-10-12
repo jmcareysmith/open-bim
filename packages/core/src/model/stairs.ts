@@ -119,9 +119,35 @@ export function stairLayout(doc: Document, stair: Stair): StairLayout {
     z += n * riser;
   });
 
-  // Landings between runs, in the frame of the run arriving at them.
-  const landings: StairLayout["landings"] = [];
-  const hw = t.width / 2;
+  const landings = landingsBetween(
+    runs.map((r) => ({ start: r.start, dir: r.dir, length: r.length, zEnd: r.z0 + r.risers * riser })),
+    t.width,
+  );
+
+  const twoRG = 2 * riser + going;
+  const checks = [
+    { label: `Riser ${riser.toFixed(0)} mm ≤ 190`, ok: riser <= 190 + 1e-6 },
+    { label: `Going ${going.toFixed(0)} mm ≥ 280`, ok: going >= 280 - 1e-6 },
+    { label: `2R + G ${twoRG.toFixed(0)} mm in 550–700`, ok: twoRG >= 550 && twoRG <= 700 },
+  ];
+  return { bottom, top, height, risers, riser, going, width: t.width, runs, landings, checks };
+}
+
+/** A straight run in plan, for landing layout: start, unit direction, length and height at its end. */
+export interface PlanRun {
+  start: Vec2;
+  dir: Vec2;
+  length: number;
+  zEnd: number;
+}
+
+/**
+ * Landings between consecutive runs (stairs and ramps), each a rectangle in the frame of the run
+ * arriving at it: from that run's end to the far edge of the next run's start, across both widths.
+ */
+export function landingsBetween(runs: PlanRun[], width: number): { boundary: Vec2[]; z: number }[] {
+  const out: { boundary: Vec2[]; z: number }[] = [];
+  const hw = width / 2;
   for (let i = 0; i + 1 < runs.length; i++) {
     const a = runs[i]!;
     const b = runs[i + 1]!;
@@ -135,20 +161,14 @@ export function stairLayout(doc: Document, stair: Stair): StairLayout {
       { x: b.start.x - bn.x * hw, y: b.start.y - bn.y * hw },
     ];
     const local = edge.map((q) => ({ u: (q.x - end.x) * a.dir.x + (q.y - end.y) * a.dir.y, v: (q.x - end.x) * nrm.x + (q.y - end.y) * nrm.y }));
-    const collinear = Math.abs(a.dir.x * b.dir.x + a.dir.y * b.dir.y) > 0.999 && a.dir.x * b.dir.x + a.dir.y * b.dir.y > 0;
-    const u1 = Math.max(collinear ? 0 : t.width, ...local.map((q) => q.u));
+    const dot = a.dir.x * b.dir.x + a.dir.y * b.dir.y;
+    const collinear = dot > 0.999;
+    const u1 = Math.max(collinear ? 0 : width, ...local.map((q) => q.u));
     const v0 = Math.min(...local.map((q) => q.v));
     const v1 = Math.max(...local.map((q) => q.v));
     if (u1 <= 1) continue;
     const at = (u: number, v: number) => ({ x: end.x + a.dir.x * u + nrm.x * v, y: end.y + a.dir.y * u + nrm.y * v });
-    landings.push({ boundary: [at(0, v0), at(u1, v0), at(u1, v1), at(0, v1)], z: a.z0 + a.risers * riser });
+    out.push({ boundary: [at(0, v0), at(u1, v0), at(u1, v1), at(0, v1)], z: a.zEnd });
   }
-
-  const twoRG = 2 * riser + going;
-  const checks = [
-    { label: `Riser ${riser.toFixed(0)} mm ≤ 190`, ok: riser <= 190 + 1e-6 },
-    { label: `Going ${going.toFixed(0)} mm ≥ 280`, ok: going >= 280 - 1e-6 },
-    { label: `2R + G ${twoRG.toFixed(0)} mm in 550–700`, ok: twoRG >= 550 && twoRG <= 700 },
-  ];
-  return { bottom, top, height, risers, riser, going, width: t.width, runs, landings, checks };
+  return out;
 }

@@ -26,3 +26,4 @@ export * from "./links.ts";
 export * from "./gltf.ts";
 export * from "./stairs.ts";
 export * from "./railings.ts";
+export * from "./ramps.ts";

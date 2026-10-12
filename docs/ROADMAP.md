@@ -57,7 +57,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] glTF/OBJ export — .glb (node per element, metres Y-up) and zipped OBJ + MTL
 
 ## Phase 6 — Advanced modelling (current)
-- Stairs, railings, ramps
+- [x] Stairs, railings, ramps — straight runs with landings (no winders/curved runs yet); D1/AS1, F4/AS1, NZS 4121 checks
 - Curtain walls
 - Stacked walls
 - Toposolids & site

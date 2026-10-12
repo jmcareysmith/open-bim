@@ -147,6 +147,7 @@ const TOOL_TYPES: Record<string, string> = {
   window: Cat.WindowType,
   stair: Cat.StairType,
   railing: Cat.RailingType,
+  ramp: Cat.RampType,
 };
 const activeTypeId = (cat: string): ElementId | undefined => {
   const id = activeTypes.get(cat);
@@ -371,6 +372,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   dimension: new DimensionTool(ctx),
   room: new RoomTool(ctx),
   stair: new StairTool(ctx),
+  ramp: new StairTool(ctx, "ramp"),
   railing: new RailingTool(ctx),
   placegroup: new PlaceGroupTool(ctx),
   roomseparator: new RoomSeparatorTool(ctx),

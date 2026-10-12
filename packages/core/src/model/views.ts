@@ -83,4 +83,5 @@ const TYPE_CATEGORY: Record<string, string> = {
   [Cat.Window]: Cat.WindowType,
   [Cat.Stair]: Cat.StairType,
   [Cat.Railing]: Cat.RailingType,
+  [Cat.Ramp]: Cat.RampType,
 };

@@ -79,4 +79,6 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Shared coordinates (Project Information & Units → Location; NZTM2000) and links (browser → Links →
   Link project…; by shared coordinates or origin; Reload). Links draw in one colour, aren't scheduled.
 - glTF (.glb) and OBJ (+MTL, zipped) export.
-- Next: Phase 6 — advanced modelling (see ROADMAP), top item first.
+- Stairs (Stair tool: run ends, Enter; D1/AS1 checks), ramps (1:12 check), railings (sketched or
+  on stairs/ramps, F4/AS1 gap). Straight runs only (no winders/curved runs).
+- Next: Phase 6 — curtain walls, then stacked walls, toposolids, structure, phasing/options/clash.

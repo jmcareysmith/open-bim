@@ -38,8 +38,8 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Ceilings | 1 | 🟨 |
 | Doors & windows (hosted, cut openings) | 1 | 🟨 |
 | Openings (shaft, wall, vertical) | 1 | 🟨 |
-| Stairs (run, landing, sketch) & railings | 6 | 🟨 |
-| Ramps | 6 | ⬜ |
+| Stairs (run, landing, sketch) & railings | 6 | ✅ |
+| Ramps | 6 | ✅ |
 | Components / furniture (loadable families) | 3 | ✅ |
 | Model in-place | 3 | ⬜ |
 | Rooms, room separation, room bounding | 4 | ✅ |

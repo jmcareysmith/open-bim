@@ -63,6 +63,8 @@ export const Cat = {
   StairType: "StairType",
   Railing: "Railing",
   RailingType: "RailingType",
+  Ramp: "Ramp",
+  RampType: "RampType",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

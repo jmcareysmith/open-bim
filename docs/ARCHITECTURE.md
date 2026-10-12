@@ -238,7 +238,9 @@ frame, and reports NZBC D1/AS1 private-stair checks. Geometry sweeps a sawtooth 
 extrudes landings; the plan symbol is a walking line with an arrow and "UP". `Railing`s follow a
 sketched plan path at their level, or a stair side (`hostId` + side) along the nosing line; the
 type gives height, rail and baluster sections and the clear gap (NZBC F4/AS1: ≤ 100 mm). New stairs
-get railings on both sides.
+get railings on both sides. `Ramp`s share the stair run model: the rise is spread over runs by
+length (`rampLayout`), runs are sloping slabs, landings come from the shared `landingsBetween`,
+and the gradient is checked against 1:12.
 
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.

@@ -7,7 +7,7 @@ import { extrudePolygon, type MeshData } from "./mesh.ts";
 // across the stair width; landings are slabs. Plan symbol: run centreline arrows with "UP".
 
 /** Extrude a profile drawn in (u, z) across the width, into the run's frame. */
-function sweepProfile(profile: Vec2[], origin: Vec2, dir: Vec2, width: number): MeshData {
+export function sweepProfile(profile: Vec2[], origin: Vec2, dir: Vec2, width: number): MeshData {
   // Local extrusion: profile in XY (x = u, y = z), extruded along local Z = across the run.
   const m = extrudePolygon(profile, [], -width / 2, width / 2);
   const nrm = { x: -dir.y, y: dir.x };

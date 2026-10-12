@@ -62,6 +62,8 @@ import {
   createAreaBoundary,
   createStair,
   ensureStairType,
+  createRamp,
+  ensureRampType,
   createRailing,
   createStairRailings,
   ensureRailingType,
@@ -848,17 +850,26 @@ export class RoomSeparatorTool extends DatumLineTool {
   }
 }
 
-/** Stair by component: click the start and end of each run; Enter builds it, Esc cancels. */
+/** Stair (or ramp) by component: click the start and end of each run; Enter builds it, Esc cancels. */
 export class StairTool implements Tool {
-  readonly name = "stair";
+  readonly name: "stair" | "ramp";
   private runs: StairRun[] = [];
   private start: Vec2 | null = null;
-  constructor(private ctx: ToolContext) {}
+  constructor(
+    private ctx: ToolContext,
+    kind: "stair" | "ramp" = "stair",
+  ) {
+    this.name = kind;
+  }
+
+  private get label(): string {
+    return this.name === "ramp" ? "Ramp" : "Stair";
+  }
 
   activate(): void {
     this.runs = [];
     this.start = null;
-    this.ctx.status("Stair: click the start and end of each run (centreline, going up). Enter to finish, Esc to cancel.");
+    this.ctx.status(`${this.label}: click the start and end of each run (centreline, going up). Enter to finish, Esc to cancel.`);
   }
 
   deactivate(): void {
@@ -879,7 +890,7 @@ export class StairTool implements Tool {
   }
 
   click(ev: PointerEvent): void {
-    if (this.ctx.viewport.viewMode !== "plan") return this.ctx.status("Draw stairs in a floor plan.");
+    if (this.ctx.viewport.viewMode !== "plan") return this.ctx.status(`Draw ${this.name}s in a floor plan.`);
     const p = viewPoint(this.ctx, ev, this.start);
     if (!p) return;
     if (!this.start) {
@@ -890,7 +901,7 @@ export class StairTool implements Tool {
     this.runs.push({ start: this.start, end: p });
     this.start = null;
     this.preview(null);
-    this.ctx.status(`Stair: ${this.runs.length} run(s). Click the next run, or Enter to finish.`);
+    this.ctx.status(`${this.label}: ${this.runs.length} run(s). Click the next run, or Enter to finish.`);
   }
 
   key(ev: KeyboardEvent): boolean {
@@ -904,21 +915,24 @@ export class StairTool implements Tool {
     const base = this.ctx.activeLevelId();
     const top = levelAbove(doc, base);
     if (!top) {
-      this.ctx.status("\u26a0 Stairs go up to the next level, and there's none above this one.");
+      this.ctx.status(`\u26a0 ${this.label}s go up to the next level, and there's none above this one.`);
       return true;
     }
     try {
       const runs = this.runs;
       // Railings go on both sides, as Revit adds them by default.
-      const s = doc.transact("Create stair", (tx) => {
-        const stair = createStair(tx, doc, this.ctx.activeTypeId(Cat.StairType) ?? ensureStairType(tx, doc), base, top, runs);
-        createStairRailings(tx, doc, ensureRailingType(tx, doc), stair);
-        return stair;
+      const ramp = this.name === "ramp";
+      const s = doc.transact(`Create ${this.name}`, (tx) => {
+        const host = ramp
+          ? createRamp(tx, doc, this.ctx.activeTypeId(Cat.RampType) ?? ensureRampType(tx, doc), base, top, runs)
+          : createStair(tx, doc, this.ctx.activeTypeId(Cat.StairType) ?? ensureStairType(tx, doc), base, top, runs);
+        createStairRailings(tx, doc, ensureRailingType(tx, doc), host);
+        return host;
       });
       this.ctx.setSelection([s.id]);
       this.activate();
       this.ctx.viewport.setPreviewLines(null);
-      this.ctx.status("Stair created. Check riser and going in Properties.");
+      this.ctx.status(this.name === "ramp" ? "Ramp created. Check the gradient in Properties." : "Stair created. Check riser and going in Properties.");
     } catch (err) {
       this.ctx.status(`\u26a0 ${(err as Error).message}`);
     }

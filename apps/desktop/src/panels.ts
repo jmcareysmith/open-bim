@@ -12,6 +12,11 @@ import {
   createSchedule,
   createRevision,
   stairLayout,
+  rampLayout,
+  rampLengthNeeded,
+  type Ramp,
+  type RampParams,
+  type RampTypeParams,
   type RailingParams,
   type RailingTypeParams,
   type Stair,
@@ -925,6 +930,7 @@ const VG_CATEGORIES: [string, string][] = [
   [Cat.WallOpening, "Openings"],
   [Cat.Stair, "Stairs"],
   [Cat.Railing, "Railings"],
+  [Cat.Ramp, "Ramps"],
   [Cat.Room, "Rooms"],
   [Cat.RoomSeparator, "Room separators"],
   [Cat.Area, "Areas"],
@@ -1668,6 +1674,36 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         h("h3", {}, "NZBC D1/AS1 (private stairway)"),
       );
       for (const c of L.checks) sec.append(row(c.ok ? "\u2713" : "\u2717", h("span", { class: c.ok ? "" : "warn" }, c.label)));
+      break;
+    }
+    case Cat.Ramp: {
+      const r = el as Ramp;
+      const p = r.params;
+      const L = rampLayout(doc, r);
+      sec.append(
+        row("Type", select(typeOpts(Cat.RampType), r.typeId ?? "", (v) => edit(ctx, "Change ramp type", (tx) => tx.setType(r.id, v)))),
+        row("Base level", select(levelOpts, p.baseLevelId, (v) => update<RampParams>("Change ramp base", { baseLevelId: v }))),
+        row("Base offset", numberInput(p.baseOffset, (v) => update<RampParams>("Change ramp base offset", { baseOffset: v }))),
+        row("Top level", select(levelOpts, p.topLevelId, (v) => update<RampParams>("Change ramp top", { topLevelId: v }))),
+        row("Top offset", numberInput(p.topOffset, (v) => update<RampParams>("Change ramp top offset", { topOffset: v }))),
+        row("Rise", len(L.height)),
+        row("Run length", len(L.runs.reduce((s, x) => s + x.length, 0))),
+        row("Needed at max gradient", len(rampLengthNeeded(doc, r))),
+        h("h3", {}, "NZBC D1/AS1, NZS 4121"),
+      );
+      for (const c of L.checks) sec.append(row(c.ok ? "\u2713" : "\u2717", h("span", { class: c.ok ? "" : "warn" }, c.label)));
+      break;
+    }
+    case Cat.RampType: {
+      const p = el.params as RampTypeParams;
+      const set = (k: keyof RampTypeParams, label: string) =>
+        row(label, numberInput(p[k], (v) => (v > 0 ? update<RampTypeParams>("Edit ramp type", { [k]: v }) : ctx.status("\u26a0 Must be positive"))));
+      sec.append(
+        row("Name", textInput(el.name ?? "", (v) => v && edit(ctx, "Rename type", (tx) => tx.setName(el.id, v)))),
+        set("width", "Width"),
+        set("thickness", "Thickness"),
+        set("maxSlope", "Steepest gradient (1:n)"),
+      );
       break;
     }
     case Cat.Railing: {

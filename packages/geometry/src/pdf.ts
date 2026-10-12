@@ -7,6 +7,10 @@ import type { Drawing, StrokeKind } from "./drawing.ts";
 const PT = 72 / 25.4;
 
 /** Pen widths on paper, mm (ISO-ish: heavy cuts, fine hatching). */
+/** Override pen weights 1-16, mm on paper (like Revit's model pens at 1:100). */
+const PEN = [0, 0.1, 0.13, 0.18, 0.25, 0.35, 0.5, 0.6, 0.7, 0.8, 1, 1.2, 1.4, 1.6, 1.8, 2, 2.4];
+const DASH: Record<string, string> = { dash: "[3 2] 0 d", dot: "[0.4 1.6] 0 d", dashDot: "[4 1.5 0.4 1.5] 0 d", longDash: "[7 2] 0 d" };
+
 const WEIGHT: Record<StrokeKind, number> = {
   cut: 0.5,
   beyond: 0.18,
@@ -47,7 +51,7 @@ function pageContent(p: PdfPage): string {
   const ops: string[] = ["1 J 1 j"]; // round caps and joins
   const X = (x: number) => f(x * PT);
   for (const fill of p.drawing.fills) {
-    const grey = fill.kind === "poche" ? "0.55 0.55 0.55" : fill.kind === "solid" ? "0.2 0.2 0.2" : rgb(fill.color ?? 0xbbbbbb);
+    const grey = fill.color !== undefined ? rgb(fill.color) : fill.kind === "poche" ? "0.55 0.55 0.55" : fill.kind === "solid" ? "0.2 0.2 0.2" : rgb(0xbbbbbb);
     const tris = fillLoops(fill.loops);
     if (!tris.length) continue;
     ops.push(`${grey} rg`);
@@ -56,7 +60,9 @@ function pageContent(p: PdfPage): string {
   for (const s of p.drawing.strokes) {
     if (!s.segments.length) continue;
     const colour = s.halftone ? "0.6 0.6 0.6" : s.color !== undefined ? rgb(s.color) : "0 0 0";
-    ops.push(`${f(WEIGHT[s.kind] * PT)} w ${colour} RG ${s.dashed ? "[3 2] 0 d" : "[] 0 d"}`);
+    const width = s.weight ? (PEN[Math.max(1, Math.min(16, Math.round(s.weight)))] ?? WEIGHT[s.kind]) : WEIGHT[s.kind];
+    const dash = s.pattern ? (DASH[s.pattern] ?? "[] 0 d") : s.dashed ? DASH.dash! : "[] 0 d";
+    ops.push(`${f(width * PT)} w ${colour} RG ${dash}`);
     for (let i = 0; i < s.segments.length; i += 4) {
       ops.push(`${X(s.segments[i]!)} ${X(s.segments[i + 1]!)} m ${X(s.segments[i + 2]!)} ${X(s.segments[i + 3]!)} l`);
     }

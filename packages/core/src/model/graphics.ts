@@ -10,12 +10,30 @@ import { customValue } from "./parameters.ts";
 // Visibility/Graphics: per-view category visibility and overrides, rule-based filters, and view
 // templates that several views share (Revit V/G, Filters, View Templates).
 
-/** Graphic override for a category or filter in a view. Unset fields don't override. */
+/** Line patterns for overridden lines. */
+export type LinePattern = "solid" | "dash" | "dot" | "dashDot" | "longDash";
+export const LINE_PATTERNS: LinePattern[] = ["solid", "dash", "dot", "dashDot", "longDash"];
+
+/** Line override (Revit: Projection/Cut Lines). Weight is Revit's 1-16 pen number. */
+export type LineOverride = { color?: number | null; weight?: number | null; pattern?: LinePattern | null };
+/** One layer of a fill (Revit: Foreground/Background pattern): pattern name ("solid" or a hatch). */
+export type FillOverride = { visible?: boolean; color?: number | null; pattern?: string | null };
+export type PatternOverride = { foreground?: FillOverride; background?: FillOverride };
+
+/**
+ * Graphic override for an element, category or filter in a view (Revit: Override Graphics in View).
+ * Unset fields don't override. `color` is the older single line colour (projection and cut).
+ */
 export type GraphicOverride = {
   visible?: boolean;
   halftone?: boolean;
-  /** Line colour, 0xRRGGBB. */
+  /** 0 (opaque) to 100 (invisible). */
+  transparency?: number;
   color?: number;
+  projectionLines?: LineOverride;
+  surfacePatterns?: PatternOverride;
+  cutLines?: LineOverride;
+  cutPatterns?: PatternOverride;
 };
 
 export type FilterOp = "equals" | "notEquals" | "contains" | "notContains" | "greater" | "less";
@@ -44,6 +62,8 @@ export type ViewGraphicsParams = {
   hiddenCategories: string[];
   categoryOverrides?: Record<string, GraphicOverride> | null;
   filters?: AppliedFilter[] | null;
+  /** Per-element overrides (Revit: Override Graphics in View, By Element); from the view, never a template. */
+  elementOverrides?: Record<ElementId, GraphicOverride> | null;
   /** Phase filter (templates can set it); see phases.ts. */
   phaseFilter?: PhaseFilter | null;
   /** The view's phase (from the view, never the template). */
@@ -103,6 +123,7 @@ export function effectiveGraphics(doc: Document, view: Element<ViewParams>): Vie
     hiddenCategories: src.hiddenCategories,
     categoryOverrides: src.categoryOverrides ?? null,
     filters: src.filters ?? null,
+    elementOverrides: view.params.elementOverrides ?? null,
     phaseFilter: src.phaseFilter ?? view.params.phaseFilter ?? "all",
     phase: view.params.phase ?? null,
     designOptions: view.params.designOptions ?? null,
@@ -154,11 +175,78 @@ export function filterMatches(doc: Document, filter: ViewFilter, el: Element): b
   return rules.every((r) => ruleMatches(doc, el, r));
 }
 
+export interface ResolvedLine {
+  color: number | null;
+  weight: number | null;
+  pattern: LinePattern | null;
+}
+export interface ResolvedFill {
+  visible: boolean;
+  color: number | null;
+  pattern: string | null;
+}
+
 /** Resolved display of an element in a view. */
 export interface ResolvedGraphics {
   visible: boolean;
   halftone: boolean;
+  /** Line colour for anything that doesn't distinguish projection from cut. */
   color: number | null;
+  /** 0-100. */
+  transparency: number;
+  projection: ResolvedLine;
+  cut: ResolvedLine;
+  surface: { foreground: ResolvedFill; background: ResolvedFill };
+  cutFill: { foreground: ResolvedFill; background: ResolvedFill };
+}
+
+const line0 = (): ResolvedLine => ({ color: null, weight: null, pattern: null });
+const fill0 = (): ResolvedFill => ({ visible: true, color: null, pattern: null });
+
+/** The plain resolution: visible, nothing overridden. */
+export function defaultGraphics(): ResolvedGraphics {
+  return {
+    visible: true,
+    halftone: false,
+    color: null,
+    transparency: 0,
+    projection: line0(),
+    cut: line0(),
+    surface: { foreground: fill0(), background: fill0() },
+    cutFill: { foreground: fill0(), background: fill0() },
+  };
+}
+
+/** Lay `o` over `r`, field by field (later layers win). */
+function layer(r: ResolvedGraphics, o: GraphicOverride): void {
+  if (o.visible !== undefined) r.visible = o.visible;
+  if (o.halftone !== undefined) r.halftone = o.halftone;
+  if (o.transparency !== undefined) r.transparency = Math.max(0, Math.min(100, o.transparency));
+  if (o.color !== undefined) {
+    r.color = o.color;
+    r.projection.color = o.color;
+    r.cut.color = o.color;
+  }
+  const lines = (dst: ResolvedLine, src?: LineOverride) => {
+    if (!src) return;
+    if (src.color !== undefined) dst.color = src.color;
+    if (src.weight !== undefined) dst.weight = src.weight;
+    if (src.pattern !== undefined) dst.pattern = src.pattern;
+  };
+  const fills = (dst: { foreground: ResolvedFill; background: ResolvedFill }, src?: PatternOverride) => {
+    for (const k of ["foreground", "background"] as const) {
+      const f = src?.[k];
+      if (!f) continue;
+      if (f.visible !== undefined) dst[k].visible = f.visible;
+      if (f.color !== undefined) dst[k].color = f.color;
+      if (f.pattern !== undefined) dst[k].pattern = f.pattern;
+    }
+  };
+  lines(r.projection, o.projectionLines);
+  lines(r.cut, o.cutLines);
+  fills(r.surface, o.surfacePatterns);
+  fills(r.cutFill, o.cutPatterns);
+  if (o.projectionLines?.color !== undefined) r.color = o.projectionLines.color;
 }
 
 /**
@@ -166,27 +254,65 @@ export interface ResolvedGraphics {
  * priority order (the first filter to set a property wins over later filters and the category).
  */
 export function elementGraphics(doc: Document, g: ViewGraphicsParams, el: Element): ResolvedGraphics {
-  const cat = g.categoryOverrides?.[el.category] ?? {};
-  let visible = !g.hiddenCategories.includes(el.category) && cat.visible !== false;
-  let halftone = cat.halftone ?? false;
-  let color = cat.color ?? null;
-  // Design options: only the option the view shows (default primary) is visible.
-  if (!optionVisible(doc, el, g.designOptions)) visible = false;
+  const r = defaultGraphics();
+  r.visible = !g.hiddenCategories.includes(el.category);
+  const cat = g.categoryOverrides?.[el.category];
+  if (cat) {
+    // A hidden category stays hidden even if its override says visible.
+    const v = r.visible;
+    layer(r, cat);
+    r.visible = v && cat.visible !== false;
+  }
   // Phasing: the view's phase filter hides or overrides by the element's status in its phase.
   if (PHASED.has(el.category) && g.phaseFilter && g.phaseFilter !== "none") {
     const pg = phaseGraphics(g.phaseFilter, phaseStatus(doc, el, viewPhase(doc, g.phase)));
-    if (!pg.visible) visible = false;
-    if (pg.halftone) halftone = true;
-    if (pg.color !== undefined && color === null) color = pg.color;
+    if (!pg.visible) r.visible = false;
+    if (pg.halftone) r.halftone = true;
+    if (pg.color !== undefined && r.color === null) layer(r, { color: pg.color });
   }
-  const set = { visible: false, halftone: false, color: false };
-  for (const af of g.filters ?? []) {
+  // Filters: the first in the list wins, so lay them on lowest priority first.
+  for (const af of [...(g.filters ?? [])].reverse()) {
     const f = doc.get<ViewFilterParams>(af.filterId);
     if (!f || f.category !== Cat.ViewFilter || !filterMatches(doc, f as ViewFilter, el)) continue;
-    const o = af.override;
-    if (o.visible !== undefined && !set.visible) [visible, set.visible] = [o.visible, true];
-    if (o.halftone !== undefined && !set.halftone) [halftone, set.halftone] = [o.halftone, true];
-    if (o.color !== undefined && !set.color) [color, set.color] = [o.color, true];
+    layer(r, af.override);
   }
-  return { visible, halftone, color };
+  // Element overrides win over everything.
+  const own = g.elementOverrides?.[el.id];
+  if (own) layer(r, own);
+  // Design options: only the option the view shows (default primary) is visible.
+  if (!optionVisible(doc, el, g.designOptions)) r.visible = false;
+  return r;
+}
+
+/** Override (or clear, with null) elements' graphics in a view (Override Graphics in View, By Element). */
+export function setElementOverrides(tx: Transaction, doc: Document, viewId: ElementId, ids: ElementId[], o: GraphicOverride | null): void {
+  const v = doc.require<ViewParams>(viewId);
+  if (v.category !== Cat.View) throw new Error("Element overrides belong to a view");
+  const next = { ...(v.params.elementOverrides ?? {}) };
+  for (const id of ids) {
+    if (o && Object.keys(o).length) next[id] = o;
+    else delete next[id];
+  }
+  tx.update<ViewParams>(viewId, { elementOverrides: Object.keys(next).length ? next : null });
+}
+
+/** Where a view's category overrides live: its template if it has one, else the view. */
+export function graphicsOwner(doc: Document, viewId: ElementId): ElementId {
+  const v = doc.require<ViewParams>(viewId);
+  const t = v.params.templateId;
+  return t && doc.get(t)?.category === Cat.ViewTemplate ? t : viewId;
+}
+
+/** Override (or clear) a category's graphics in a view (By Category); edits the template when there is one. */
+export function setCategoryOverride(tx: Transaction, doc: Document, viewId: ElementId, category: string, o: GraphicOverride | null): void {
+  const owner = graphicsOwner(doc, viewId);
+  const cur = (doc.require(owner).params as ViewGraphicsParams).categoryOverrides ?? {};
+  const next = { ...cur };
+  if (o && Object.keys(o).length) next[category] = o;
+  else delete next[category];
+  tx.update<ViewGraphicsParams>(owner, { categoryOverrides: Object.keys(next).length ? next : null });
+  if (o?.visible !== undefined) {
+    const hidden = (doc.require(owner).params as ViewGraphicsParams).hiddenCategories.filter((c) => c !== category);
+    tx.update<ViewGraphicsParams>(owner, { hiddenCategories: o.visible ? hidden : [...hidden, category] });
+  }
 }

@@ -17,6 +17,10 @@ import {
   type View,
   type ViewParams,
   planLevelOf,
+  type LinePattern,
+  type PatternName,
+  type ResolvedGraphics,
+  type ResolvedLine,
 } from "@open-bim/core";
 import { GRID_BUBBLE_RADIUS, type LineData } from "./datums.ts";
 import { planLinework, type PlanLinework } from "./hlr.ts";
@@ -38,6 +42,9 @@ export interface Stroke {
   color?: number;
   halftone?: boolean;
   dashed?: boolean;
+  /** Override Graphics: pen weight (1-16) and line pattern. */
+  weight?: number;
+  pattern?: LinePattern;
   /** Element this came from, for picking. */
   id?: ElementId;
 }
@@ -117,22 +124,35 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
   for (const lw of linework) {
     const el = doc.require(lw.id);
     const r = elementGraphics(doc, g, el);
-    const style = { color: r.color ?? undefined, halftone: r.halftone, id: lw.id };
+    const proj = lineStyle(r, r.projection, lw.id);
+    const cut = lineStyle(r, r.cut, lw.id);
+    const fg = r.cutFill.foreground;
+    const bg = r.cutFill.background;
+    // Cut patterns: the background (a solid fill when set), then the foreground pattern.
+    const cutFill = (loops: Vec2[][], materialPattern: string | null, kind: Fill["kind"]) => {
+      if (bg.visible && bg.pattern === "solid") out.fills.push({ kind: "solid", loops, ...(bg.color !== null ? { color: bg.color } : {}), id: lw.id });
+      if (!fg.visible) return;
+      const pattern = fg.pattern ?? materialPattern;
+      if (pattern === "solid" || (pattern === null && kind === "poche")) {
+        out.fills.push({ kind: pattern === "solid" ? "solid" : "poche", loops, ...(fg.color !== null ? { color: fg.color } : {}), id: lw.id });
+        return;
+      }
+      const fam = pattern ? patternFamilies(pattern as PatternName, g.scale) : null;
+      if (fam) out.strokes.push({ kind: "hatch", segments: hatch(loops, fam), ...proj, ...(fg.color !== null ? { color: fg.color } : {}) });
+    };
     if (detailed) {
       for (const reg of layerRegions(doc, el, lw.cutLoops, frame)) {
         const m = reg.materialId ? doc.get<MaterialParams>(reg.materialId) : undefined;
-        const pattern = m?.params.cutPattern ?? "diagonal";
-        if (pattern === "solid") out.fills.push({ kind: "solid", loops: [reg.loop], id: lw.id });
-        const fam = patternFamilies(pattern, g.scale);
-        if (fam) out.strokes.push({ kind: "hatch", segments: hatch([reg.loop], fam), ...style });
-        out.strokes.push({ kind: "beyond", segments: loopSegments([reg.loop]), ...style });
+        cutFill([reg.loop], m?.params.cutPattern ?? "diagonal", "solid");
+        out.strokes.push({ kind: "beyond", segments: loopSegments([reg.loop]), ...cut });
       }
     } else if (lw.cutLoops.length) {
-      out.fills.push({ kind: "poche", loops: lw.cutLoops, id: lw.id });
+      cutFill(lw.cutLoops, null, "poche");
     }
-    if (lw.projection.length) out.strokes.push({ kind: "beyond", segments: lw.projection, ...style });
-    if (lw.surface.length) out.strokes.push({ kind: "surface", segments: lw.surface, ...style });
-    if (lw.cutLoops.length) out.strokes.push({ kind: "cut", segments: loopSegments(lw.cutLoops), ...style });
+    if (lw.projection.length) out.strokes.push({ kind: "beyond", segments: lw.projection, ...proj });
+    const sf = r.surface.foreground;
+    if (lw.surface.length && sf.visible) out.strokes.push({ kind: "surface", segments: lw.surface, ...proj, ...(sf.color !== null ? { color: sf.color } : {}) });
+    if (lw.cutLoops.length) out.strokes.push({ kind: "cut", segments: loopSegments(lw.cutLoops), ...cut });
   }
 
   // Line work: datums, plan symbols, view markers, annotations.
@@ -144,11 +164,7 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
     if (!lines) continue;
     if (lines.planOnly && section) continue;
     const r = elementGraphics(doc, g, el);
-    addLineData(out, lines, owner ? "annotation" : el.category === Cat.Grid || el.category === Cat.ReferencePlane ? "datum" : "symbol", {
-      color: r.color ?? undefined,
-      halftone: r.halftone,
-      id: el.id,
-    });
+    addLineData(out, lines, owner ? "annotation" : el.category === Cat.Grid || el.category === Cat.ReferencePlane ? "datum" : "symbol", lineStyle(r, r.projection, el.id));
   }
   if (section) addLineData(out, sectionAnnotations(doc, view), "datum", {});
 
@@ -254,5 +270,16 @@ export function transformDrawing(d: Drawing, a: number, bx: number, by: number):
     fills: d.fills.map((f) => ({ ...f, loops: f.loops.map((l) => l.map((p) => ({ x: tx(p.x), y: ty(p.y) }))) })),
     texts: d.texts.map((t) => ({ ...t, x: tx(t.x), y: ty(t.y), size: t.size * a })),
     bounds: { min: { x: tx(d.bounds.min.x), y: ty(d.bounds.min.y) }, max: { x: tx(d.bounds.max.x), y: ty(d.bounds.max.y) } },
+  };
+}
+
+/** Stroke style from resolved graphics and one of its line overrides (projection or cut). */
+function lineStyle(r: ResolvedGraphics, l: ResolvedLine, id: ElementId): Omit<Stroke, "kind" | "segments"> {
+  return {
+    halftone: r.halftone,
+    id,
+    ...(l.color !== null ? { color: l.color } : r.color !== null ? { color: r.color } : {}),
+    ...(l.weight !== null ? { weight: l.weight } : {}),
+    ...(l.pattern !== null && l.pattern !== "solid" ? { pattern: l.pattern } : {}),
   };
 }

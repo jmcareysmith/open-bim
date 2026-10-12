@@ -25,6 +25,7 @@ import {
   type ViewRange,
   viewCrop,
   planLevelOf,
+  defaultGraphics,
 } from "@open-bim/core";
 import {
   GRID_BUBBLE_RADIUS,
@@ -173,7 +174,7 @@ export class Viewport {
   /** Temporary hide/isolate state for this view. */
   readonly visibility = new TemporaryVisibility();
   /** The active view's Visibility/Graphics: visibility, halftone and colour per element. */
-  private resolveGraphics: (el: Element) => ResolvedGraphics = () => ({ visible: true, halftone: false, color: null });
+  private resolveGraphics: (el: Element) => ResolvedGraphics = () => defaultGraphics();
   /** Annotations are drawn only in the view that owns them. */
   private annotationViewId: ElementId | undefined;
   private workPlaneZ = 0;

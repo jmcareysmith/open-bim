@@ -84,6 +84,7 @@ import {
   setFamilySolver,
   type FamilyCategory,
   type FamilyDef,
+  defaultGraphics,
 } from "@open-bim/core";
 import { OcctKernel, SimpleKernel, findClashes, exportGlb, exportObj, exportParts, areaLoopsFromWalls, drawingDxf, parseDxf, viewDrawing, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
@@ -1045,7 +1046,7 @@ function applyView(): void {
   const sheet = active;
   if (sheet?.category === Cat.Sheet) {
     viewport.setSheet(sheet as Sheet);
-    viewport.setGraphicsResolver(() => ({ visible: true, halftone: false, color: null }));
+    viewport.setGraphicsResolver(() => defaultGraphics());
     viewport.setAnnotationView(sheet.id);
     viewport.setPlanLevel(undefined);
     if (!DRAWING_TOOLS.has(tool.name)) setTool("select");

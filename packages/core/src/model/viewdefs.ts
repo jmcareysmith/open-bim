@@ -62,6 +62,8 @@ export type ViewParams = {
   /** Callouts: the view they're drawn from, and the plan region they show. */
   parentId?: ElementId | null;
   crop?: { min: Vec2; max: Vec2 } | null;
+  /** Override Graphics in View, By Element. */
+  elementOverrides?: Record<ElementId, GraphicOverride> | null;
   /** Visibility/Graphics overrides per category. */
   categoryOverrides?: Record<string, GraphicOverride> | null;
   /** Filters applied in this view, highest priority first. */

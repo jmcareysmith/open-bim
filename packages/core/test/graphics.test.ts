@@ -53,8 +53,8 @@ describe("visibility/graphics", () => {
       }),
     );
     const g = effectiveGraphics(doc, doc.require<ViewParams>(plan.id));
-    expect(elementGraphics(doc, g, ext)).toEqual({ visible: true, halftone: true, color: 0xff0000 });
-    expect(elementGraphics(doc, g, int)).toEqual({ visible: true, halftone: true, color: 0x00ff00 });
+    expect(elementGraphics(doc, g, ext)).toMatchObject({ visible: true, halftone: true, color: 0xff0000 });
+    expect(elementGraphics(doc, g, int)).toMatchObject({ visible: true, halftone: true, color: 0x00ff00 });
 
     doc.transact("Hide walls", (tx) => tx.update<ViewParams>(plan.id, { hiddenCategories: [Cat.Wall], filters: [] }));
     expect(elementGraphics(doc, effectiveGraphics(doc, doc.require<ViewParams>(plan.id)), ext).visible).toBe(false);

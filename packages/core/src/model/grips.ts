@@ -9,6 +9,7 @@ import { normaliseFootprint } from "./roofs.ts";
 import { validateRegion } from "./sketch.ts";
 import { tagPosition, type Tag } from "./tags.ts";
 import type { DimensionParams } from "./annotations.ts";
+import { viewFrame, type View, type ViewParams } from "./viewdefs.ts";
 
 // Grips (Revit's drag controls): handles on a selected element that reshape it when dragged —
 // line ends, sketch vertices, stair run ends, a door's place along its wall — or move it.
@@ -76,6 +77,32 @@ export function elementGrips(doc: Document, el: Element): Grip[] {
     return at ? [{ key: "move", point: at, kind: "move" }] : [];
   }
   if (el.category === Cat.Dimension) return [{ key: "at", point: (p as unknown as DimensionParams).at, kind: "move" }];
+  if (el.category === Cat.View) {
+    // View extents: the line's ends (width), the far clip (depth); elevations move by their marker.
+    const v = el as View;
+    const vp = v.params;
+    if (vp.line) {
+      const f = viewFrame(v);
+      const dir = { x: f.dir[0], y: f.dir[1] };
+      const { start, end } = vp.line;
+      const mid = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+      const far = vp.farClip ?? 0;
+      const grips: Grip[] = [
+        { key: "lstart", point: start, kind: "end" },
+        { key: "lend", point: end, kind: "end" },
+        { key: "far", point: { x: mid.x + dir.x * far, y: mid.y + dir.y * far }, kind: "end" },
+      ];
+      if (vp.kind === "elevation") grips.push({ key: "move", point: vp.marker ?? mid, kind: "move" });
+      return grips;
+    }
+    if (vp.crop) {
+      return [
+        { key: "cmin", point: vp.crop.min, kind: "end" },
+        { key: "cmax", point: vp.crop.max, kind: "end" },
+      ];
+    }
+    return [];
+  }
   const k = POINT_KEY[el.category];
   if (k && (el.category !== Cat.FamilyInstance || !p.hostId)) return [{ key: "move", point: p[k] as Vec2, kind: "move" }];
   return [];
@@ -120,6 +147,32 @@ export function dragGrip(tx: Transaction, doc: Document, id: ElementId, key: str
   if (key === "at") {
     tx.update(id, { at: { ...to } } as Params);
     return;
+  }
+  if (el.category === Cat.View) {
+    const v = el as View;
+    const vp = v.params;
+    if (vp.line && (key === "lstart" || key === "lend" || key === "far")) {
+      const { start, end } = vp.line;
+      const len = Math.hypot(end.x - start.x, end.y - start.y);
+      const u = { x: (end.x - start.x) / len, y: (end.y - start.y) / len };
+      if (key === "far") {
+        const f = viewFrame(v);
+        const depth = (to.x - start.x) * f.dir[0] + (to.y - start.y) * f.dir[1];
+        tx.update<ViewParams>(id, { farClip: Math.max(100, depth) });
+        return;
+      }
+      // Ends slide along the line, so the view keeps its direction.
+      const t = (to.x - start.x) * u.x + (to.y - start.y) * u.y;
+      const line = key === "lstart" ? { start: { x: start.x + u.x * Math.min(t, len - 100), y: start.y + u.y * Math.min(t, len - 100) }, end } : { start, end: { x: start.x + u.x * Math.max(t, 100), y: start.y + u.y * Math.max(t, 100) } };
+      tx.update<ViewParams>(id, { line });
+      return;
+    }
+    if (vp.crop && (key === "cmin" || key === "cmax")) {
+      const other = key === "cmin" ? vp.crop.max : vp.crop.min;
+      if (Math.abs(to.x - other.x) < 100 || Math.abs(to.y - other.y) < 100) throw new Error("A callout needs some size");
+      tx.update<ViewParams>(id, { crop: { min: { x: Math.min(to.x, other.x), y: Math.min(to.y, other.y) }, max: { x: Math.max(to.x, other.x), y: Math.max(to.y, other.y) } } });
+      return;
+    }
   }
   if (isLinear(el) && (key === "start" || key === "end")) {
     const { start, end } = p as { start: Vec2; end: Vec2 };

@@ -622,6 +622,28 @@ export class Viewport {
     this.needsRender = true;
   }
 
+  private overlay: THREE.Group | null = null;
+
+  /** Line work shown for the selection (e.g. a section's view extent), each in its own colour. */
+  setOverlay(items: { lines: LineData; color: number }[] | null): void {
+    if (this.overlay) {
+      this.overlay.removeFromParent();
+      disposeGroup(this.overlay);
+      this.overlay = null;
+    }
+    if (items?.length) {
+      const g = new THREE.Group();
+      for (const it of items) g.add(makeLineGroup(it.lines, it.color));
+      this.overlay = g;
+      if (this.mode === "drawing") this.drawScene.add(g);
+      else {
+        g.position.z = this.workPlaneZ;
+        this.scene.add(g);
+      }
+    }
+    this.needsRender = true;
+  }
+
   // ---- views & camera -----------------------------------------------------
 
   /** The 3D view's camera (for renders). */

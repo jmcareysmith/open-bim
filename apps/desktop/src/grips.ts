@@ -1,4 +1,4 @@
-import { Cat, dragGrip, elementGrips, flipWall, lineLength, setLineLength, wallThickness, type Element, type ElementId, type Grip, type Vec2 } from "@open-bim/core";
+import { Cat, dragGrip, elementGrips, flipWall, lineLength, setLineLength, viewFrame, wallThickness, type View, type ViewParams, type Element, type ElementId, type Grip, type Vec2 } from "@open-bim/core";
 import { viewPoint, type ToolContext } from "./tools.ts";
 
 // Grips and temporary dimensions over the viewport (Revit's drag controls). Shown for the
@@ -50,6 +50,7 @@ export class GripLayer {
     if (this.dragging) return;
     this.root.replaceChildren();
     this.placed = [];
+    this.ctx.viewport.setOverlay(null);
     if (!this.enabled) return;
     const { doc } = this.ctx;
     const sel = this.ctx.selection().map((id) => doc.get(id)).filter((e): e is Element => !!e && this.editable(e));
@@ -58,6 +59,7 @@ export class GripLayer {
       for (const g of elementGrips(doc, el)) this.addGrip(el.id, g);
     }
     if (sel.length === 1) this.addLength(sel[0]!);
+    if (sel.length === 1 && sel[0]!.category === Cat.View) this.showExtent(sel[0] as View);
     if (sel.length === 1 && sel[0]!.category === Cat.Wall && this.ctx.viewport.viewMode === "plan") this.addFlip(sel[0]!);
     this.position();
   }
@@ -110,6 +112,33 @@ export class GripLayer {
     };
     this.root.append(el);
     this.placed.push({ el, at: () => at });
+  }
+
+  /** A section's or elevation's view extent: dashed outline (line to far clip) with a light hatch. */
+  private showExtent(v: View): void {
+    const p = v.params as ViewParams;
+    if (!p.line || this.ctx.viewport.viewMode !== "plan") return;
+    const f = viewFrame(v);
+    const dir = { x: f.dir[0], y: f.dir[1] };
+    const { start, end } = p.line;
+    const L = Math.hypot(end.x - start.x, end.y - start.y);
+    const F = p.farClip ?? 0;
+    if (L < 1 || F < 1) return;
+    const u = { x: (end.x - start.x) / L, y: (end.y - start.y) / L };
+    const at = (a: number, b: number) => [start.x + u.x * a + dir.x * b, start.y + u.y * a + dir.y * b, 0];
+    const outline = [...at(0, 0), ...at(L, 0), ...at(L, 0), ...at(L, F), ...at(L, F), ...at(0, F), ...at(0, F), ...at(0, 0)];
+    // 45° hatch, spaced for the zoom: lines a - b = c clipped to the rectangle.
+    const step = Math.max(50, this.ctx.viewport.mmPerPixel() * 14);
+    const hatch: number[] = [];
+    for (let c = -F + step; c < L; c += step) {
+      const b0 = Math.max(0, -c);
+      const b1 = Math.min(F, L - c);
+      if (b1 > b0) hatch.push(...at(c + b0, b0), ...at(c + b1, b1));
+    }
+    this.ctx.viewport.setOverlay([
+      { lines: { segments: new Float32Array(hatch), labels: [] }, color: 0xb9c9dc },
+      { lines: { segments: new Float32Array(outline), labels: [], dashed: true }, color: 0x2f7de1 },
+    ]);
   }
 
   /** Revit's flip arrows: on the wall's exterior side; click to swap the exterior face. */

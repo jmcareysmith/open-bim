@@ -70,6 +70,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   the view's Properties (library: several heads/tails/marks; New family → View Marker for your own); Elevation tool places one
   elevation facing the nearest wall (Elevation ▾: N/E/S/W set). Sections, callouts, grids and
   ref planes place by two clicks or press-drag-release.
+- Selecting a section/elevation shows its view extent (dashed, hatched) with grips for the line ends
+  and far clip (elevations move by their marker; callouts by corner grips). Arrow keys nudge the
+  selection (step follows the zoom; Shift ×10).
 - Double-click: section/elevation/callout marker opens its view; sheet viewport opens its view;
   a component opens its family in the family editor.
 - Wall attach: Modify → Attach Top/Base (or right-click a wall), then click the roof/floor/ceiling;

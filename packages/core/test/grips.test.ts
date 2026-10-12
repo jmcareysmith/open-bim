@@ -5,6 +5,9 @@ import {
   createDoor,
   createFloor,
   createRoom,
+  createSection,
+  createElevationAt,
+  type ViewParams,
   createWall,
   dragGrip,
   elementGrips,
@@ -67,5 +70,20 @@ describe("grips", () => {
     expect(W(doc, walls[0]!.id).end).toEqual({ x: 4500, y: 0 });
     expect(W(doc, walls[1]!.id).start).toEqual({ x: 4500, y: 0 });
     expect(() => doc.transact("Length", (tx) => setLineLength(tx, doc, walls[0]!.id, 0))).toThrow(/at least/);
+  });
+
+  it("view extents: line ends slide along the line, the far clip sets depth, elevations move by their marker", () => {
+    const { doc } = box();
+    const sec = doc.transact("S", (tx) => createSection(tx, doc, { x: 0, y: 1500 }, { x: 4000, y: 1500 }, { farClip: 2000 }));
+    expect(elementGrips(doc, sec).map((g) => g.key)).toEqual(["lstart", "lend", "far"]);
+    doc.transact("Drag", (tx) => dragGrip(tx, doc, sec.id, "lend", { x: 6000, y: 1900 }));
+    expect(doc.require<ViewParams>(sec.id).params.line!.end).toEqual({ x: 6000, y: 1500 });
+    doc.transact("Drag", (tx) => dragGrip(tx, doc, sec.id, "far", { x: 3000, y: 4500 }));
+    expect(doc.require<ViewParams>(sec.id).params.farClip).toBeCloseTo(3000);
+    const el = doc.transact("E", (tx) => createElevationAt(tx, doc, { x: 2000, y: -3000 }));
+    const move = elementGrips(doc, el).find((g) => g.key === "move")!;
+    expect(move.point).toEqual({ x: 2000, y: -3000 });
+    doc.transact("Drag", (tx) => dragGrip(tx, doc, el.id, "move", { x: 2500, y: -3000 }));
+    expect(doc.require<ViewParams>(el.id).params.marker).toEqual({ x: 2500, y: -3000 });
   });
 });

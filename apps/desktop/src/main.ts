@@ -1,6 +1,8 @@
 import {
   Cat,
   Document,
+  transformElements,
+  translation,
   detachWall,
   DETAIL_GROUPABLE,
   isDetailFamily,
@@ -1084,6 +1086,11 @@ window.addEventListener("keydown", (ev) => {
   if (mod && ev.key.toLowerCase() === "g") return run(ev, "group");
   if (ev.key === "`") return run(ev, "console");
   if (mod) return;
+  // Arrow keys nudge the selection (plans, sections, sheets); Shift nudges ten times further.
+  if (ev.key.startsWith("Arrow") && tool.name === "select" && selection.length && viewport.viewMode !== "3d") {
+    ev.preventDefault();
+    return nudge(ev.key, ev.shiftKey);
+  }
   // Revit's two-letter shortcuts (MV, CO, RO, MM, AR, AL, OF, TR, SL) take over from the first letter's tool.
   const pair = lastKey && ev.timeStamp - lastKey.at < 1000 ? lastKey.key + ev.key.toLowerCase() : "";
   lastKey = { key: ev.key.toLowerCase(), at: ev.timeStamp };
@@ -1292,6 +1299,26 @@ function unhide(el: ModelElement, category: boolean): void {
   }
   afterVisibility(category ? `${el.category} unhidden` : "Element unhidden");
   if (viewport.isHidden(el)) status(`⚠ Still hidden by Visibility/Graphics (its category, a filter or the phase). Try Unhide Category, or VV.`);
+}
+
+/** Nudge distance for the zoom: about three screen pixels, rounded to 1, 2 or 5 × 10ⁿ mm. */
+function nudgeStep(): number {
+  const raw = Math.max(1, viewport.mmPerPixel() * 3);
+  const p = 10 ** Math.floor(Math.log10(raw));
+  return ([1, 2, 5, 10].map((m) => m * p).find((v) => v >= raw) ?? raw);
+}
+
+function nudge(key: string, far: boolean): void {
+  const d = nudgeStep() * (far ? 10 : 1);
+  const move = { ArrowLeft: { x: -d, y: 0 }, ArrowRight: { x: d, y: 0 }, ArrowUp: { x: 0, y: d }, ArrowDown: { x: 0, y: -d } }[key];
+  if (!move) return;
+  const ids = selection.filter((id) => doc.has(id));
+  try {
+    doc.transact("Nudge", (tx) => transformElements(tx, doc, ids, translation(move)));
+    status(`Nudged ${d} mm${far ? "" : " (Shift + arrow nudges ×10)"}.`);
+  } catch (e) {
+    status(`⚠ ${(e as Error).message}`);
+  }
 }
 
 /** Run a model change, reporting errors in the status bar. */

@@ -740,6 +740,7 @@ const FAMILY_CATEGORIES: [FamilyCategory, string][] = [
   ["Door", "Door (wall hosted)"],
   ["Window", "Window (wall hosted)"],
   ["DetailItem", "Detail Item (2D)"],
+  ["ViewMarker", "View Marker (elevation mark, section head/tail, callout head)"],
 ];
 
 /** A number or formula: numeric text is stored as a number, anything else as a formula. */

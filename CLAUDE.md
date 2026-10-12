@@ -36,7 +36,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - End each session by updating the "Current state" section below and pushing to GitHub.
 
 ## Current state (update at the end of each session)
-- Phase 0 done except CI green (runs on Windows via `npm run tauri dev`). Phases 1–5 done (DWG pending a licence decision).
+- Phase 0 done except CI green (runs on Windows via `npm run tauri dev`). Phases 1–6 done (DWG pending a licence decision).
 - Modelling: levels, layered wall/floor/ceiling/roof types with materials, walls (W; auto L/T/X joins,
   Flip), floors/ceilings/roofs from sketches (roofs: per-edge slope or gable), doors (D) and windows (N)
   as parametric hosted types, wall openings, grids (G), reference planes (R), project units + info.
@@ -86,4 +86,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Toposolids: Toposolid tool (sketch boundary) + Import survey CSV (E,N,RL m) in Properties; contours.
 - Structure: Column / Beam / Footing tools; sections (NZ timber/steel/concrete) as Structural types.
   Beams only show in plans where the view range cuts them (no dashed beam symbols yet).
-- Next: Phase 6 — phasing, design options, clash detection (last Phase 6 item).
+- Phasing (view Phase / Phase filter; element Phase created/demolished; Demolish tool), design options
+  (browser → Design Options; element Design option; per-view option), Clashes panel (OCCT volumes).
+- Next: Phase 7 — CRDT multi-user editing, cloud sync, rendering, NZ H1 / NZS 3604 bracing.
+  (CRDT/cloud need design decisions: sync backend, auth — ask Jeremy before building.)

@@ -70,7 +70,7 @@ import {
   type FamilyCategory,
   type FamilyDef,
 } from "@open-bim/core";
-import { OcctKernel, SimpleKernel, exportGlb, exportObj, exportParts, areaLoopsFromWalls, drawingDxf, parseDxf, viewDrawing, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
+import { OcctKernel, SimpleKernel, findClashes, exportGlb, exportObj, exportParts, areaLoopsFromWalls, drawingDxf, parseDxf, viewDrawing, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
 import gcsWasmUrl from "@salusoft89/planegcs/dist/planegcs_dist/planegcs.wasm?url";
 import { LIBRARY } from "@open-bim/library";
@@ -503,6 +503,11 @@ const commands: Record<string, () => void | Promise<void>> = {
   },
   fit() {
     viewport.zoomToFit();
+  },
+  clashes() {
+    const pane = $<HTMLDivElement>("#clash-pane");
+    pane.hidden = !pane.hidden;
+    if (!pane.hidden) renderClashPane();
   },
   console() {
     const c = $<HTMLDivElement>("#console");
@@ -995,6 +1000,84 @@ async function importSurveyPoints(id: ElementId): Promise<void> {
   } catch (err) {
     status(`\u26a0 Survey import failed: ${(err as Error).message}`);
   }
+}
+
+// ---- interference check ----------------------------------------------------------
+
+const CLASH_CATEGORIES: [string, string][] = [
+  [Cat.Wall, "Walls"],
+  [Cat.Floor, "Floors"],
+  [Cat.Roof, "Roofs"],
+  [Cat.Ceiling, "Ceilings"],
+  [Cat.Column, "Columns"],
+  [Cat.Beam, "Beams"],
+  [Cat.PadFooting, "Pad footings"],
+  [Cat.StripFooting, "Strip footings"],
+  [Cat.Stair, "Stairs"],
+  [Cat.Ramp, "Ramps"],
+  [Cat.FamilyInstance, "Components"],
+  [Cat.DirectShape, "Imported (IFC)"],
+  [Cat.Link, "Linked models"],
+];
+const clashSets = { a: new Set<string>([Cat.Beam, Cat.Column]), b: new Set<string>([Cat.Wall, Cat.Floor, Cat.Roof]) };
+
+function renderClashPane(results?: ReturnType<typeof findClashes>): void {
+  const pane = $<HTMLDivElement>("#clash-pane");
+  const el = (tag: string, text = "") => Object.assign(document.createElement(tag), { textContent: text });
+  const title = el("h2", "Interference Check");
+  const cats = el("div");
+  cats.className = "cats";
+  cats.append(el("strong", "Category set A"), el("strong", "Category set B"));
+  for (const [cat, label] of CLASH_CATEGORIES) {
+    for (const side of ["a", "b"] as const) {
+      const lab = el("label");
+      const cb = Object.assign(document.createElement("input"), { type: "checkbox", checked: clashSets[side].has(cat) });
+      cb.onchange = () => (cb.checked ? clashSets[side].add(cat) : clashSets[side].delete(cat));
+      lab.append(cb, ` ${label}`);
+      cats.append(lab);
+    }
+  }
+  const run = el("button", "Run check") as HTMLButtonElement;
+  run.onclick = () => {
+    status("Checking for clashes\u2026");
+    setTimeout(() => {
+      try {
+        const r = findClashes(doc, viewport.geometryKernel as never, { a: [...clashSets.a], b: [...clashSets.b] });
+        status(`${r.length} clash(es) found${r.length && !r[0]!.exact ? " (bounding-box estimate; OpenCascade still loading)" : ""}.`);
+        renderClashPane(r);
+      } catch (err) {
+        status(`\u26a0 Clash check failed: ${(err as Error).message}`);
+      }
+    }, 10);
+  };
+  const close = el("button", "Close") as HTMLButtonElement;
+  close.onclick = () => (pane.hidden = true);
+  const bar = el("div");
+  bar.className = "buttons";
+  bar.append(run, close);
+  const items: Node[] = [title, cats, bar];
+  if (results) {
+    if (!results.length) items.push(el("p", "No clashes."));
+    else {
+      const table = el("table");
+      const head = el("tr");
+      head.append(el("th", "#"), el("th", "Element A"), el("th", "Element B"), el("th", "Overlap"));
+      table.append(head);
+      const name = (id: string) => {
+        const e = doc.get(id);
+        return e ? `${e.category} ${e.name ?? (e.typeId ? (doc.get(e.typeId)?.name ?? "") : "")}`.trim() : "(deleted)";
+      };
+      results.forEach((c, i) => {
+        const tr = el("tr");
+        tr.className = "clash";
+        tr.append(el("td", String(i + 1)), el("td", name(c.a)), el("td", name(c.b)), el("td", `${(c.volume / 1e6).toFixed(c.volume < 1e6 ? 3 : 1)} L`));
+        tr.onclick = () => ctx.setSelection([c.a, c.b]);
+        table.append(tr);
+      });
+      items.push(table);
+    }
+  }
+  pane.replaceChildren(...items);
 }
 
 /** Reload a link: re-read its file on desktop, or pick it again in the browser. */

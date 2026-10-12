@@ -93,6 +93,23 @@ export class OcctKernel implements GeometryKernel {
     }
   }
 
+  /** Volume shared by two closed meshes, mm³ (0 when they only touch). */
+  intersectionVolume(a: MeshData, b: MeshData): number {
+    const gc: Deletable[] = [];
+    const keep = <T extends Deletable>(o: T): T => {
+      gc.push(o);
+      return o;
+    };
+    try {
+      const common = keep(keep(new this.oc.BRepAlgoAPI_Common(this.meshToSolid(a, keep), this.meshToSolid(b, keep))).Shape());
+      const props = keep(new this.oc.GProp_GProps());
+      this.oc.BRepGProp.VolumeProperties(common, props, false, false, false);
+      return Math.abs(props.Mass());
+    } finally {
+      for (const o of gc.reverse()) o.delete();
+    }
+  }
+
   /** Sew a closed triangle mesh into a solid. */
   private meshToSolid(m: MeshData, keep: <T extends Deletable>(o: T) => T): TopoDS_Shape {
     const oc = this.oc;

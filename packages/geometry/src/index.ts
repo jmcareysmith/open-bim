@@ -31,3 +31,4 @@ export * from "./curtain.ts";
 export * from "./stacked.ts";
 export * from "./site.ts";
 export * from "./structure.ts";
+export * from "./clash.ts";

@@ -143,7 +143,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Multi-user editing (worksharing equivalent, CRDT based) | 7 | ⬜ |
 | Element borrowing / ownership | 7 | ⬜ |
 | Cloud sync | 7 | ⬜ |
-| Clash detection / interference check | 6 | ⬜ |
+| Clash detection / interference check | 6 | ✅ |
 
 ## 13. Analysis
 | Feature | Phase | Status |

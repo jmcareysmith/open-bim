@@ -117,3 +117,15 @@ input.invalid { outline: 1px solid var(--danger); }
 .console-line.err { color: #ff8a80; }
 .console-in { border: 0; border-top: 1px solid #2a2f36; background: #0f1215; color: inherit; font: inherit; padding: 6px 8px; resize: none; outline: none; }
 .warn { color: #ff8a80; }
+#clash-pane { position: absolute; top: 0; right: 0; bottom: 0; width: min(520px, 60%); overflow: auto; background: var(--panel); color: var(--text, #d7dce2); border-left: 1px solid var(--line); padding: 10px 12px; z-index: 3; font-size: 12px; }
+#clash-pane[hidden] { display: none; }
+#clash-pane h2 { font-size: 13px; margin: 0 0 8px; }
+#clash-pane .cats { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; margin-bottom: 8px; }
+#clash-pane table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+#clash-pane td, #clash-pane th { border-bottom: 1px solid var(--line); padding: 3px 4px; text-align: left; }
+#clash-pane tr.clash { cursor: pointer; }
+#clash-pane tr.clash:hover td { background: rgba(61, 139, 253, 0.15); }
+#clash-pane .cats label { display: flex; align-items: center; gap: 6px; margin: 0; white-space: nowrap; }
+#clash-pane .cats input { margin: 0; }
+#clash-pane .cats label { justify-content: flex-start; }
+#clash-pane .cats input { width: auto; flex: none; }

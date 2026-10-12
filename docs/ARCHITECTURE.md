@@ -270,6 +270,11 @@ elements carry `designOption`; views choose per set (`ViewParams.designOptions`,
 `elementGraphics` hides elements of options a view doesn't show. `acceptPrimary` moves the primary's
 elements into the main model and deletes the other options' elements.
 
+**Clash detection** — `findClashes` pairs elements of two category sets by overlapping bounding
+boxes, skips hosted pairs, and asks the kernel for the shared volume (`OcctKernel.intersectionVolume`:
+BRepAlgoAPI_Common + volume properties), so touching elements don't clash; without OCCT it falls back
+to the box overlap.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

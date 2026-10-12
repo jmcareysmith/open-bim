@@ -56,15 +56,15 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Shared coordinates, links — NZTM2000 location, IFC map conversion; .obim links (one colour, not scheduled)
 - [x] glTF/OBJ export — .glb (node per element, metres Y-up) and zipped OBJ + MTL
 
-## Phase 6 — Advanced modelling (current)
+## Phase 6 — Advanced modelling (done)
 - [x] Stairs, railings, ramps — straight runs with landings (no winders/curved runs yet); D1/AS1, F4/AS1, NZS 4121 checks
 - [x] Curtain walls — wall types with a curtain grid (equal divisions, mullions, glazed panels); no per-panel editing yet
 - [x] Stacked walls — member wall types bottom to top, one variable segment
 - [x] Toposolids & site — spot heights (survey CSV via shared coordinates), Delaunay surface, contours; no pads/sub-regions yet
 - [x] Structural columns, beams, foundations — section types (rect/circle/I/SHS), pads, strips; no analytical model or beam plan symbols yet
-- Phasing, design options, clash detection
+- [x] Phasing, design options, clash detection — phase filters, option sets, OCCT volume clashes
 
-## Phase 7 — Collaboration, rendering, NZ tools
+## Phase 7 — Collaboration, rendering, NZ tools (current)
 - CRDT document model (Yjs/Automerge) for multi-user editing
 - Cloud sync
 - Realistic rendering + AI render

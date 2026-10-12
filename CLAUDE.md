@@ -64,6 +64,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Annotate: Dimension, Detail (line, region, cloud), Text (+ Check Spelling, Find/Replace), Tag (+
   Keynote ▾ load/export keynote files), Revisions, Groups. Symbol, Detail Component, Detail Group
   are placeholders (disabled) until built. Options bar under the ribbon holds Level/Type.
+- Double-click: section/elevation/callout marker opens its view; sheet viewport opens its view;
+  a component opens its family in the family editor.
 - Reveal Hidden mode: right-click a magenta element → Unhide Element / Unhide Category. Docking:
   drop on a docked panel's top/bottom half to split it there.
 - Under the view: open-view tabs (bottom, Revit-style per Jeremy) and the view control bar (scale,

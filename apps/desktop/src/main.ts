@@ -560,6 +560,23 @@ let rightDown: { x: number; y: number } | null = null;
 window.addEventListener("pointerdown", (ev) => {
   if (ev.button === 2) rightDown = { x: ev.clientX, y: ev.clientY };
 }, { capture: true });
+// Double-click (Revit): a section/elevation/callout marker opens its view, a viewport on a sheet
+// opens the view it shows, and a component opens its family for editing.
+canvas.addEventListener("dblclick", (ev) => {
+  if (tool.name !== "select") return;
+  const id = viewport.pick(ev);
+  const el = id ? doc.get(id) : undefined;
+  if (!el) return;
+  if (el.category === Cat.View && el.id !== activeViewId) return ctx.setActiveView(el.id);
+  if (el.category === Cat.Viewport) {
+    const viewId = (el.params as { viewId?: ElementId }).viewId;
+    if (viewId && doc.has(viewId)) return ctx.setActiveView(viewId);
+  }
+  if (el.category === Cat.FamilyInstance && !projectSession) {
+    const familyId = (el.params as { familyId?: ElementId }).familyId;
+    if (familyId && doc.has(familyId)) return ctx.editFamily(familyId);
+  }
+});
 canvas.addEventListener("contextmenu", (ev) => {
   ev.preventDefault();
   if (!rightDown || Math.hypot(ev.clientX - rightDown.x, ev.clientY - rightDown.y) > 5) return;

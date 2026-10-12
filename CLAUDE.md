@@ -37,7 +37,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - End each session by updating the "Current state" section below and pushing to GitHub.
 
 ## Current state (update at the end of each session)
-- Phase 0 done except CI green (runs on Windows via `npm run tauri dev`). Phases 1–6 done (DWG pending a licence decision).
+- Phase 0 done except CI green (runs on Windows via `npm run tauri dev`). Phases 1–7 done.
 - Modelling: levels, layered wall/floor/ceiling/roof types with materials, walls (W; auto L/T/X joins,
   Flip), floors/ceilings/roofs from sketches (roofs: per-edge slope or gable), doors (D) and windows (N)
   as parametric hosted types, wall openings, grids (G), reference planes (R), project units + info.
@@ -75,8 +75,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Ctrl+G; Place copy; Apply to other instances; Ungroup).
 - Plugins + scripting console (toolbar Console or `; docs/PLUGINS.md, examples/plugins).
 - IFC: Export IFC (IFC4, packages/ifc) and Import IFC (web-ifc → DirectShapes on matching levels).
-- DXF: Export DXF (open view/sheet) and Import DXF (into the open view as a CadImport). DWG not done
-  (needs a licence decision: LibreDWG is GPL; ODA is proprietary).
+- DXF/DWG: Export DXF/DWG (open view/sheet) and Import DXF/DWG (into the open view as a CadImport).
+  DWG is desktop-only via an installed ODA File Converter or LibreDWG (src-tauri/src/cad.rs);
+  not tested with a real converter (none installed here).
 - Shared coordinates (Project Information & Units → Location; NZTM2000) and links (browser → Links →
   Link project…; by shared coordinates or origin; Reload). Links draw in one colour, aren't scheduled.
 - glTF (.glb) and OBJ (+MTL, zipped) export.
@@ -100,5 +101,4 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   NZ Checks → NZS 3604 bracing (enter tabulated demand there). Demand is a provisional estimate.
 - AI render: Render pane → AI render… (self-hosted SD WebUI API, or Gemini with the user's key).
   Tested against a mock server only, not a real model.
-- Next: DWG via an external converter (ODA File Converter / LibreDWG CLI) from the Tauri side,
-  reusing DXF import/export; then Phase 7 is done.
+- Next: Phase 8 (MEP & visual programming) has no item list yet — plan it with Jeremy first.

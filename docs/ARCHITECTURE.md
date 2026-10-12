@@ -366,6 +366,12 @@ tools snap to grid endpoints, intersections and lines.
   Interactions API (`gemini-3.1-flash-image`, editable) with the user's own key, kept in
   localStorage. Request building and response parsing are pure and tested with a fake fetch.
 
+## DWG
+- `src-tauri/src/cad.rs`: `dwg_to_dxf` / `dxf_to_dwg` commands run an external converter the user
+  installs (ODA File Converter, else LibreDWG `dwg2dxf`/`dxf2dwg`; path override remembered in
+  localStorage) in a temp folder. The app's DXF parser/writer does the rest. Nothing GPL or
+  proprietary is linked, keeping the MIT licence. Browser builds offer DXF only.
+
 ## Collaboration (`packages/collab`)
 - Multi-user editing binds a `Document` to a Yjs `Y.Doc` (`bindDocument`): a map of element id →
   Y.Map (category, name, typeId, params as a nested Y.Map), so concurrent edits to different params

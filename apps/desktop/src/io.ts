@@ -132,3 +132,63 @@ export async function openText(filter: { name: string; extensions: string[] }): 
     input.click();
   });
 }
+
+// ---- DWG (desktop only, through an external converter; see src-tauri/src/cad.rs) ----------
+
+const CONVERTER_STORE = "open-bim.dwgConverter";
+
+/** User-set converter path (ODA File Converter, or LibreDWG's dwg2dxf), if any. */
+export function dwgConverterPath(): string | undefined {
+  try {
+    return localStorage.getItem(CONVERTER_STORE) || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function setDwgConverterPath(path: string): void {
+  try {
+    if (path.trim()) localStorage.setItem(CONVERTER_STORE, path.trim());
+    else localStorage.removeItem(CONVERTER_STORE);
+  } catch {
+    /* not remembered */
+  }
+}
+
+
+/** Pick a DXF or DWG drawing and return it as DXF text (DWG is converted first). */
+export async function openCad(): Promise<{ name: string; dxf: string } | null> {
+  const filter = { name: "CAD drawing", extensions: isTauri() ? ["dxf", "dwg"] : ["dxf"] };
+  if (!isTauri()) {
+    const f = await openBytes(filter);
+    return f ? { name: f.name, dxf: new TextDecoder().decode(f.bytes) } : null;
+  }
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const path = await open({ filters: [filter], multiple: false, directory: false });
+  if (!path) return null;
+  const name = path.split(/[\/]/).pop() ?? path;
+  if (/\.dwg$/i.test(path)) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return { name, dxf: await invoke<string>("dwg_to_dxf", { path, converter: dwgConverterPath() ?? null }) };
+  }
+  const { readTextFile } = await import("@tauri-apps/plugin-fs");
+  return { name, dxf: await readTextFile(path) };
+}
+
+/** Save DXF text as .dxf, or as .dwg when the chosen name ends in .dwg (desktop). */
+export async function saveCad(dxf: string, defaultName: string): Promise<string | null> {
+  if (!isTauri()) return saveText(dxf, defaultName, { name: "DXF", extensions: ["dxf"] });
+  const { save } = await import("@tauri-apps/plugin-dialog");
+  const path = await save({ filters: [{ name: "DXF", extensions: ["dxf"] }, { name: "DWG (via converter)", extensions: ["dwg"] }], defaultPath: defaultName });
+  if (!path) return null;
+  if (/\.dwg$/i.test(path)) {
+    const { invoke } = await import("@tauri-apps/api/core");
+    await invoke("dxf_to_dwg", { dxf, path, converter: dwgConverterPath() ?? null });
+  } else {
+    const { writeTextFile } = await import("@tauri-apps/plugin-fs");
+    await writeTextFile(path, dxf);
+  }
+  return path;
+}
+
+

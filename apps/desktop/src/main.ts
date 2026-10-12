@@ -79,7 +79,7 @@ import { exportIfc } from "@open-bim/ifc/export";
 import { SyncClient, bindDocument, newYDoc, type Binding } from "@open-bim/collab";
 import type { IfcApi } from "@open-bim/ifc";
 import ifcWasmUrl from "web-ifc/web-ifc.wasm?url";
-import { openBytes, openProject, openText, readProjectAt, saveBytes, savePdf, saveProject, saveText } from "./io.ts";
+import { dwgConverterPath, openBytes, openCad, openProject, openText, readProjectAt, saveBytes, saveCad, savePdf, saveProject, saveText, setDwgConverterPath } from "./io.ts";
 import { renderBrowser, renderProperties, renderSchedulePane, type PanelContext } from "./panels.ts";
 import { PluginHost, mountConsole } from "./plugins.ts";
 import { buildSample } from "./sample.ts";
@@ -618,24 +618,24 @@ const commands: Record<string, () => void | Promise<void>> = {
       // Plans can go out in shared (map) coordinates when the project's location asks for it.
       const loc = projectSettings(doc)?.params.location;
       const shared = loc?.dxfShared && v.category === Cat.View && isPlanView(v as View) ? loc : undefined;
-      const path = await saveText(drawingDxf(d, doc, { shared }), `${name}.dxf`, { name: "DXF", extensions: ["dxf"] });
-      if (path) status(`DXF exported to ${path}${v.category === Cat.Sheet ? " (paper mm)" : shared ? ` (EPSG:${shared.epsg}, metres)` : " (project mm)"}`);
+      const path = await saveCad(drawingDxf(d, doc, { shared }), `${name}.dxf`);
+      if (path) status(`Exported to ${path}${v.category === Cat.Sheet ? " (paper mm)" : shared ? ` (EPSG:${shared.epsg}, metres)` : " (project mm)"}`);
     } catch (err) {
-      status(`\u26a0 DXF export failed: ${(err as Error).message}`);
+      cadError("Export", err);
     }
   },
   async importDxf() {
     const v = activeViewId ? doc.get<ViewParams>(activeViewId) : undefined;
     if (!v || v.category !== Cat.View || v.params.kind === "3d") return status("Import DXF: open a plan, section, elevation or legend first.");
     try {
-      const file = await openBytes({ name: "DXF", extensions: ["dxf"] });
+      const file = await openCad();
       if (!file) return;
-      const content = parseDxf(new TextDecoder().decode(file.bytes));
+      const content = parseDxf(file.dxf);
       const imp = doc.transact(`Import ${file.name}`, (tx) => createCadImport(tx, doc, v.id, content, file.name));
       ctx.setSelection([imp.id]);
       status(`Imported ${content.segments.length / 4} line(s) and ${content.texts.length} text(s) from ${file.name} into ${v.name}. Move it with Offset in Properties.`);
     } catch (err) {
-      status(`\u26a0 DXF import failed: ${(err as Error).message}`);
+      cadError("Import", err);
     }
   },
   async linkProject() {
@@ -1038,6 +1038,16 @@ async function importSurveyPoints(id: ElementId): Promise<void> {
 }
 
 let closeRender: (() => void) | undefined;
+
+/** CAD import/export errors; a missing DWG converter asks for its path. */
+function cadError(what: "Import" | "Export", err: unknown): void {
+  const msg = err instanceof Error ? err.message : String(err);
+  status(`⚠ ${what} failed: ${msg}`);
+  if (/No DWG converter|Converter not found/.test(msg)) {
+    const path = prompt("Path to ODAFileConverter.exe (or LibreDWG's dwg2dxf), then try again:", dwgConverterPath() ?? "");
+    if (path !== null) setDwgConverterPath(path);
+  }
+}
 
 function refreshNzChecks(): void {
   const pane = $<HTMLDivElement>("#nz-pane");

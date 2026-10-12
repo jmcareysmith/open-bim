@@ -52,7 +52,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 
 ## Phase 5 — Interoperability (done)
 - [x] IFC4 export, then import (web-ifc; IfcOpenShell if needed) — import as DirectShapes (no conversion to native walls yet)
-- [x] DXF/DWG import & export — DXF (R12) export of views/sheets and import into a view; DWG pending a licence decision
+- [x] DXF/DWG import & export — DXF (R12) export of views/sheets and import into a view; DWG (desktop) through an installed converter — ODA File Converter or LibreDWG CLI — so no DWG library is linked
 - [x] Shared coordinates, links — NZTM2000 location, IFC map conversion; .obim links (one colour, not scheduled)
 - [x] glTF/OBJ export — .glb (node per element, metres Y-up) and zipped OBJ + MTL
 
@@ -64,7 +64,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Structural columns, beams, foundations — section types (rect/circle/I/SHS), pads, strips; no analytical model or beam plan symbols yet
 - [x] Phasing, design options, clash detection — phase filters, option sets, OCCT volume clashes
 
-## Phase 7 — Collaboration, rendering, NZ tools (current)
+## Phase 7 — Collaboration, rendering, NZ tools (done)
 - [x] CRDT document model (Yjs) for multi-user editing — per-param merge, remote edits kept out of local undo, orphan repair, presence
 - [x] Cloud sync — self-hosted sync server (`packages/collab`, rooms saved to disk, shared access token); no accounts or hosted service yet
 - [x] Realistic rendering — progressive GPU path tracer (three-gpu-pathtracer) of the 3D view; sun for the site, date and time; glass; material roughness/metalness/transparency; Save PNG
@@ -72,5 +72,5 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] NZ H1 compliance — schedule method: construction R-values on types, climate zones, glazing limit (provisional minimums, editable per project)
 - [x] NZS 3604 bracing module — panels on walls, automatic bracing lines per storey/direction, wind + EQ demand (provisional estimate or tabulated override), line minimum and spacing checks
 
-## Phase 8 — MEP & visual programming
+## Phase 8 — MEP & visual programming (next: needs planning)
 ## Phase 9 — Analysis, rebar, point clouds

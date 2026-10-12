@@ -24,3 +24,4 @@ export * from "./schedules.ts";
 export * from "./dxf.ts";
 export * from "./links.ts";
 export * from "./gltf.ts";
+export * from "./stairs.ts";

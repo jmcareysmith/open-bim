@@ -11,6 +11,10 @@ import {
   createLegend,
   createSchedule,
   createRevision,
+  stairLayout,
+  type Stair,
+  type StairParams,
+  type StairTypeParams,
   links,
   linkDocument,
   type Link,
@@ -917,6 +921,7 @@ const VG_CATEGORIES: [string, string][] = [
   [Cat.Door, "Doors"],
   [Cat.Window, "Windows"],
   [Cat.WallOpening, "Openings"],
+  [Cat.Stair, "Stairs"],
   [Cat.Room, "Rooms"],
   [Cat.RoomSeparator, "Room separators"],
   [Cat.Area, "Areas"],
@@ -1641,6 +1646,38 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         ),
         row("X", numberInput(p.position.x, (v) => update<KeynoteLegendParams>("Move keynote legend", { position: { ...p.position, x: v } }))),
         row("Y", numberInput(p.position.y, (v) => update<KeynoteLegendParams>("Move keynote legend", { position: { ...p.position, y: v } }))),
+      );
+      break;
+    }
+    case Cat.Stair: {
+      const s = el as Stair;
+      const p = s.params;
+      const L = stairLayout(doc, s);
+      sec.append(
+        row("Type", select(typeOpts(Cat.StairType), s.typeId ?? "", (v) => edit(ctx, "Change stair type", (tx) => tx.setType(s.id, v)))),
+        row("Base level", select(levelOpts, p.baseLevelId, (v) => update<StairParams>("Change stair base", { baseLevelId: v }))),
+        row("Base offset", numberInput(p.baseOffset, (v) => update<StairParams>("Change stair base offset", { baseOffset: v }))),
+        row("Top level", select(levelOpts, p.topLevelId, (v) => update<StairParams>("Change stair top", { topLevelId: v }))),
+        row("Top offset", numberInput(p.topOffset, (v) => update<StairParams>("Change stair top offset", { topOffset: v }))),
+        row("Risers", `${L.risers} \u00d7 ${L.riser.toFixed(1)} mm`),
+        row("Going", len(L.going)),
+        row("Runs", L.runs.map((r) => r.risers).join(" + ")),
+        h("h3", {}, "NZBC D1/AS1 (private stairway)"),
+      );
+      for (const c of L.checks) sec.append(row(c.ok ? "\u2713" : "\u2717", h("span", { class: c.ok ? "" : "warn" }, c.label)));
+      break;
+    }
+    case Cat.StairType: {
+      const p = el.params as StairTypeParams;
+      const set = (k: keyof StairTypeParams, label: string) =>
+        row(label, numberInput(p[k], (v) => (v > 0 ? update<StairTypeParams>("Edit stair type", { [k]: v }) : ctx.status("\u26a0 Must be positive"))));
+      sec.append(
+        row("Name", textInput(el.name ?? "", (v) => v && edit(ctx, "Rename type", (tx) => tx.setName(el.id, v)))),
+        set("maxRiser", "Maximum riser"),
+        set("going", "Going"),
+        set("width", "Width"),
+        set("waist", "Waist"),
+        set("landingThickness", "Landing thickness"),
       );
       break;
     }

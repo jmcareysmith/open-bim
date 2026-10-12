@@ -116,3 +116,4 @@ input.invalid { outline: 1px solid var(--danger); }
 .console-line.in { color: #8ab4f8; }
 .console-line.err { color: #ff8a80; }
 .console-in { border: 0; border-top: 1px solid #2a2f36; background: #0f1215; color: inherit; font: inherit; padding: 6px 8px; resize: none; outline: none; }
+.warn { color: #ff8a80; }

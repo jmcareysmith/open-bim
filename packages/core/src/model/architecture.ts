@@ -59,6 +59,8 @@ export const Cat = {
   DirectShape: "DirectShape",
   CadImport: "CadImport",
   Link: "Link",
+  Stair: "Stair",
+  StairType: "StairType",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

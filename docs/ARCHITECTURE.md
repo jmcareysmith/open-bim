@@ -231,6 +231,12 @@ plan cuts. Linked elements are read-only and not scheduled or tagged yet.
 its colour; `exportGlb` writes binary glTF 2.0 (one node per element with id/category extras, a
 material per colour, metres Y-up) and `exportObj` writes OBJ + MTL (zipped by the app).
 
+**Stairs** — `Stair` (base/top level + offsets, runs as centrelines) with a `StairType` (max riser,
+going, width, waist, landing thickness). `stairLayout` (core) derives risers from the height, splits
+them over runs by drawn length (last run takes the rest), builds landings in the arriving run's
+frame, and reports NZBC D1/AS1 private-stair checks. Geometry sweeps a sawtooth profile per run and
+extrudes landings; the plan symbol is a walking line with an arrow and "UP".
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

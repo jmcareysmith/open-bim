@@ -73,6 +73,7 @@ const COLORS: Record<string, number> = {
   [Cat.AreaBoundary]: 0x9a3fb5,
   [Cat.CadImport]: 0x5a6470,
   [Cat.Link]: 0xc4c8cc,
+  [Cat.Stair]: 0xb7b2a6,
 };
 const SELECTED = 0x3d8bfd;
 const VOID_COLOR = 0xff8c1a;

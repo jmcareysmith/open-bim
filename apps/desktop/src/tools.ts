@@ -60,6 +60,10 @@ import {
   type Room,
   createArea,
   createAreaBoundary,
+  createStair,
+  ensureStairType,
+  levelAbove,
+  type StairRun,
   groupOf,
   placeGroup,
   createRevisionCloud,
@@ -838,6 +842,79 @@ export class RoomSeparatorTool extends DatumLineTool {
       preview: (_doc, start, end) => linePreview(start, end),
       create: (tx, doc, start, end) => createRoomSeparator(tx, doc, ctx.activeLevelId(), start, end),
     });
+  }
+}
+
+/** Stair by component: click the start and end of each run; Enter builds it, Esc cancels. */
+export class StairTool implements Tool {
+  readonly name = "stair";
+  private runs: StairRun[] = [];
+  private start: Vec2 | null = null;
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.runs = [];
+    this.start = null;
+    this.ctx.status("Stair: click the start and end of each run (centreline, going up). Enter to finish, Esc to cancel.");
+  }
+
+  deactivate(): void {
+    this.runs = [];
+    this.start = null;
+    this.ctx.viewport.setPreviewLines(null);
+  }
+
+  private preview(cursor: Vec2 | null): void {
+    const seg: number[] = [];
+    for (const r of this.runs) seg.push(r.start.x, r.start.y, 0, r.end.x, r.end.y, 0);
+    if (this.start && cursor) seg.push(this.start.x, this.start.y, 0, cursor.x, cursor.y, 0);
+    this.ctx.viewport.setPreviewLines(seg.length ? { segments: new Float32Array(seg), labels: [] } : null);
+  }
+
+  pointerMove(ev: PointerEvent): void {
+    this.preview(viewPoint(this.ctx, ev, this.start));
+  }
+
+  click(ev: PointerEvent): void {
+    if (this.ctx.viewport.viewMode !== "plan") return this.ctx.status("Draw stairs in a floor plan.");
+    const p = viewPoint(this.ctx, ev, this.start);
+    if (!p) return;
+    if (!this.start) {
+      this.start = p;
+      return;
+    }
+    if (Math.hypot(p.x - this.start.x, p.y - this.start.y) < 100) return;
+    this.runs.push({ start: this.start, end: p });
+    this.start = null;
+    this.preview(null);
+    this.ctx.status(`Stair: ${this.runs.length} run(s). Click the next run, or Enter to finish.`);
+  }
+
+  key(ev: KeyboardEvent): boolean {
+    if (ev.key === "Escape") {
+      this.activate();
+      this.ctx.viewport.setPreviewLines(null);
+      return true;
+    }
+    if (ev.key !== "Enter" || !this.runs.length) return false;
+    const { doc } = this.ctx;
+    const base = this.ctx.activeLevelId();
+    const top = levelAbove(doc, base);
+    if (!top) {
+      this.ctx.status("\u26a0 Stairs go up to the next level, and there's none above this one.");
+      return true;
+    }
+    try {
+      const runs = this.runs;
+      const s = doc.transact("Create stair", (tx) => createStair(tx, doc, this.ctx.activeTypeId(Cat.StairType) ?? ensureStairType(tx, doc), base, top, runs));
+      this.ctx.setSelection([s.id]);
+      this.activate();
+      this.ctx.viewport.setPreviewLines(null);
+      this.ctx.status("Stair created. Check riser and going in Properties.");
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
+    return true;
   }
 }
 

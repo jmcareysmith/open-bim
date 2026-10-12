@@ -1464,6 +1464,7 @@ function refreshPanels(): void {
   makeCollapsible($("#browser-body"));
   viewBar?.render();
   renderProperties($("#properties-body"), ctx);
+  makeCollapsible($("#properties-body"), "p:");
   const active = activeViewId ? doc.get(activeViewId) : undefined;
   if (active?.category === Cat.Schedule) renderSchedulePane($("#schedule-pane"), ctx, active as Schedule);
 }

@@ -107,7 +107,7 @@ main { display: flex; min-height: 0; }
 .fold-head { cursor: pointer; user-select: none; }
 .fold-head::before { content: "▾"; display: inline-block; width: 1em; color: var(--muted); }
 .folded > .fold-head::before, .subhead.folded::before { content: "▸"; }
-.section.folded > :not(h3) { display: none; }
+.section.folded > :not(h3), .vg.folded > :not(h3) { display: none; }
 .dock { position: relative; display: flex; flex-direction: column; min-height: 0; flex: none; background: var(--panel); }
 .dock[hidden] { display: none; }
 .dock-left { border-right: 1px solid var(--line); }

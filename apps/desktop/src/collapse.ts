@@ -28,11 +28,12 @@ function applySub(head: HTMLElement, closed: boolean): void {
   }
 }
 
-export function makeCollapsible(root: HTMLElement): void {
-  for (const sec of root.querySelectorAll<HTMLElement>(":scope > .section")) {
+/** Fold sections (and the Visibility/Graphics block) by their headings; `prefix` keeps panels apart. */
+export function makeCollapsible(root: HTMLElement, prefix = ""): void {
+  for (const sec of root.querySelectorAll<HTMLElement>(":scope > .section, .vg")) {
     const h3 = sec.querySelector<HTMLElement>(":scope > h3");
     if (!h3) continue;
-    const key = `s:${h3.textContent}`;
+    const key = `${prefix}s:${h3.textContent}`;
     h3.classList.add("fold-head");
     sec.classList.toggle("folded", folded.has(key));
     h3.onclick = () => {

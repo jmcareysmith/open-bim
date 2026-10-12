@@ -1,6 +1,9 @@
 import {
   Cat,
   Document,
+  flipWall,
+  groupOf,
+  type Element as ModelElement,
   applyResidentialTemplate,
   hostedPlacement,
   isWallCutter,
@@ -80,7 +83,7 @@ import { SyncClient, bindDocument, newYDoc, type Binding } from "@open-bim/colla
 import type { IfcApi } from "@open-bim/ifc";
 import ifcWasmUrl from "web-ifc/web-ifc.wasm?url";
 import { dwgConverterPath, openBytes, openCad, openProject, openText, readProjectAt, saveBytes, saveCad, savePdf, saveProject, saveText, setDwgConverterPath } from "./io.ts";
-import { renderBrowser, renderProperties, renderSchedulePane, type PanelContext } from "./panels.ts";
+import { renderBrowser, renderProperties, renderSchedulePane, viewGraphicsEditor, type PanelContext } from "./panels.ts";
 import { PluginHost, mountConsole } from "./plugins.ts";
 import { buildSample } from "./sample.ts";
 import {
@@ -119,6 +122,7 @@ import { renderNzChecks } from "./nzchecks.ts";
 import { ModifyTool, type ModifyToolContext, type ToolOption } from "./modifytools.ts";
 import { AlignTool, OffsetTool, SplitTool, TrimTool } from "./edittools.ts";
 import { GripLayer } from "./grips.ts";
+import { openDialog, showContextMenu, type MenuItem } from "./dialog.ts";
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 
@@ -452,7 +456,18 @@ window.addEventListener("pointerup", (ev) => {
   if (moved < 5 && ev.target === canvas) tool.click?.(ev);
 });
 canvas.addEventListener("pointermove", (ev) => tool.pointerMove?.(ev));
-canvas.addEventListener("contextmenu", (ev) => ev.preventDefault());
+// Right-click (without dragging; a right-drag pans or orbits): context menu for what's under the
+// cursor, or for the view on empty space.
+let rightDown: { x: number; y: number } | null = null;
+window.addEventListener("pointerdown", (ev) => {
+  if (ev.button === 2) rightDown = { x: ev.clientX, y: ev.clientY };
+}, { capture: true });
+canvas.addEventListener("contextmenu", (ev) => {
+  ev.preventDefault();
+  if (!rightDown || Math.hypot(ev.clientX - rightDown.x, ev.clientY - rightDown.y) > 5) return;
+  rightDown = null;
+  openCanvasMenu(ev);
+});
 
 // ---- commands -------------------------------------------------------------
 
@@ -730,6 +745,12 @@ const commands: Record<string, () => void | Promise<void>> = {
     viewport.visibility.reset();
     afterVisibility("Temporary hide/isolate reset");
   },
+  visibilityGraphics() {
+    const v = activeView();
+    if (!v || v.category !== Cat.View) return status("Visibility/Graphics: open a view first (not a sheet or schedule).");
+    vgDialog?.close();
+    vgDialog = openDialog(`Visibility/Graphics \u2014 ${v.name ?? "view"}`, () => viewGraphicsEditor(ctx, v.id), () => (vgDialog = null));
+  },
 };
 
 function selectedCategories(): string[] {
@@ -852,7 +873,7 @@ window.addEventListener("keydown", (ev) => {
   if (two) {
     lastKey = null;
     ev.preventDefault();
-    return setTool(two);
+    return two.startsWith("cmd:") ? void commands[two.slice(4)]?.() : setTool(two);
   }
   if (tool.key?.(ev)) return ev.preventDefault();
   if (ev.key === "Escape") return setTool("select");
@@ -873,7 +894,7 @@ window.addEventListener("keydown", (ev) => {
 });
 
 /** The tool a single-letter shortcut started may hand its selection on to a two-letter one. */
-const TWO_LETTER: Record<string, string> = { mv: "move", co: "copy", cc: "copy", ro: "rotate", mm: "mirror", dm: "mirror", ar: "array", al: "align", of: "offset", tr: "trim", sl: "split" };
+const TWO_LETTER: Record<string, string> = { vv: "cmd:visibilityGraphics", vg: "cmd:visibilityGraphics", mv: "move", co: "copy", cc: "copy", ro: "rotate", mm: "mirror", dm: "mirror", ar: "array", al: "align", of: "offset", tr: "trim", sl: "split" };
 let lastKey: { key: string; at: number } | null = null;
 
 /** Options strip for the active tool (Copy, Disjoin, Number…), over the top of the view. */
@@ -899,6 +920,102 @@ function renderToolOptions(options: ToolOption[] | null): void {
       return label;
     }),
   );
+}
+
+let vgDialog: { refresh(): void; close(): void } | null = null;
+
+/** Elements like `el`: same type (or family type), else same category. */
+function similar(el: ModelElement): ModelElement[] {
+  const fam = (e: ModelElement) => (e.params as { familyId?: unknown; typeName?: unknown });
+  return doc.all().filter((e) => {
+    if (e.category !== el.category) return false;
+    if (el.typeId) return e.typeId === el.typeId;
+    if (el.category === Cat.FamilyInstance) return fam(e).familyId === fam(el).familyId && fam(e).typeName === fam(el).typeName;
+    return true;
+  });
+}
+
+function openCanvasMenu(ev: MouseEvent): void {
+  const items: MenuItem[] = [];
+  if (tool.name !== "select") items.push({ label: "Cancel", hint: "Esc", action: () => setTool("select") }, "-");
+  let id = viewport.pick(ev);
+  const hit = id ? doc.get(id) : undefined;
+  const g = hit && groupOf(hit);
+  if (g && doc.has(g)) id = g;
+  if (id && tool.name === "select") {
+    if (!selection.includes(id)) ctx.setSelection([id]);
+    const el = doc.require(id);
+    const type = el.typeId ? doc.get(el.typeId) : undefined;
+    const many = selection.length > 1;
+    const walls = selection.map((s) => doc.get(s)).filter((e): e is ModelElement => e?.category === Cat.Wall);
+    items.push(
+      { heading: many ? `${selection.length} elements` : `${el.category}${type?.name ? `: ${type.name}` : el.name ? `: ${el.name}` : ""}` },
+      { label: "Move", hint: "MV", action: () => setTool("move") },
+      { label: "Copy", hint: "CO", action: () => setTool("copy") },
+      { label: "Rotate", hint: "RO", action: () => setTool("rotate") },
+      { label: "Mirror", hint: "MM", action: () => setTool("mirror") },
+      { label: "Array", hint: "AR", action: () => setTool("array") },
+    );
+    if (walls.length) {
+      items.push({
+        label: walls.length > 1 ? `Flip ${walls.length} walls` : "Flip orientation",
+        action: () => edit(`Flip wall${walls.length > 1 ? "s" : ""}`, (tx) => walls.forEach((w) => flipWall(tx, doc, w.id))),
+      });
+    }
+    items.push("-");
+    if (type && !many) items.push({ label: "Edit Type", action: () => ctx.setSelection([type.id]) });
+    items.push(
+      {
+        label: "Select All Instances: Visible in View",
+        action: () => {
+          const ids = similar(el).filter((e) => viewport.isVisible(e.id)).map((e) => e.id);
+          ctx.setSelection(ids);
+          status(`${ids.length} selected (visible in this view)`);
+        },
+      },
+      {
+        label: "Select All Instances: In Entire Project",
+        action: () => {
+          const ids = similar(el).map((e) => e.id);
+          ctx.setSelection(ids);
+          status(`${ids.length} selected in the project`);
+        },
+      },
+      "-",
+      { label: "Hide Element (temporary)", hint: "H", action: () => void commands.hide?.() },
+      { label: "Hide Category (temporary)", hint: "\u21e7H", action: () => void commands.hideCategory?.() },
+      { label: "Isolate Element (temporary)", hint: "I", action: () => void commands.isolate?.() },
+      { label: "Visibility/Graphics\u2026", hint: "VV", action: () => void commands.visibilityGraphics?.() },
+      "-",
+      { label: "Group", hint: "Ctrl+G", action: () => void commands.group?.() },
+      {
+        label: "Delete",
+        hint: "Del",
+        action: () => {
+          const ids = [...selection];
+          edit(`Delete ${ids.length} element(s)`, (tx) => ids.forEach((d) => doc.has(d) && tx.delete(d)));
+          ctx.setSelection([]);
+        },
+      },
+    );
+  } else {
+    items.push(
+      { label: "Visibility/Graphics\u2026", hint: "VV", action: () => void commands.visibilityGraphics?.() },
+      { label: "Zoom to Fit", hint: "F", action: () => void commands.fit?.() },
+      { label: "Reset Temporary Hide/Isolate", hint: "U", action: () => void commands.resetVisibility?.() },
+    );
+    if (selection.length) items.push({ label: "Deselect All", action: () => ctx.setSelection([]) });
+  }
+  showContextMenu(ev.clientX, ev.clientY, items);
+}
+
+/** Run a model change, reporting errors in the status bar. */
+function edit(name: string, fn: Parameters<Document["transact"]>[1]): void {
+  try {
+    doc.transact(name, fn);
+  } catch (e) {
+    status(`\u26a0 ${(e as Error).message}`);
+  }
 }
 
 function run(ev: KeyboardEvent, cmd: string): void {
@@ -996,6 +1113,7 @@ function refreshTypeSelector(): void {
 
 function refreshPanels(): void {
   grips?.refresh();
+  vgDialog?.refresh();
   refreshTypeSelector();
   renderBrowser($("#browser-body"), ctx);
   renderProperties($("#properties-body"), ctx);

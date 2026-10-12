@@ -2712,3 +2712,23 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
   del.onclick = () => edit(ctx, `Delete ${el.category}`, (tx) => tx.delete(el.id));
   root.replaceChildren(sec, ...extra, h("div", { class: "section" }, del));
 }
+
+/**
+ * The Visibility/Graphics editor for a view (Revit VV): its own settings, or its template's when
+ * a template controls it (edits then change the template, for every view using it).
+ */
+export function viewGraphicsEditor(ctx: PanelContext, viewId: ElementId): HTMLElement {
+  const { doc } = ctx;
+  const view = doc.get<ViewParams>(viewId) as View | undefined;
+  if (!view || view.category !== Cat.View) return h("p", { class: "empty" }, "Open a view first.");
+  const template = view.params.templateId ? doc.get<ViewTemplateParams>(view.params.templateId) : undefined;
+  if (template) {
+    return h(
+      "div",
+      {},
+      h("p", { class: "muted" }, `Controlled by the view template "${template.name}". Changes here change the template, and every view using it.`),
+      visibilityGraphics(ctx, template.id, template.params),
+    );
+  }
+  return visibilityGraphics(ctx, view.id, view.params);
+}

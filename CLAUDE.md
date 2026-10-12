@@ -54,7 +54,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   strip (Copy, Multiple, Disjoin, Number) top-left of the view. Mirror by drawn axis only.
   Align (AL), Offset (OF), Trim/Extend (TR; corner or to boundary), Split (SL) — plans/3D only.
   Grips on the selection (Select tool, plans/sections/sheets): drag ends/vertices; click a line's
-  length label to type a new length; press on a selected element and drag to move it.
+  length label to type a new length; press on a selected element and drag to move it. Selected
+  walls show a flip arrow (exterior side). Right-click (no drag): element menu, or on empty space
+  the view menu with Visibility/Graphics (dialog; also VV). In 3D, orbit pivots on the selection.
 - Known gaps: joins whole-wall (no per-layer cleanup), no disallow-join, crossing walls overlap; walls
   don't attach to floors/roofs; grids straight only;
   floors lack pick-walls/slope arrows; roofs exact for convex/L/T/U only; doors/windows parametric;

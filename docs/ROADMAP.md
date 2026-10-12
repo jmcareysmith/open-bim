@@ -90,7 +90,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [ ] Drag and drop from the Project Browser: views/schedules/legends onto sheets, families into views
 - [ ] Dockable panels (Properties, Project Browser): dock, tab, float, collapse; layout remembered
 - [ ] View tabs (tile/cascade), status bar with selection filter, view control bar (scale, detail level, visual style, hide/isolate)
-- [ ] Right-click menus (Select All Instances, Edit Type, Hide in View…), two-letter shortcuts, shortcut editor
+- [ ] Right-click menus (Select All Instances, Edit Type, Hide in View…), two-letter shortcuts, shortcut editor — menus done (element: modify tools, Flip, Edit Type, Select All Instances, hide/isolate, V/G, Group, Delete; empty space: V/G dialog, Zoom to Fit, Reset); two-letter shortcuts for modify tools + VV; no shortcut editor yet
 
 ## Phase 8 — MEP & visual programming
 - [ ] Connectors and MEP systems (supply/return air, cold/hot water, sanitary, power); system browser

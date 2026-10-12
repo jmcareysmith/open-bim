@@ -221,6 +221,8 @@ export class Viewport {
     this.controlsDraw.mouseButtons = { LEFT: null, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN };
     this.controlsDraw.enabled = false;
     this.controlsDraw.addEventListener("change", () => (this.needsRender = true));
+    // Orbit about the selection (Revit): in 3D with something selected, the orbit pivots on it.
+    this.renderer.domElement.addEventListener("pointerdown", (ev) => this.orbitAboutSelection(ev), { capture: true });
 
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.6));
     const sun = new THREE.DirectionalLight(0xffffff, 1.6);
@@ -790,7 +792,7 @@ export class Viewport {
     this.needsRender = true;
   }
 
-  private mmPerPixel(): number {
+  mmPerPixel(): number {
     const h = Math.max(1, this.renderer.domElement.clientHeight);
     const cam = this.camera;
     if (cam instanceof THREE.OrthographicCamera) return (cam.top - cam.bottom) / cam.zoom / h;
@@ -884,6 +886,62 @@ export class Viewport {
   };
 
   private frameListeners = new Set<() => void>();
+
+  /** Is the element drawn in the current view (after V/G, phase and temporary hide)? */
+  isVisible(id: ElementId): boolean {
+    return !!this.objects.get(id)?.visible || this.drawing.has(id);
+  }
+
+  /** Centre of the selected elements' 3D extents, or null. */
+  selectionPivot(): THREE.Vector3 | null {
+    const box = new THREE.Box3();
+    for (const id of this.selected) {
+      const g = this.objects.get(id);
+      if (g?.visible) box.expandByObject(g);
+    }
+    return box.isEmpty() ? null : box.getCenter(new THREE.Vector3());
+  }
+
+  private orbitAboutSelection(ev: PointerEvent): void {
+    if (this.mode !== "3d" || !(ev.button === 2 || (ev.button === 1 && ev.shiftKey))) return;
+    const pivot = this.selectionPivot();
+    if (!pivot) return;
+    // Take the drag from OrbitControls; rotate the camera and its target rigidly about the pivot,
+    // so the view doesn't jump to centre the selection.
+    ev.stopImmediatePropagation();
+    const el = this.renderer.domElement;
+    el.setPointerCapture(ev.pointerId);
+    let last = { x: ev.clientX, y: ev.clientY };
+    const cam = this.camera3d;
+    const target = this.controls3d.target;
+    const zUp = new THREE.Vector3(0, 0, 1);
+    const turn = (q: THREE.Quaternion) => {
+      cam.position.sub(pivot).applyQuaternion(q).add(pivot);
+      target.sub(pivot).applyQuaternion(q).add(pivot);
+    };
+    const move = (mv: PointerEvent) => {
+      const dx = mv.clientX - last.x;
+      const dy = mv.clientY - last.y;
+      last = { x: mv.clientX, y: mv.clientY };
+      const k = (2 * Math.PI) / el.clientHeight;
+      turn(new THREE.Quaternion().setFromAxisAngle(zUp, -dx * k));
+      const dir = target.clone().sub(cam.position).normalize();
+      const right = dir.clone().cross(zUp).normalize();
+      const pitch = -dy * k;
+      // Stop short of looking straight up or down.
+      const next = dir.clone().applyAxisAngle(right, pitch);
+      if (Math.abs(next.z) < 0.995) turn(new THREE.Quaternion().setFromAxisAngle(right, pitch));
+      cam.lookAt(target);
+      this.needsRender = true;
+    };
+    const up = () => {
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      this.controls3d.update();
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+  }
 
   /** Called after each redraw (camera moves, model changes), e.g. to place overlays. */
   onFrame(fn: () => void): () => void {

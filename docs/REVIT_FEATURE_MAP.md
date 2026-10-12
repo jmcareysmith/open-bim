@@ -172,4 +172,4 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Drag and drop from the Project Browser | 7b | ⬜ |
 | Dockable panels | 7b | ⬜ |
 | View tabs, status bar, view control bar | 7b | ⬜ |
-| Context menus, keyboard shortcuts | 7b | ⬜ |
+| Context menus, keyboard shortcuts | 7b | 🟨 (menus, VV/MV/CO…; no shortcut editor) |

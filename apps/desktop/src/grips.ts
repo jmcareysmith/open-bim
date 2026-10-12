@@ -1,4 +1,4 @@
-import { dragGrip, elementGrips, lineLength, setLineLength, type Element, type ElementId, type Grip, type Vec2 } from "@open-bim/core";
+import { Cat, dragGrip, elementGrips, flipWall, lineLength, setLineLength, wallThickness, type Element, type ElementId, type Grip, type Vec2 } from "@open-bim/core";
 import { viewPoint, type ToolContext } from "./tools.ts";
 
 // Grips and temporary dimensions over the viewport (Revit's drag controls). Shown for the
@@ -10,7 +10,7 @@ import { viewPoint, type ToolContext } from "./tools.ts";
 const MAX_ELEMENTS = 30;
 
 interface Placed {
-  el: HTMLDivElement;
+  el: HTMLElement;
   at: () => Vec2;
 }
 
@@ -58,6 +58,7 @@ export class GripLayer {
       for (const g of elementGrips(doc, el)) this.addGrip(el.id, g);
     }
     if (sel.length === 1) this.addLength(sel[0]!);
+    if (sel.length === 1 && sel[0]!.category === Cat.Wall && this.ctx.viewport.viewMode === "plan") this.addFlip(sel[0]!);
     this.position();
   }
 
@@ -109,6 +110,40 @@ export class GripLayer {
     };
     this.root.append(el);
     this.placed.push({ el, at: () => at });
+  }
+
+  /** Revit's flip arrows: on the wall's exterior side; click to swap the exterior face. */
+  private addFlip(wall: Element): void {
+    const { start, end } = wall.params as unknown as { start: Vec2; end: Vec2 };
+    const len = Math.hypot(end.x - start.x, end.y - start.y);
+    if (len < 1) return;
+    // Exterior is to the left of start → end.
+    const n = { x: -(end.y - start.y) / len, y: (end.x - start.x) / len };
+    const mid = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+    const half = wallThickness(this.ctx.doc, wall as never) / 2;
+    const b = document.createElement("button");
+    b.className = "flip-arrow";
+    b.textContent = "⇅";
+    b.title = "Flip: swap the wall's exterior side";
+    b.onpointerdown = (ev) => ev.stopPropagation();
+    b.onclick = () => {
+      try {
+        this.ctx.doc.transact("Flip wall", (tx) => flipWall(tx, this.ctx.doc, wall.id));
+      } catch (e) {
+        this.ctx.status(`⚠ ${(e as Error).message}`);
+      }
+      this.refresh();
+    };
+    const at = () => {
+      const off = half + 22 * this.ctx.viewport.mmPerPixel();
+      return { x: mid.x + n.x * off, y: mid.y + n.y * off };
+    };
+    // Point the arrows across the wall, as drawn on screen.
+    const a = this.ctx.viewport.toScreen(mid);
+    const c = this.ctx.viewport.toScreen({ x: mid.x + n.x * 1000, y: mid.y + n.y * 1000 });
+    b.style.rotate = `${Math.atan2(c.y - a.y, c.x - a.x) * (180 / Math.PI) + 90}deg`;
+    this.root.append(b);
+    this.placed.push({ el: b, at });
   }
 
   /** Temporary dimension: the length at the line's midpoint; click to type a new length. */

@@ -260,6 +260,11 @@ for `Column`s (level to level, rotated about their point) and `Beam`s (swept alo
 at level + offset). `PadFooting`s are boxes under a point; `StripFooting`s run under a wall (deleted
 with it). `elementMaterial` reads a type's or element's `materialId` for colour.
 
+**Phasing** — ordered phases in `ProjectSettings.phases`; phased model elements carry
+`phaseCreated` / `phaseDemolished` (no created phase = the last phase). A view's `phase` and
+`phaseFilter` (Show All / Complete / New / Previous + Demo) go through `effectiveGraphics` into
+`elementGraphics`, which hides or overrides (existing halftone, demolished red) by `phaseStatus`.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

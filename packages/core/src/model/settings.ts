@@ -30,6 +30,8 @@ export type ProjectSettingsParams = {
   keynotes?: { key: string; text: string; parent: string | null }[] | null;
   /** Shared coordinates (survey point) — see `toShared`. */
   location?: SiteLocation | null;
+  /** Ordered phases (phases.ts); defaults to Existing, New Construction. */
+  phases?: { id: string; name: string }[] | null;
 };
 
 /**

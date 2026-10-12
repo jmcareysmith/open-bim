@@ -13,7 +13,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Regeneration (change a level → hosted elements update) | 0–1 | 🟨 |
 | Project units & settings | 1 | ✅ |
 | Shared coordinates, project base point, survey point, true north | 5 | 🟨 |
-| Phasing (existing / new / demolished, phase filters) | 6 | ⬜ |
+| Phasing (existing / new / demolished, phase filters) | 6 | ✅ |
 | Design options | 6 | ⬜ |
 | Groups (model & detail) | 4 | 🟨 |
 | Links (linked models) | 5 | 🟨 |

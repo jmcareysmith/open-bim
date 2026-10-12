@@ -1,4 +1,5 @@
 import { registerCategory } from "../categories.ts";
+import { PHASED, phaseGraphics, phaseStatus, viewPhase, type PhaseFilter } from "./phases.ts";
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, ParamValue } from "../element.ts";
 import { Cat } from "./architecture.ts";
@@ -42,6 +43,10 @@ export type ViewGraphicsParams = {
   hiddenCategories: string[];
   categoryOverrides?: Record<string, GraphicOverride> | null;
   filters?: AppliedFilter[] | null;
+  /** Phase filter (templates can set it); see phases.ts. */
+  phaseFilter?: PhaseFilter | null;
+  /** The view's phase (from the view, never the template). */
+  phase?: string | null;
 };
 
 export type ViewTemplateParams = ViewGraphicsParams & {
@@ -95,6 +100,8 @@ export function effectiveGraphics(doc: Document, view: Element<ViewParams>): Vie
     hiddenCategories: src.hiddenCategories,
     categoryOverrides: src.categoryOverrides ?? null,
     filters: src.filters ?? null,
+    phaseFilter: src.phaseFilter ?? view.params.phaseFilter ?? "all",
+    phase: view.params.phase ?? null,
   };
 }
 
@@ -159,6 +166,13 @@ export function elementGraphics(doc: Document, g: ViewGraphicsParams, el: Elemen
   let visible = !g.hiddenCategories.includes(el.category) && cat.visible !== false;
   let halftone = cat.halftone ?? false;
   let color = cat.color ?? null;
+  // Phasing: the view's phase filter hides or overrides by the element's status in its phase.
+  if (PHASED.has(el.category) && g.phaseFilter && g.phaseFilter !== "none") {
+    const pg = phaseGraphics(g.phaseFilter, phaseStatus(doc, el, viewPhase(doc, g.phase)));
+    if (!pg.visible) visible = false;
+    if (pg.halftone) halftone = true;
+    if (pg.color !== undefined && color === null) color = pg.color;
+  }
   const set = { visible: false, halftone: false, color: false };
   for (const af of g.filters ?? []) {
     const f = doc.get<ViewFilterParams>(af.filterId);

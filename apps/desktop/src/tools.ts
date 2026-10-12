@@ -60,6 +60,9 @@ import {
   type Room,
   createArea,
   createAreaBoundary,
+  demolish,
+  phases,
+  viewPhase,
   createBeam,
   createColumn,
   createPadFooting,
@@ -1115,6 +1118,30 @@ export class FootingTool implements Tool {
       if (!p) return;
       const f = doc.transact("Create pad footing", (tx) => createPadFooting(tx, doc, this.ctx.activeLevelId(), p));
       this.ctx.setSelection([f.id]);
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
+  }
+}
+
+/** Demolish: click elements to demolish them in the open view's phase. */
+export class DemolishTool implements Tool {
+  readonly name = "demolish";
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.ctx.status("Demolish: click elements to demolish them in this view's phase.");
+  }
+
+  click(ev: PointerEvent): void {
+    const { doc } = this.ctx;
+    const id = this.ctx.viewport.pick(ev);
+    if (!id) return;
+    const v = this.ctx.activeViewId() ? doc.get<ViewParams>(this.ctx.activeViewId()!) : undefined;
+    const phase = viewPhase(doc, v?.params.phase);
+    try {
+      doc.transact("Demolish", (tx) => demolish(tx, doc, id, phase));
+      this.ctx.status(`Demolished in ${phases(doc).find((p) => p.id === phase)?.name}.`);
     } catch (err) {
       this.ctx.status(`\u26a0 ${(err as Error).message}`);
     }

@@ -11,6 +11,12 @@ import {
   createLegend,
   createSchedule,
   createRevision,
+  DEFAULT_PHASES,
+  PHASED,
+  PHASE_FILTERS,
+  phases,
+  setPhases,
+  viewPhase,
   createStackedWallType,
   stairLayout,
   type BeamParams,
@@ -342,6 +348,13 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
     sec.append(row("View scale", `1 : ${g.scale}`), row("Detail level", g.detailLevel), row("Visibility/Graphics", `from ${template.name}`));
   } else {
     sec.append(...graphicsRows(ctx, view.id, p));
+  }
+  if (p.kind !== "legend") {
+    // Phasing: which phase this view shows, through which filter.
+    sec.append(
+      row("Phase", select(phases(doc).map((ph) => ({ value: ph.id, label: ph.name })), viewPhase(doc, p.phase), (v) => set("Change view phase", { phase: v }))),
+      row("Phase filter", select(PHASE_FILTERS, p.phaseFilter ?? "all", (v) => set("Change phase filter", { phaseFilter: v as ViewParams["phaseFilter"] }))),
+    );
   }
   {
     const make = h("button", { textContent: "Create template from view" });
@@ -1169,7 +1182,23 @@ function settingsSections(ctx: PanelContext, id: ElementId, p: ProjectSettingsPa
     row("DXF plans in shared coordinates", checkbox(loc.dxfShared === true, (v) => setLoc({ dxfShared: v }))),
     row("", h("span", { class: "muted" }, "Project origin's map position; project north turned anticlockwise from grid north. Written to IFC as IfcMapConversion.")),
   );
-  return [info, unitsSec, locSec];
+  // Phases, in order.
+  const phSec = h("div", { class: "section" }, h("h3", {}, "Phases"));
+  const list = p.phases ?? DEFAULT_PHASES;
+  const setList = (next: typeof list) => edit(ctx, "Edit phases", (tx) => setPhases(tx, ctx.doc, next));
+  list.forEach((ph, i) => {
+    const rm = h("button", { textContent: "\u00d7", class: "mini", disabled: list.length <= 1 });
+    rm.onclick = () => setList(list.filter((_, j) => j !== i));
+    phSec.append(h("div", { class: "buttons wrap" }, h("span", { class: "muted" }, String(i + 1)), textInput(ph.name, (v) => v && setList(list.map((x, j) => (j === i ? { ...x, name: v } : x)))), rm));
+  });
+  const addPhase = h("button", { textContent: "Add phase" });
+  addPhase.onclick = () => {
+    let n = list.length + 1;
+    while (list.some((x) => x.id === `phase${n}`)) n++;
+    setList([...list, { id: `phase${n}`, name: `Phase ${n}` }]);
+  };
+  phSec.append(row("", addPhase));
+  return [info, unitsSec, locSec, phSec];
 }
 
 function deleteButton(ctx: PanelContext, el: Element): HTMLButtonElement {
@@ -2413,6 +2442,20 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
     const opts = [{ value: "", label: "\u2014" }, ...table.map((k) => ({ value: k.key, label: `${k.key}  ${k.text}` }))];
     if (cur && !table.some((k) => k.key === cur)) opts.push({ value: cur, label: `${cur} (not in table)` });
     sec.append(row("Keynote", select(opts, cur, (v) => edit(ctx, "Change keynote", (tx) => tx.update(el.id, { keynote: v || undefined })))));
+  }
+  // Phasing of model elements.
+  if (PHASED.has(el.category)) {
+    const list = phases(doc);
+    const pp = el.params as { phaseCreated?: string; phaseDemolished?: string | null };
+    sec.append(
+      row("Phase created", select(list.map((ph) => ({ value: ph.id, label: ph.name })), pp.phaseCreated ?? list.at(-1)!.id, (v) => edit(ctx, "Change phase created", (tx) => tx.update(el.id, { phaseCreated: v })))),
+      row(
+        "Phase demolished",
+        select([{ value: "", label: "None" }, ...list.map((ph) => ({ value: ph.id, label: ph.name }))], pp.phaseDemolished ?? "", (v) =>
+          edit(ctx, "Change phase demolished", (tx) => tx.update(el.id, { phaseDemolished: v || null })),
+        ),
+      ),
+    );
   }
   // Revit "Mark": the instance identifier tags show (rooms and areas use their number).
   if (TAGGABLE.has(el.category) && el.category !== Cat.Room && el.category !== Cat.Area) {

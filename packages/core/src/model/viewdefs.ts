@@ -55,6 +55,9 @@ export type ViewParams = {
    * its views with their own settings rather than deleting them.
    */
   templateId?: ElementId | null;
+  /** Phasing: the phase this view shows and its phase filter (default: last phase, Show All). */
+  phase?: string | null;
+  phaseFilter?: "all" | "complete" | "new" | "previous" | "none" | null;
   /** Area plans: their area scheme. */
   areaScheme?: "gross" | "rentable" | null;
 };

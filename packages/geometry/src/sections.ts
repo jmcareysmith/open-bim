@@ -155,53 +155,87 @@ function crossing(view: View, a: Vec2, b: Vec2): number | null {
   return t * Math.hypot(r.x, r.y);
 }
 
-/** Plan symbols for views: section lines with heads, elevation markers, callout boxes. */
+/**
+ * Plan symbols for views (sized for 1:100):
+ * - section: the cut line, a head bubble at the start (name inside, a filled arrow showing which
+ *   way it looks) and a tail flag at the end pointing the same way;
+ * - elevation: a bubble with the name, and a filled pointer towards what it looks at;
+ * - callout: a box with rounded corners and a named head bubble on a short leader.
+ */
 export function buildViewMarker(doc: Document, el: Element): LineData | null {
   const v = el as View;
   const p = el.params as ViewParams;
   const seg: number[] = [];
+  const loops: Vec2[][] = [];
   const line = (a: Vec2, b: Vec2) => seg.push(a.x, a.y, 0, b.x, b.y, 0);
-  const circle = (c: Vec2, rad: number) => {
-    for (let i = 0; i < 24; i++) {
-      const a0 = (i / 24) * 2 * Math.PI;
-      const a1 = ((i + 1) / 24) * 2 * Math.PI;
-      line({ x: c.x + rad * Math.cos(a0), y: c.y + rad * Math.sin(a0) }, { x: c.x + rad * Math.cos(a1), y: c.y + rad * Math.sin(a1) });
-    }
-  };
+  const poly = (pts: Vec2[], closed = true) => pts.forEach((a, i) => (closed || i < pts.length - 1) && line(a, pts[(i + 1) % pts.length]!));
+  const arc = (c: Vec2, r: number, a0: number, a1: number, n = 24): Vec2[] =>
+    Array.from({ length: n + 1 }, (_, i) => {
+      const t = a0 + ((a1 - a0) * i) / n;
+      return { x: c.x + r * Math.cos(t), y: c.y + r * Math.sin(t) };
+    });
+  const add = (q: Vec2, d: Vec2, k: number): Vec2 => ({ x: q.x + d.x * k, y: q.y + d.y * k });
   const labels: LineData["labels"] = [];
+  const R = 400; // bubble radius
+  const TEXT = 230;
+  // Bubbles show a short reference, as Revit's do: the view's number ("Section 3" → "3").
+  const name = markerLabel(el.name ?? "");
+
+  /** Bubble at `c` with a filled pointer towards `dir` (the view direction). */
+  const bubble = (c: Vec2, dir: Vec2) => {
+    poly(arc(c, R, 0, 2 * Math.PI, 32));
+    const side = { x: -dir.y, y: dir.x };
+    // Pointer: a filled triangle from the bubble's edge out to a tip in the view direction.
+    const tip = add(c, dir, R * 1.75);
+    const a = add(add(c, side, R * 0.7), dir, R * 0.71);
+    const b = add(add(c, side, -R * 0.7), dir, R * 0.71);
+    poly([tip, a, b]);
+    loops.push([tip, a, b]);
+    labels.push({ text: name, position: [c.x, c.y, 0], size: TEXT });
+  };
+
   if ((p.kind === "section" || p.kind === "elevation") && p.line) {
     const { start, end } = p.line;
     const f = viewFrame(v);
     const dir = { x: f.dir[0], y: f.dir[1] };
     const along = { x: f.right[0], y: f.right[1] };
-    const head = 350;
     if (p.kind === "section") {
       line(start, end);
-      // Head bubble before the start, with the view-direction arrow.
-      const c = { x: start.x - along.x * head, y: start.y - along.y * head };
-      circle(c, head);
-      const tip = { x: c.x + dir.x * head * 2, y: c.y + dir.y * head * 2 };
-      line({ x: c.x + along.x * head, y: c.y + along.y * head }, tip);
-      line({ x: c.x - along.x * head, y: c.y - along.y * head }, tip);
-      labels.push({ text: el.name ?? "", position: [c.x, c.y, 0], size: 220 });
+      // Head: bubble just beyond the start, on the line.
+      bubble(add(start, along, -R), dir);
+      // Tail: a short flag showing the view direction.
+      const flag = add(end, dir, R * 1.2);
+      line(end, flag);
+      loops.push([flag, add(flag, dir, -R * 0.5), add(add(flag, dir, -R * 0.25), along, R * 0.45)]);
     } else {
-      // Elevation marker at the line's midpoint: circle with a pointer towards the building.
-      const m = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
-      circle(m, head);
-      const tip = { x: m.x + dir.x * head * 1.8, y: m.y + dir.y * head * 1.8 };
-      line({ x: m.x + along.x * head, y: m.y + along.y * head }, tip);
-      line({ x: m.x - along.x * head, y: m.y - along.y * head }, tip);
-      labels.push({ text: el.name ?? "", position: [m.x - dir.x * head * 1.9, m.y - dir.y * head * 1.9, 0], size: 220 });
+      const m = p.marker ?? { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+      bubble(m, dir);
     }
   } else if (p.kind === "callout" && p.crop) {
     const { min, max } = p.crop;
-    line(min, { x: max.x, y: min.y });
-    line({ x: max.x, y: min.y }, max);
-    line(max, { x: min.x, y: max.y });
-    line({ x: min.x, y: max.y }, min);
-    labels.push({ text: el.name ?? "", position: [min.x, max.y + 300, 0], size: 220, align: "left" });
+    const r = Math.min(400, (max.x - min.x) / 4, (max.y - min.y) / 4);
+    const box = [
+      ...arc({ x: max.x - r, y: min.y + r }, r, -Math.PI / 2, 0, 6),
+      ...arc({ x: max.x - r, y: max.y - r }, r, 0, Math.PI / 2, 6),
+      ...arc({ x: min.x + r, y: max.y - r }, r, Math.PI / 2, Math.PI, 6),
+      ...arc({ x: min.x + r, y: min.y + r }, r, Math.PI, (3 * Math.PI) / 2, 6),
+    ];
+    poly(box);
+    // Head bubble off the top-right corner on a leader.
+    const corner = { x: max.x - r * 0.3, y: max.y - r * 0.3 };
+    const c = { x: max.x + R * 1.6, y: max.y + R * 1.6 };
+    line(corner, add(c, { x: -Math.SQRT1_2, y: -Math.SQRT1_2 }, R));
+    poly(arc(c, R, 0, 2 * Math.PI, 32));
+    labels.push({ text: name, position: [c.x, c.y, 0], size: TEXT });
   } else {
     return null;
   }
-  return { segments: new Float32Array(seg), labels, planOnly: true, dashed: p.kind === "callout" };
+  // Callout boundaries are dashed (Revit's default).
+  return { segments: new Float32Array(seg), labels, planOnly: true, dashed: p.kind === "callout", ...(loops.length ? { fill: { loops, color: 0x2b2f36 } } : {}) };
+}
+
+/** Short bubble text for a view: its trailing number, else its first few characters. */
+export function markerLabel(name: string): string {
+  const m = /(\d+)\s*$/.exec(name);
+  return m ? m[1]! : name.slice(0, 3);
 }

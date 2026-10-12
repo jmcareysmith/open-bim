@@ -121,6 +121,8 @@ export interface Tool {
   click?(ev: PointerEvent): void;
   /** Return true if the key was handled. */
   key?(ev: KeyboardEvent): boolean;
+  /** Press-drag-release places it like two clicks (sections, grids, callouts), when true now. */
+  readonly dragPlace?: boolean;
 }
 
 // ---- Select ---------------------------------------------------------------
@@ -466,6 +468,9 @@ interface DatumLineKind {
 class DatumLineTool implements Tool {
   readonly name: string;
   private start: Vec2 | null = null;
+  get dragPlace(): boolean {
+    return !this.start;
+  }
 
   constructor(
     private ctx: ToolContext,
@@ -485,7 +490,7 @@ class DatumLineTool implements Tool {
   }
 
   private prompt(): void {
-    this.ctx.status(`${this.kind.label(this.ctx.doc)}: click start point, then end point. Shift = free angle.`);
+    this.ctx.status(`${this.kind.label(this.ctx.doc)}: click start point, then end point (or drag). Shift = free angle.`);
   }
 
   private point(ev: PointerEvent): Snapped | null {
@@ -1356,11 +1361,14 @@ export class RoomTool implements Tool {
 export class CalloutTool implements Tool {
   readonly name = "callout";
   private start: Vec2 | null = null;
+  get dragPlace(): boolean {
+    return !this.start;
+  }
   constructor(private ctx: ToolContext) {}
 
   activate(): void {
     this.start = null;
-    this.ctx.status("Callout: click two opposite corners on a floor plan.");
+    this.ctx.status("Callout: click two opposite corners on a floor plan, or drag from one to the other.");
   }
 
   deactivate(): void {

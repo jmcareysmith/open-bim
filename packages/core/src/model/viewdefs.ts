@@ -49,6 +49,8 @@ export type ViewParams = {
    * start -> end (Revit's section head direction); its width is the line's length.
    */
   line?: { start: Vec2; end: Vec2 } | null;
+  /** Elevations: where the marker sits in plan (default: the line's midpoint). */
+  marker?: Vec2 | null;
   /** Sections/elevations: how far beyond the line the view sees, mm. */
   farClip?: number | null;
   /** Sections/elevations: absolute Z crop, mm. */
@@ -242,6 +244,48 @@ export function createBuildingElevations(tx: Transaction, doc: Document, min: Ve
   return specs
     .filter(([name]) => !nameInUse(doc, "elevation", name))
     .map(([name, a, b]) => createElevation(tx, doc, a, b, { name, farClip: depth }));
+}
+
+/**
+ * One elevation placed at `at` (Revit's Elevation tool): it looks squarely at the nearest wall and
+ * spans the whole model across its view, seeing a little past the far side.
+ */
+export function createElevationAt(tx: Transaction, doc: Document, at: Vec2, opts: { name?: string } = {}): View {
+  const walls = doc.byCategory<{ start: Vec2; end: Vec2 }>(Cat.Wall);
+  if (!walls.length) throw new Error("Draw some walls first: an elevation looks at the nearest one");
+  let best: { d: number; look: Vec2 } | null = null;
+  for (const w of walls) {
+    const { start: a, end: b } = w.params;
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (len < 1) continue;
+    const u = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
+    const t = Math.max(0, Math.min(len, (at.x - a.x) * u.x + (at.y - a.y) * u.y));
+    const q = { x: a.x + u.x * t, y: a.y + u.y * t };
+    const d = Math.hypot(q.x - at.x, q.y - at.y);
+    if (best && d >= best.d) continue;
+    // Look square to the wall, towards it.
+    const n = { x: -u.y, y: u.x };
+    const side = (q.x - at.x) * n.x + (q.y - at.y) * n.y;
+    best = { d, look: side >= 0 ? n : { x: -n.x, y: -n.y } };
+  }
+  if (!best) throw new Error("Draw some walls first: an elevation looks at the nearest one");
+  const look = best.look;
+  // The view looks to the left of its line, so the line runs with `look` on its left.
+  const dir = { x: look.y, y: -look.x };
+  const pts = walls.flatMap((w) => [w.params.start, w.params.end]);
+  const across = pts.map((p) => (p.x - at.x) * dir.x + (p.y - at.y) * dir.y);
+  const deep = pts.map((p) => (p.x - at.x) * look.x + (p.y - at.y) * look.y);
+  const m = 1000;
+  const lo = Math.min(...across) - m;
+  const hi = Math.max(...across) + m;
+  let name = opts.name;
+  for (let i = 1; !name || nameInUse(doc, "elevation", name); i++) name = `Elevation ${i}`;
+  const v = createElevation(tx, doc, { x: at.x + dir.x * lo, y: at.y + dir.y * lo }, { x: at.x + dir.x * hi, y: at.y + dir.y * hi }, {
+    name,
+    farClip: Math.max(1000, Math.max(...deep) + 3000),
+  });
+  tx.update<ViewParams>(v.id, { marker: { ...at } });
+  return doc.require<ViewParams>(v.id) as View;
 }
 
 /** Callout: a cropped plan region of a floor plan, usually at a larger scale. */

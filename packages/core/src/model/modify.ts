@@ -303,6 +303,7 @@ function transformed(c: Ctx, el: Element): Record<string, unknown> | null {
         // A section looks to the left of its line; swap the ends so a mirrored one looks the mirrored way.
         p.line = mirror ? { start: b, end: a } : { start: a, end: b };
       }
+      if (v.marker) p.marker = applyAffine(t, v.marker);
       if (v.crop) {
         if (!isTranslation(t)) throw new Error("Callouts can only be moved");
         p.crop = { min: applyAffine(t, v.crop.min), max: applyAffine(t, v.crop.max) };

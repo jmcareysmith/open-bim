@@ -142,6 +142,7 @@ import { openFindReplace, openSpelling } from "./textdialogs.ts";
 import { SymbolTool } from "./symboltool.ts";
 import { DetailComponentTool } from "./detailtool.ts";
 import { AttachTool } from "./attachtool.ts";
+import { ElevationTool } from "./elevationtool.ts";
 
 /** The family editor's Void toggle; one element, shown on the Create tab. */
 const voidForm = Object.assign(document.createElement("input"), { type: "checkbox", id: "void-form" });
@@ -458,6 +459,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   symbol: new SymbolTool(ctx),
   detailcomponent: new DetailComponentTool(ctx),
   attach: new AttachTool(ctx),
+  elevation: new ElevationTool(ctx),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
 const DRAWING_TOOLS = new Set(["select", "symbol", "detailcomponent", "placegroup", "attach", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution"]);
@@ -568,19 +570,34 @@ function setTool(name: string): void {
 
 const canvas = viewport.renderer.domElement;
 let downAt: { x: number; y: number } | null = null;
+// Press-drag-release as two clicks, for tools that allow it (sections, grids, callouts).
+let dragPlace: { down: PointerEvent; started: boolean } | null = null;
 canvas.addEventListener("pointerdown", (ev) => {
   if (ev.button === 0) downAt = { x: ev.clientX, y: ev.clientY };
+  dragPlace = ev.button === 0 && tool.dragPlace ? { down: ev, started: false } : null;
   tool.pointerDown?.(ev);
 });
 // Listen on window so a box-select drag that leaves the canvas still finishes.
 window.addEventListener("pointerup", (ev) => {
+  if (dragPlace?.started && ev.button === 0) {
+    dragPlace = null;
+    downAt = null;
+    return tool.click?.(ev);
+  }
+  dragPlace = null;
   tool.pointerUp?.(ev);
   if (ev.button !== 0 || !downAt) return;
   const moved = Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y);
   downAt = null;
   if (moved < 5 && ev.target === canvas) tool.click?.(ev);
 });
-canvas.addEventListener("pointermove", (ev) => tool.pointerMove?.(ev));
+canvas.addEventListener("pointermove", (ev) => {
+  if (dragPlace && !dragPlace.started && ev.buttons & 1 && Math.hypot(ev.clientX - dragPlace.down.clientX, ev.clientY - dragPlace.down.clientY) > 8) {
+    dragPlace.started = true;
+    tool.click?.(dragPlace.down);
+  }
+  tool.pointerMove?.(ev);
+});
 // Right-click (without dragging; a right-drag pans or orbits): context menu for what's under the
 // cursor, or for the view on empty space.
 let rightDown: { x: number; y: number } | null = null;

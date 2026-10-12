@@ -73,4 +73,5 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Revisions (browser → Revisions; Cloud tool; sheet revision schedule) and model groups (Group /
   Ctrl+G; Place copy; Apply to other instances; Ungroup).
 - Plugins + scripting console (toolbar Console or `; docs/PLUGINS.md, examples/plugins).
-- Next: Phase 5 — IFC4 export then import (web-ifc), DXF/DWG, shared coordinates/links, glTF/OBJ.
+- IFC: Export IFC (IFC4, packages/ifc) and Import IFC (web-ifc → DirectShapes on matching levels).
+- Next: Phase 5 — DXF/DWG import & export, then shared coordinates/links, then glTF/OBJ.

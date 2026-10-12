@@ -19,4 +19,5 @@ export * from "./constraints.ts";
 export * from "./rooms.ts";
 export * from "./legends.ts";
 export * from "./revisions.ts";
+export * from "./directshape.ts";
 export * from "./schedules.ts";

@@ -22,6 +22,7 @@ import { buildFamilyInstance, nestedMeshes } from "./components.ts";
 import { buildViewMarker } from "./sections.ts";
 import { buildAnnotationLines } from "./annotations.ts";
 import { buildLegendLines } from "./legends.ts";
+import { buildDirectShape } from "./directshape.ts";
 import { buildRevisionCloudLines } from "./revisions.ts";
 import { buildAreaBoundaryLines, buildAreaLines, buildRoomLines, buildRoomSeparatorLines } from "./rooms.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
@@ -84,6 +85,7 @@ export class SimpleKernel implements GeometryKernel {
   private mesher = (fd: Document, v: Values) => this.familyMesh(fd, v);
   private builders = new Map<string, Builder>([
     [Cat.Wall, buildWall],
+    [Cat.DirectShape, buildDirectShape],
     [Cat.Floor, buildFloor],
     [Cat.Ceiling, buildCeiling],
     [Cat.Roof, buildRoof],

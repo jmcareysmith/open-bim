@@ -67,8 +67,11 @@ import { OcctKernel, SimpleKernel, areaLoopsFromWalls, scheduleTable, createPlan
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
 import gcsWasmUrl from "@salusoft89/planegcs/dist/planegcs_dist/planegcs.wasm?url";
 import { LIBRARY } from "@open-bim/library";
-import { exportIfc } from "@open-bim/ifc";
-import { openProject, openText, saveBytes, savePdf, saveProject, saveText } from "./io.ts";
+// The IFC exporter is small; web-ifc (import) loads on demand.
+import { exportIfc } from "@open-bim/ifc/export";
+import type { IfcApi } from "@open-bim/ifc";
+import ifcWasmUrl from "web-ifc/web-ifc.wasm?url";
+import { openBytes, openProject, openText, saveBytes, savePdf, saveProject, saveText } from "./io.ts";
 import { renderBrowser, renderProperties, renderSchedulePane, type PanelContext } from "./panels.ts";
 import { PluginHost, mountConsole } from "./plugins.ts";
 import { buildSample } from "./sample.ts";
@@ -119,6 +122,7 @@ interface Session {
 }
 /** Component tool: the family type chosen in the type selector ("familyId|type"). */
 let activeComponentKey: string | undefined;
+let ifcApi: IfcApi | undefined;
 
 let selection: ElementId[] = [];
 let activeLevelId: ElementId = levels(doc)[0]!.id;
@@ -520,6 +524,22 @@ const commands: Record<string, () => void | Promise<void>> = {
     if (!cats.length) return status("Isolate category: select something first.");
     viewport.visibility.isolateCategories(cats);
     afterVisibility(`Isolated ${cats.join(", ")}`);
+  },
+  async importIfc() {
+    if (projectSession) return status("Import IFC: close the family editor first.");
+    try {
+      const file = await openBytes({ name: "IFC", extensions: ["ifc"] });
+      if (!file) return;
+      status(`Reading ${file.name}\u2026`);
+      // web-ifc (and its wasm) loads on first use.
+      const ifc = await import("@open-bim/ifc");
+      ifcApi ??= await ifc.createIfcApi(() => ifcWasmUrl);
+      const r = await ifc.importIfc(doc, file.bytes, ifcApi);
+      status(`Imported ${r.shapes} element(s) from ${file.name}${r.levelsCreated ? `, ${r.levelsCreated} new level(s)` : ""}. Undo removes the import.`);
+      viewport.zoomToFit();
+    } catch (err) {
+      status(`\u26a0 IFC import failed: ${(err as Error).message}`);
+    }
   },
   async exportIfc() {
     if (projectSession) return status("Export IFC: close the family editor first.");

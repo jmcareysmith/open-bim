@@ -93,6 +93,24 @@ export async function saveText(text: string, defaultName: string, filter: { name
   return defaultName;
 }
 
+/** Pick and read a binary file (e.g. an .ifc). Returns its bytes and name. */
+export async function openBytes(filter: { name: string; extensions: string[] }): Promise<{ bytes: Uint8Array; name: string } | null> {
+  if (isTauri()) {
+    const { open } = await import("@tauri-apps/plugin-dialog");
+    const { readFile } = await import("@tauri-apps/plugin-fs");
+    const path = await open({ filters: [filter], multiple: false, directory: false });
+    return path ? { bytes: await readFile(path), name: path.split(/[\\/]/).pop() ?? path } : null;
+  }
+  return new Promise((resolve) => {
+    const input = Object.assign(document.createElement("input"), { type: "file", accept: filter.extensions.map((e) => `.${e}`).join(",") });
+    input.onchange = async () => {
+      const f = input.files?.[0];
+      resolve(f ? { bytes: new Uint8Array(await f.arrayBuffer()), name: f.name } : null);
+    };
+    input.click();
+  });
+}
+
 /** Pick and read a text file. */
 export async function openText(filter: { name: string; extensions: string[] }): Promise<string | null> {
   if (isTauri()) {

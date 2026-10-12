@@ -56,6 +56,7 @@ export const Cat = {
   RevisionCloud: "RevisionCloud",
   GroupType: "GroupType",
   Group: "Group",
+  DirectShape: "DirectShape",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

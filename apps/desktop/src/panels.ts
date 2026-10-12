@@ -11,6 +11,7 @@ import {
   createLegend,
   createSchedule,
   createRevision,
+  type DirectShapeParams,
   groupInstances,
   groupMembers,
   moveGroup,
@@ -1595,6 +1596,21 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("X", numberInput(p.position.x, (v) => update<KeynoteLegendParams>("Move keynote legend", { position: { ...p.position, x: v } }))),
         row("Y", numberInput(p.position.y, (v) => update<KeynoteLegendParams>("Move keynote legend", { position: { ...p.position, y: v } }))),
       );
+      break;
+    }
+    case Cat.DirectShape: {
+      const p = el.params as DirectShapeParams;
+      sec.append(
+        row("IFC class", p.ifcClass),
+        row("GlobalId", p.globalId || "\u2014"),
+        row("Level", select(levelOpts, p.levelId, (v) => update<DirectShapeParams>("Change level", { levelId: v }))),
+        row("Triangles", String(p.indices.length / 3)),
+      );
+      const props = Object.entries(p.properties);
+      if (props.length) {
+        sec.append(h("h3", {}, "IFC properties"));
+        for (const [k, v] of props) sec.append(row(k, v));
+      }
       break;
     }
     case Cat.Group: {

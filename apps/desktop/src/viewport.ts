@@ -281,7 +281,7 @@ export class Viewport {
         const material = elementMaterial(this.doc, el);
         // Family voids show as translucent orange in the family editor (Revit convention).
         const isVoid = isFormCategory(el.category) && (el.params as { isVoid?: boolean }).isVoid;
-        group = isVoid ? makeGroup(mesh, VOID_COLOR, 0.35) : makeGroup(mesh, material?.params.color ?? COLORS[el.category] ?? 0xcccccc);
+        group = isVoid ? makeGroup(mesh, VOID_COLOR, 0.35) : makeGroup(mesh, material?.params.color ?? (el.params as { color?: number }).color ?? COLORS[el.category] ?? 0xcccccc);
         group.userData.baseColor = material?.params.color;
         group.userData.solid = true;
         // Symbols drawn with a solid (door swings) ride along in the same group.

@@ -51,7 +51,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Plugin API + scripting console — JS plugins (ES modules) and console; see docs/PLUGINS.md
 
 ## Phase 5 — Interoperability (current)
-- IFC4 export, then import (web-ifc; IfcOpenShell if needed)
+- [x] IFC4 export, then import (web-ifc; IfcOpenShell if needed) — import as DirectShapes (no conversion to native walls yet)
 - DXF/DWG import & export
 - Shared coordinates, links
 - glTF/OBJ export

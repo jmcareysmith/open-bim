@@ -206,7 +206,10 @@ building → storeys, elements (IfcWall/Slab/Roof/Covering/Door/Window/Space/Fur
 triangulated bodies (from the kernel, so OCCT gives cut walls) in storey placements, element types,
 material layer sets with surface colours, Pset_*Common + an "Open-BIM" set (Mark, Keynote, project
 parameters) and Qto_*BaseQuantities. GlobalIds come from element UUIDs, so re-exports are stable.
-Tests re-read the output with web-ifc.
+Tests re-read the output with web-ifc. Import (`importIfc`, web-ifc loaded on demand) maps
+storeys to levels (reusing levels within 1 mm) and every product body to a `DirectShape` (stored
+mesh in model mm/Z-up, IFC class, GlobalId, colour, flattened "Pset.Property" values), in one
+transaction.
 
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.

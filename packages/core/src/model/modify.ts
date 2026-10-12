@@ -304,6 +304,7 @@ function transformed(c: Ctx, el: Element): Record<string, unknown> | null {
         p.line = mirror ? { start: b, end: a } : { start: a, end: b };
       }
       if (v.marker) p.marker = applyAffine(t, v.marker);
+      if (v.headPosition) p.headPosition = applyAffine(t, v.headPosition);
       if (v.crop) {
         if (!isTranslation(t)) throw new Error("Callouts can only be moved");
         p.crop = { min: applyAffine(t, v.crop.min), max: applyAffine(t, v.crop.max) };

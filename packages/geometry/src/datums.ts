@@ -76,9 +76,9 @@ export function buildGridLines(_doc: Document, el: Element, scale = 100): LineDa
 }
 
 /** Grid line pattern, model mm (paper mm × 100): dash, gap, dot, gap. */
-const GRID_DASH = [1200, 300, 150, 300];
+const GRID_DASH = [600, 150, 60, 150];
 /** Solid length at each end of a grid line, model mm. */
-const GRID_END = 800;
+const GRID_END = 500;
 
 /** Reference plane: dashed line at z = 0; its name, if any, labels the end. */
 export function buildReferencePlaneLines(_doc: Document, el: Element, scale = 100): LineData {

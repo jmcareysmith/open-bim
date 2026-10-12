@@ -55,6 +55,8 @@ export type ViewParams = {
   headFamilyId?: ElementId | null;
   tailFamilyId?: ElementId | null;
   markerFamilyId?: ElementId | null;
+  /** Callouts: where the head bubble sits in plan (default: off the box's top-right corner). */
+  headPosition?: Vec2 | null;
   /** Sections and callouts: the pattern of the marker's line in plans (default dashed). */
   markerLine?: LinePattern | null;
   /** Sections/elevations: how far beyond the line the view sees, mm. */
@@ -294,6 +296,12 @@ export function createElevationAt(tx: Transaction, doc: Document, at: Vec2, opts
   });
   tx.update<ViewParams>(v.id, { marker: { ...at } });
   return doc.require<ViewParams>(v.id) as View;
+}
+
+/** Where a callout's head bubble is drawn: its own position, or off the box's top-right corner. */
+export function calloutHeadPosition(p: ViewParams): Vec2 | null {
+  if (!p.crop) return null;
+  return p.headPosition ?? { x: p.crop.max.x + 1300, y: p.crop.max.y + 700 };
 }
 
 /** Callout: a cropped plan region of a floor plan, usually at a larger scale. */

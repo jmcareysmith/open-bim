@@ -9,7 +9,7 @@ import { normaliseFootprint } from "./roofs.ts";
 import { validateRegion } from "./sketch.ts";
 import { tagPosition, type Tag } from "./tags.ts";
 import type { DimensionParams } from "./annotations.ts";
-import { viewFrame, type View, type ViewParams } from "./viewdefs.ts";
+import { calloutHeadPosition, viewFrame, type View, type ViewParams } from "./viewdefs.ts";
 
 // Grips (Revit's drag controls): handles on a selected element that reshape it when dragged —
 // line ends, sketch vertices, stair run ends, a door's place along its wall — or move it.
@@ -99,6 +99,7 @@ export function elementGrips(doc: Document, el: Element): Grip[] {
       return [
         { key: "cmin", point: vp.crop.min, kind: "end" },
         { key: "cmax", point: vp.crop.max, kind: "end" },
+        { key: "head", point: calloutHeadPosition(vp)!, kind: "move" },
       ];
     }
     return [];
@@ -165,6 +166,10 @@ export function dragGrip(tx: Transaction, doc: Document, id: ElementId, key: str
       const t = (to.x - start.x) * u.x + (to.y - start.y) * u.y;
       const line = key === "lstart" ? { start: { x: start.x + u.x * Math.min(t, len - 100), y: start.y + u.y * Math.min(t, len - 100) }, end } : { start, end: { x: start.x + u.x * Math.max(t, 100), y: start.y + u.y * Math.max(t, 100) } };
       tx.update<ViewParams>(id, { line });
+      return;
+    }
+    if (vp.crop && key === "head") {
+      tx.update<ViewParams>(id, { headPosition: { ...to } });
       return;
     }
     if (vp.crop && (key === "cmin" || key === "cmax")) {

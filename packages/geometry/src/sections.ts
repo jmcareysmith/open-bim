@@ -17,6 +17,7 @@ import {
   viewMarkerFamily,
   viewNumber,
   type MarkerRole,
+  calloutHeadPosition,
 } from "@open-bim/core";
 import { GRID_BUBBLE_RADIUS, type LineData } from "./datums.ts";
 import { planLinework, type PlanLinework } from "./hlr.ts";
@@ -232,12 +233,15 @@ export function buildViewMarker(doc: Document, el: Element, scale = 100): LineDa
   const bubble = (c: Vec2, dir: Vec2) => {
     poly(arc(c, R, 0, 2 * Math.PI, 32));
     const side = { x: -dir.y, y: dir.x };
-    // Pointer: a filled triangle from the bubble's edge out to a tip in the view direction.
+    // Pointer: filled from the bubble's edge (not inside it) out to a tip in the view direction.
     const tip = add(c, dir, R * 1.75);
-    const a = add(add(c, side, R * 0.7), dir, R * 0.71);
-    const b = add(add(c, side, -R * 0.7), dir, R * 0.71);
-    poly([tip, a, b]);
-    loops.push([tip, a, b]);
+    const th = Math.atan2(dir.y, dir.x);
+    const edge = arc(c, R, th + Math.PI / 4, th - Math.PI / 4, 8);
+    const a = edge[0]!;
+    const b = edge.at(-1)!;
+    line(tip, a);
+    line(tip, b);
+    loops.push([tip, ...edge]);
     labels.push({ text: name, position: [c.x, c.y, 0], size: TEXT });
   };
 
@@ -266,12 +270,20 @@ export function buildViewMarker(doc: Document, el: Element, scale = 100): LineDa
       ...arc({ x: min.x + r, y: min.y + r }, r, Math.PI, (3 * Math.PI) / 2, 6),
     ];
     box.forEach((a, i) => patterned(a, box[(i + 1) % box.length]!));
-    // Head bubble off the top-right corner on a solid leader with a shoulder.
-    const corner = { x: max.x - r * 0.3, y: max.y - r * 0.3 };
-    const c = { x: max.x + R * 3.2, y: max.y + R * 1.8 };
-    const shoulder = { x: c.x - R * 1.6, y: c.y };
+    // Head bubble (draggable) on a solid leader from the nearest corner, with a short shoulder.
+    const c = calloutHeadPosition(p)!;
+    const inset = r * 0.3;
+    const corners = [
+      { x: min.x + inset, y: min.y + inset },
+      { x: max.x - inset, y: min.y + inset },
+      { x: max.x - inset, y: max.y - inset },
+      { x: min.x + inset, y: max.y - inset },
+    ];
+    const corner = corners.reduce((a, q) => (Math.hypot(q.x - c.x, q.y - c.y) < Math.hypot(a.x - c.x, a.y - c.y) ? q : a));
+    const side = c.x >= corner.x ? -1 : 1;
+    const shoulder = { x: c.x + side * R * 1.6, y: c.y };
     line(corner, shoulder);
-    line(shoulder, { x: c.x - R, y: c.y });
+    line(shoulder, { x: c.x + side * R, y: c.y });
     if (!family("calloutHead", c, { x: 0, y: 1 }, { x: 1, y: 0 })) {
       poly(arc(c, R, 0, 2 * Math.PI, 32));
       labels.push({ text: name, position: [c.x, c.y, 0], size: TEXT });

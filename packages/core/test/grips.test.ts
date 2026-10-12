@@ -6,6 +6,9 @@ import {
   createFloor,
   createRoom,
   createSection,
+  createCallout,
+  floorPlanFor,
+  calloutHeadPosition,
   createElevationAt,
   type ViewParams,
   createWall,
@@ -85,5 +88,16 @@ describe("grips", () => {
     expect(move.point).toEqual({ x: 2000, y: -3000 });
     doc.transact("Drag", (tx) => dragGrip(tx, doc, el.id, "move", { x: 2500, y: -3000 }));
     expect(doc.require<ViewParams>(el.id).params.marker).toEqual({ x: 2500, y: -3000 });
+  });
+
+  it("a callout's head bubble drags on its own and moves with the callout", () => {
+    const { doc, ids } = box();
+    const plan = floorPlanFor(doc, ids.levels.ground)!;
+    const c = doc.transact("C", (tx) => createCallout(tx, doc, plan.id, { x: 0, y: 0 }, { x: 2000, y: 2000 }));
+    expect(elementGrips(doc, c).map((g) => g.key)).toEqual(["cmin", "cmax", "head"]);
+    doc.transact("Drag", (tx) => dragGrip(tx, doc, c.id, "head", { x: -1500, y: 2500 }));
+    expect(calloutHeadPosition(doc.require<ViewParams>(c.id).params)).toEqual({ x: -1500, y: 2500 });
+    doc.transact("Move", (tx) => dragGrip(tx, doc, c.id, "cmax", { x: 3000, y: 3000 }));
+    expect(calloutHeadPosition(doc.require<ViewParams>(c.id).params)).toEqual({ x: -1500, y: 2500 });
   });
 });

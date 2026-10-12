@@ -12,8 +12,8 @@ describe("grid line work", () => {
     expect(k.build(doc, g)).toBeNull();
     const lines = k.buildLines(doc, g)!;
     // Solid ends at the bubbles, dash-dot between (all on the grid's line, spanning it).
-    expect(Array.from(lines.segments.slice(0, 6))).toEqual([0, 0, 0, 0, 800, 0]);
-    expect(Array.from(lines.segments.slice(6, 12))).toEqual([0, 4200, 0, 0, 5000, 0]);
+    expect(Array.from(lines.segments.slice(0, 6))).toEqual([0, 0, 0, 0, 500, 0]);
+    expect(Array.from(lines.segments.slice(6, 12))).toEqual([0, 4500, 0, 0, 5000, 0]);
     expect(lines.segments.length % 6).toBe(0);
     const r = GRID_BUBBLE_RADIUS;
     expect(lines.labels).toEqual([

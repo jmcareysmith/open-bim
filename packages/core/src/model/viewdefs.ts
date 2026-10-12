@@ -58,6 +58,8 @@ export type ViewParams = {
   /** Phasing: the phase this view shows and its phase filter (default: last phase, Show All). */
   phase?: string | null;
   phaseFilter?: "all" | "complete" | "new" | "previous" | "none" | null;
+  /** Design options: which option this view shows per option set (default primary). */
+  designOptions?: Record<string, string> | null;
   /** Area plans: their area scheme. */
   areaScheme?: "gross" | "rentable" | null;
 };

@@ -11,6 +11,13 @@ import {
   createLegend,
   createSchedule,
   createRevision,
+  acceptPrimary,
+  addOption,
+  createOptionSet,
+  elementOption,
+  makePrimary,
+  optionSets,
+  setDesignOption,
   DEFAULT_PHASES,
   PHASED,
   PHASE_FILTERS,
@@ -355,6 +362,24 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
       row("Phase", select(phases(doc).map((ph) => ({ value: ph.id, label: ph.name })), viewPhase(doc, p.phase), (v) => set("Change view phase", { phase: v }))),
       row("Phase filter", select(PHASE_FILTERS, p.phaseFilter ?? "all", (v) => set("Change phase filter", { phaseFilter: v as ViewParams["phaseFilter"] }))),
     );
+    // Which option each option set shows here (Revit: Visibility/Graphics → Design Options).
+    for (const os of optionSets(doc)) {
+      sec.append(
+        row(
+          os.name,
+          select(
+            [{ value: "", label: "Automatic (primary)" }, ...os.options.map((o) => ({ value: o.id, label: o.name }))],
+            p.designOptions?.[os.id] ?? "",
+            (v) => {
+              const next = { ...(p.designOptions ?? {}) };
+              if (v) next[os.id] = v;
+              else delete next[os.id];
+              set("Change shown design option", { designOptions: next });
+            },
+          ),
+        ),
+      );
+    }
   }
   {
     const make = h("button", { textContent: "Create template from view" });
@@ -1454,6 +1479,33 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   loadFile.onclick = () => ctx.loadFamilyFile();
   fams.append(row("", h("div", { class: "buttons" }, loadFile)));
 
+  // Design options: sets, their options (primary first marked), and accepting the primary.
+  const optSec = h("div", { class: "section" }, h("h3", {}, "Design Options"));
+  for (const set of optionSets(doc)) {
+    optSec.append(h("div", { class: "subhead" }, set.name));
+    for (const o of set.options) {
+      const primary = o.id === set.primary;
+      const mk = h("button", { textContent: primary ? "primary" : "Make primary", class: "mini", disabled: primary });
+      mk.onclick = () => edit(ctx, "Make primary", (tx) => makePrimary(tx, doc, o.id));
+      const n = doc.all().filter((e) => elementOption(e) === o.id).length;
+      optSec.append(h("div", { class: "list-item indent" }, h("span", {}, `${o.name} (${n})`), mk));
+    }
+    const add = h("button", { textContent: "Add option" });
+    add.onclick = () => edit(ctx, "Add design option", (tx) => addOption(tx, doc, set.id));
+    const accept = h("button", { textContent: "Accept primary" });
+    accept.title = "Primary option joins the main model; other options' elements are deleted";
+    accept.onclick = () => edit(ctx, `Accept primary of ${set.name}`, (tx) => acceptPrimary(tx, doc, set.id));
+    optSec.append(h("div", { class: "buttons wrap" }, add, accept));
+  }
+  const newSet = h("button", { textContent: "New option set" });
+  newSet.onclick = () =>
+    edit(ctx, "New option set", (tx) => {
+      let name = "Option Set 1";
+      for (let i = 2; optionSets(doc).some((s) => s.name === name); i++) name = `Option Set ${i}`;
+      createOptionSet(tx, doc, name);
+    });
+  optSec.append(row("", newSet));
+
   // Linked projects.
   const linkSec = h("div", { class: "section" }, h("h3", {}, "Links"));
   for (const l of links(doc)) {
@@ -1559,7 +1611,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
     h("div", { class: "buttons wrap" }, imp, exp),
   );
 
-  root.replaceChildren(project, views, schedSec, sheetsSec, revSec, linkSec, fams, paramsSec, lv, types, mats, vg, counts);
+  root.replaceChildren(project, views, schedSec, sheetsSec, revSec, linkSec, optSec, fams, paramsSec, lv, types, mats, vg, counts);
 }
 
 // ---- Properties -----------------------------------------------------------
@@ -2442,6 +2494,12 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
     const opts = [{ value: "", label: "\u2014" }, ...table.map((k) => ({ value: k.key, label: `${k.key}  ${k.text}` }))];
     if (cur && !table.some((k) => k.key === cur)) opts.push({ value: cur, label: `${cur} (not in table)` });
     sec.append(row("Keynote", select(opts, cur, (v) => edit(ctx, "Change keynote", (tx) => tx.update(el.id, { keynote: v || undefined })))));
+  }
+  // Design option membership (model elements).
+  const sets = optionSets(doc);
+  if (sets.length && PHASED.has(el.category)) {
+    const opts = [{ value: "", label: "Main model" }, ...sets.flatMap((s) => s.options.map((o) => ({ value: o.id, label: `${s.name}: ${o.name}${o.id === s.primary ? " (primary)" : ""}` })))];
+    sec.append(row("Design option", select(opts, elementOption(el) ?? "", (v) => edit(ctx, "Change design option", (tx) => setDesignOption(tx, doc, [el.id], v || null)))));
   }
   // Phasing of model elements.
   if (PHASED.has(el.category)) {

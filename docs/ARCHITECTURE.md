@@ -265,6 +265,11 @@ with it). `elementMaterial` reads a type's or element's `materialId` for colour.
 `phaseFilter` (Show All / Complete / New / Previous + Demo) go through `effectiveGraphics` into
 `elementGraphics`, which hides or overrides (existing halftone, demolished red) by `phaseStatus`.
 
+**Design options** — option sets live in `ProjectSettings.designOptions` (options, primary);
+elements carry `designOption`; views choose per set (`ViewParams.designOptions`, default primary).
+`elementGraphics` hides elements of options a view doesn't show. `acceptPrimary` moves the primary's
+elements into the main model and deletes the other options' elements.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

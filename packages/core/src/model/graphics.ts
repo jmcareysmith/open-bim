@@ -1,4 +1,5 @@
 import { registerCategory } from "../categories.ts";
+import { optionVisible } from "./options.ts";
 import { PHASED, phaseGraphics, phaseStatus, viewPhase, type PhaseFilter } from "./phases.ts";
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, ParamValue } from "../element.ts";
@@ -47,6 +48,8 @@ export type ViewGraphicsParams = {
   phaseFilter?: PhaseFilter | null;
   /** The view's phase (from the view, never the template). */
   phase?: string | null;
+  /** Design option shown per option set (from the view; default each set's primary). */
+  designOptions?: Record<string, string> | null;
 };
 
 export type ViewTemplateParams = ViewGraphicsParams & {
@@ -102,6 +105,7 @@ export function effectiveGraphics(doc: Document, view: Element<ViewParams>): Vie
     filters: src.filters ?? null,
     phaseFilter: src.phaseFilter ?? view.params.phaseFilter ?? "all",
     phase: view.params.phase ?? null,
+    designOptions: view.params.designOptions ?? null,
   };
 }
 
@@ -166,6 +170,8 @@ export function elementGraphics(doc: Document, g: ViewGraphicsParams, el: Elemen
   let visible = !g.hiddenCategories.includes(el.category) && cat.visible !== false;
   let halftone = cat.halftone ?? false;
   let color = cat.color ?? null;
+  // Design options: only the option the view shows (default primary) is visible.
+  if (!optionVisible(doc, el, g.designOptions)) visible = false;
   // Phasing: the view's phase filter hides or overrides by the element's status in its phase.
   if (PHASED.has(el.category) && g.phaseFilter && g.phaseFilter !== "none") {
     const pg = phaseGraphics(g.phaseFilter, phaseStatus(doc, el, viewPhase(doc, g.phase)));

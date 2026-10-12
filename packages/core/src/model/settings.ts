@@ -32,6 +32,8 @@ export type ProjectSettingsParams = {
   location?: SiteLocation | null;
   /** Ordered phases (phases.ts); defaults to Existing, New Construction. */
   phases?: { id: string; name: string }[] | null;
+  /** Design option sets (options.ts). */
+  designOptions?: { id: string; name: string; options: { id: string; name: string }[]; primary: string }[] | null;
 };
 
 /**

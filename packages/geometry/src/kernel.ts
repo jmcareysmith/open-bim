@@ -11,6 +11,7 @@ import {
   type Floor,
   type Vec2,
   type Wall,
+  curtainOf,
 } from "@open-bim/core";
 import { buildGridLines, buildOpeningLines, buildReferencePlaneLines, type LineData } from "./datums.ts";
 import { buildDoor, buildDoorLines, buildWindow, buildWindowLines } from "./doors.ts";
@@ -22,6 +23,7 @@ import { buildFamilyInstance, nestedMeshes } from "./components.ts";
 import { buildViewMarker } from "./sections.ts";
 import { buildAnnotationLines } from "./annotations.ts";
 import { buildLegendLines } from "./legends.ts";
+import { buildCurtainWall } from "./curtain.ts";
 import { buildDirectShape } from "./directshape.ts";
 import { buildLink } from "./links.ts";
 import { buildStair, buildStairLines } from "./stairs.ts";
@@ -70,6 +72,8 @@ export function buildWall(doc: Document, el: Element): MeshData | null {
   const wall = el as Wall;
   const { bottom, top } = wallExtent(doc, wall);
   if (top <= bottom) return null;
+  const grid = curtainOf(doc, wall);
+  if (grid) return buildCurtainWall(doc, wall, grid);
   return extrudePolygon(joinedWallFootprint(doc, wall), [], bottom, top);
 }
 

@@ -81,4 +81,5 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - glTF (.glb) and OBJ (+MTL, zipped) export.
 - Stairs (Stair tool: run ends, Enter; D1/AS1 checks), ramps (1:12 check), railings (sketched or
   on stairs/ramps, F4/AS1 gap). Straight runs only (no winders/curved runs).
-- Next: Phase 6 — curtain walls, then stacked walls, toposolids, structure, phasing/options/clash.
+- Curtain walls: wall type "Curtain Wall - Aluminium 1200 x 1500" (grid in type properties).
+- Next: Phase 6 — stacked walls, then toposolids, structure, phasing/options/clash.

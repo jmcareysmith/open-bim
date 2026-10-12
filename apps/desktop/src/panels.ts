@@ -2219,6 +2219,24 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Total", len(totalThickness(t))),
       );
       const matOpts = materialElements(doc).map((m) => ({ value: m.id, label: m.name ?? m.id }));
+      const grid = t.params.curtain;
+      if (grid) {
+        // Curtain wall: grid, mullions and panels instead of layers.
+        const setGrid = (patch: Partial<typeof grid>) => update<LayeredTypeParams>("Edit curtain grid", { curtain: { ...grid, ...patch } });
+        const num = (k: "uSpacing" | "vSpacing" | "mullionWidth" | "mullionDepth" | "panelThickness", label: string) =>
+          row(label, numberInput(grid[k], (v) => (v > 0 ? setGrid({ [k]: v }) : ctx.status("⚠ Must be positive"))));
+        sec.append(
+          h("h3", {}, "Curtain grid"),
+          num("uSpacing", "Vertical grid spacing (max)"),
+          num("vSpacing", "Horizontal grid spacing (max)"),
+          num("mullionWidth", "Mullion width"),
+          num("mullionDepth", "Mullion depth"),
+          num("panelThickness", "Panel thickness"),
+          row("Panel material", select(matOpts, grid.panelMaterialId ?? "", (v) => setGrid({ panelMaterialId: v }))),
+          row("Mullion material", select(matOpts, grid.mullionMaterialId ?? "", (v) => setGrid({ mullionMaterialId: v }))),
+        );
+        break;
+      }
       sec.append(h("h3", {}, "Layers (exterior / top first)"));
       t.params.layers.forEach((layer, i) => {
         const setLayer = (name: string, patch: Partial<typeof layer>) =>

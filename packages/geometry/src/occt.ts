@@ -12,6 +12,7 @@ import {
   type Values,
   type Wall,
   type WallCut,
+  curtainOf,
 } from "@open-bim/core";
 import { mergeMeshes } from "./doors.ts";
 import { formMesh } from "./forms.ts";
@@ -51,7 +52,8 @@ export class OcctKernel implements GeometryKernel {
     if (el.category === Cat.Wall) {
       const wall = el as Wall;
       const cuts = wallCuts(doc, wall);
-      if (cuts.length) return this.buildWallWithCuts(doc, wall, cuts);
+      // Curtain walls aren't cut: panels and mullions are built on their own grid.
+      if (cuts.length && !curtainOf(doc, wall)) return this.buildWallWithCuts(doc, wall, cuts);
     }
     if (el.category === Cat.FamilyInstance) return buildFamilyInstance(doc, el, this.mesher);
     if (el.category === Cat.Link) return buildLink(doc, el, this);

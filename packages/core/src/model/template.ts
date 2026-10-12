@@ -8,7 +8,7 @@ import { create3DView, createFloorPlan } from "./viewdefs.ts";
 
 export interface TemplateIds {
   levels: { ground: ElementId; first: ElementId; roof: ElementId };
-  wallTypes: { exterior: ElementId; interior: ElementId };
+  wallTypes: { exterior: ElementId; interior: ElementId; curtain: ElementId };
   floorTypes: { slab: ElementId; timber: ElementId };
   ceilingTypes: { plasterboard: ElementId };
   roofTypes: { steel: ElementId };
@@ -40,6 +40,8 @@ export function applyResidentialTemplate(doc: Document): TemplateIds {
       ["Long-run Steel", { color: 0x5f6b75, cutPattern: "solid" }],
       ["Purlins 70x45", { color: 0xb08a5a, cutPattern: "timber" }],
       ["Rafters 140x45", { color: 0xb88f55, cutPattern: "crosshatch" }],
+      ["Glazing", { color: 0xa9cfe3, cutPattern: "none" }],
+      ["Aluminium", { color: 0x8a9199, cutPattern: "solid" }],
     ];
     const matId = new Map(mats.map(([name, p]) => [name, createMaterial(tx, doc, name, p).id]));
     const link = (layers: Layer[]): Layer[] => layers.map((l) => ({ ...l, materialId: matId.get(l.material)! }));
@@ -59,6 +61,14 @@ export function applyResidentialTemplate(doc: Document): TemplateIds {
       { function: "structure", material: "Timber Frame 90x45", thickness: 90 },
       { function: "finish2", material: "Plasterboard", thickness: 10 },
     ]);
+    const curtain = tx.create<LayeredTypeParams>(
+      Cat.WallType,
+      {
+        layers: link([{ function: "structure", material: "Aluminium", thickness: 100 }]),
+        curtain: { uSpacing: 1200, vSpacing: 1500, mullionWidth: 50, mullionDepth: 100, panelThickness: 24, panelMaterialId: matId.get("Glazing")!, mullionMaterialId: matId.get("Aluminium")! },
+      },
+      { name: "Curtain Wall - Aluminium 1200 x 1500" },
+    ).id;
     const slab = ft("Concrete Slab 100", [{ function: "structure", material: "Concrete", thickness: 100 }]);
     const timber = ft("Timber Floor - 20 Ply on 240 Joists", [
       { function: "finish1", material: "Plywood", thickness: 20 },
@@ -101,7 +111,7 @@ export function applyResidentialTemplate(doc: Document): TemplateIds {
 
     return {
       levels: { ground, first, roof },
-      wallTypes: { exterior, interior },
+      wallTypes: { exterior, interior, curtain },
       floorTypes: { slab, timber },
       ceilingTypes: { plasterboard },
       roofTypes: { steel },

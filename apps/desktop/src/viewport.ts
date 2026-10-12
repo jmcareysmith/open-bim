@@ -119,6 +119,7 @@ export function toGeometry(mesh: MeshData): THREE.BufferGeometry {
   g.setAttribute("position", new THREE.BufferAttribute(mesh.positions, 3));
   g.setAttribute("normal", new THREE.BufferAttribute(mesh.normals, 3));
   g.setIndex(new THREE.BufferAttribute(mesh.indices, 1));
+  if (mesh.colors) g.setAttribute("color", new THREE.BufferAttribute(mesh.colors, 3));
   g.computeBoundingSphere();
   return g;
 }
@@ -860,8 +861,10 @@ export class Viewport {
 
 function makeGroup(mesh: MeshData, color: number, opacity = 1): THREE.Group {
   const geom = toGeometry(mesh);
+  // Multi-material meshes (curtain walls) carry vertex colours; the material colour then tints them.
   const mat = new THREE.MeshStandardMaterial({
-    color,
+    color: mesh.colors ? 0xffffff : color,
+    vertexColors: !!mesh.colors,
     roughness: 0.85,
     metalness: 0,
     // Double-sided so walls cut by a plan's clip plane read as filled, not hollow.

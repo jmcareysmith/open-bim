@@ -23,7 +23,7 @@ describe("template", () => {
   it("creates levels and types", () => {
     const { doc, ids } = setup();
     expect(doc.require<LevelParams>(ids.levels.first).params.elevation).toBe(2700);
-    expect(doc.byCategory("WallType")).toHaveLength(2);
+    expect(doc.byCategory("WallType")).toHaveLength(3);
     expect(doc.canUndo).toBe(true);
   });
 });

@@ -96,7 +96,31 @@ export const layerMaterialDeps = (el: Element): ElementId[] =>
 export type LayeredTypeParams = {
   /** Exterior → interior (walls) or top → bottom (floors). */
   layers: Layer[];
+  /** Wall types only: a curtain wall (glazed panels on a mullion grid) instead of solid layers. */
+  curtain?: CurtainGrid | null;
 };
+
+/**
+ * Curtain wall grid (Revit: Curtain Wall type). Grid lines divide the wall equally at no more than
+ * the given spacings; mullions run on every grid line and around the edge, panels fill the cells.
+ */
+export type CurtainGrid = {
+  /** Maximum spacing of vertical grid lines along the wall, mm. */
+  uSpacing: number;
+  /** Maximum spacing of horizontal grid lines, mm. */
+  vSpacing: number;
+  mullionWidth: number;
+  mullionDepth: number;
+  panelThickness: number;
+  panelMaterialId?: ElementId | null;
+  mullionMaterialId?: ElementId | null;
+};
+
+/** The curtain grid of a wall's type, if it is a curtain wall. */
+export function curtainOf(doc: Document, wall: Element): CurtainGrid | undefined {
+  const t = wall.typeId ? doc.get<LayeredTypeParams>(wall.typeId) : undefined;
+  return t?.params.curtain ?? undefined;
+}
 
 export function totalThickness(t: Element<LayeredTypeParams>): number {
   return t.params.layers.reduce((sum, l) => sum + l.thickness, 0);

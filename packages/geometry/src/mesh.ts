@@ -6,6 +6,8 @@ export interface MeshData {
   positions: Float32Array;
   normals: Float32Array;
   indices: Uint32Array;
+  /** Optional per-vertex RGB (0–1), for elements with more than one material (curtain walls). */
+  colors?: Float32Array;
 }
 
 export interface Box3 {

@@ -64,8 +64,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Annotate: Dimension, Detail (line, region, cloud), Text (+ Check Spelling, Find/Replace), Tag (+
   Keynote ▾ load/export keynote files), Revisions, Groups. Symbol ▾ places a north arrow
   (true north option), scale bar or break line. Detail → Component ▾ places Detail Item
-  families (library or your own: New family → Detail Item, draw detail lines/regions). Detail Group
-  is still a placeholder. Options bar under the ribbon holds Level/Type.
+  families (library or your own: New family → Detail Item, draw detail lines/regions). Detail Group (or
+  Ctrl+G on one view's drafting) makes a detail group; Place Group puts copies in the open view. Options bar under the ribbon holds Level/Type.
 - Double-click: section/elevation/callout marker opens its view; sheet viewport opens its view;
   a component opens its family in the family editor.
 - Reveal Hidden mode: right-click a magenta element → Unhide Element / Unhide Category. Docking:
@@ -95,7 +95,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Schedules/Quantities and material takeoffs (browser → Schedules; fields, filter, sort/group,
   totals; Export CSV / Excel). Not yet placeable on sheets; no calculated fields.
 - Revisions (browser → Revisions; Cloud tool; sheet revision schedule) and model groups (Group /
-  Ctrl+G; Place copy; Apply to other instances; Ungroup).
+  Ctrl+G; Place copy; Apply to other instances; Ungroup) and detail groups (view drafting).
 - Plugins + scripting console (toolbar Console or `; docs/PLUGINS.md, examples/plugins).
 - IFC: Export IFC (IFC4, packages/ifc) and Import IFC (web-ifc → DirectShapes on matching levels).
 - DXF/DWG: Export DXF/DWG (open view/sheet) and Import DXF/DWG (into the open view as a CadImport).

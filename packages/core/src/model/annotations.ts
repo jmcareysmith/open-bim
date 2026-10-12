@@ -82,6 +82,8 @@ registerCategory({
 
 /** The view that owns an annotation, or undefined for model elements. */
 export function annotationView(el: Element): ElementId | undefined {
+  // Detail groups belong to their view too.
+  if (el.category === Cat.Group) return (el.params as { viewId?: ElementId | null }).viewId ?? undefined;
   return (ANNOTATION_CATEGORIES as readonly string[]).includes(el.category) ? (el.params as { viewId: ElementId }).viewId : undefined;
 }
 

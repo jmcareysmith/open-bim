@@ -1202,13 +1202,21 @@ export class PlaceGroupTool implements Tool {
   click(ev: PointerEvent): void {
     const { doc } = this.ctx;
     if (!this.source || !doc.has(this.source)) return this.ctx.status("Select a group first, then Place copy.");
-    const elevation = doc.require<LevelParams>(this.ctx.activeLevelId()).params.elevation;
-    const raw = this.ctx.viewport.pickPlane(ev, elevation);
-    if (!raw) return;
-    const p = snapPoint(this.ctx, raw, null, ev.shiftKey).p;
     const src = this.source;
+    const detail = !!(doc.require(src).params as { viewId?: unknown }).viewId;
+    let p: Vec2 | null;
+    if (detail) {
+      // Detail groups go in the open view, at a point in its own 2D space.
+      p = viewPoint(this.ctx, ev, null);
+    } else {
+      const elevation = doc.require<LevelParams>(this.ctx.activeLevelId()).params.elevation;
+      const raw = this.ctx.viewport.pickPlane(ev, elevation);
+      p = raw && snapPoint(this.ctx, raw, null, ev.shiftKey).p;
+    }
+    if (!p) return;
+    const at = p;
     try {
-      const g = doc.transact("Place group", (tx) => placeGroup(tx, doc, src, p));
+      const g = doc.transact("Place group", (tx) => placeGroup(tx, doc, src, at, 0, detail ? this.ctx.activeViewId() : undefined));
       this.ctx.setSelection([g.id]);
     } catch (err) {
       this.ctx.status(`\u26a0 ${(err as Error).message}`);

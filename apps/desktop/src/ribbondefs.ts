@@ -16,8 +16,6 @@ export interface RibbonMenus {
   loadDetail(name: string): void;
 }
 
-const SOON = "coming next";
-
 export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): RibbonTab[] {
   const scheduleMenu = (kind: "schedule" | "takeoff"): MenuItem[] => [
     { heading: kind === "schedule" ? "New schedule of…" : "New material takeoff of…" },
@@ -241,7 +239,7 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
           items: [
             { label: "Create Group", icon: "group", cmd: "group", title: "Group the selection (Ctrl+G)" },
             { label: "Place Group", icon: "copy", cmd: "placeGroupCopy" },
-            { label: "Detail Group", icon: "group", soon: SOON },
+            { label: "Detail Group", icon: "group", cmd: "group", title: "Group one view's detail lines, text, symbols and details (Ctrl+G); Place Group copies it" },
           ],
         },
       ],

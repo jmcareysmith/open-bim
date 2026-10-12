@@ -1,6 +1,7 @@
 import {
   Cat,
   Document,
+  DETAIL_GROUPABLE,
   isDetailFamily,
   createLegend,
   createOptionSet,
@@ -456,7 +457,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   detailcomponent: new DetailComponentTool(ctx),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
-const DRAWING_TOOLS = new Set(["select", "symbol", "detailcomponent", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution"]);
+const DRAWING_TOOLS = new Set(["select", "symbol", "detailcomponent", "placegroup", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution"]);
 let tool: Tool = tools.select!;
 /** Grips and temporary dimensions for the selection (Select tool only). */
 let grips: GripLayer | undefined = new GripLayer(ctx, $("#viewport"));
@@ -718,9 +719,10 @@ const commands: Record<string, () => void | Promise<void>> = {
     if (!c.hidden) c.querySelector<HTMLTextAreaElement>("textarea")?.focus();
   },
   group() {
-    if (!selection.length) return status("Group: select walls, floors, components or rooms first.");
-    // Datums, views and annotation can't be in model groups: leave them out.
-    const ids = selection.filter((id) => GROUPABLE.has(doc.get(id)?.category ?? ""));
+    if (!selection.length) return status("Group: select walls, floors, components or rooms (or one view's detail lines, text, symbols, details) first.");
+    // All drafting → a detail group. Otherwise a model group: datums, views and annotation are left out.
+    const detail = selection.every((id) => DETAIL_GROUPABLE.has(doc.get(id)?.category ?? ""));
+    const ids = detail ? selection : selection.filter((id) => GROUPABLE.has(doc.get(id)?.category ?? ""));
     const skipped = selection.length - ids.length;
     if (!ids.length) return status("Group: none of the selection can be grouped (walls, floors, roofs, components, rooms).");
     try {

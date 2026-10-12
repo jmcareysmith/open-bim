@@ -8,7 +8,8 @@ import { Cat } from "./architecture.ts";
 // deleting the group deletes them). Placing copies a group's members; "apply to all" re-copies one
 // instance's members into every other instance, which is how edits propagate.
 
-export type GroupParams = { origin: Vec2; rotation: number };
+/** `viewId` set: a detail group (view-specific members: lines, regions, text, symbols, details). */
+export type GroupParams = { origin: Vec2; rotation: number; viewId?: ElementId | null };
 export type Group = Element<GroupParams>;
 
 /** Categories that can be grouped (hosted openings come along with their walls). */
@@ -24,10 +25,19 @@ export const GROUPABLE = new Set<string>([
   Cat.Room,
   Cat.RoomSeparator,
 ]);
+/** What detail groups hold: one view's own drafting. */
+export const DETAIL_GROUPABLE = new Set<string>([Cat.DetailLine, Cat.FilledRegion, Cat.TextNote, Cat.Symbol, Cat.DetailComponent, Cat.RevisionCloud]);
 const HOSTED = new Set<string>([Cat.Door, Cat.Window, Cat.WallOpening]);
 
 registerCategory({ name: Cat.GroupType, dependencies: () => [], cascadeDelete: false, isType: true });
-registerCategory({ name: Cat.Group, dependencies: (el) => (el.typeId ? [el.typeId] : []), cascadeDelete: true, isType: false });
+registerCategory({
+  name: Cat.Group,
+  dependencies: (el) => [...(el.typeId ? [el.typeId] : []), ...((el.params as GroupParams).viewId ? [(el.params as GroupParams).viewId!] : [])],
+  cascadeDelete: true,
+  isType: false,
+});
+
+export const isDetailGroup = (g: Element) => g.category === Cat.Group && !!(g.params as GroupParams).viewId;
 
 export function groupOf(el: Element): ElementId | undefined {
   const g = (el.params as { groupId?: unknown }).groupId;
@@ -71,6 +81,7 @@ export function transformedParams(el: Element, t: PlanTransform): Params {
   if (Array.isArray(p.boundary)) p.boundary = (p.boundary as Vec2[]).map((q) => applyTransform(t, q));
   if (Array.isArray(p.holes)) p.holes = (p.holes as Vec2[][]).map((h) => h.map((q) => applyTransform(t, q)));
   if (el.category === Cat.FamilyInstance && !p.hostId && typeof p.rotation === "number") p.rotation = p.rotation + t.angle;
+  if ((el.category === Cat.Symbol || el.category === Cat.DetailComponent) && typeof p.rotation === "number") p.rotation = p.rotation + t.angle;
   return p as Params;
 }
 
@@ -88,8 +99,16 @@ function points(el: Element): Vec2[] {
 /** Group elements (plus doors/windows/openings in grouped walls) under a new group type. */
 export function createGroup(tx: Transaction, doc: Document, ids: ElementId[], name?: string): Group {
   const picked = ids.map((id) => doc.require(id));
-  const bad = picked.find((e) => !GROUPABLE.has(e.category));
-  if (bad) throw new Error(`${bad.category} elements can't be grouped`);
+  // All drafting in one view → a detail group; otherwise a model group (no mixing).
+  const detail = picked.length > 0 && picked.every((e) => DETAIL_GROUPABLE.has(e.category));
+  const viewId = detail ? (picked[0]!.params as { viewId: ElementId }).viewId : null;
+  if (detail && picked.some((e) => (e.params as { viewId: ElementId }).viewId !== viewId)) throw new Error("A detail group's elements must all be in one view");
+  const bad = picked.find((e) => !(detail ? DETAIL_GROUPABLE : GROUPABLE).has(e.category));
+  if (bad) {
+    throw new Error(DETAIL_GROUPABLE.has(bad.category) || picked.some((e) => DETAIL_GROUPABLE.has(e.category))
+      ? "Model and detail elements can't share a group: group them separately"
+      : `${bad.category} elements can't be grouped`);
+  }
   if (picked.some((e) => groupOf(e))) throw new Error("An element is already in a group; ungroup it first");
   const members = new Map(picked.map((e) => [e.id, e]));
   for (const e of doc.all()) {
@@ -105,11 +124,12 @@ export function createGroup(tx: Transaction, doc: Document, ids: ElementId[], na
   const xs = pts.map((p) => p.x);
   const ys = pts.map((p) => p.y);
   const origin = { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
-  let typeName = name ?? "Group 1";
-  for (let i = 2; !name && doc.byCategory(Cat.GroupType).some((t) => t.name === typeName); i++) typeName = `Group ${i}`;
+  const base = detail ? "Detail Group" : "Group";
+  let typeName = name ?? `${base} 1`;
+  for (let i = 2; !name && doc.byCategory(Cat.GroupType).some((t) => t.name === typeName); i++) typeName = `${base} ${i}`;
   if (doc.byCategory(Cat.GroupType).some((t) => t.name === typeName)) throw new Error(`A group called "${typeName}" already exists`);
   const type = tx.create(Cat.GroupType, {}, { name: typeName });
-  const group = tx.create<GroupParams>(Cat.Group, { origin, rotation: 0 }, { typeId: type.id }) as Group;
+  const group = tx.create<GroupParams>(Cat.Group, { origin, rotation: 0, ...(viewId ? { viewId } : {}) }, { typeId: type.id }) as Group;
   for (const id of members.keys()) tx.update(id, { groupId: group.id });
   return group;
 }
@@ -129,16 +149,24 @@ function copyMembers(tx: Transaction, doc: Document, source: Group, target: Grou
     const p = transformedParams(m, t) as Record<string, unknown>;
     p.groupId = target.id;
     if (typeof p.hostId === "string" && map.has(p.hostId)) p.hostId = map.get(p.hostId)!;
+    // Detail groups can be placed in another view: their members move there.
+    if (target.params.viewId) p.viewId = target.params.viewId;
     const copy = tx.create(m.category, p as Params, { ...(m.name !== undefined ? { name: m.name } : {}), ...(m.typeId ? { typeId: m.typeId } : {}) });
     map.set(m.id, copy.id);
   }
 }
 
 /** Place another instance of a group's type at `origin` (copies the source instance's members). */
-export function placeGroup(tx: Transaction, doc: Document, sourceId: ElementId, origin: Vec2, rotation = 0): Group {
+export function placeGroup(tx: Transaction, doc: Document, sourceId: ElementId, origin: Vec2, rotation = 0, viewId?: ElementId): Group {
   const source = doc.require<GroupParams>(sourceId) as Group;
   if (source.category !== Cat.Group) throw new Error("Pick a group to copy");
-  const target = tx.create<GroupParams>(Cat.Group, { origin: { ...origin }, rotation }, { typeId: source.typeId! }) as Group;
+  // A detail group goes in the given view (default: the source's); model groups have none.
+  const view = source.params.viewId ? (viewId ?? source.params.viewId) : null;
+  if (view) {
+    const v = doc.require(view);
+    if (v.category !== Cat.View || (v.params as { kind?: string }).kind === "3d") throw new Error("Place detail groups in plans, sections or elevations");
+  }
+  const target = tx.create<GroupParams>(Cat.Group, { origin: { ...origin }, rotation, ...(view ? { viewId: view } : {}) }, { typeId: source.typeId! }) as Group;
   copyMembers(tx, doc, source, target);
   return target;
 }

@@ -122,7 +122,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Materials (graphics, appearance, physical, thermal) | 2 | 🟨 |
 | Surface / cut patterns | 2 | ✅ |
 | Realistic rendering | 7 | ✅ (path traced; no textures yet) |
-| AI render (Gemini-style) | 7 | ⬜ |
+| AI render (Gemini-style) | 7 | ✅ (self-hosted SD WebUI or Gemini, user key) |
 | Sun & shadow studies | 7 | 🟡 (sun position in renders; no shadow-study animation) |
 
 ## 11. Interoperability

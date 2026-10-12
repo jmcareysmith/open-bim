@@ -148,3 +148,8 @@ input.invalid { outline: 1px solid var(--danger); }
 #nz-pane button.active { background: var(--accent, #3d8bfd); color: #fff; }
 #nz-pane ul { padding-left: 18px; }
 #nz-pane input.narrow, #props input.narrow { width: 70px; }
+#render-pane .ai-panel { position: absolute; top: 44px; right: 0; width: min(340px, 90%); background: var(--panel); border-left: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 10px 12px; z-index: 2; font-size: 12px; }
+#render-pane .ai-panel label { display: grid; grid-template-columns: 90px 1fr; gap: 6px; align-items: center; margin: 6px 0; }
+#render-pane .ai-panel textarea { width: 100%; box-sizing: border-box; }
+#render-pane .ai-result { position: absolute; inset: 0; background: #111; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
+#render-pane .ai-result img { max-width: 100%; max-height: calc(100% - 44px); object-fit: contain; }

@@ -98,5 +98,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   minimums in Project Information → H1 energy. Jeremy said build with my own figures for now.
 - Bracing: wall Properties → Bracing (NZS 3604) panels; zones/weights/systems in Project Information;
   NZ Checks → NZS 3604 bracing (enter tabulated demand there). Demand is a provisional estimate.
-- Next: Phase 7 — AI render (self-hosted img2img + optional Gemini with the
-  user's API key), then DWG via an external converter (ODA File Converter / LibreDWG CLI).
+- AI render: Render pane → AI render… (self-hosted SD WebUI API, or Gemini with the user's key).
+  Tested against a mock server only, not a real model.
+- Next: DWG via an external converter (ODA File Converter / LibreDWG CLI) from the Tauri side,
+  reusing DXF import/export; then Phase 7 is done.

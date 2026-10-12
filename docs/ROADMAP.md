@@ -68,7 +68,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] CRDT document model (Yjs) for multi-user editing — per-param merge, remote edits kept out of local undo, orphan repair, presence
 - [x] Cloud sync — self-hosted sync server (`packages/collab`, rooms saved to disk, shared access token); no accounts or hosted service yet
 - [x] Realistic rendering — progressive GPU path tracer (three-gpu-pathtracer) of the 3D view; sun for the site, date and time; glass; material roughness/metalness/transparency; Save PNG
-- AI render — needs a service/API decision (not started)
+- [x] AI render — img2img from the path-traced render: self-hosted (Stable Diffusion WebUI API: AUTOMATIC1111/Forge) or Gemini with the user's own API key
 - [x] NZ H1 compliance — schedule method: construction R-values on types, climate zones, glazing limit (provisional minimums, editable per project)
 - [x] NZS 3604 bracing module — panels on walls, automatic bracing lines per storey/direction, wind + EQ demand (provisional estimate or tabulated override), line minimum and spacing checks
 

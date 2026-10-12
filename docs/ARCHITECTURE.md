@@ -360,6 +360,12 @@ tools snap to grid endpoints, intersections and lines.
   values. Lines must carry max(100 BU, 50% of demand / lines) and be ≤ 6 m apart. All provisional.
 - The desktop NZ Checks pane (`apps/desktop/src/nzchecks.ts`) shows the reports.
 
+- AI render (`apps/desktop/src/airender.ts`): sends the render canvas (PNG) with a prompt that
+  pins the geometry to an image-to-image model — a self-hosted Stable Diffusion WebUI API
+  (`/sdapi/v1/img2img`, run with `--api --cors-allow-origins=*`) by default, or Gemini's
+  Interactions API (`gemini-3.1-flash-image`, editable) with the user's own key, kept in
+  localStorage. Request building and response parsing are pure and tested with a fake fetch.
+
 ## Collaboration (`packages/collab`)
 - Multi-user editing binds a `Document` to a Yjs `Y.Doc` (`bindDocument`): a map of element id →
   Y.Map (category, name, typeId, params as a nested Y.Map), so concurrent edits to different params

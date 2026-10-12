@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { elementMaterial, sunDirection, type Document } from "@open-bim/core";
 import type { MeshData } from "@open-bim/geometry";
 import { toGeometry, type Viewport } from "./viewport.ts";
+import { DEFAULT_GEMINI_MODEL, DEFAULT_LOCAL, aiRender, type AiProvider } from "./airender.ts";
 
 // Realistic rendering: a progressive GPU path tracer (three-gpu-pathtracer, loaded on first use)
 // over the 3D view's model solids, lit by the sun for the project's location, date and time plus a
@@ -50,7 +51,8 @@ export async function openRender(host: RenderHost): Promise<() => void> {
   const pause = el("button", { textContent: "Pause" });
   const save = el("button", { textContent: "Save PNG" });
   const close = el("button", { textContent: "Close" });
-  bar.append(el("strong", { textContent: "Render" }), dateIn, timeIn, el("span", { textContent: "Exposure" }), exposure, info, pause, save, close);
+  const ai = el("button", { textContent: "AI render\u2026", title: "Restyle this render into a photo with an image model (self-hosted or Gemini)" });
+  bar.append(el("strong", { textContent: "Render" }), dateIn, timeIn, el("span", { textContent: "Exposure" }), exposure, info, pause, save, ai, close);
   const canvasHost = el("div", { className: "render-canvas" });
   pane.append(bar, canvasHost);
   container.append(pane);
@@ -214,6 +216,130 @@ export async function openRender(host: RenderHost): Promise<() => void> {
     pane.remove();
   };
   close.onclick = dispose;
+  ai.onclick = () => openAiPanel(pane, canvasHost, renderer.domElement, host);
   host.status("Rendering. It sharpens as samples build up; change the date or time to move the sun.");
   return dispose;
+}
+
+// ---- AI render ---------------------------------------------------------------------
+
+const AI_STORE = "open-bim.ai-render";
+type AiSettings = { provider: "local" | "gemini"; url: string; steps: number; strength: number; apiKey: string; model: string; prompt: string };
+
+function aiSettings(): AiSettings {
+  const base: AiSettings = { provider: "local", url: DEFAULT_LOCAL.url, steps: DEFAULT_LOCAL.steps, strength: DEFAULT_LOCAL.strength, apiKey: "", model: DEFAULT_GEMINI_MODEL, prompt: "" };
+  try {
+    return { ...base, ...(JSON.parse(localStorage.getItem(AI_STORE) ?? "{}") as Partial<AiSettings>) };
+  } catch {
+    return base;
+  }
+}
+
+function saveAiSettings(s: AiSettings): void {
+  try {
+    localStorage.setItem(AI_STORE, JSON.stringify(s));
+  } catch {
+    /* not remembered */
+  }
+}
+
+/** Side panel: provider settings, prompt, Generate; the result shows over the render. */
+function openAiPanel(pane: HTMLElement, canvasHost: HTMLElement, canvas: HTMLCanvasElement, host: RenderHost): void {
+  pane.querySelector(".ai-panel")?.remove();
+  const s = aiSettings();
+  const panel = document.createElement("div");
+  panel.className = "ai-panel";
+  const field = (label: string, input: HTMLElement) => {
+    const l = document.createElement("label");
+    l.append(label, input);
+    return l;
+  };
+  const text = (key: "url" | "apiKey" | "model", type = "text") => {
+    const i = Object.assign(document.createElement("input"), { type, value: s[key] });
+    i.oninput = () => (s[key] = i.value);
+    return i;
+  };
+  const num = (key: "steps" | "strength", min: number, max: number, step: number) => {
+    const i = Object.assign(document.createElement("input"), { type: "number", min: String(min), max: String(max), step: String(step), value: String(s[key]) });
+    i.onchange = () => {
+      const v = Number(i.value);
+      if (v >= min && v <= max) s[key] = v;
+    };
+    return i;
+  };
+  const provider = document.createElement("select");
+  for (const [v, label] of [
+    ["local", "Self-hosted (Stable Diffusion WebUI API)"],
+    ["gemini", "Google Gemini (your API key)"],
+  ] as const)
+    provider.append(Object.assign(document.createElement("option"), { value: v, textContent: label, selected: s.provider === v }));
+  const localFields = document.createElement("div");
+  localFields.append(field("Server", text("url")), field("Strength (0\u20131)", num("strength", 0.05, 1, 0.05)), field("Steps", num("steps", 5, 80, 1)));
+  const geminiFields = document.createElement("div");
+  const note = document.createElement("p");
+  note.className = "muted";
+  note.textContent = "Your key is kept on this computer only and sent only to Google. The image goes to Google for processing.";
+  geminiFields.append(field("API key", text("apiKey", "password")), field("Model", text("model")), note);
+  const showFields = () => {
+    localFields.hidden = provider.value !== "local";
+    geminiFields.hidden = provider.value !== "gemini";
+  };
+  provider.onchange = () => {
+    s.provider = provider.value as AiSettings["provider"];
+    showFields();
+  };
+  showFields();
+  const prompt = Object.assign(document.createElement("textarea"), { rows: 4, value: s.prompt, placeholder: "e.g. cedar weatherboards, black joinery, native planting, golden hour" });
+  prompt.oninput = () => (s.prompt = prompt.value);
+  const go = Object.assign(document.createElement("button"), { textContent: "Generate" });
+  const close = Object.assign(document.createElement("button"), { textContent: "Close" });
+  const msg = document.createElement("p");
+  msg.className = "muted";
+  close.onclick = () => panel.remove();
+  const bar = document.createElement("div");
+  bar.className = "buttons";
+  bar.append(go, close);
+  const title = document.createElement("strong");
+  title.textContent = "AI render";
+  panel.append(title, field("Provider", provider), localFields, geminiFields, field("Prompt", prompt), bar, msg);
+  pane.append(panel);
+
+  go.onclick = () => {
+    saveAiSettings(s);
+    const p: AiProvider = s.provider === "local" ? { kind: "local", url: s.url, steps: s.steps, strength: s.strength } : { kind: "gemini", apiKey: s.apiKey, model: s.model };
+    go.disabled = true;
+    msg.textContent = "Generating\u2026 (this can take a minute)";
+    canvas.toBlob(async (blob) => {
+      try {
+        if (!blob) throw new Error("Could not capture the render");
+        const out = await aiRender(p, { image: new Uint8Array(await blob.arrayBuffer()), width: canvas.width, height: canvas.height, prompt: s.prompt });
+        showResult(canvasHost, out, host);
+        msg.textContent = "Done. The result is over the render; Save it or Back to return.";
+      } catch (err) {
+        msg.textContent = `\u26a0 ${(err as Error).message}`;
+      } finally {
+        go.disabled = false;
+      }
+    }, "image/png");
+  };
+}
+
+function showResult(canvasHost: HTMLElement, png: Uint8Array, host: RenderHost): void {
+  canvasHost.querySelector(".ai-result")?.remove();
+  const wrap = document.createElement("div");
+  wrap.className = "ai-result";
+  const url = URL.createObjectURL(new Blob([png as BlobPart], { type: "image/png" }));
+  const img = Object.assign(document.createElement("img"), { src: url, alt: "AI render" });
+  const save = Object.assign(document.createElement("button"), { textContent: "Save AI render" });
+  save.onclick = () => void host.savePng(png);
+  const back = Object.assign(document.createElement("button"), { textContent: "Back to render" });
+  back.onclick = () => {
+    URL.revokeObjectURL(url);
+    wrap.remove();
+  };
+  const bar = document.createElement("div");
+  bar.className = "buttons";
+  bar.append(save, back);
+  wrap.append(img, bar);
+  canvasHost.append(wrap);
 }

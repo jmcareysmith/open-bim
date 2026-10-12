@@ -1,3 +1,4 @@
+import type { BracingSettings } from "./bracing.ts";
 import type { H1Settings } from "./h1.ts";
 import { registerCategory } from "../categories.ts";
 import type { Document, Transaction } from "../document.ts";
@@ -37,6 +38,8 @@ export type ProjectSettingsParams = {
   designOptions?: { id: string; name: string; options: { id: string; name: string }[]; primary: string }[] | null;
   /** NZBC H1 settings (h1.ts). */
   h1?: H1Settings | null;
+  /** NZS 3604 bracing settings (bracing.ts). */
+  bracing?: Partial<BracingSettings> | null;
 };
 
 /**

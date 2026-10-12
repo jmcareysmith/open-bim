@@ -70,7 +70,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Realistic rendering — progressive GPU path tracer (three-gpu-pathtracer) of the 3D view; sun for the site, date and time; glass; material roughness/metalness/transparency; Save PNG
 - AI render — needs a service/API decision (not started)
 - [x] NZ H1 compliance — schedule method: construction R-values on types, climate zones, glazing limit (provisional minimums, editable per project)
-- NZS 3604 bracing module
+- [x] NZS 3604 bracing module — panels on walls, automatic bracing lines per storey/direction, wind + EQ demand (provisional estimate or tabulated override), line minimum and spacing checks
 
 ## Phase 8 — MEP & visual programming
 ## Phase 9 — Analysis, rebar, point clouds

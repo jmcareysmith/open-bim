@@ -11,6 +11,12 @@ import {
   createLegend,
   createSchedule,
   createRevision,
+  bracingSettings,
+  setBracingSettings,
+  setWallBracing,
+  wallBracing,
+  type BracedWallParams,
+  type BracingSettings,
   DEFAULT_H1,
   H1_CLASS_LABELS,
   h1Settings,
@@ -301,6 +307,38 @@ function rValueInput(value: number | null | undefined, onCommit: (v: number | nu
     else input.value = value ? String(value) : "";
   };
   return input;
+}
+
+/** NZS 3604 bracing panels on a wall. */
+function bracingRows(ctx: PanelContext, w: Wall): HTMLElement[] {
+  const { doc } = ctx;
+  const systems = bracingSettings(doc).systems;
+  const panels = (w.params as BracedWallParams).bracing ?? [];
+  const save = (next: typeof panels) => edit(ctx, "Edit bracing", (tx) => setWallBracing(tx, doc, w.id, next));
+  const out: HTMLElement[] = [h("div", { class: "subhead" }, "Bracing (NZS 3604)")];
+  const sysOpts = systems.map((s) => ({ value: s.name, label: s.name }));
+  panels.forEach((pn, i) => {
+    const put = (patch: Partial<typeof pn>) => save(panels.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+    const rm = h("button", { textContent: "\u00d7", class: "mini" });
+    rm.onclick = () => save(panels.filter((_, j) => j !== i));
+    out.push(
+      row(`Panel ${i + 1}`, h("div", { class: "buttons wrap" }, select(sysOpts, pn.system, (v) => put({ system: v })), rm)),
+      row("  from start", numberInput(pn.offset, (v) => put({ offset: v }))),
+      row("  length", numberInput(pn.length, (v) => put({ length: v }))),
+    );
+  });
+  const cap = wallBracing(doc, w, systems);
+  if (panels.length) out.push(row("Capacity", `${cap.wind.toFixed(0)} BU wind / ${cap.eq.toFixed(0)} BU EQ`));
+  const add = h("button", { textContent: "Add bracing panel" });
+  add.onclick = () => {
+    const sys = systems[0];
+    if (!sys) return;
+    const used = panels.reduce((a, x) => Math.max(a, x.offset + x.length), 0);
+    const length = Math.min(1200, Math.max(sys.minLength, wallLength(w) - used));
+    save([...panels, { system: sys.name, offset: Math.max(0, Math.min(used, wallLength(w) - length)), length }]);
+  };
+  out.push(row("", add));
+  return out;
 }
 
 /** Thermal (H1) properties of envelope types. */
@@ -1321,7 +1359,52 @@ function settingsSections(ctx: PanelContext, id: ElementId, p: ProjectSettingsPa
     row("Max glazing (% of wall)", intInput(Math.round(req.maxGlazingRatio * 100), 1, 100, (v) => setReq({ ...req, maxGlazingRatio: v / 100 }))),
     row("", h("span", { class: "muted" }, "Provisional H1/AS1 schedule-method values: check them against the current edition. Run the check from NZ Checks.")),
   );
-  return [info, unitsSec, locSec, phSec, h1Sec];
+  // NZS 3604 bracing inputs (provisional estimates; demand overrides live in NZ Checks).
+  const br = bracingSettings(ctx.doc);
+  const setBr = (name: string, patch: Partial<BracingSettings>) => edit(ctx, name, (tx) => setBracingSettings(tx, ctx.doc, patch));
+  const kpa = (v: number, onCommit: (x: number) => void) => {
+    const input = h("input", { type: "number", min: "0", step: "0.05", value: String(v) });
+    input.onchange = () => {
+      const x = Number(input.value);
+      if (Number.isFinite(x) && x >= 0) onCommit(x);
+    };
+    return input;
+  };
+  const brSec = h("div", { class: "section" }, h("h3", {}, "Bracing (NZS 3604)"));
+  brSec.append(
+    row(
+      "Wind zone",
+      select(
+        (["L", "M", "H", "VH", "EH"] as const).map((z) => ({ value: z, label: `${{ L: "Low", M: "Medium", H: "High", VH: "Very high", EH: "Extra high" }[z]} (${br.windSpeeds[z]} m/s)` })),
+        br.windZone,
+        (v) => setBr("Change wind zone", { windZone: v as BracingSettings["windZone"] }),
+      ),
+    ),
+    row("Earthquake zone", select([1, 2, 3, 4].map((n) => ({ value: String(n), label: `Zone ${n}` })), String(br.eqZone), (v) => setBr("Change earthquake zone", { eqZone: Number(v) as BracingSettings["eqZone"] }))),
+    row("Roof weight (kPa)", kpa(br.roofKPa, (v) => setBr("Change roof weight", { roofKPa: v }))),
+    row("Cladding weight (kPa)", kpa(br.claddingKPa, (v) => setBr("Change cladding weight", { claddingKPa: v }))),
+    row("Floor weight (kPa)", kpa(br.floorKPa, (v) => setBr("Change floor weight", { floorKPa: v }))),
+    h("div", { class: "subhead" }, "Bracing systems (BU/m)"),
+  );
+  br.systems.forEach((s, i) => {
+    const put = (patch: Partial<typeof s>) => setBr("Edit bracing system", { systems: br.systems.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+    const num = (v: number, on: (x: number) => void) => {
+      const input = h("input", { type: "number", min: "0", step: "5", value: String(v), class: "narrow" });
+      input.onchange = () => Number(input.value) > 0 && on(Number(input.value));
+      return input;
+    };
+    brSec.append(
+      row("Name", textInput(s.name, (v) => v && put({ name: v }))),
+      row("Wind / EQ", h("div", { class: "buttons" }, num(s.windPerM, (x) => put({ windPerM: x })), num(s.eqPerM, (x) => put({ eqPerM: x })))),
+    );
+  });
+  const addSys = h("button", { textContent: "Add system" });
+  addSys.onclick = () => setBr("Add bracing system", { systems: [...br.systems, { name: `System ${br.systems.length + 1}`, windPerM: 50, eqPerM: 50, minLength: 400 }] });
+  brSec.append(
+    row("", addSys),
+    row("", h("span", { class: "muted" }, "Provisional: demand is estimated from wind speed and seismic weight, not NZS 3604 tables, and system ratings are nominal. Enter tabulated demand in NZ Checks and manufacturers' ratings here.")),
+  );
+  return [info, unitsSec, locSec, phSec, h1Sec, brSec];
 }
 
 function deleteButton(ctx: PanelContext, el: Element): HTMLButtonElement {
@@ -1781,6 +1864,7 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Thickness", len(wallThickness(doc, w))),
         row("Room bounding", checkbox(p.roomBounding !== false, (v) => update<WallParams>("Change room bounding", { roomBounding: v }))),
       );
+      sec.append(...bracingRows(ctx, w));
       break;
     }
     case Cat.Room: {

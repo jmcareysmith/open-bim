@@ -150,7 +150,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 |---|---|---|
 | Energy analysis | 9 | ⬜ |
 | NZ H1 compliance (R-values, schedule method) | 7 | ✅ (provisional minimums) |
-| NZS 3604 bracing | 7 | ⬜ |
+| NZS 3604 bracing | 7 | ✅ (provisional demand; tabulated override) |
 | Structural analysis export | 9 | ⬜ |
 
 ## 14. Extensibility

@@ -352,6 +352,12 @@ tools snap to grid endpoints, intersections and lines.
   `h1Check` compares each envelope type in use with the zone minimum and the glazing share
   (windows + curtain walls over gross exterior wall area) with its limit. Requirements are a
   per-project table (`ProjectSettingsParams.h1`) seeded with provisional H1/AS1 values.
+- Bracing (`core/model/bracing.ts`): walls carry NZS 3604 bracing panels (`bracing`: system,
+  offset, length); systems are a project table of BU/m ratings (wind, EQ). `bracingCheck` groups
+  each storey's walls into lines per direction (within `lineTolerance`), sums capacity, and compares
+  with demand: wind = q(zone speed) × Cp × elevation above mid-storey, EQ = coefficient × seismic
+  weight above mid-storey, both × 20 BU/kN, unless overridden per storey with NZS 3604 table
+  values. Lines must carry max(100 BU, 50% of demand / lines) and be ≤ 6 m apart. All provisional.
 - The desktop NZ Checks pane (`apps/desktop/src/nzchecks.ts`) shows the reports.
 
 ## Collaboration (`packages/collab`)

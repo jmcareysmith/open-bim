@@ -147,3 +147,4 @@ input.invalid { outline: 1px solid var(--danger); }
 #nz-pane .fail { color: #ef5350; white-space: nowrap; }
 #nz-pane button.active { background: var(--accent, #3d8bfd); color: #fff; }
 #nz-pane ul { padding-left: 18px; }
+#nz-pane input.narrow, #props input.narrow { width: 70px; }

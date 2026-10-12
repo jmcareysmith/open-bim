@@ -1,4 +1,4 @@
-import { H1_CLASS_LABELS, h1Check, type Document } from "@open-bim/core";
+import { H1_CLASS_LABELS, bracingCheck, bracingSettings, h1Check, setBracingSettings, type Document } from "@open-bim/core";
 
 // NZ Checks pane: H1 energy (schedule method) and NZS 3604 bracing, run over the open model.
 
@@ -8,12 +8,6 @@ export interface NzChecksHost {
 }
 
 let tab: "h1" | "bracing" = "h1";
-const extraTabs = new Map<string, (host: NzChecksHost) => Node[]>();
-
-/** Register another tab's body (bracing adds itself). */
-export function registerNzTab(name: "bracing", render: (host: NzChecksHost) => Node[]): void {
-  extraTabs.set(name, render);
-}
 
 export const el = (tag: string, text = "", cls = ""): HTMLElement => {
   const e = document.createElement(tag);
@@ -24,7 +18,7 @@ export const el = (tag: string, text = "", cls = ""): HTMLElement => {
 
 export const verdict = (pass: boolean) => el("span", pass ? "✓ Pass" : "✗ Fail", pass ? "pass" : "fail");
 
-function table(head: string[], rows: (string | Node)[][]): HTMLElement {
+function nzTable(head: string[], rows: (string | Node)[][]): HTMLElement {
   const t = el("table");
   const hr = el("tr");
   for (const h of head) hr.append(el("th", h));
@@ -40,7 +34,6 @@ function table(head: string[], rows: (string | Node)[][]): HTMLElement {
   }
   return t;
 }
-export { table as nzTable };
 
 function h1Body(host: NzChecksHost): Node[] {
   const r = h1Check(host.doc);
@@ -51,13 +44,13 @@ function h1Body(host: NzChecksHost): Node[] {
   head.append(el("strong", "Overall: "), verdict(r.pass));
   out.push(head);
   out.push(
-    table(
+    nzTable(
       ["Element", "Type", "Area m²", "R", "Min R", ""],
       r.items.map((i) => [H1_CLASS_LABELS[i.cls], i.typeName, i.area.toFixed(1), i.rValue === null ? "not set" : i.rValue.toFixed(2), i.required.toFixed(2), verdict(i.pass)]),
     ),
   );
   out.push(
-    table(
+    nzTable(
       ["Glazing", "", ""],
       [
         ["Exterior wall area", `${r.wallArea.toFixed(1)} m²`, ""],
@@ -66,6 +59,65 @@ function h1Body(host: NzChecksHost): Node[] {
       ],
     ),
   );
+  if (r.notes.length) {
+    const ul = el("ul");
+    for (const n of r.notes) ul.append(el("li", n));
+    out.push(ul);
+  }
+  return out;
+}
+
+function bracingBody(host: NzChecksHost): Node[] {
+  const { doc } = host;
+  const r = bracingCheck(doc);
+  const set = bracingSettings(doc);
+  const out: Node[] = [
+    el("p", `Wind zone ${set.windZone}, earthquake zone ${set.eqZone}. Demand is a provisional first-principles estimate unless you enter the NZS 3604 table value (BU) below. Lines group walls within ${set.lineTolerance} mm.`, "muted"),
+  ];
+  const head = el("p");
+  head.append(el("strong", "Overall: "), verdict(r.pass));
+  out.push(head);
+  const overrideInput = (levelId: string, key: "windX" | "windY" | "eqX" | "eqY", value: number, overridden: boolean) => {
+    const input = document.createElement("input");
+    input.type = "number";
+    input.min = "0";
+    input.className = "narrow";
+    input.placeholder = value.toFixed(0);
+    input.value = overridden ? String(Math.round(value)) : "";
+    input.title = "NZS 3604 tabulated demand (BU); blank = estimate";
+    input.onchange = () => {
+      const cur = { ...(set.overrides ?? {}) };
+      const lv = { ...(cur[levelId] ?? {}) };
+      if (input.value.trim() === "") delete lv[key];
+      else lv[key] = Number(input.value);
+      cur[levelId] = lv;
+      doc.transact("Bracing demand", (tx) => setBracingSettings(tx, doc, { overrides: cur }));
+    };
+    return input;
+  };
+  for (const s of r.storeys) {
+    const dir = s.direction.toUpperCase() as "X" | "Y";
+    const o = set.overrides?.[s.levelId] ?? {};
+    out.push(el("h3", `${s.levelName} — ${dir} direction`));
+    out.push(
+      nzTable(
+        ["", "Wind BU", "EQ BU", ""],
+        [
+          ["Demand", overrideInput(s.levelId, `wind${dir}`, s.demandWind, o[`wind${dir}`] !== undefined), overrideInput(s.levelId, `eq${dir}`, s.demandEq, o[`eq${dir}`] !== undefined), ""],
+          ["Capacity", s.capacityWind.toFixed(0), s.capacityEq.toFixed(0), verdict(s.capacityWind >= s.demandWind - 1e-6 && s.capacityEq >= s.demandEq - 1e-6)],
+          ["Line spacing", `${(s.maxSpacing / 1000).toFixed(1)} m max`, `limit ${(set.maxLineSpacing / 1000).toFixed(1)} m`, verdict(s.spacingPass)],
+        ],
+      ),
+    );
+    const rows = s.lines.map((l, i) => {
+      const name = el("a", `Line ${dir}${i + 1} @ ${(l.position / 1000).toFixed(2)} m`);
+      name.style.cursor = "pointer";
+      name.onclick = () => host.select(l.walls);
+      return [name, l.wind.toFixed(0), l.eq.toFixed(0), `min ${l.required.toFixed(0)}`, verdict(l.pass)] as (string | Node)[];
+    });
+    if (rows.length) out.push(nzTable(["Line", "Wind", "EQ", "Required", ""], rows));
+    else out.push(el("p", "No walls run in this direction.", "muted"));
+  }
   if (r.notes.length) {
     const ul = el("ul");
     for (const n of r.notes) ul.append(el("li", n));
@@ -93,7 +145,7 @@ export function renderNzChecks(pane: HTMLElement, host: NzChecksHost): void {
   tabs.append(rerun, close);
   let body: Node[];
   try {
-    body = tab === "h1" ? h1Body(host) : (extraTabs.get(tab)?.(host) ?? [el("p", "Not available.")]);
+    body = tab === "h1" ? h1Body(host) : bracingBody(host);
   } catch (err) {
     body = [el("p", `⚠ ${(err as Error).message}`)];
   }

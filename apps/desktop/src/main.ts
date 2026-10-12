@@ -89,6 +89,7 @@ import {
   DimensionTool,
   RoomTool,
   StairTool,
+  RailingTool,
   PlaceGroupTool,
   RoomSeparatorTool,
   AreaTool,
@@ -145,6 +146,7 @@ const TOOL_TYPES: Record<string, string> = {
   door: Cat.DoorType,
   window: Cat.WindowType,
   stair: Cat.StairType,
+  railing: Cat.RailingType,
 };
 const activeTypeId = (cat: string): ElementId | undefined => {
   const id = activeTypes.get(cat);
@@ -369,6 +371,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   dimension: new DimensionTool(ctx),
   room: new RoomTool(ctx),
   stair: new StairTool(ctx),
+  railing: new RailingTool(ctx),
   placegroup: new PlaceGroupTool(ctx),
   roomseparator: new RoomSeparatorTool(ctx),
   area: new AreaTool(ctx),

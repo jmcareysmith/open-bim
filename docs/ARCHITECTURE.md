@@ -235,7 +235,10 @@ material per colour, metres Y-up) and `exportObj` writes OBJ + MTL (zipped by th
 going, width, waist, landing thickness). `stairLayout` (core) derives risers from the height, splits
 them over runs by drawn length (last run takes the rest), builds landings in the arriving run's
 frame, and reports NZBC D1/AS1 private-stair checks. Geometry sweeps a sawtooth profile per run and
-extrudes landings; the plan symbol is a walking line with an arrow and "UP".
+extrudes landings; the plan symbol is a walking line with an arrow and "UP". `Railing`s follow a
+sketched plan path at their level, or a stair side (`hostId` + side) along the nosing line; the
+type gives height, rail and baluster sections and the clear gap (NZBC F4/AS1: ≤ 100 mm). New stairs
+get railings on both sides.
 
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.

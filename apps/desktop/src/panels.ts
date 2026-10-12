@@ -12,6 +12,8 @@ import {
   createSchedule,
   createRevision,
   stairLayout,
+  type RailingParams,
+  type RailingTypeParams,
   type Stair,
   type StairParams,
   type StairTypeParams,
@@ -922,6 +924,7 @@ const VG_CATEGORIES: [string, string][] = [
   [Cat.Window, "Windows"],
   [Cat.WallOpening, "Openings"],
   [Cat.Stair, "Stairs"],
+  [Cat.Railing, "Railings"],
   [Cat.Room, "Rooms"],
   [Cat.RoomSeparator, "Room separators"],
   [Cat.Area, "Areas"],
@@ -1665,6 +1668,39 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         h("h3", {}, "NZBC D1/AS1 (private stairway)"),
       );
       for (const c of L.checks) sec.append(row(c.ok ? "\u2713" : "\u2717", h("span", { class: c.ok ? "" : "warn" }, c.label)));
+      break;
+    }
+    case Cat.Railing: {
+      const p = el.params as RailingParams;
+      const host = p.hostId ? doc.get(p.hostId) : undefined;
+      sec.append(row("Type", select(typeOpts(Cat.RailingType), el.typeId ?? "", (v) => edit(ctx, "Change railing type", (tx) => tx.setType(el.id, v)))));
+      if (host) {
+        const sel2 = h("button", { textContent: "Select stair" });
+        sel2.onclick = () => ctx.setSelection([host.id]);
+        sec.append(row("Host", `Stair (${p.side})`), row("", sel2));
+      } else {
+        sec.append(
+          row("Level", select(levelOpts, p.levelId, (v) => update<RailingParams>("Change railing level", { levelId: v }))),
+          row("Base offset", numberInput(p.baseOffset, (v) => update<RailingParams>("Change railing offset", { baseOffset: v }))),
+          row("Path points", String(p.path.length)),
+        );
+      }
+      break;
+    }
+    case Cat.RailingType: {
+      const p = el.params as RailingTypeParams;
+      const set = (k: keyof RailingTypeParams, label: string) =>
+        row(label, numberInput(p[k], (v) => (v > 0 ? update<RailingTypeParams>("Edit railing type", { [k]: v }) : ctx.status("\u26a0 Must be positive"))));
+      sec.append(
+        row("Name", textInput(el.name ?? "", (v) => v && edit(ctx, "Rename type", (tx) => tx.setName(el.id, v)))),
+        set("height", "Height"),
+        set("railSize", "Top rail size"),
+        set("balusterSize", "Baluster size"),
+        set("balusterGap", "Baluster gap"),
+        h("h3", {}, "NZBC F4/AS1"),
+        row(p.balusterGap <= 100 ? "\u2713" : "\u2717", h("span", { class: p.balusterGap <= 100 ? "" : "warn" }, `Openings ${p.balusterGap} mm \u2264 100`)),
+        row(p.height >= 1000 ? "\u2713" : "\u2717", h("span", { class: p.height >= 1000 ? "" : "warn" }, `Barrier height ${p.height} mm \u2265 1000 (floors)`)),
+      );
       break;
     }
     case Cat.StairType: {

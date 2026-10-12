@@ -32,6 +32,7 @@ export * from "./model/directshape.ts";
 export * from "./model/cadimport.ts";
 export * from "./model/links.ts";
 export * from "./model/stairs.ts";
+export * from "./model/railings.ts";
 export * from "./model/settings.ts";
 export * from "./model/template.ts";
 export * from "./scripting.ts";

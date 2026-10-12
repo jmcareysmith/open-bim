@@ -62,6 +62,9 @@ import {
   createAreaBoundary,
   createStair,
   ensureStairType,
+  createRailing,
+  createStairRailings,
+  ensureRailingType,
   levelAbove,
   type StairRun,
   groupOf,
@@ -906,11 +909,67 @@ export class StairTool implements Tool {
     }
     try {
       const runs = this.runs;
-      const s = doc.transact("Create stair", (tx) => createStair(tx, doc, this.ctx.activeTypeId(Cat.StairType) ?? ensureStairType(tx, doc), base, top, runs));
+      // Railings go on both sides, as Revit adds them by default.
+      const s = doc.transact("Create stair", (tx) => {
+        const stair = createStair(tx, doc, this.ctx.activeTypeId(Cat.StairType) ?? ensureStairType(tx, doc), base, top, runs);
+        createStairRailings(tx, doc, ensureRailingType(tx, doc), stair);
+        return stair;
+      });
       this.ctx.setSelection([s.id]);
       this.activate();
       this.ctx.viewport.setPreviewLines(null);
       this.ctx.status("Stair created. Check riser and going in Properties.");
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
+    return true;
+  }
+}
+
+/** Railing by sketch: click points along the path, Enter to finish, Esc to cancel. */
+export class RailingTool implements Tool {
+  readonly name = "railing";
+  private pts: Vec2[] = [];
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.pts = [];
+    this.ctx.status("Railing: click points along the path. Enter to finish, Esc to cancel.");
+  }
+
+  deactivate(): void {
+    this.pts = [];
+    this.ctx.viewport.setPreviewLines(null);
+  }
+
+  pointerMove(ev: PointerEvent): void {
+    const p = viewPoint(this.ctx, ev, this.pts.at(-1) ?? null);
+    const seg: number[] = [];
+    const all = p ? [...this.pts, p] : this.pts;
+    for (let i = 0; i + 1 < all.length; i++) seg.push(all[i]!.x, all[i]!.y, 0, all[i + 1]!.x, all[i + 1]!.y, 0);
+    this.ctx.viewport.setPreviewLines(seg.length ? { segments: new Float32Array(seg), labels: [] } : null);
+  }
+
+  click(ev: PointerEvent): void {
+    if (this.ctx.viewport.viewMode !== "plan") return this.ctx.status("Sketch railings in a floor plan.");
+    const p = viewPoint(this.ctx, ev, this.pts.at(-1) ?? null);
+    if (p) this.pts.push(p);
+  }
+
+  key(ev: KeyboardEvent): boolean {
+    if (ev.key === "Escape") {
+      this.activate();
+      this.ctx.viewport.setPreviewLines(null);
+      return true;
+    }
+    if (ev.key !== "Enter" || this.pts.length < 2) return false;
+    const { doc } = this.ctx;
+    const pts = this.pts;
+    try {
+      const r = doc.transact("Create railing", (tx) => createRailing(tx, doc, this.ctx.activeTypeId(Cat.RailingType) ?? ensureRailingType(tx, doc), this.ctx.activeLevelId(), pts));
+      this.ctx.setSelection([r.id]);
+      this.activate();
+      this.ctx.viewport.setPreviewLines(null);
     } catch (err) {
       this.ctx.status(`\u26a0 ${(err as Error).message}`);
     }

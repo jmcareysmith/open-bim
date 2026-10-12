@@ -74,6 +74,7 @@ const COLORS: Record<string, number> = {
   [Cat.CadImport]: 0x5a6470,
   [Cat.Link]: 0xc4c8cc,
   [Cat.Stair]: 0xb7b2a6,
+  [Cat.Railing]: 0x6b7178,
 };
 const SELECTED = 0x3d8bfd;
 const VOID_COLOR = 0xff8c1a;

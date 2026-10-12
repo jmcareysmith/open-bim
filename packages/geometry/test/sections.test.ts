@@ -8,6 +8,7 @@ import {
   createWall,
   floorPlanFor,
   type Vec2,
+  type ViewParams,
 } from "@open-bim/core";
 import { SimpleKernel, cropLinework, sectionAnnotations, sectionLinework } from "../src/index.ts";
 
@@ -84,7 +85,13 @@ describe("view markers in plan", () => {
     const c = doc.transact("C", (tx) => createCallout(tx, doc, floorPlanFor(doc, ids.levels.ground)!.id, p(0, 0), p(2000, 2000)));
     expect(k.buildLines(doc, s)!.planOnly).toBe(true);
     expect(k.buildLines(doc, s)!.labels[0]!.text).toBe("1"); // bubbles show the view number;
-    expect(k.buildLines(doc, c)!.dashed).toBe(true);
+    // Callout boxes and section lines are dashed by default (real dashes), solid when set so.
+    const segs = (id: string) => k.buildLines(doc, doc.require(id))!.segments.length / 6;
+    const dashed = segs(c.id);
+    doc.transact("Solid", (tx) => tx.update<ViewParams>(c.id, { markerLine: "solid" }));
+    expect(segs(c.id)).toBeLessThan(dashed);
+    // Section ends carry solid bars.
+    expect(k.buildLines(doc, s)!.fill?.loops.length).toBeGreaterThanOrEqual(3);
     expect(k.buildLines(doc, floorPlanFor(doc, ids.levels.ground)!)).toBeNull();
   });
 });

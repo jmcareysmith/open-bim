@@ -68,5 +68,5 @@ export function buildSymbolLines(doc: Document, el: Element): LineData | null {
       break;
     }
   }
-  return { segments: new Float32Array(seg), labels, ...(fills.length ? { fill: { loops: fills, color: 0x1f2328 } } : {}) };
+  return { segments: new Float32Array(seg), labels, ...(fills.length ? { fill: { loops: fills, color: 0x1f2328, opaque: true } } : {}) };
 }

@@ -129,11 +129,13 @@ export class GripLayer {
     const outline = [...at(0, 0), ...at(L, 0), ...at(L, 0), ...at(L, F), ...at(L, F), ...at(0, F), ...at(0, F), ...at(0, 0)];
     // 45° hatch, spaced for the zoom: lines a - b = c clipped to the rectangle.
     const step = Math.max(50, this.ctx.viewport.mmPerPixel() * 14);
+    // Keep the hatch out of the marker bubbles (section head before the start; elevation mark).
+    const holes = [p.kind === "elevation" ? (p.marker ?? { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 }) : { x: start.x - u.x * 400, y: start.y - u.y * 400 }];
     const hatch: number[] = [];
     for (let c = -F + step; c < L; c += step) {
       const b0 = Math.max(0, -c);
       const b1 = Math.min(F, L - c);
-      if (b1 > b0) hatch.push(...at(c + b0, b0), ...at(c + b1, b1));
+      if (b1 > b0) hatch.push(...clipCircles(at(c + b0, b0), at(c + b1, b1), holes, 480));
     }
     this.ctx.viewport.setOverlay([
       { lines: { segments: new Float32Array(hatch), labels: [] }, color: 0xb9c9dc },
@@ -221,4 +223,30 @@ export class GripLayer {
       },
     });
   }
+}
+
+/** A segment (x, y, z triples) with the parts inside any circle removed, as flat segment data. */
+function clipCircles(a: number[], b: number[], centres: Vec2[], r: number): number[] {
+  let parts: [number, number][] = [[0, 1]];
+  const dx = b[0]! - a[0]!;
+  const dy = b[1]! - a[1]!;
+  for (const c of centres) {
+    // Solve |a + t·d - c| = r.
+    const fx = a[0]! - c.x;
+    const fy = a[1]! - c.y;
+    const A = dx * dx + dy * dy;
+    const B = 2 * (fx * dx + fy * dy);
+    const C = fx * fx + fy * fy - r * r;
+    const disc = B * B - 4 * A * C;
+    if (A === 0 || disc <= 0) continue;
+    const t0 = (-B - Math.sqrt(disc)) / (2 * A);
+    const t1 = (-B + Math.sqrt(disc)) / (2 * A);
+    parts = parts.flatMap(([s, e]): [number, number][] => {
+      const out: [number, number][] = [];
+      if (t0 > s) out.push([s, Math.min(e, t0)]);
+      if (t1 < e) out.push([Math.max(s, t1), e]);
+      return out.filter(([x, y]) => y > x);
+    });
+  }
+  return parts.flatMap(([s, e]) => [a[0]! + dx * s, a[1]! + dy * s, 0, a[0]! + dx * e, a[1]! + dy * e, 0]);
 }

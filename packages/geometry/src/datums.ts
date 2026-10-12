@@ -27,7 +27,7 @@ export interface LineData {
   /** Only drawn in plan views (e.g. door swings). */
   planOnly?: boolean;
   /** Filled areas (filled regions), as loops with even-odd nesting. */
-  fill?: { loops: Vec2[][]; color: number };
+  fill?: { loops: Vec2[][]; color: number; /** Solid (symbols, markers) rather than translucent (filled regions). */ opaque?: boolean };
 }
 
 /** Grid head (bubble) radius, mm. ~8 mm on paper at 1:100. */
@@ -45,7 +45,17 @@ export function buildGridLines(_doc: Document, el: Element): LineData {
   const ux = (end.x - start.x) / len;
   const uy = (end.y - start.y) / len;
   const r = GRID_BUBBLE_RADIUS;
-  const seg: number[] = [start.x, start.y, 0, end.x, end.y, 0];
+  // Dash-dot-dash centre line with short solid ends at the bubbles (Revit's default grid).
+  const seg: number[] = [];
+  const at = (t: number) => [start.x + ux * t, start.y + uy * t, 0];
+  const ends = len > 4 * GRID_END ? GRID_END : 0;
+  if (ends) seg.push(...at(0), ...at(ends), ...at(len - ends), ...at(len));
+  let t = ends;
+  for (let i = 0; t < len - ends; i++) {
+    const d = GRID_DASH[i % GRID_DASH.length]!;
+    if (i % 2 === 0) seg.push(...at(t), ...at(Math.min(len - ends, t + d)));
+    t += d;
+  }
   const labels: LineData["labels"] = [];
   for (const [p, s] of [
     [start, -1],
@@ -62,6 +72,11 @@ export function buildGridLines(_doc: Document, el: Element): LineData {
   }
   return { segments: new Float32Array(seg), labels };
 }
+
+/** Grid line pattern, model mm (paper mm × 100): dash, gap, dot, gap. */
+const GRID_DASH = [1200, 300, 150, 300];
+/** Solid length at each end of a grid line, model mm. */
+const GRID_END = 800;
 
 /** Reference plane: dashed line at z = 0; its name, if any, labels the end. */
 export function buildReferencePlaneLines(_doc: Document, el: Element): LineData {

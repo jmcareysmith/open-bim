@@ -3,7 +3,7 @@ import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
 import { Cat, levels, type LevelParams } from "./architecture.ts";
 import { PLAN_CUT_HEIGHT, type ViewRange } from "./views.ts";
-import type { AppliedFilter, GraphicOverride } from "./graphics.ts";
+import type { AppliedFilter, GraphicOverride, LinePattern } from "./graphics.ts";
 
 // Views are elements, as in Revit: saved with the project, listed in the browser, each with its
 // own range, scale, detail level and visibility. Sections, elevations and sheets build on this.
@@ -55,6 +55,8 @@ export type ViewParams = {
   headFamilyId?: ElementId | null;
   tailFamilyId?: ElementId | null;
   markerFamilyId?: ElementId | null;
+  /** Sections and callouts: the pattern of the marker's line in plans (default dashed). */
+  markerLine?: LinePattern | null;
   /** Sections/elevations: how far beyond the line the view sees, mm. */
   farClip?: number | null;
   /** Sections/elevations: absolute Z crop, mm. */

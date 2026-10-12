@@ -64,7 +64,7 @@ const COLORS: Record<string, number> = {
   [Cat.FamilyInstance]: 0xb9a48a,
   [Cat.Grid]: 0x4a5560,
   [Cat.ReferencePlane]: 0x2e8b57,
-  [Cat.View]: 0x2b2f36,
+  [Cat.View]: 0x111111,
   [Cat.DetailLine]: 0x1f2328,
   [Cat.DetailComponent]: 0x1f2328,
   [Cat.Symbol]: 0x1f2328,
@@ -1156,14 +1156,14 @@ function makeLineGroup(lines: LineData, color: number): THREE.Group {
     fillGeom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(tris.flatMap((t) => t.flatMap((p) => [p.x, p.y, 0]))), 3));
     const fill = new THREE.Mesh(
       fillGeom,
-      new THREE.MeshBasicMaterial({ color: lines.fill.color, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }),
+      new THREE.MeshBasicMaterial({ color: lines.fill.color, transparent: !lines.fill.opaque, opacity: lines.fill.opaque ? 1 : 0.55, side: THREE.DoubleSide, depthWrite: false }),
     );
     fill.position.z = DATUM_LIFT - 0.5;
     fill.renderOrder = -4;
     g.add(fill);
   }
   for (const label of lines.labels) {
-    const { texture, aspect } = labelTexture(label.text, label.size !== undefined);
+    const { texture, aspect } = labelTexture(label.text, label.size !== undefined, undefined, label.align === "left");
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));
     sprite.position.set(label.position[0], label.position[1], label.position[2] + DATUM_LIFT);
     if (label.size !== undefined) {
@@ -1179,7 +1179,7 @@ function makeLineGroup(lines: LineData, color: number): THREE.Group {
 }
 
 /** Text texture. Bubble labels are square; free text is as wide as it needs (`aspect` = width / height). */
-function labelTexture(text: string, free: boolean, color = "#1f2328"): { texture: THREE.CanvasTexture; aspect: number } {
+function labelTexture(text: string, free: boolean, color = "#1f2328", left = true): { texture: THREE.CanvasTexture; aspect: number } {
   const h = 128;
   const canvas = document.createElement("canvas");
   const c0 = canvas.getContext("2d")!;
@@ -1191,9 +1191,11 @@ function labelTexture(text: string, free: boolean, color = "#1f2328"): { texture
   const c = canvas.getContext("2d")!;
   c.font = font;
   c.fillStyle = color;
-  c.textAlign = free ? "left" : "center";
+  // Left-aligned text starts at the anchor; centred text (bubbles, tags) sits on it.
+  const atLeft = free && left;
+  c.textAlign = atLeft ? "left" : "center";
   c.textBaseline = "middle";
-  c.fillText(text, free ? 8 : w / 2, h / 2 + 2);
+  c.fillText(text, atLeft ? 8 : w / 2, h / 2 + 2);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   return { texture, aspect: w / h };
@@ -1258,7 +1260,7 @@ function renderDrawing(d: Drawing): THREE.Group {
     g.add(mesh);
   }
   for (const t of d.texts) {
-    const { texture, aspect } = labelTexture(t.text, true, "#111111");
+    const { texture, aspect } = labelTexture(t.text, true, "#111111", t.align === "left");
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true }));
     sprite.position.set(t.x, t.y, 2);
     sprite.scale.set(t.size * 2 * aspect, t.size * 2, 1);

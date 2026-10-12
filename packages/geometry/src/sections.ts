@@ -180,6 +180,28 @@ export function buildViewMarker(doc: Document, el: Element): LineData | null {
       return { x: c.x + r * Math.cos(t), y: c.y + r * Math.sin(t) };
     });
   const add = (q: Vec2, d: Vec2, k: number): Vec2 => ({ x: q.x + d.x * k, y: q.y + d.y * k });
+  /** A line in the view's marker pattern (dashes are paper mm at 1:100). */
+  const patterned = (a: Vec2, b: Vec2) => {
+    const pat = DASHES[p.markerLine ?? "dash"];
+    const len = Math.hypot(b.x - a.x, b.y - a.y);
+    if (!pat || len < 1) return line(a, b);
+    const u = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
+    let t = 0;
+    for (let i = 0; t < len; i++) {
+      const d = pat[i % pat.length]! * K;
+      if (i % 2 === 0) line(add(a, u, t), add(a, u, Math.min(len, t + d)));
+      t += d;
+    }
+  };
+  /** A solid bar along a→b (Revit's heavy section line ends). */
+  const bar = (a: Vec2, u: Vec2, length: number) => {
+    const n = { x: -u.y, y: u.x };
+    const w = 0.35 * K;
+    const b = add(a, u, length);
+    const pts = [add(a, n, w), add(b, n, w), add(b, n, -w), add(a, n, -w)];
+    poly(pts);
+    loops.push(pts);
+  };
   const labels: LineData["labels"] = [];
   const R = 400; // bubble radius
   const TEXT = 230;
@@ -223,7 +245,12 @@ export function buildViewMarker(doc: Document, el: Element): LineData | null {
     const dir = { x: f.dir[0], y: f.dir[1] };
     const along = { x: f.right[0], y: f.right[1] };
     if (p.kind === "section") {
-      line(start, end);
+      // Heavy bars at both ends, the patterned line between.
+      const L = Math.hypot(end.x - start.x, end.y - start.y);
+      const ends = Math.min(END * K, L / 3);
+      bar(start, along, ends);
+      bar(end, { x: -along.x, y: -along.y }, ends);
+      patterned(add(start, along, ends), add(end, along, -ends));
       // Head: bubble just beyond the start, on the line (or the head family, origin at the start).
       if (!family("sectionHead", start, dir, along)) bubble(add(start, along, -R), dir);
       // Tail: a short flag showing the view direction.
@@ -245,11 +272,13 @@ export function buildViewMarker(doc: Document, el: Element): LineData | null {
       ...arc({ x: min.x + r, y: max.y - r }, r, Math.PI / 2, Math.PI, 6),
       ...arc({ x: min.x + r, y: min.y + r }, r, Math.PI, (3 * Math.PI) / 2, 6),
     ];
-    poly(box);
-    // Head bubble off the top-right corner on a leader.
+    box.forEach((a, i) => patterned(a, box[(i + 1) % box.length]!));
+    // Head bubble off the top-right corner on a solid leader with a shoulder.
     const corner = { x: max.x - r * 0.3, y: max.y - r * 0.3 };
-    const c = { x: max.x + R * 1.6, y: max.y + R * 1.6 };
-    line(corner, add(c, { x: -Math.SQRT1_2, y: -Math.SQRT1_2 }, R));
+    const c = { x: max.x + R * 3.2, y: max.y + R * 1.8 };
+    const shoulder = { x: c.x - R * 1.6, y: c.y };
+    line(corner, shoulder);
+    line(shoulder, { x: c.x - R, y: c.y });
     if (!family("calloutHead", c, { x: 0, y: 1 }, { x: 1, y: 0 })) {
       poly(arc(c, R, 0, 2 * Math.PI, 32));
       labels.push({ text: name, position: [c.x, c.y, 0], size: TEXT });
@@ -257,9 +286,12 @@ export function buildViewMarker(doc: Document, el: Element): LineData | null {
   } else {
     return null;
   }
-  // Callout boundaries are dashed (Revit's default).
-  return { segments: new Float32Array(seg), labels, planOnly: true, dashed: p.kind === "callout", ...(loops.length ? { fill: { loops, color: 0x2b2f36 } } : {}) };
+  return { segments: new Float32Array(seg), labels, planOnly: true, ...(loops.length ? { fill: { loops, color: 0x111111, opaque: true } } : {}) };
 }
 
 /** Marker families are drawn in paper mm; the built-in marks are sized for 1:100. */
 const K = 100;
+/** Length of the heavy bars at a section line's ends, paper mm. */
+const END = 6;
+/** Dash patterns, paper mm: on, off, on, off… (solid draws one line). */
+const DASHES: Record<string, number[] | null> = { solid: null, dash: [4, 2], dot: [0.6, 1.4], dashDot: [6, 1.5, 0.6, 1.5], longDash: [9, 2.5] };

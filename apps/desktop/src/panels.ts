@@ -187,6 +187,8 @@ import {
   type SymbolParams,
   type MarkerRole,
   MARKER_SLOTS,
+  LINE_PATTERNS,
+  type LinePattern,
   markerFamilies,
   type DetailComponentParams,
   type SymbolKind,
@@ -600,13 +602,25 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
       ),
     );
   }
+  if (p.kind === "section" || p.kind === "callout") {
+    sec.append(
+      row(
+        p.kind === "section" ? "Section line" : "Callout line",
+        select(
+          LINE_PATTERNS.map((v) => ({ value: v, label: { solid: "Solid", dash: "Dashed", dot: "Dotted", dashDot: "Dash-dot", longDash: "Long dash" }[v] })),
+          p.markerLine ?? "dash",
+          (v) => edit(ctx, "Marker line", (tx) => tx.update<ViewParams>(view.id, { markerLine: v as LinePattern })),
+        ),
+      ),
+    );
+  }
   if (MARKER_SLOTS[p.kind]) {
     const all = h("button", { textContent: `Use these marks for all ${p.kind === "callout" ? "callouts" : `${p.kind}s`}` });
     all.onclick = () =>
       edit(ctx, "Apply marks", (tx) => {
         for (const other of doc.byCategory<ViewParams>(Cat.View)) {
           if (other.params.kind !== p.kind || other.id === view.id) continue;
-          tx.update<ViewParams>(other.id, Object.fromEntries((MARKER_SLOTS[p.kind] ?? []).map((s) => [s.key, p[s.key] ?? null])));
+          tx.update<ViewParams>(other.id, { ...Object.fromEntries((MARKER_SLOTS[p.kind] ?? []).map((s) => [s.key, p[s.key] ?? null])), markerLine: p.markerLine ?? null });
         }
       });
     sec.append(row("", all));

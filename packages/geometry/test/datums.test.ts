@@ -11,19 +11,28 @@ describe("grid line work", () => {
 
     expect(k.build(doc, g)).toBeNull();
     const lines = k.buildLines(doc, g)!;
-    expect(Array.from(lines.segments.slice(0, 6))).toEqual([0, 0, 0, 0, 5000, 0]);
+    // Solid ends at the bubbles, dash-dot between (all on the grid's line, spanning it).
+    expect(Array.from(lines.segments.slice(0, 6))).toEqual([0, 0, 0, 0, 800, 0]);
+    expect(Array.from(lines.segments.slice(6, 12))).toEqual([0, 4200, 0, 0, 5000, 0]);
     expect(lines.segments.length % 6).toBe(0);
     const r = GRID_BUBBLE_RADIUS;
     expect(lines.labels).toEqual([
       { text: "A", position: [0, -r, 0] },
       { text: "A", position: [0, 5000 + r, 0] },
     ]);
-    // Bubble points sit on the circle
-    for (let i = 6; i < lines.segments.length; i += 3) {
+    // Every point is on the grid line (between its ends) or on a bubble's circle.
+    let onLine = 0;
+    for (let i = 0; i < lines.segments.length; i += 3) {
+      const x = lines.segments[i]!;
       const y = lines.segments[i + 1]!;
+      if (x === 0 && y >= 0 && y <= 5000) {
+        onLine++;
+        continue;
+      }
       const cy = y < 2500 ? -r : 5000 + r;
-      expect(Math.hypot(lines.segments[i]!, y - cy)).toBeCloseTo(r, 2);
+      expect(Math.hypot(x, y - cy)).toBeCloseTo(r, 2);
     }
+    expect(onLine).toBeGreaterThan(8); // dashes, not one line
   });
 
   it("has no line work for walls", () => {

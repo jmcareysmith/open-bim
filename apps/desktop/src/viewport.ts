@@ -77,6 +77,10 @@ const COLORS: Record<string, number> = {
   [Cat.Railing]: 0x6b7178,
   [Cat.Ramp]: 0xb7b2a6,
   [Cat.Toposolid]: 0x9fb07c,
+  [Cat.Column]: 0x8f969d,
+  [Cat.Beam]: 0x8f969d,
+  [Cat.PadFooting]: 0xa7a8a6,
+  [Cat.StripFooting]: 0xa7a8a6,
 };
 const SELECTED = 0x3d8bfd;
 const VOID_COLOR = 0xff8c1a;

@@ -35,6 +35,7 @@ export * from "./model/stairs.ts";
 export * from "./model/railings.ts";
 export * from "./model/ramps.ts";
 export * from "./model/site.ts";
+export * from "./model/structure.ts";
 export * from "./model/settings.ts";
 export * from "./model/template.ts";
 export * from "./scripting.ts";

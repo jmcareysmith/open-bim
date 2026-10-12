@@ -66,6 +66,11 @@ export const Cat = {
   Ramp: "Ramp",
   RampType: "RampType",
   Toposolid: "Toposolid",
+  StructuralType: "StructuralType",
+  Column: "Column",
+  Beam: "Beam",
+  PadFooting: "PadFooting",
+  StripFooting: "StripFooting",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

@@ -13,6 +13,11 @@ import {
   createRevision,
   createStackedWallType,
   stairLayout,
+  type BeamParams,
+  type ColumnParams,
+  type PadFootingParams,
+  type StripFootingParams,
+  type StructuralSectionParams,
   type ToposolidParams,
   rampLayout,
   rampLengthNeeded,
@@ -935,6 +940,10 @@ const VG_CATEGORIES: [string, string][] = [
   [Cat.Railing, "Railings"],
   [Cat.Ramp, "Ramps"],
   [Cat.Toposolid, "Topography"],
+  [Cat.Column, "Structural columns"],
+  [Cat.Beam, "Structural framing"],
+  [Cat.PadFooting, "Foundations (pads)"],
+  [Cat.StripFooting, "Foundations (strips)"],
   [Cat.Room, "Rooms"],
   [Cat.RoomSeparator, "Room separators"],
   [Cat.Area, "Areas"],
@@ -1693,6 +1702,75 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         h("h3", {}, "NZBC D1/AS1 (private stairway)"),
       );
       for (const c of L.checks) sec.append(row(c.ok ? "\u2713" : "\u2717", h("span", { class: c.ok ? "" : "warn" }, c.label)));
+      break;
+    }
+    case Cat.Column: {
+      const p = el.params as ColumnParams;
+      sec.append(
+        row("Type", select(typeOpts(Cat.StructuralType), el.typeId ?? "", (v) => edit(ctx, "Change section", (tx) => tx.setType(el.id, v)))),
+        row("Base level", select(levelOpts, p.baseLevelId, (v) => update<ColumnParams>("Change column base", { baseLevelId: v }))),
+        row("Base offset", numberInput(p.baseOffset, (v) => update<ColumnParams>("Change column base offset", { baseOffset: v }))),
+        row("Top level", select(levelOpts, p.topLevelId, (v) => update<ColumnParams>("Change column top", { topLevelId: v }))),
+        row("Top offset", numberInput(p.topOffset, (v) => update<ColumnParams>("Change column top offset", { topOffset: v }))),
+        row("Rotation (\u00b0)", numberInput(Math.round(((p.rotation * 180) / Math.PI) * 100) / 100, (v) => update<ColumnParams>("Rotate column", { rotation: (v * Math.PI) / 180 }))),
+      );
+      break;
+    }
+    case Cat.Beam: {
+      const p = el.params as BeamParams;
+      sec.append(
+        row("Type", select(typeOpts(Cat.StructuralType), el.typeId ?? "", (v) => edit(ctx, "Change section", (tx) => tx.setType(el.id, v)))),
+        row("Reference level", select(levelOpts, p.levelId, (v) => update<BeamParams>("Change beam level", { levelId: v }))),
+        row("Top offset", numberInput(p.offset, (v) => update<BeamParams>("Change beam offset", { offset: v }))),
+        row("Length", len(Math.hypot(p.end.x - p.start.x, p.end.y - p.start.y))),
+      );
+      break;
+    }
+    case Cat.PadFooting: {
+      const p = el.params as PadFootingParams;
+      const num = (k: "width" | "length" | "depth", label: string) =>
+        row(label, numberInput(p[k], (v) => (v > 0 ? update<PadFootingParams>("Edit footing", { [k]: v }) : ctx.status("\u26a0 Must be positive"))));
+      sec.append(
+        row("Level", select(levelOpts, p.levelId, (v) => update<PadFootingParams>("Change footing level", { levelId: v }))),
+        row("Top offset", numberInput(p.offset, (v) => update<PadFootingParams>("Change footing offset", { offset: v }))),
+        num("width", "Width"),
+        num("length", "Length"),
+        num("depth", "Depth"),
+      );
+      break;
+    }
+    case Cat.StripFooting: {
+      const p = el.params as StripFootingParams;
+      sec.append(
+        row("Width", numberInput(p.width, (v) => (v > 0 ? update<StripFootingParams>("Edit footing", { width: v }) : ctx.status("\u26a0 Must be positive")))),
+        row("Depth", numberInput(p.depth, (v) => (v > 0 ? update<StripFootingParams>("Edit footing", { depth: v }) : ctx.status("\u26a0 Must be positive")))),
+      );
+      break;
+    }
+    case Cat.StructuralType: {
+      const p = el.params as StructuralSectionParams;
+      const set = (k: "d" | "b" | "tf" | "tw", label: string) => row(label, numberInput(p[k], (v) => update<StructuralSectionParams>("Edit section", { [k]: Math.max(0, v) })));
+      const matOpts = [{ value: "", label: "\u2014" }, ...materialElements(doc).map((m) => ({ value: m.id, label: m.name ?? m.id }))];
+      sec.append(
+        row("Name", textInput(el.name ?? "", (v) => v && edit(ctx, "Rename type", (tx) => tx.setName(el.id, v)))),
+        row(
+          "Shape",
+          select(
+            [
+              { value: "rect", label: "Rectangle" },
+              { value: "circle", label: "Circle" },
+              { value: "I", label: "I-section" },
+              { value: "SHS", label: "Hollow section (SHS/RHS)" },
+            ],
+            p.shape,
+            (v) => update<StructuralSectionParams>("Change shape", { shape: v as StructuralSectionParams["shape"] }),
+          ),
+        ),
+        set("d", p.shape === "circle" ? "Diameter" : "Depth"),
+        ...(p.shape === "circle" ? [] : [set("b", "Width")]),
+        ...(p.shape === "I" || p.shape === "SHS" ? [set("tf", p.shape === "I" ? "Flange thickness" : "Wall thickness (top/bottom)"), set("tw", p.shape === "I" ? "Web thickness" : "Wall thickness (sides)")] : []),
+        row("Material", select(matOpts, p.materialId ?? "", (v) => update<StructuralSectionParams>("Change material", { materialId: v || null }))),
+      );
       break;
     }
     case Cat.Toposolid: {

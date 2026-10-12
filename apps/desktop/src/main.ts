@@ -91,6 +91,9 @@ import {
   DimensionTool,
   RoomTool,
   StairTool,
+  ColumnTool,
+  BeamTool,
+  FootingTool,
   RailingTool,
   PlaceGroupTool,
   RoomSeparatorTool,
@@ -150,6 +153,8 @@ const TOOL_TYPES: Record<string, string> = {
   stair: Cat.StairType,
   railing: Cat.RailingType,
   ramp: Cat.RampType,
+  column: Cat.StructuralType,
+  beam: Cat.StructuralType,
 };
 const activeTypeId = (cat: string): ElementId | undefined => {
   const id = activeTypes.get(cat);
@@ -377,6 +382,9 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   room: new RoomTool(ctx),
   stair: new StairTool(ctx),
   ramp: new StairTool(ctx, "ramp"),
+  column: new ColumnTool(ctx),
+  beam: new BeamTool(ctx),
+  footing: new FootingTool(ctx),
   railing: new RailingTool(ctx),
   placegroup: new PlaceGroupTool(ctx),
   roomseparator: new RoomSeparatorTool(ctx),

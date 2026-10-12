@@ -255,6 +255,11 @@ outside the boundary are dropped) and parses survey CSVs (E, N, RL metres) throu
 coordinates. Geometry adds sides and a flat bottom `thickness` below the lowest point; plans draw
 contours by marching the triangles, labelling every fifth.
 
+**Structure** — `StructuralType` sections (rect, circle, I, SHS; NZ defaults created on first use)
+for `Column`s (level to level, rotated about their point) and `Beam`s (swept along their line, top
+at level + offset). `PadFooting`s are boxes under a point; `StripFooting`s run under a wall (deleted
+with it). `elementMaterial` reads a type's or element's `materialId` for colour.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

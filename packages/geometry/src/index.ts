@@ -30,3 +30,4 @@ export * from "./ramps.ts";
 export * from "./curtain.ts";
 export * from "./stacked.ts";
 export * from "./site.ts";
+export * from "./structure.ts";

@@ -69,6 +69,9 @@ export function elementMaterial(doc: Document, el: Element): Material | undefine
   if (typeof own === "string") return doc.get<MaterialParams>(own) as Material | undefined;
   if (!el.typeId) return undefined;
   const t = doc.get<LayeredTypeParams>(el.typeId);
+  // Section types (structure) name one material.
+  const typeMat = (t?.params as { materialId?: unknown } | undefined)?.materialId;
+  if (typeof typeMat === "string") return doc.get<MaterialParams>(typeMat) as Material | undefined;
   const first = t?.params.layers?.[0];
   return first ? layerMaterial(doc, first) : undefined;
 }

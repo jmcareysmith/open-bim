@@ -49,8 +49,8 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 4. Structural
 | Feature | Phase | Status |
 |---|---|---|
-| Structural columns, beams, braces | 6 | ⬜ |
-| Foundations (isolated, strip, slab) | 6 | ⬜ |
+| Structural columns, beams, braces | 6 | 🟨 |
+| Foundations (isolated, strip, slab) | 6 | 🟨 |
 | Structural framing systems | 6 | ⬜ |
 | Rebar | 9 | ⬜ |
 | Analytical model | 9 | ⬜ |

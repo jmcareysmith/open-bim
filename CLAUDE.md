@@ -84,4 +84,6 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Curtain walls: wall type "Curtain Wall - Aluminium 1200 x 1500" (grid in type properties).
 - Stacked walls: browser Types → New stacked wall type (segments in its properties).
 - Toposolids: Toposolid tool (sketch boundary) + Import survey CSV (E,N,RL m) in Properties; contours.
-- Next: Phase 6 — structural columns/beams/foundations, then phasing/design options/clash.
+- Structure: Column / Beam / Footing tools; sections (NZ timber/steel/concrete) as Structural types.
+  Beams only show in plans where the view range cuts them (no dashed beam symbols yet).
+- Next: Phase 6 — phasing, design options, clash detection (last Phase 6 item).

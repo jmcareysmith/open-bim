@@ -60,6 +60,11 @@ import {
   type Room,
   createArea,
   createAreaBoundary,
+  createBeam,
+  createColumn,
+  createPadFooting,
+  createStripFooting,
+  ensureStructuralTypes,
   createToposolid,
   createStair,
   ensureStairType,
@@ -999,6 +1004,120 @@ export class RailingTool implements Tool {
       this.ctx.status(`\u26a0 ${(err as Error).message}`);
     }
     return true;
+  }
+}
+
+/** The structural section to use: the type selector's, else the first (creating NZ defaults). */
+function sectionType(ctx: ToolContext, prefer: (name: string) => boolean): ElementId {
+  const chosen = ctx.activeTypeId(Cat.StructuralType);
+  if (chosen) return chosen;
+  const { doc } = ctx;
+  const ids = doc.byCategory(Cat.StructuralType).length ? doc.byCategory(Cat.StructuralType).map((t) => t.id) : doc.transact("Load structural sections", (tx) => ensureStructuralTypes(tx, doc));
+  return ids.find((id) => prefer(doc.require(id).name ?? "")) ?? ids[0]!;
+}
+
+/** Structural column: click to place, from the active level to the one above. */
+export class ColumnTool implements Tool {
+  readonly name = "column";
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    if (!this.ctx.doc.byCategory(Cat.StructuralType).length) this.ctx.doc.transact("Load structural sections", (tx) => ensureStructuralTypes(tx, this.ctx.doc));
+    this.ctx.status("Column: click to place (section from the type selector). Runs up to the next level.");
+  }
+
+  click(ev: PointerEvent): void {
+    if (this.ctx.viewport.viewMode === "drawing") return this.ctx.status("Place columns in a plan or 3D.");
+    const p = viewPoint(this.ctx, ev, null);
+    if (!p) return;
+    const { doc } = this.ctx;
+    const base = this.ctx.activeLevelId();
+    const top = levelAbove(doc, base);
+    if (!top) return this.ctx.status("\u26a0 Columns run to the level above, and there's none.");
+    try {
+      const c = doc.transact("Create column", (tx) => createColumn(tx, doc, sectionType(this.ctx, (n) => n.includes("Column") || n.includes("Post")), base, top, p));
+      this.ctx.setSelection([c.id]);
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
+  }
+}
+
+/** Beam: click start and end (chains until Esc); top of beam at the active level. */
+export class BeamTool implements Tool {
+  readonly name = "beam";
+  private start: Vec2 | null = null;
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.start = null;
+    if (!this.ctx.doc.byCategory(Cat.StructuralType).length) this.ctx.doc.transact("Load structural sections", (tx) => ensureStructuralTypes(tx, this.ctx.doc));
+    this.ctx.status("Beam: click start, then end; beams chain until Esc. Top of beam at this level.");
+  }
+
+  deactivate(): void {
+    this.start = null;
+    this.ctx.viewport.setPreviewLines(null);
+  }
+
+  pointerMove(ev: PointerEvent): void {
+    const p = viewPoint(this.ctx, ev, this.start);
+    this.ctx.viewport.setPreviewLines(p && this.start ? linePreview(this.start, p) : null);
+  }
+
+  click(ev: PointerEvent): void {
+    const p = viewPoint(this.ctx, ev, this.start);
+    if (!p) return;
+    if (!this.start) {
+      this.start = p;
+      return;
+    }
+    const { doc } = this.ctx;
+    const a = this.start;
+    try {
+      const b = doc.transact("Create beam", (tx) => createBeam(tx, doc, sectionType(this.ctx, (n) => n.includes("UB") || n.includes("190x45")), this.ctx.activeLevelId(), a, p));
+      this.ctx.setSelection([b.id]);
+      this.start = p;
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
+  }
+
+  key(ev: KeyboardEvent): boolean {
+    if (ev.key === "Escape" && this.start) {
+      this.start = null;
+      this.ctx.viewport.setPreviewLines(null);
+      return true;
+    }
+    return false;
+  }
+}
+
+/** Foundations: click empty space for a pad footing, or a wall for a strip footing under it. */
+export class FootingTool implements Tool {
+  readonly name = "footing";
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.ctx.status("Footing: click a wall for a strip footing, or anywhere else for a 900 \u00d7 900 pad.");
+  }
+
+  click(ev: PointerEvent): void {
+    const { doc } = this.ctx;
+    const hit = this.ctx.viewport.pickHit(ev, (id) => doc.get(id)?.category === Cat.Wall);
+    try {
+      if (hit) {
+        const f = doc.transact("Create strip footing", (tx) => createStripFooting(tx, doc, hit.id));
+        this.ctx.setSelection([f.id]);
+        return;
+      }
+      const p = viewPoint(this.ctx, ev, null);
+      if (!p) return;
+      const f = doc.transact("Create pad footing", (tx) => createPadFooting(tx, doc, this.ctx.activeLevelId(), p));
+      this.ctx.setSelection([f.id]);
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
   }
 }
 

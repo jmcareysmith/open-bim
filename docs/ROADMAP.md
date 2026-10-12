@@ -61,7 +61,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Curtain walls — wall types with a curtain grid (equal divisions, mullions, glazed panels); no per-panel editing yet
 - [x] Stacked walls — member wall types bottom to top, one variable segment
 - [x] Toposolids & site — spot heights (survey CSV via shared coordinates), Delaunay surface, contours; no pads/sub-regions yet
-- Structural columns, beams, foundations
+- [x] Structural columns, beams, foundations — section types (rect/circle/I/SHS), pads, strips; no analytical model or beam plan symbols yet
 - Phasing, design options, clash detection
 
 ## Phase 7 — Collaboration, rendering, NZ tools

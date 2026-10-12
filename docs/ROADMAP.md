@@ -88,7 +88,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [ ] Ribbon: tabs and labelled panels, split-button dropdowns, contextual Modify tab, options bar
 - [ ] File menu (New, Open, Save, Export ▸, Import ▸, recent files) and Quick Access Toolbar
 - [ ] Drag and drop from the Project Browser: views/schedules/legends onto sheets, families into views
-- [ ] Dockable panels (Properties, Project Browser): dock, tab, float, collapse; layout remembered
+- [x] Dockable panels (Properties, Project Browser): dock, tab, float, collapse; layout remembered — drag titles/tabs; dock widths resizable; light theme (Jeremy: no dark chrome)
 - [ ] View tabs (tile/cascade), status bar with selection filter, view control bar (scale, detail level, visual style, hide/isolate)
 - [ ] Right-click menus (Select All Instances, Edit Type, Hide in View…), two-letter shortcuts, shortcut editor — menus done (element: modify tools, Flip, Edit Type, Select All Instances, hide/isolate, V/G, Group, Delete; empty space: V/G dialog, Zoom to Fit, Reset); two-letter shortcuts for modify tools + VV; no shortcut editor yet
 

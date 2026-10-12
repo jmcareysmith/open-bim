@@ -170,6 +170,6 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Ribbon, contextual tabs, options bar | 7b | ⬜ |
 | File menu, Quick Access Toolbar | 7b | ⬜ |
 | Drag and drop from the Project Browser | 7b | ⬜ |
-| Dockable panels | 7b | ⬜ |
+| Dockable panels | 7b | ✅ |
 | View tabs, status bar, view control bar | 7b | ⬜ |
 | Context menus, keyboard shortcuts | 7b | 🟨 (menus, VV/MV/CO…; no shortcut editor) |

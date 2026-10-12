@@ -57,6 +57,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   length label to type a new length; press on a selected element and drag to move it. Selected
   walls show a flip arrow (exterior side). Right-click (no drag): element menu, or on empty space
   the view menu with Visibility/Graphics (dialog; also VV). In 3D, orbit pivots on the selection.
+- Panels: Project Browser / Properties dock left or right (drag the title), tab together (drop on
+  the other's title), or float (drop elsewhere, or ⧉); empty-space menu → Reset Panel Layout.
+  UI chrome is light grey (Jeremy asked: no black menus).
 - Known gaps: joins whole-wall (no per-layer cleanup), no disallow-join, crossing walls overlap; walls
   don't attach to floors/roofs; grids straight only;
   floors lack pick-walls/slope arrows; roofs exact for convex/L/T/U only; doors/windows parametric;

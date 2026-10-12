@@ -123,6 +123,7 @@ import { ModifyTool, type ModifyToolContext, type ToolOption } from "./modifytoo
 import { AlignTool, OffsetTool, SplitTool, TrimTool } from "./edittools.ts";
 import { GripLayer } from "./grips.ts";
 import { openDialog, showContextMenu, type MenuItem } from "./dialog.ts";
+import { Docking } from "./docking.ts";
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 
@@ -174,6 +175,14 @@ const activeTypeId = (cat: string): ElementId | undefined => {
 let filePath: string | null = null;
 let dirty = false;
 
+// Project Browser and Properties: dockable left/right, tabbed or floating.
+const docking = new Docking(
+  [
+    { id: "browser", title: "Project Browser", el: $("#browser") },
+    { id: "properties", title: "Properties", el: $("#properties") },
+  ],
+  $("main"),
+);
 const viewport = new Viewport($("#viewport"), doc, new SimpleKernel());
 const status = (text: string): void => {
   $("#status").textContent = text;
@@ -1003,6 +1012,7 @@ function openCanvasMenu(ev: MouseEvent): void {
       { label: "Visibility/Graphics\u2026", hint: "VV", action: () => void commands.visibilityGraphics?.() },
       { label: "Zoom to Fit", hint: "F", action: () => void commands.fit?.() },
       { label: "Reset Temporary Hide/Isolate", hint: "U", action: () => void commands.resetVisibility?.() },
+      { label: "Reset Panel Layout", action: () => docking.reset() },
     );
     if (selection.length) items.push({ label: "Deselect All", action: () => ctx.setSelection([]) });
   }

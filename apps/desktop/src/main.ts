@@ -154,6 +154,8 @@ const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)
 /** The document being edited: the project, or a family open in the family editor. */
 let doc = new Document();
 buildSample(doc);
+// The sample is the starting point: Undo mustn't take it apart.
+doc.clearHistory();
 // Global parameters drive element values inside every transaction of the project.
 enableGlobalParameters(doc);
 /** While a family is open, the project's state to return to. */
@@ -230,6 +232,7 @@ const ctx: ModifyToolContext & PanelContext = {
     let n = 1;
     while (familyDefs(doc).some((f) => f.name === `${category} ${n}`)) n++;
     applyFamilyTemplate(fam, category, `${category} ${n}`);
+    fam.clearHistory();
     openFamily(fam);
   },
   projectFamilies: () => (projectSession ? familyDefs(projectSession.doc) : []),

@@ -228,6 +228,12 @@ export class Document {
     return doc;
   }
 
+  /** Forget undo/redo (e.g. after building a starting model, so Undo can't take it apart). */
+  clearHistory(): void {
+    this.undoStack = [];
+    this.redoStack = [];
+  }
+
   /** Replace all content (e.g. after opening a file). Clears undo history. */
   load(json: DocumentJSON): void {
     const loaded = Document.fromJSON(json);

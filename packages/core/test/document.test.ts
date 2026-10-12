@@ -228,3 +228,15 @@ describe("remote changes", () => {
     expect(doc.orphans()).toEqual([w.id]);
   });
 });
+
+describe("undo history", () => {
+  it("clearHistory leaves the model as it is but with nothing to undo or redo", () => {
+    const { doc } = setup();
+    expect(doc.canUndo).toBe(true);
+    const before = doc.toJSON();
+    doc.clearHistory();
+    expect(doc.canUndo).toBe(false);
+    expect(doc.undo()).toBe(false);
+    expect(doc.toJSON()).toEqual(before);
+  });
+});

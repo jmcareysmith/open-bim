@@ -378,7 +378,8 @@ export class Viewport {
       const em = edges.material as THREE.LineBasicMaterial;
       em.visible = style !== "realistic";
       em.depthTest = style !== "wireframe";
-      em.color.setHex(style === "wireframe" ? color : 0x14171b);
+      // Wireframe is black lines on white; the selection (blue) and revealed elements (magenta) keep their colour.
+      em.color.setHex(style === "wireframe" && (this.selected.has(el.id) || this.revealedOnly(el)) ? color : 0x14171b);
     }
     // Glazing meshes (curtain walls, windows) follow the faces.
     for (const c of g.children.slice(2)) if (c instanceof THREE.Mesh) (c.material as THREE.Material).visible = style !== "wireframe";

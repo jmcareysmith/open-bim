@@ -214,8 +214,22 @@ export async function openRender(host: RenderHost): Promise<() => void> {
     materials.forEach((m) => m.dispose());
     renderer.dispose();
     pane.remove();
+    window.removeEventListener("keydown", esc, true);
   };
   close.onclick = dispose;
+  // Esc stops the render (the image so far stays; Resume carries on); Esc again closes it.
+  const esc = (ev: KeyboardEvent) => {
+    if (ev.key !== "Escape" || !pane.isConnected) return;
+    const t = ev.target as HTMLElement;
+    if (t.matches("input, textarea, select") || document.querySelector(".dialog-backdrop, .context-menu")) return;
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
+    if (!paused && tracer.samples < MAX_SAMPLES) {
+      paused = true;
+      host.status(`Render stopped at ${Math.floor(tracer.samples)} samples. Resume to carry on, Save PNG to keep it, or Esc to close.`);
+    } else dispose();
+  };
+  window.addEventListener("keydown", esc, true);
   ai.onclick = () => openAiPanel(pane, canvasHost, renderer.domElement, host);
   host.status("Rendering. It sharpens as samples build up; change the date or time to move the sun.");
   return dispose;

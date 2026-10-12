@@ -59,7 +59,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 ## Phase 6 — Advanced modelling (current)
 - [x] Stairs, railings, ramps — straight runs with landings (no winders/curved runs yet); D1/AS1, F4/AS1, NZS 4121 checks
 - [x] Curtain walls — wall types with a curtain grid (equal divisions, mullions, glazed panels); no per-panel editing yet
-- Stacked walls
+- [x] Stacked walls — member wall types bottom to top, one variable segment
 - Toposolids & site
 - Structural columns, beams, foundations
 - Phasing, design options, clash detection

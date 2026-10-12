@@ -12,6 +12,7 @@ import {
   type Vec2,
   type Wall,
   curtainOf,
+  stackSegments,
 } from "@open-bim/core";
 import { buildGridLines, buildOpeningLines, buildReferencePlaneLines, type LineData } from "./datums.ts";
 import { buildDoor, buildDoorLines, buildWindow, buildWindowLines } from "./doors.ts";
@@ -24,6 +25,7 @@ import { buildViewMarker } from "./sections.ts";
 import { buildAnnotationLines } from "./annotations.ts";
 import { buildLegendLines } from "./legends.ts";
 import { buildCurtainWall } from "./curtain.ts";
+import { buildStackedWall } from "./stacked.ts";
 import { buildDirectShape } from "./directshape.ts";
 import { buildLink } from "./links.ts";
 import { buildStair, buildStairLines } from "./stairs.ts";
@@ -74,6 +76,8 @@ export function buildWall(doc: Document, el: Element): MeshData | null {
   if (top <= bottom) return null;
   const grid = curtainOf(doc, wall);
   if (grid) return buildCurtainWall(doc, wall, grid);
+  const segments = stackSegments(doc, wall);
+  if (segments.length) return buildStackedWall(doc, wall, segments);
   return extrudePolygon(joinedWallFootprint(doc, wall), [], bottom, top);
 }
 

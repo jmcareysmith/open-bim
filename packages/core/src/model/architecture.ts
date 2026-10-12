@@ -98,7 +98,12 @@ export type LayeredTypeParams = {
   layers: Layer[];
   /** Wall types only: a curtain wall (glazed panels on a mullion grid) instead of solid layers. */
   curtain?: CurtainGrid | null;
+  /** Wall types only: a stacked wall — other wall types bottom to top (Revit: Stacked Wall). */
+  stack?: StackSegment[] | null;
 };
+
+/** One wall type in a stack; `height` 0 marks the single variable-height segment. */
+export type StackSegment = { typeId: ElementId; height: number };
 
 /**
  * Curtain wall grid (Revit: Curtain Wall type). Grid lines divide the wall equally at no more than
@@ -115,6 +120,44 @@ export type CurtainGrid = {
   panelMaterialId?: ElementId | null;
   mullionMaterialId?: ElementId | null;
 };
+
+/**
+ * A stacked wall type: member types bottom to top, exactly one with height 0 (it takes the rest).
+ * The stack's own layers copy its thickest member's, so joins and footprints use that thickness.
+ */
+export function createStackedWallType(tx: Transaction, doc: Document, name: string, stack: StackSegment[]): Element<LayeredTypeParams> {
+  if (stack.length < 2) throw new Error("A stacked wall needs at least two wall types");
+  if (stack.filter((s) => s.height === 0).length !== 1) throw new Error("Exactly one segment must have variable height (0)");
+  let thickest: Element<LayeredTypeParams> | undefined;
+  for (const s of stack) {
+    const t = doc.get<LayeredTypeParams>(s.typeId);
+    if (!t || t.category !== Cat.WallType) throw new Error("Stacked walls are made of wall types");
+    if (t.params.stack || t.params.curtain) throw new Error("Stacks can't contain stacked or curtain walls");
+    if (s.height < 0) throw new Error("Segment heights can't be negative");
+    if (!thickest || totalThickness(t) > totalThickness(thickest)) thickest = t;
+  }
+  return tx.create<LayeredTypeParams>(Cat.WallType, { layers: thickest!.params.layers.map((l) => ({ ...l })), stack: stack.map((s) => ({ ...s })) }, { name });
+}
+
+/** A stacked wall's segments with absolute heights (the variable one fills what's left). */
+export function stackSegments(doc: Document, wall: Wall): { typeId: ElementId; bottom: number; top: number; thickness: number }[] {
+  const t = wall.typeId ? doc.get<LayeredTypeParams>(wall.typeId) : undefined;
+  const stack = t?.params.stack;
+  if (!stack) return [];
+  const { bottom, top } = wallExtent(doc, wall);
+  const fixed = stack.reduce((s, x) => s + x.height, 0);
+  const variable = Math.max(0, top - bottom - fixed);
+  const out: { typeId: ElementId; bottom: number; top: number; thickness: number }[] = [];
+  let z = bottom;
+  for (const s of stack) {
+    const h = s.height === 0 ? variable : s.height;
+    const z1 = Math.min(top, z + h);
+    const mt = doc.get<LayeredTypeParams>(s.typeId);
+    if (z1 > z && mt) out.push({ typeId: s.typeId, bottom: z, top: z1, thickness: totalThickness(mt) });
+    z = z1;
+  }
+  return out;
+}
 
 /** The curtain grid of a wall's type, if it is a curtain wall. */
 export function curtainOf(doc: Document, wall: Element): CurtainGrid | undefined {
@@ -216,7 +259,13 @@ export function ceilingExtent(doc: Document, ceiling: Ceiling): { bottom: number
 const typeDeps = (el: Element): ElementId[] => (el.typeId ? [el.typeId] : []);
 
 registerCategory({ name: Cat.Level, dependencies: () => [], cascadeDelete: false, isType: false });
-registerCategory({ name: Cat.WallType, dependencies: layerMaterialDeps, cascadeDelete: false, isType: true });
+registerCategory({
+  name: Cat.WallType,
+  // Stacked types depend on their member types (deleting one is blocked while it's stacked).
+  dependencies: (el) => [...layerMaterialDeps(el), ...((el.params as LayeredTypeParams).stack ?? []).map((s) => s.typeId)],
+  cascadeDelete: false,
+  isType: true,
+});
 registerCategory({ name: Cat.FloorType, dependencies: layerMaterialDeps, cascadeDelete: false, isType: true });
 registerCategory({ name: Cat.CeilingType, dependencies: layerMaterialDeps, cascadeDelete: false, isType: true });
 

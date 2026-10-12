@@ -82,4 +82,5 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Stairs (Stair tool: run ends, Enter; D1/AS1 checks), ramps (1:12 check), railings (sketched or
   on stairs/ramps, F4/AS1 gap). Straight runs only (no winders/curved runs).
 - Curtain walls: wall type "Curtain Wall - Aluminium 1200 x 1500" (grid in type properties).
-- Next: Phase 6 — stacked walls, then toposolids, structure, phasing/options/clash.
+- Stacked walls: browser Types → New stacked wall type (segments in its properties).
+- Next: Phase 6 — toposolids & site, then structure, then phasing/design options/clash.

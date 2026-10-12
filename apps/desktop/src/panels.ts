@@ -11,6 +11,7 @@ import {
   createLegend,
   createSchedule,
   createRevision,
+  createStackedWallType,
   stairLayout,
   rampLayout,
   rampLengthNeeded,
@@ -1280,6 +1281,21 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   for (const t of doc.byCategory<WindowTypeParams>(Cat.WindowType)) {
     types.append(item(t, `${t.params.width} \u00d7 ${t.params.height}`, () => ctx.setSelection([t.id])));
   }
+  const plainWalls = doc.byCategory<LayeredTypeParams>(Cat.WallType).filter((t) => !t.params.stack && !t.params.curtain);
+  if (plainWalls.length >= 2) {
+    const newStack = h("button", { textContent: "New stacked wall type" });
+    newStack.onclick = () =>
+      edit(ctx, "New stacked wall type", (tx) => {
+        let name = "Stacked Wall 1";
+        for (let i = 2; doc.byCategory(Cat.WallType).some((t) => t.name === name); i++) name = `Stacked Wall ${i}`;
+        const st = createStackedWallType(tx, doc, name, [
+          { typeId: plainWalls[1]!.id, height: 900 },
+          { typeId: plainWalls[0]!.id, height: 0 },
+        ]);
+        queueMicrotask(() => ctx.setSelection([st.id]));
+      });
+    types.append(row("", newStack));
+  }
 
   const counts = h("div", { class: "section" }, h("h3", {}, "Model"));
   counts.append(row("Walls", String(doc.byCategory(Cat.Wall).length)));
@@ -2219,6 +2235,35 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Total", len(totalThickness(t))),
       );
       const matOpts = materialElements(doc).map((m) => ({ value: m.id, label: m.name ?? m.id }));
+      const stack = t.params.stack;
+      if (stack) {
+        // Stacked wall: member types bottom to top; height 0 = variable.
+        const members = doc.byCategory<LayeredTypeParams>(Cat.WallType).filter((x) => !x.params.stack && !x.params.curtain);
+        const setStack = (next: typeof stack) =>
+          edit(ctx, "Edit stacked wall", (tx) => {
+            if (next.filter((s) => s.height === 0).length !== 1) throw new Error("Exactly one segment must have variable height (0)");
+            const thickest = next.map((s) => doc.require<LayeredTypeParams>(s.typeId)).reduce((a, b) => (totalThickness(b) > totalThickness(a) ? b : a));
+            tx.update<LayeredTypeParams>(t.id, { stack: next, layers: thickest.params.layers.map((l) => ({ ...l })) });
+          });
+        sec.append(h("h3", {}, "Stack (bottom to top; height 0 = variable)"));
+        stack.forEach((s, i) => {
+          const rm = h("button", { textContent: "\u00d7", class: "mini", disabled: stack.length <= 2 });
+          rm.onclick = () => setStack(stack.filter((_, j) => j !== i));
+          sec.append(
+            h(
+              "div",
+              { class: "buttons wrap" },
+              select(members.map((m) => ({ value: m.id, label: m.name ?? m.id })), s.typeId, (v) => setStack(stack.map((x, j) => (j === i ? { ...x, typeId: v } : x)))),
+              numberInput(s.height, (v) => setStack(stack.map((x, j) => (j === i ? { ...x, height: Math.max(0, v) } : x)))),
+              rm,
+            ),
+          );
+        });
+        const add = h("button", { textContent: "Add segment" });
+        add.onclick = () => setStack([...stack, { typeId: members[0]!.id, height: 600 }]);
+        sec.append(row("", add));
+        break;
+      }
       const grid = t.params.curtain;
       if (grid) {
         // Curtain wall: grid, mullions and panels instead of layers.

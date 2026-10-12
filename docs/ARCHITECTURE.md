@@ -245,7 +245,9 @@ and the gradient is checked against 1:12.
 **Curtain walls** — a wall type with `curtain` (max grid spacings, mullion/panel sizes and
 materials) instead of solid layers (it keeps one layer at mullion depth for joins and footprints).
 `geometry/src/curtain.ts` divides the wall equally and builds panels and mullions as boxes with
-per-vertex colours (`MeshData.colors`); OCCT skips opening cuts for curtain walls.
+per-vertex colours (`MeshData.colors`); OCCT skips opening cuts for curtain walls. Stacked wall
+types list member wall types bottom to top (`stack`, one variable height) and copy their thickest
+member's layers for joins; each segment is the joined footprint narrowed to its own thickness.
 
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.

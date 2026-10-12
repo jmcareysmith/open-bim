@@ -124,6 +124,8 @@ import { AlignTool, OffsetTool, SplitTool, TrimTool } from "./edittools.ts";
 import { GripLayer } from "./grips.ts";
 import { openDialog, showContextMenu, type MenuItem } from "./dialog.ts";
 import { Docking } from "./docking.ts";
+import { ViewBar } from "./viewbar.ts";
+import { makeCollapsible } from "./collapse.ts";
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 
@@ -430,6 +432,21 @@ const DRAWING_TOOLS = new Set(["select", "move", "copy", "rotate", "mirror", "ar
 let tool: Tool = tools.select!;
 /** Grips and temporary dimensions for the selection (Select tool only). */
 let grips: GripLayer | undefined = new GripLayer(ctx, $("#viewport"));
+/** Open-view tabs and the view control bar under the model window. */
+let viewBar: ViewBar | undefined = new ViewBar(
+  {
+    get doc() {
+      return doc;
+    },
+    viewport,
+    activeViewId: () => activeViewId,
+    setActiveView: (id) => ctx.setActiveView(id),
+    run: (c) => void commands[c]?.(),
+    status,
+  },
+  $("#view-tabs"),
+  $("#view-bar"),
+);
 
 function setTool(name: string): void {
   if (viewport.viewMode === "drawing" && !DRAWING_TOOLS.has(name)) {
@@ -771,6 +788,7 @@ function afterVisibility(message: string): void {
   selection = selection.filter((id) => viewport.visibility.isVisible(doc.require(id)));
   viewport.setSelection(selection);
   refreshPanels();
+  viewBar?.render();
   status(viewport.visibility.active ? `${message} \u00b7 temporary hide/isolate is on (U to reset)` : message);
 }
 
@@ -844,6 +862,7 @@ function applyView(): void {
   if (!activeView()) activeViewId = views(doc).find((v) => v.params.kind === "3d")?.id ?? views(doc)[0]?.id;
   const v = activeView();
   if (!v) return viewport.setViewMode("3d");
+  viewport.setVisualStyle(v.params.kind === "3d" ? (v.params.visualStyle ?? "shaded") : "shaded");
   if (isPlanView(v)) {
     viewport.setPlanRange(viewRange(doc, v));
     viewport.setViewMode("plan");
@@ -1126,6 +1145,8 @@ function refreshPanels(): void {
   vgDialog?.refresh();
   refreshTypeSelector();
   renderBrowser($("#browser-body"), ctx);
+  makeCollapsible($("#browser-body"));
+  viewBar?.render();
   renderProperties($("#properties-body"), ctx);
   const active = activeViewId ? doc.get(activeViewId) : undefined;
   if (active?.category === Cat.Schedule) renderSchedulePane($("#schedule-pane"), ctx, active as Schedule);

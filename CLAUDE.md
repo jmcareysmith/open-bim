@@ -59,7 +59,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   the view menu with Visibility/Graphics (dialog; also VV). In 3D, orbit pivots on the selection.
 - Panels: Project Browser / Properties dock left or right (drag the title), tab together (drop on
   the other's title), or float (drop elsewhere, or ⧉); empty-space menu → Reset Panel Layout.
-  UI chrome is light grey (Jeremy asked: no black menus).
+  UI chrome is light grey (Jeremy asked: no black menus). Browser groups fold (click headings).
+- Under the view: open-view tabs (bottom, Revit-style per Jeremy) and the view control bar (scale,
+  detail level, visual style for 3D, temporary hide/isolate, reveal hidden in magenta).
 - Known gaps: joins whole-wall (no per-layer cleanup), no disallow-join, crossing walls overlap; walls
   don't attach to floors/roofs; grids straight only;
   floors lack pick-walls/slope arrows; roofs exact for convex/L/T/U only; doors/windows parametric;

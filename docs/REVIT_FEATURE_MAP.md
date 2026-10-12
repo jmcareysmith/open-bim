@@ -90,7 +90,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Detail levels (coarse/medium/fine) | 2 | 🟨 |
 | Visibility/Graphics overrides, filters | 2 | 🟨 |
 | View templates | 2 | ✅ |
-| Hidden-line, shaded, realistic styles | 2 | 🟨 |
+| Hidden-line, shaded, realistic styles | 2 | ✅ (3D views; plans/sections are 2D drawings) |
 | Camera / perspective views | 2 | ⬜ |
 | Temporary hide/isolate | 1 | ✅ |
 
@@ -171,5 +171,5 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | File menu, Quick Access Toolbar | 7b | ⬜ |
 | Drag and drop from the Project Browser | 7b | ⬜ |
 | Dockable panels | 7b | ✅ |
-| View tabs, status bar, view control bar | 7b | ⬜ |
+| View tabs, status bar, view control bar | 7b | 🟨 (tabs + view control bar; no tiling or selection filter) |
 | Context menus, keyboard shortcuts | 7b | 🟨 (menus, VV/MV/CO…; no shortcut editor) |

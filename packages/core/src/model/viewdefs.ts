@@ -10,6 +10,16 @@ import type { AppliedFilter, GraphicOverride } from "./graphics.ts";
 
 export type ViewKind = "floorPlan" | "3d" | "section" | "elevation" | "callout" | "areaPlan" | "legend";
 export type DetailLevel = "coarse" | "medium" | "fine";
+/** Revit's visual styles (3D views). "rendered" shows the path-traced render. */
+export type VisualStyle = "wireframe" | "hiddenLine" | "shaded" | "consistent" | "realistic" | "rendered";
+export const VISUAL_STYLES: { value: VisualStyle; label: string }[] = [
+  { value: "wireframe", label: "Wireframe" },
+  { value: "hiddenLine", label: "Hidden Line" },
+  { value: "shaded", label: "Shaded" },
+  { value: "consistent", label: "Consistent Colours" },
+  { value: "realistic", label: "Realistic" },
+  { value: "rendered", label: "Rendered" },
+];
 
 /** Revit view range, as offsets from the view's level, mm. */
 export type ViewRangeOffsets = {
@@ -57,6 +67,8 @@ export type ViewParams = {
   templateId?: ElementId | null;
   /** Phasing: the phase this view shows and its phase filter (default: last phase, Show All). */
   phase?: string | null;
+  /** 3D views: how the model is drawn (default shaded). */
+  visualStyle?: VisualStyle | null;
   phaseFilter?: "all" | "complete" | "new" | "previous" | "none" | null;
   /** Design options: which option this view shows per option set (default primary). */
   designOptions?: Record<string, string> | null;

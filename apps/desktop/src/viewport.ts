@@ -16,6 +16,7 @@ import {
   type ResolvedGraphics,
   type Sheet,
   type ViewParams,
+  type VisualStyle,
   type ChangeSet,
   type Document,
   type ElementId,
@@ -82,6 +83,8 @@ const COLORS: Record<string, number> = {
   [Cat.PadFooting]: 0xa7a8a6,
   [Cat.StripFooting]: 0xa7a8a6,
 };
+/** Hidden elements while revealing them (Revit shows them magenta). */
+const REVEALED = 0xd0389c;
 const SELECTED = 0x3d8bfd;
 const VOID_COLOR = 0xff8c1a;
 /** Large surfaces that lose picks to line work drawn over them. */
@@ -355,7 +358,59 @@ export class Viewport {
     if (!g || !el) return;
     const mesh = g.children[0] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial | THREE.LineBasicMaterial>;
     const base = (g.userData.baseColor as number | undefined) ?? COLORS[el.category] ?? 0xcccccc;
-    mesh.material.color.setHex(this.displayColor(el, base));
+    const color = this.displayColor(el, base);
+    const mat = mesh.material;
+    if (!(mat instanceof THREE.MeshStandardMaterial)) {
+      mat.color.setHex(color);
+      return;
+    }
+    // Visual style (3D): faces lit, flat (emissive only) or hidden; edges on top for wireframe.
+    const style = this.visualStyle;
+    const flat = style === "hiddenLine" || style === "consistent";
+    // Hidden Line faces are white unless selected, revealed or overridden in V/G.
+    const vg = this.resolveGraphics(el);
+    const plain = style === "hiddenLine" && !this.selected.has(el.id) && !this.revealedOnly(el) && vg.color == null && !vg.halftone;
+    mat.visible = style !== "wireframe";
+    mat.color.setHex(flat ? 0x000000 : color);
+    mat.emissive.setHex(flat ? (plain ? 0xffffff : color) : 0x000000);
+    const edges = g.children[1];
+    if (edges instanceof THREE.LineSegments) {
+      const em = edges.material as THREE.LineBasicMaterial;
+      em.visible = style !== "realistic";
+      em.depthTest = style !== "wireframe";
+      em.color.setHex(style === "wireframe" ? color : 0x14171b);
+    }
+    // Glazing meshes (curtain walls, windows) follow the faces.
+    for (const c of g.children.slice(2)) if (c instanceof THREE.Mesh) (c.material as THREE.Material).visible = style !== "wireframe";
+  }
+
+  private visualStyle: VisualStyle = "shaded";
+  private revealHidden = false;
+
+  /** The 3D view's visual style (Wireframe, Hidden Line, Shaded, Consistent Colours, Realistic). */
+  setVisualStyle(style: VisualStyle): void {
+    const s = style === "rendered" ? "realistic" : style;
+    if (s === this.visualStyle) return;
+    this.visualStyle = s;
+    for (const id of this.objects.keys()) this.applyHighlight(id);
+    this.needsRender = true;
+  }
+
+  /** Reveal hidden elements (Revit's light bulb): hidden ones show in magenta. */
+  setRevealHidden(on: boolean): void {
+    if (on === this.revealHidden) return;
+    this.revealHidden = on;
+    this.container.classList.toggle("reveal-hidden", on);
+    this.refreshVisibility();
+    for (const id of this.objects.keys()) this.applyHighlight(id);
+  }
+  get revealing(): boolean {
+    return this.revealHidden;
+  }
+
+  /** Shown only because hidden elements are being revealed. */
+  private revealedOnly(el: Element): boolean {
+    return this.revealHidden && !(this.resolveGraphics(el).visible && this.visibility.isVisible(el));
   }
 
   // ---- picking ------------------------------------------------------------
@@ -420,6 +475,7 @@ export class Viewport {
   /** Colour after selection, V/G colour override and halftone. */
   private displayColor(el: Element, base: number): number {
     if (this.selected.has(el.id)) return SELECTED;
+    if (this.revealedOnly(el)) return REVEALED;
     const g = this.resolveGraphics(el);
     const c = g.color ?? base;
     return g.halftone ? blend(c, HALFTONE_TOWARD, 0.6) : c;
@@ -430,6 +486,7 @@ export class Viewport {
     if (owner && owner !== this.annotationViewId) return false;
     const lvl = planLevelOf(el as Element);
     if (lvl && lvl !== this.planLevelId) return false;
+    if (this.revealHidden) return true;
     return this.resolveGraphics(el as Element).visible && this.visibility.isVisible(el);
   }
 

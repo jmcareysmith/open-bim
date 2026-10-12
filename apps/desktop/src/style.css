@@ -14,6 +14,7 @@
   background: var(--bg);
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html, body { margin: 0; height: 100%; overflow: hidden; }
 body { display: grid; grid-template-rows: auto 1fr auto; }
 
@@ -38,7 +39,31 @@ input { width: 100%; }
 input:focus, select:focus { outline: 1px solid var(--accent); }
 
 main { display: flex; min-height: 0; }
+#view-area { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 #viewport { flex: 1; }
+#view-tabs { display: flex; gap: 2px; padding: 3px 4px 0; background: var(--bg); border-top: 1px solid var(--line); overflow-x: auto; flex: none; }
+#view-tabs:empty { display: none; }
+.view-tab {
+  display: flex; align-items: center; gap: 6px; padding: 3px 4px 3px 10px; border: 1px solid var(--line); border-top: 0;
+  border-radius: 0 0 5px 5px; background: var(--panel); cursor: pointer; white-space: nowrap; max-width: 240px;
+}
+.view-tab span:not(.tab-kind) { overflow: hidden; text-overflow: ellipsis; }
+.view-tab.active { background: var(--panel-2); box-shadow: inset 0 -2px 0 var(--accent); font-weight: 600; }
+.tab-kind { color: var(--muted); font-size: 11px; font-weight: 400; }
+.tab-close { padding: 0 5px; border: 0; background: none; color: var(--muted); line-height: 1.2; }
+.tab-close:hover { color: var(--danger); }
+#view-bar { display: flex; align-items: center; gap: 6px; padding: 3px 6px; background: var(--panel); border-top: 1px solid var(--line); flex: none; }
+#view-bar select, #view-bar button { padding: 1px 6px; font-size: 12px; }
+#view-bar .bar-group { display: inline-flex; }
+#view-bar .bar-group button { border-radius: 0; }
+#view-bar .bar-group button:first-child { border-radius: 4px 0 0 4px; }
+#view-bar .bar-group button:last-child { border-radius: 0 4px 4px 0; }
+#viewport.reveal-hidden { outline: 3px solid #d0389c; outline-offset: -3px; }
+#viewport.reveal-hidden::before { content: "Reveal Hidden Elements"; position: absolute; top: 8px; right: 10px; color: #d0389c; z-index: 3; font-weight: 600; }
+.fold-head { cursor: pointer; user-select: none; }
+.fold-head::before { content: "▾"; display: inline-block; width: 1em; color: var(--muted); }
+.folded > .fold-head::before, .subhead.folded::before { content: "▸"; }
+.section.folded > :not(h3) { display: none; }
 .dock { position: relative; display: flex; flex-direction: column; min-height: 0; flex: none; background: var(--panel); }
 .dock[hidden] { display: none; }
 .dock-left { border-right: 1px solid var(--line); }

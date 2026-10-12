@@ -42,6 +42,13 @@ export async function openProject(): Promise<{ path: string; json: DocumentJSON 
   });
 }
 
+/** Read a project file at a known path (desktop only; null in the browser). */
+export async function readProjectAt(path: string): Promise<DocumentJSON | null> {
+  if (!isTauri()) return null;
+  const { readTextFile } = await import("@tauri-apps/plugin-fs");
+  return JSON.parse(await readTextFile(path)) as DocumentJSON;
+}
+
 /** Save PDF bytes. Returns the path (desktop) or file name (browser), or null if cancelled. */
 export async function savePdf(bytes: Uint8Array, defaultName: string): Promise<string | null> {
   if (isTauri()) {

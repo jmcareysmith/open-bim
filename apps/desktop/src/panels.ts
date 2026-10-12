@@ -11,6 +11,10 @@ import {
   createLegend,
   createSchedule,
   createRevision,
+  links,
+  linkDocument,
+  type Link,
+  type LinkParams,
   CRS_OPTIONS,
   DEFAULT_LOCATION,
   type SiteLocation,
@@ -206,6 +210,8 @@ export interface PanelContext {
   importKeynotes(): void;
   exportKeynotes(): void;
   exportSchedule(id: ElementId, format: "csv" | "xlsx"): void;
+  linkProject(): void;
+  reloadLink(id: ElementId): void;
   /** Start placing copies of a selected group. */
   placeGroupCopy(): void;
   /** Family editor: the project's loaded families, and copying one in to nest it. */
@@ -914,6 +920,7 @@ const VG_CATEGORIES: [string, string][] = [
   [Cat.Room, "Rooms"],
   [Cat.RoomSeparator, "Room separators"],
   [Cat.Area, "Areas"],
+  [Cat.Link, "Linked models"],
   [Cat.AreaBoundary, "Area boundaries"],
   [Cat.Grid, "Grids"],
   [Cat.ReferencePlane, "Reference planes"],
@@ -1376,6 +1383,17 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   loadFile.onclick = () => ctx.loadFamilyFile();
   fams.append(row("", h("div", { class: "buttons" }, loadFile)));
 
+  // Linked projects.
+  const linkSec = h("div", { class: "section" }, h("h3", {}, "Links"));
+  for (const l of links(doc)) {
+    const div = h("div", { class: `list-item${sel.has(l.id) ? " selected" : ""}` }, h("span", {}, l.name ?? l.id), h("span", { class: "muted" }, l.params.positioning === "shared" ? "shared" : "origin"));
+    div.onclick = () => ctx.setSelection([l.id]);
+    linkSec.append(div);
+  }
+  const addLink = h("button", { textContent: "Link project\u2026" });
+  addLink.onclick = () => ctx.linkProject();
+  linkSec.append(row("", addLink));
+
   // Sheet issues / revisions, in sequence.
   const revSec = h("div", { class: "section" }, h("h3", {}, "Revisions"));
   for (const r of revisions(doc)) {
@@ -1470,7 +1488,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
     h("div", { class: "buttons wrap" }, imp, exp),
   );
 
-  root.replaceChildren(project, views, schedSec, sheetsSec, revSec, fams, paramsSec, lv, types, mats, vg, counts);
+  root.replaceChildren(project, views, schedSec, sheetsSec, revSec, linkSec, fams, paramsSec, lv, types, mats, vg, counts);
 }
 
 // ---- Properties -----------------------------------------------------------
@@ -1623,6 +1641,39 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         ),
         row("X", numberInput(p.position.x, (v) => update<KeynoteLegendParams>("Move keynote legend", { position: { ...p.position, x: v } }))),
         row("Y", numberInput(p.position.y, (v) => update<KeynoteLegendParams>("Move keynote legend", { position: { ...p.position, y: v } }))),
+      );
+      break;
+    }
+    case Cat.Link: {
+      const l = el as Link;
+      const p = l.params;
+      const reload = h("button", { textContent: "Reload" });
+      reload.onclick = () => ctx.reloadLink(l.id);
+      let count = 0;
+      try {
+        count = linkDocument(l).all().length;
+      } catch {
+        count = 0;
+      }
+      sec.append(
+        row("File", p.path),
+        row("Elements", String(count)),
+        row(
+          "Positioning",
+          select(
+            [
+              { value: "shared", label: "By shared coordinates" },
+              { value: "origin", label: "Origin to origin" },
+            ],
+            p.positioning,
+            (v) => update<LinkParams>("Change link positioning", { positioning: v as LinkParams["positioning"] }),
+          ),
+        ),
+        row("Offset X", numberInput(p.offset.x, (v) => update<LinkParams>("Move link", { offset: { ...p.offset, x: v } }))),
+        row("Offset Y", numberInput(p.offset.y, (v) => update<LinkParams>("Move link", { offset: { ...p.offset, y: v } }))),
+        row("Offset Z", numberInput(p.offset.z, (v) => update<LinkParams>("Move link", { offset: { ...p.offset, z: v } }))),
+        row("Rotation (\u00b0)", numberInput(Math.round(((p.rotation * 180) / Math.PI) * 100) / 100, (v) => update<LinkParams>("Rotate link", { rotation: (v * Math.PI) / 180 }))),
+        row("", reload),
       );
       break;
     }

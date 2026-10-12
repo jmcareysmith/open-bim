@@ -58,6 +58,7 @@ export const Cat = {
   Group: "Group",
   DirectShape: "DirectShape",
   CadImport: "CadImport",
+  Link: "Link",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

@@ -221,6 +221,12 @@ northings, height in metres; rotation of project north anticlockwise from grid n
 `fromShared` convert; IFC export writes `IfcMapConversion` + `IfcProjectedCRS`, and DXF plans can be
 exported in map metres.
 
+**Links** — a `Link` stores the linked project's JSON snapshot plus its path (reload re-reads it),
+positioning (origin to origin, or by the two projects' shared coordinates via `linkTransform`),
+offset and rotation. `geometry/src/links.ts` builds every linked element with the host's kernel,
+merges them (cached per kernel and snapshot) and applies the transform, so links draw in 3D and in
+plan cuts. Linked elements are read-only and not scheduled or tagged yet.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

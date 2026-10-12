@@ -19,6 +19,7 @@ import { buildFamilyInstance, nestedMeshes } from "./components.ts";
 import type { LineData } from "./datums.ts";
 import { joinedWallFootprint } from "./joins.ts";
 import { SimpleKernel, type GeometryKernel } from "./kernel.ts";
+import { buildLink } from "./links.ts";
 import type { MeshData } from "./mesh.ts";
 
 /** Cut boxes overshoot the wall faces by this much so booleans never leave slivers. */
@@ -53,6 +54,7 @@ export class OcctKernel implements GeometryKernel {
       if (cuts.length) return this.buildWallWithCuts(doc, wall, cuts);
     }
     if (el.category === Cat.FamilyInstance) return buildFamilyInstance(doc, el, this.mesher);
+    if (el.category === Cat.Link) return buildLink(doc, el, this);
     if (isFormCategory(el.category) && !(el.params as { isVoid?: boolean }).isVoid) {
       // Family solids are cut by every void in the family (Revit behaviour).
       const values = familyValues(doc);

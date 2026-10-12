@@ -23,6 +23,7 @@ import { buildViewMarker } from "./sections.ts";
 import { buildAnnotationLines } from "./annotations.ts";
 import { buildLegendLines } from "./legends.ts";
 import { buildDirectShape } from "./directshape.ts";
+import { buildLink } from "./links.ts";
 import { buildCadImportLines } from "./dxf.ts";
 import { buildRevisionCloudLines } from "./revisions.ts";
 import { buildAreaBoundaryLines, buildAreaLines, buildRoomLines, buildRoomSeparatorLines } from "./rooms.ts";
@@ -87,6 +88,7 @@ export class SimpleKernel implements GeometryKernel {
   private builders = new Map<string, Builder>([
     [Cat.Wall, buildWall],
     [Cat.DirectShape, buildDirectShape],
+    [Cat.Link, (doc, el) => buildLink(doc, el, this)],
     [Cat.Floor, buildFloor],
     [Cat.Ceiling, buildCeiling],
     [Cat.Roof, buildRoof],

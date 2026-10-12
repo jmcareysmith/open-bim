@@ -35,6 +35,9 @@ import {
   loadFamily,
   familyFile,
   readFamilyFile,
+  createLink,
+  reloadLink,
+  type Link,
   createCadImport,
   createGroup,
   groupMembers,
@@ -72,7 +75,7 @@ import { LIBRARY } from "@open-bim/library";
 import { exportIfc } from "@open-bim/ifc/export";
 import type { IfcApi } from "@open-bim/ifc";
 import ifcWasmUrl from "web-ifc/web-ifc.wasm?url";
-import { openBytes, openProject, openText, saveBytes, savePdf, saveProject, saveText } from "./io.ts";
+import { openBytes, openProject, openText, readProjectAt, saveBytes, savePdf, saveProject, saveText } from "./io.ts";
 import { renderBrowser, renderProperties, renderSchedulePane, type PanelContext } from "./panels.ts";
 import { PluginHost, mountConsole } from "./plugins.ts";
 import { buildSample } from "./sample.ts";
@@ -232,6 +235,8 @@ const ctx: ToolContext & PanelContext = {
     }
   },
   placeGroupCopy: () => void commands.placeGroupCopy?.(),
+  linkProject: () => void commands.linkProject?.(),
+  reloadLink: (id: ElementId) => void reloadLinkFile(id),
   async exportSchedule(id: ElementId, format: "csv" | "xlsx") {
     try {
       const s = doc.require(id) as Schedule;
@@ -569,6 +574,18 @@ const commands: Record<string, () => void | Promise<void>> = {
       status(`Imported ${content.segments.length / 4} line(s) and ${content.texts.length} text(s) from ${file.name} into ${v.name}. Move it with Offset in Properties.`);
     } catch (err) {
       status(`\u26a0 DXF import failed: ${(err as Error).message}`);
+    }
+  },
+  async linkProject() {
+    if (projectSession) return status("Link: close the family editor first.");
+    try {
+      const r = await openProject();
+      if (!r) return;
+      const link = doc.transact(`Link ${r.path.split(/[\\/]/).pop()}`, (tx) => createLink(tx, r.json, r.path, "shared"));
+      ctx.setSelection([link.id]);
+      status(`Linked ${link.name} by shared coordinates. Change positioning or offset in Properties.`);
+    } catch (err) {
+      status(`\u26a0 Link failed: ${(err as Error).message}`);
     }
   },
   async exportIfc() {
@@ -913,6 +930,27 @@ function loadFamilyIntoProject(fam: Document, name: string): void {
     status(`${reload ? "Reloaded" : "Loaded"} ${name}. Place it with the Component tool (C).`);
   } catch (err) {
     status(`⚠ ${(err as Error).message}`);
+  }
+}
+
+/** Reload a link: re-read its file on desktop, or pick it again in the browser. */
+async function reloadLinkFile(id: ElementId): Promise<void> {
+  const link = doc.get(id) as Link | undefined;
+  if (!link) return;
+  try {
+    // Desktop: re-read the same file; browser: pick it again.
+    let json = await readProjectAt(link.params.path);
+    let path = link.params.path;
+    if (!json) {
+      const r = await openProject();
+      if (!r) return;
+      json = r.json;
+      path = r.path;
+    }
+    doc.transact(`Reload ${link.name}`, (tx) => reloadLink(tx, id, json!, path));
+    status(`Reloaded ${link.name}.`);
+  } catch (err) {
+    status(`\u26a0 Reload failed: ${(err as Error).message}`);
   }
 }
 

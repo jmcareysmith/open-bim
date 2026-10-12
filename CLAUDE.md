@@ -76,4 +76,6 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - IFC: Export IFC (IFC4, packages/ifc) and Import IFC (web-ifc → DirectShapes on matching levels).
 - DXF: Export DXF (open view/sheet) and Import DXF (into the open view as a CadImport). DWG not done
   (needs a licence decision: LibreDWG is GPL; ODA is proprietary).
-- Next: Phase 5 — shared coordinates/links, then glTF/OBJ.
+- Shared coordinates (Project Information & Units → Location; NZTM2000) and links (browser → Links →
+  Link project…; by shared coordinates or origin; Reload). Links draw in one colour, aren't scheduled.
+- Next: Phase 5 — glTF/OBJ export (last Phase 5 item).

@@ -408,6 +408,11 @@ export class Viewport {
     return this.revealHidden;
   }
 
+  /** Hidden in this view (by V/G or temporary hide/isolate), whether or not it's being revealed. */
+  isHidden(el: Element): boolean {
+    return !(this.resolveGraphics(el).visible && this.visibility.isVisible(el));
+  }
+
   /** Shown only because hidden elements are being revealed. */
   private revealedOnly(el: Element): boolean {
     return this.revealHidden && !(this.resolveGraphics(el).visible && this.visibility.isVisible(el));

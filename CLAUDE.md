@@ -60,6 +60,12 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Panels: Project Browser / Properties dock left or right (drag the title), tab together (drop on
   the other's title), or float (drop elsewhere, or ⧉); empty-space menu → Reset Panel Layout.
   UI chrome is light grey (Jeremy asked: no black menus). Browser groups fold (click headings).
+- Ribbon (apps/desktop/src/ribbon.ts + ribbondefs.ts, icons.ts): File menu, QAT, Revit-order tabs;
+  Annotate: Dimension, Detail (line, region, cloud), Text (+ Check Spelling, Find/Replace), Tag (+
+  Keynote ▾ load/export keynote files), Revisions, Groups. Symbol, Detail Component, Detail Group
+  are placeholders (disabled) until built. Options bar under the ribbon holds Level/Type.
+- Reveal Hidden mode: right-click a magenta element → Unhide Element / Unhide Category. Docking:
+  drop on a docked panel's top/bottom half to split it there.
 - Under the view: open-view tabs (bottom, Revit-style per Jeremy) and the view control bar (scale,
   detail level, visual style for 3D, temporary hide/isolate, reveal hidden in magenta).
 - Known gaps: joins whole-wall (no per-layer cleanup), no disallow-join, crossing walls overlap; walls

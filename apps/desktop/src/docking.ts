@@ -230,19 +230,21 @@ export class Docking {
           return x >= r.left && x <= r.right;
         })();
         if (!near && !over) continue;
-        // Stack position: above the first panel whose middle is below the pointer.
-        const others = this.layout[side].panels.filter((p) => p !== id);
-        let index = others.length;
+        const d = this.layout[side];
+        const w = d.width;
+        const whole = new DOMRect(side === "left" ? m.left : m.right - w, m.top, w, m.height);
+        const others = d.panels.filter((p) => p !== id);
+        // Into a tabbed dock: it joins the tabs.
+        if (d.tabbed && others.length > 1) return { target: { kind: "dock", side, index: others.length }, rect: whole };
+        // Over a docked panel: its top or bottom half lights up, and the drop splits it there.
         for (const [i, p] of others.entries()) {
           const r = this.spec(p).el.getBoundingClientRect();
-          if (y < r.top + r.height / 2) {
-            index = i;
-            break;
-          }
+          if (!r.height || y < r.top || y > r.bottom) continue;
+          const lower = y > r.top + r.height / 2;
+          const rect = new DOMRect(r.left, lower ? r.top + r.height / 2 : r.top, r.width, r.height / 2);
+          return { target: { kind: "dock", side, index: lower ? i + 1 : i }, rect };
         }
-        const w = this.layout[side].width;
-        const rect = new DOMRect(side === "left" ? m.left : m.right - w, m.top, w, m.height);
-        return { target: { kind: "dock", side, index }, rect };
+        return { target: { kind: "dock", side, index: others.length }, rect: whole };
       }
     }
     const at = { x: x - grab.dx, y: y - grab.dy, w: grab.w, h: grab.h };

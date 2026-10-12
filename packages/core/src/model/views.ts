@@ -54,6 +54,21 @@ export class TemporaryVisibility {
     this.isolatedIds = null;
   }
 
+  /** Show elements again (Revit: Unhide in reveal hidden mode). Isolations take them in. */
+  unhide(ids: Iterable<ElementId>): void {
+    for (const id of ids) {
+      this.hiddenIds.delete(id);
+      this.isolatedIds?.add(id);
+    }
+  }
+
+  unhideCategories(categories: Iterable<string>): void {
+    for (const c of categories) {
+      this.hiddenCats.delete(c);
+      this.isolatedCats?.add(c);
+    }
+  }
+
   reset(): void {
     this.hiddenIds.clear();
     this.hiddenCats.clear();

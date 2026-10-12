@@ -167,8 +167,8 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Move, copy, rotate, mirror, array | 7a | ✅ (mirror by drawn axis; radial array via API only) |
 | Align, offset, trim/extend, split | 7a | ✅ (plans/3D) |
 | Grips, drag editing, temporary dimensions | 7a | ✅ (temp dims: line length only) |
-| Ribbon, contextual tabs, options bar | 7b | ⬜ |
-| File menu, Quick Access Toolbar | 7b | ⬜ |
+| Ribbon, contextual tabs, options bar | 7b | ✅ |
+| File menu, Quick Access Toolbar | 7b | 🟨 (no recent files) |
 | Drag and drop from the Project Browser | 7b | ⬜ |
 | Dockable panels | 7b | ✅ |
 | View tabs, status bar, view control bar | 7b | 🟨 (tabs + view control bar; no tiling or selection filter) |

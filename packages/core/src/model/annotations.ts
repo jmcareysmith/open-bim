@@ -216,3 +216,51 @@ export function createDimension(
   }
   return tx.create<DimensionParams>(Cat.Dimension, { viewId, refs, dir, at, size: opts.size ?? DEFAULT_TEXT_SIZE });
 }
+
+// ---- find / replace (Revit: Annotate → Text → Find/Replace) --------------------------------
+
+export interface FindOptions {
+  matchCase?: boolean;
+  wholeWord?: boolean;
+  /** Only text notes in this view (all views when omitted). */
+  viewId?: ElementId;
+}
+
+export interface TextMatch {
+  id: ElementId;
+  viewId: ElementId;
+  text: string;
+  /** How many times the search text occurs in this note. */
+  count: number;
+}
+
+function searchPattern(query: string, opts: FindOptions): RegExp {
+  const body = query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(opts.wholeWord ? `(?<![\\p{L}\\p{N}_])${body}(?![\\p{L}\\p{N}_])` : body, `gu${opts.matchCase ? "" : "i"}`);
+}
+
+/** Text notes containing `query`. */
+export function findText(doc: Document, query: string, opts: FindOptions = {}): TextMatch[] {
+  if (!query) return [];
+  const re = searchPattern(query, opts);
+  const out: TextMatch[] = [];
+  for (const n of doc.byCategory<TextNoteParams>(Cat.TextNote)) {
+    if (opts.viewId && n.params.viewId !== opts.viewId) continue;
+    const count = [...n.params.text.matchAll(re)].length;
+    if (count) out.push({ id: n.id, viewId: n.params.viewId, text: n.params.text, count });
+  }
+  return out;
+}
+
+/** Replace `query` in text notes (all matches, or only the notes in `ids`). Returns replacements made. */
+export function replaceText(tx: Transaction, doc: Document, query: string, replacement: string, opts: FindOptions & { ids?: ElementId[] } = {}): number {
+  const re = searchPattern(query, opts);
+  let total = 0;
+  for (const m of findText(doc, query, opts)) {
+    if (opts.ids && !opts.ids.includes(m.id)) continue;
+    // A function replacement keeps "$" in the replacement literal.
+    tx.update<TextNoteParams>(m.id, { text: m.text.replace(re, () => replacement) });
+    total += m.count;
+  }
+  return total;
+}

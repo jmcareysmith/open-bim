@@ -1,6 +1,13 @@
 import {
   Cat,
   Document,
+  createLegend,
+  createOptionSet,
+  createRevision,
+  createSchedule,
+  createSheet,
+  ensureProjectSettings,
+  optionSets,
   flipWall,
   groupOf,
   type Element as ModelElement,
@@ -126,6 +133,19 @@ import { openDialog, showContextMenu, type MenuItem } from "./dialog.ts";
 import { Docking } from "./docking.ts";
 import { ViewBar } from "./viewbar.ts";
 import { makeCollapsible } from "./collapse.ts";
+import { Ribbon } from "./ribbon.ts";
+import { ribbonTabs } from "./ribbondefs.ts";
+import { openFindReplace, openSpelling } from "./textdialogs.ts";
+
+/** The family editor's Void toggle; one element, shown on the Create tab. */
+const voidForm = Object.assign(document.createElement("input"), { type: "checkbox", id: "void-form" });
+const voidToggle = () => {
+  const l = document.createElement("label");
+  l.className = "rb-check";
+  l.title = "New forms are voids (cut the solids)";
+  l.append(voidForm, " Void");
+  return l;
+};
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 
@@ -196,7 +216,7 @@ const ctx: ModifyToolContext & PanelContext = {
   },
   viewport,
   setToolOptions: (options) => renderToolOptions(options),
-  formIsVoid: () => $<HTMLInputElement>("#void-form").checked,
+  formIsVoid: () => voidForm.checked,
   activeComponent() {
     const defs = familyDefs(doc);
     const [id, type] = (activeComponentKey ?? "").split("|");
@@ -432,6 +452,54 @@ const DRAWING_TOOLS = new Set(["select", "move", "copy", "rotate", "mirror", "ar
 let tool: Tool = tools.select!;
 /** Grips and temporary dimensions for the selection (Select tool only). */
 let grips: GripLayer | undefined = new GripLayer(ctx, $("#viewport"));
+/** The ribbon: File menu, Quick Access Toolbar, tabs. */
+let ribbon: Ribbon | undefined = new Ribbon(
+  $("#ribbon"),
+  ribbonTabs(
+    {
+      libraryFamilies: () => LIBRARY.map((f) => ({ name: f.name, category: f.category })),
+      loadLibraryFamily: (name) => ctx.loadLibraryFamily(name),
+      newSchedule: (category, kind) =>
+        edit(kind === "takeoff" ? "New material takeoff" : "New schedule", (tx) => {
+          const s = createSchedule(tx, doc, category, { kind });
+          queueMicrotask(() => ctx.setActiveView(s.id));
+        }),
+      cmd: (c) => void commands[c]?.(),
+    },
+    voidToggle,
+  ),
+  {
+    tool: (name) => setTool(name),
+    cmd: (name) => void commands[name]?.(),
+    activeTool: () => tool.name,
+    fileMenu: () => [
+      { label: "New", hint: "Ctrl+N", action: () => void commands.new?.() },
+      { label: "Open\u2026", hint: "Ctrl+O", action: () => void commands.open?.() },
+      { label: "Save", hint: "Ctrl+S", action: () => void commands.save?.() },
+      "-",
+      { heading: "Export" },
+      { label: "PDF (all sheets)\u2026", action: () => void commands.exportPdf?.() },
+      { label: "IFC\u2026", action: () => void commands.exportIfc?.() },
+      { label: "DXF/DWG (this view)\u2026", action: () => void commands.exportDxf?.() },
+      { label: "glTF (.glb)\u2026", action: () => void commands.exportGlb?.() },
+      { label: "OBJ\u2026", action: () => void commands.exportObj?.() },
+      "-",
+      { heading: "Import" },
+      { label: "IFC\u2026", action: () => void commands.importIfc?.() },
+      { label: "DXF/DWG into this view\u2026", action: () => void commands.importDxf?.() },
+      { label: "Link project\u2026", action: () => void commands.linkProject?.() },
+    ],
+  },
+  [
+    { label: "New", icon: "newdoc", cmd: "new", title: "New project (Ctrl+N)" },
+    { label: "Open", icon: "open", cmd: "open", title: "Open (Ctrl+O)" },
+    { label: "Save", icon: "save", cmd: "save", title: "Save (Ctrl+S)" },
+    { label: "Undo", icon: "undo", cmd: "undo", title: "Undo (Ctrl+Z)" },
+    { label: "Redo", icon: "redo", cmd: "redo", title: "Redo (Ctrl+Y)" },
+    { label: "3D", icon: "view3d", cmd: "view3d", title: "Default 3D view" },
+    { label: "Measure: Aligned Dimension", icon: "dimension", tool: "dimension", title: "Aligned dimension" },
+  ],
+);
 /** Open-view tabs and the view control bar under the model window. */
 let viewBar: ViewBar | undefined = new ViewBar(
   {
@@ -461,6 +529,7 @@ function setTool(name: string): void {
   tool = tools[name] ?? tools.select!;
   tool.activate?.();
   grips?.setEnabled(tool.name === "select");
+  ribbon?.markTool();
   document.querySelectorAll<HTMLButtonElement>("[data-tool]").forEach((b) => {
     b.classList.toggle("active", b.dataset.tool === tool.name);
   });
@@ -771,6 +840,60 @@ const commands: Record<string, () => void | Promise<void>> = {
     viewport.visibility.reset();
     afterVisibility("Temporary hide/isolate reset");
   },
+  delete() {
+    const ids = selection.filter((id) => doc.has(id));
+    if (!ids.length) return status("Delete: select something first.");
+    edit(`Delete ${ids.length} element(s)`, (tx) => ids.forEach((id) => doc.has(id) && tx.delete(id)));
+    ctx.setSelection([]);
+  },
+  view3d() {
+    const v = views(doc).find((x) => x.params.kind === "3d");
+    if (v) ctx.setActiveView(v.id);
+    else status("\u26a0 No 3D view in this project");
+  },
+  viewPlan() {
+    const v = floorPlanFor(doc, activeLevelId);
+    if (v) ctx.setActiveView(v.id);
+    else status("\u26a0 No floor plan for this level");
+  },
+  importKeynotes: () => ctx.importKeynotes(),
+  exportKeynotes: () => ctx.exportKeynotes(),
+  loadFamilyFile: () => ctx.loadFamilyFile(),
+  newSheet() {
+    edit("Create sheet", (tx) => {
+      const s = createSheet(tx, doc);
+      queueMicrotask(() => ctx.setActiveView(s.id));
+    });
+  },
+  newLegend() {
+    edit("New legend", (tx) => {
+      const v = createLegend(tx, doc);
+      queueMicrotask(() => ctx.setActiveView(v.id));
+    });
+  },
+  newRevision() {
+    edit("New revision", (tx) => {
+      const r = createRevision(tx, doc, { date: new Date().toISOString().slice(0, 10) });
+      queueMicrotask(() => ctx.setSelection([r.id]));
+    });
+    status("New revision: edit it in Properties (Project Browser \u2192 Revisions lists them).");
+  },
+  newOptionSet() {
+    edit("New option set", (tx) => {
+      let name = "Option Set 1";
+      for (let i = 2; optionSets(doc).some((s) => s.name === name); i++) name = `Option Set ${i}`;
+      createOptionSet(tx, doc, name);
+    });
+    status("New design option set: see Project Browser \u2192 Design Options.");
+  },
+  projectInfo() {
+    let id = projectSettings(doc)?.id;
+    if (!id) id = doc.transact("Create project settings", (tx) => ensureProjectSettings(tx, doc)).id;
+    ctx.setSelection([id]);
+  },
+  findReplace: () => openFindReplace(textHost),
+  checkSpelling: () => openSpelling(textHost),
+  resetLayout: () => docking.reset(),
   visibilityGraphics() {
     const v = activeView();
     if (!v || v.category !== Cat.View) return status("Visibility/Graphics: open a view first (not a sheet or schedule).");
@@ -952,6 +1075,25 @@ function renderToolOptions(options: ToolOption[] | null): void {
 
 let vgDialog: { refresh(): void; close(): void } | null = null;
 
+const textHost = {
+  get doc() {
+    return doc;
+  },
+  activeViewId: () => activeViewId,
+  setActiveView: (id: ElementId) => ctx.setActiveView(id),
+  setSelection: (ids: ElementId[]) => ctx.setSelection(ids),
+  status,
+};
+
+/** "Walls", "Doors"… for the ribbon's Modify | <category> label; "Multi-Select" when mixed. */
+function contextLabel(): string | null {
+  const cats = [...new Set(selection.map((id) => doc.get(id)?.category).filter((c): c is string => !!c))];
+  if (!cats.length) return null;
+  if (cats.length > 1) return "Multi-Select";
+  const c = cats[0]!;
+  return c.endsWith("y") ? `${c.slice(0, -1)}ies` : c.endsWith("s") ? c : `${c}s`;
+}
+
 /** Elements like `el`: same type (or family type), else same category. */
 function similar(el: ModelElement): ModelElement[] {
   const fam = (e: ModelElement) => (e.params as { familyId?: unknown; typeName?: unknown });
@@ -970,6 +1112,17 @@ function openCanvasMenu(ev: MouseEvent): void {
   const hit = id ? doc.get(id) : undefined;
   const g = hit && groupOf(hit);
   if (g && doc.has(g)) id = g;
+  const hiddenHit = id && viewport.revealing ? doc.get(id) : undefined;
+  if (hiddenHit && viewport.isHidden(hiddenHit)) {
+    // Reveal Hidden mode: bring a hidden element (or its whole category) back.
+    const el = hiddenHit;
+    items.push(
+      { heading: `Hidden ${el.category}` },
+      { label: "Unhide Element", action: () => unhide(el, false) },
+      { label: `Unhide Category (${el.category})`, action: () => unhide(el, true) },
+    );
+    return showContextMenu(ev.clientX, ev.clientY, items);
+  }
   if (id && tool.name === "select") {
     if (!selection.includes(id)) ctx.setSelection([id]);
     const el = doc.require(id);
@@ -1010,9 +1163,9 @@ function openCanvasMenu(ev: MouseEvent): void {
         },
       },
       "-",
-      { label: "Hide Element (temporary)", hint: "H", action: () => void commands.hide?.() },
-      { label: "Hide Category (temporary)", hint: "\u21e7H", action: () => void commands.hideCategory?.() },
-      { label: "Isolate Element (temporary)", hint: "I", action: () => void commands.isolate?.() },
+      { label: "Hide Element", hint: "H", action: () => void commands.hide?.() },
+      { label: "Hide Category", hint: "\u21e7H", action: () => void commands.hideCategory?.() },
+      { label: "Isolate Element", hint: "I", action: () => void commands.isolate?.() },
       { label: "Visibility/Graphics\u2026", hint: "VV", action: () => void commands.visibilityGraphics?.() },
       "-",
       { label: "Group", hint: "Ctrl+G", action: () => void commands.group?.() },
@@ -1036,6 +1189,25 @@ function openCanvasMenu(ev: MouseEvent): void {
     if (selection.length) items.push({ label: "Deselect All", action: () => ctx.setSelection([]) });
   }
   showContextMenu(ev.clientX, ev.clientY, items);
+}
+
+/**
+ * Unhide an element, or its whole category: lifts temporary hide/isolate and, for a category the
+ * view (or its template) hides in Visibility/Graphics, turns it back on there.
+ */
+function unhide(el: ModelElement, category: boolean): void {
+  if (category) viewport.visibility.unhideCategories([el.category]);
+  viewport.visibility.unhide([el.id]);
+  const v = activeView();
+  if (category && v?.category === Cat.View) {
+    const owner = v.params.templateId && doc.has(v.params.templateId) ? doc.require<{ hiddenCategories: string[] }>(v.params.templateId) : v;
+    const hidden = (owner.params as { hiddenCategories: string[] }).hiddenCategories ?? [];
+    if (hidden.includes(el.category)) {
+      edit(`Unhide ${el.category}`, (tx) => tx.update(owner.id, { hiddenCategories: hidden.filter((c) => c !== el.category) }));
+    }
+  }
+  afterVisibility(category ? `${el.category} unhidden` : "Element unhidden");
+  if (viewport.isHidden(el)) status(`⚠ Still hidden by Visibility/Graphics (its category, a filter or the phase). Try Unhide Category, or VV.`);
 }
 
 /** Run a model change, reporting errors in the status bar. */
@@ -1142,6 +1314,7 @@ function refreshTypeSelector(): void {
 
 function refreshPanels(): void {
   grips?.refresh();
+  ribbon?.setContext(contextLabel());
   vgDialog?.refresh();
   refreshTypeSelector();
   renderBrowser($("#browser-body"), ctx);
@@ -1195,6 +1368,7 @@ function switchDocument(next: Document, s: Partial<Session> = {}): void {
   dirty = s.dirty ?? false;
   activeTypes.clear();
   document.body.classList.toggle("family-mode", !!familyInfo(doc));
+  ribbon?.setMode(!!familyInfo(doc));
   setTool("select");
   refreshAll();
   viewport.zoomToFit();

@@ -7,111 +7,12 @@
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <header id="toolbar">
-      <span class="brand">Open-BIM</span>
-      <div class="group">
-        <button data-cmd="new" title="New project (Ctrl+N)">New</button>
-        <button data-cmd="open" title="Open (Ctrl+O)">Open</button>
-        <button data-cmd="save" title="Save (Ctrl+S)">Save</button>
-        <button data-cmd="exportPdf" title="Export all sheets to one vector PDF">Export PDF</button>
-        <button data-cmd="importIfc" title="Import an IFC file (as direct shapes on matching levels)">Import IFC</button>
-        <button data-cmd="exportIfc" title="Export the model as IFC4">Export IFC</button>
-        <button data-cmd="exportGlb" title="Export the model as glTF (.glb) for visualisation">Export glTF</button>
-        <button data-cmd="exportObj" title="Export the model as OBJ + MTL (zipped)">Export OBJ</button>
-        <button data-cmd="importDxf" title="Import DXF or DWG line work into this view (DWG via an installed converter)">Import DXF/DWG</button>
-        <button data-cmd="exportDxf" title="Export this view or sheet as DXF or DWG (DWG via an installed converter)">Export DXF/DWG</button>
-      </div>
-      <div class="group">
-        <button data-cmd="undo" title="Undo (Ctrl+Z)">Undo</button>
-        <button data-cmd="redo" title="Redo (Ctrl+Y)">Redo</button>
-      </div>
-      <div class="group">
-        <button data-tool="select" class="active" title="Select (Esc)">Select</button>
-        <button data-tool="move" title="Move the selection: base point, then destination; type a distance (MV)">Move</button>
-        <button data-tool="copy" title="Copy the selection: base point, then each destination (CO)">Copy</button>
-        <button data-tool="rotate" title="Rotate the selection about its centre (C to move it); type an angle (RO)">Rotate</button>
-        <button data-tool="mirror" title="Mirror the selection about an axis you draw (MM)">Mirror</button>
-        <button data-tool="array" title="Linear array of the selection: base point, then the second item (AR)">Array</button>
-        <button data-tool="align" title="Align: click the line to align to, then the line to move (AL)">Align</button>
-        <button data-tool="offset" title="Offset a wall or line by a distance, to the side clicked (OF)">Offset</button>
-        <button data-tool="trim" title="Trim/Extend to corner, or to a boundary (TR)">Trim</button>
-        <button data-tool="split" title="Split a wall or line where clicked (SL)">Split</button>
-        <button data-tool="refplane" title="Reference plane (R)">Ref Plane</button>
-      </div>
-      <div class="group family-only">
-        <span id="family-banner" class="banner">Family</span>
-        <button data-tool="extrusion" title="Extrusion: sketch a profile (plan = XY, Front = XZ, Right = YZ), Enter">Extrusion</button>
-        <button data-tool="blend" title="Blend: sketch the bottom loop, then the top loop, Enter">Blend</button>
-        <button data-tool="revolution" title="Revolve: sketch a profile in an elevation; it turns about the centre line">Revolve</button>
-        <button data-tool="sweep" title="Sweep: click a path in plan, Enter">Sweep</button>
-        <button data-tool="component" title="Place a nested family (C)">Component</button>
-        <label title="New forms are voids (cut the solids)"><input type="checkbox" id="void-form" /> Void</label>
-        <button data-cmd="saveFamilyFile" title="Save this family as an open .obim-family file">Save Family File</button>
-        <button data-cmd="loadFamily" class="primary" title="Load this family into the project and close the editor">Load into Project</button>
-        <button data-cmd="closeFamily" title="Close the family without loading it">Close Family</button>
-      </div>
-      <div class="group project-only">
-        <button data-tool="wall" title="Wall (W)">Wall</button>
-        <button data-tool="grid" title="Grid (G)">Grid</button>
-        <button data-tool="floor" title="Floor: sketch boundary">Floor</button>
-        <button data-tool="ceiling" title="Ceiling: sketch boundary">Ceiling</button>
-        <button data-tool="roof" title="Roof by footprint: sketch boundary">Roof</button>
-        <button data-tool="door" title="Door: click a wall (D)">Door</button>
-        <button data-tool="window" title="Window: click a wall (N)">Window</button>
-        <button data-tool="opening" title="Wall opening: click a wall">Opening</button>
-        <button data-tool="stair" title="Stair: click run start and end, Enter to finish">Stair</button>
-        <button data-tool="ramp" title="Ramp: click run start and end, Enter to finish">Ramp</button>
-        <button data-tool="toposolid" title="Toposolid: sketch the site boundary, then import survey points">Toposolid</button>
-        <button data-tool="railing" title="Railing: click points along the path, Enter to finish">Railing</button>
-        <button data-tool="component" title="Component: place a loaded family (C)">Component</button>
-        <button data-cmd="group" title="Group the selection (Ctrl+G)">Group</button>
-        <button data-tool="demolish" title="Demolish: click elements (in this view's phase)">Demolish</button>
-      </div>
-      <div class="group project-only">
-        <button data-tool="column" title="Structural column: click to place">Column</button>
-        <button data-tool="beam" title="Beam: click start and end">Beam</button>
-        <button data-tool="footing" title="Footing: click a wall (strip) or a point (pad)">Footing</button>
-      </div>
-      <div class="group project-only">
-        <button data-tool="room" title="Room: click inside walls (plans)">Room</button>
-        <button data-tool="roomseparator" title="Room separator: bounds rooms where there's no wall">Separator</button>
-        <button data-tool="area" title="Area: click inside area boundaries (area plans)">Area</button>
-        <button data-tool="areaboundary" title="Area boundary line (area plans)">Area Boundary</button>
-      </div>
-      <div class="group project-only">
-        <button data-tool="section" title="Section: click head, then tail; looks to the left (S)">Section</button>
-        <button data-cmd="elevations" title="Create North/East/South/West elevations around the model">Elevations</button>
-        <button data-tool="callout" title="Callout: click two corners on a floor plan">Callout</button>
-      </div>
-      <div class="group project-only">
-        <button data-tool="dimension" title="Aligned dimension: pick walls/grids, then place (M)">Dimension</button>
-        <button data-tool="detailline" title="Detail line, this view only (L)">Detail Line</button>
-        <button data-tool="region" title="Filled region: sketch a boundary">Region</button>
-        <button data-tool="text" title="Text note (T)">Text</button>
-        <button data-tool="tag" title="Tag by category: click an element">Tag</button>
-        <button data-tool="cloud" title="Revision cloud: sketch around a change (latest open revision)">Cloud</button>
-        <button data-tool="keynote" title="Keynote tag: click an element (its keynote, or its type's / material's)">Keynote</button>
-      </div>
-      <div class="group">
-        <label>Level <select id="active-level"></select></label>
-        <label><span id="active-type-label">Type</span> <select id="active-type"></select></label>
-      </div>
-      <div class="group">
-        <button data-view="plan" title="Floor plan of the active level">Plan</button>
-        <button data-view="3d" class="active" title="3D view">3D</button>
-        <button data-cmd="render" title="Realistic render of the 3D view (path traced, sun for the site and time)">Render</button>
-        <button data-cmd="fit" title="Zoom to fit (F)">Fit</button>
-      </div>
-      <div class="group">
-        <button data-cmd="hide" title="Temporarily hide selection (H); Shift = whole category (Shift+H)">Hide</button>
-        <button data-cmd="isolate" title="Temporarily isolate selection (I); Shift = whole category (Shift+I)">Isolate</button>
-        <button data-cmd="resetVisibility" title="Reset temporary hide/isolate (U)">Reset</button>
-        <button data-cmd="console" title="Scripting console and plugins (`)">Console</button>
-        <button data-cmd="clashes" title="Interference check between categories">Clashes</button>
-        <button data-cmd="nzChecks" title="NZBC H1 energy and NZS 3604 bracing checks">NZ Checks</button>
-        <button data-cmd="collaborate" title="Edit this model with others through a sync server">Collaborate</button>
-      </div>
-    </header>
+    <header id="ribbon"></header>
+    <div id="options-bar">
+      <span id="family-banner" class="banner family-only"></span>
+      <label>Level <select id="active-level"></select></label>
+      <label><span id="active-type-label">Type</span> <select id="active-type"></select></label>
+    </div>
     <main>
       <aside id="browser">
         <h2>Project Browser</h2>

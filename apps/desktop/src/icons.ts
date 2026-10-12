@@ -1,0 +1,100 @@
+// Ribbon icons: simple 24×24 line drawings (our own, stroke = currentColor). Paths are SVG path data.
+
+const P: Record<string, string> = {
+  select: "M5 3l13 8-6 1.5L9 19z",
+  move: "M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3",
+  copy: "M8 8h11v11H8zM5 16V5h11",
+  rotate: "M19 12a7 7 0 1 1-2.05-4.95M19 4v4h-4",
+  mirror: "M12 3v18M9 6L4 18h5zM15 6l5 12h-5z",
+  array: "M3 9h4v6H3zM10 9h4v6h-4zM17 9h4v6h-4z",
+  align: "M4 3v18M8 7h10M8 12h6M8 17h12",
+  offset: "M4 18L18 4M8 20L20 8",
+  trim: "M4 20V8h12M8 4v12h12",
+  split: "M3 12h7M14 12h7M12 6v12",
+  delete: "M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13",
+  hide: "M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12zM4 20L20 4",
+  group: "M4 4h7v7H4zM13 13h7v7h-7zM4 13h7v7H4zM13 4h7v7h-7z",
+  demolish: "M4 20h16M7 20V10h10v10M5 5l14 10M19 5L5 15",
+  wall: "M3 8h18v8H3zM3 12h18",
+  door: "M6 21V3h10v18M13 12h1M3 21h18",
+  window: "M4 5h16v14H4zM12 5v14M4 12h16",
+  component: "M5 10h14v4H5zM7 14v6M17 14v6M6 10V6h12v4",
+  roof: "M2 13L12 4l10 9M5 11v9h14v-9",
+  ceiling: "M3 6h18M3 9h18M6 9v3M18 9v3",
+  floor: "M3 16l5-6h13l-5 6zM3 16v2h13l5-6v-2",
+  stair: "M3 21h4v-4h4v-4h4V9h4V5h2",
+  ramp: "M3 19h18L3 9z",
+  railing: "M3 6h18M5 6v14M10 6v14M15 6v14M20 6v14",
+  opening: "M3 6h18v12H3zM8 9h8v6H8z",
+  room: "M4 4h16v16H4zM9 12h6M12 9v6",
+  separator: "M4 4h16v16H4zM4 12h16",
+  area: "M4 4h16v16H4zM4 4l16 16M12 4l8 8M4 12l8 8",
+  grid: "M8 7v15M16 7v15M8 2.5a2 2 0 1 0 .01 0M16 2.5a2 2 0 1 0 .01 0",
+  refplane: "M4 20L20 4M4 14l2-2M10 20l2-2",
+  column: "M8 3h8v18H8zM6 3h12M6 21h12",
+  beam: "M2 9h20v6H2zM2 11h20M2 13h20",
+  footing: "M9 3v9M15 3v9M4 12h16v6H4z",
+  link: "M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1",
+  import: "M12 3v12M7 10l5 5 5-5M4 19h16",
+  export: "M12 15V3M7 8l5-5 5 5M4 19h16",
+  family: "M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5",
+  dimension: "M4 8v8M20 8v8M4 12h16M4 12l3-2M4 12l3 2M20 12l-3-2M20 12l-3 2",
+  detailline: "M4 18L20 6M4 18h3M20 6h-3",
+  region: "M4 7l6-3 10 5-3 11H6zM6 12l6-6M7 17l9-9",
+  detailcomp: "M3 14h18M3 18h18M6 14V8h12v6M9 8V5h6v3",
+  cloud: "M7 18a4 4 0 0 1 0-8 5 5 0 0 1 9.6-1.5A4 4 0 0 1 17 18z",
+  text: "M5 5h14M12 5v15M9 20h6",
+  spell: "M4 15l3-10 3 10M5 12h4M13 15V5h3a2.5 2.5 0 0 1 0 5h-3M13 10h3.5a2.5 2.5 0 0 1 0 5H13M14 19l2 2 4-4",
+  find: "M10.5 4a6.5 6.5 0 1 0 .01 0M15.5 15.5L21 21",
+  tag: "M3 12l7-7h10v14H10z",
+  keynote: "M5 5h10l4 4v10H5zM15 5v4h4M8 12h8M8 15h6",
+  symbol: "M12 3l3 7h-6zM12 10v11M8 21h8",
+  revision: "M12 3l9 16H3zM12 9v5M12 16.5v.5",
+  toposolid: "M2 18l5-6 4 3 5-7 6 10z",
+  clash: "M4 4h10v10H4zM10 10h10v10H10z",
+  check: "M4 12l5 5L20 6",
+  collab: "M8 11a3 3 0 1 0 .01 0M16 11a3 3 0 1 0 .01 0M2 20c1-3 3-4 6-4s5 1 6 4M14 16c3 0 6 1 8 4",
+  vg: "M2 12s4-6 10-6 10 6 10 6-4 6-10 6S2 12 2 12zM12 9a3 3 0 1 0 .01 0",
+  render: "M12 3a9 9 0 1 0 .01 0M12 3v18M3 12h18",
+  view3d: "M12 3l8 4.5v9L12 21l-8-4.5v-9zM12 12l8-4.5M12 12v9M12 12L4 7.5",
+  plan: "M4 4h16v16H4zM4 10h8v10M12 4v6",
+  section: "M3 12h18M5 8a2 2 0 1 0 .01 0M5 12V8M19 12v4",
+  callout: "M4 4h10v8H4zM14 12l6 6M17 20h4v-4",
+  elevation: "M12 4a8 8 0 1 0 .01 0M12 4v4M12 16v4M4 12h4",
+  legend: "M4 5h4v4H4zM4 15h4v4H4zM11 7h9M11 17h9",
+  schedule: "M3 4h18v16H3zM3 9h18M3 14h18M9 4v16",
+  sheet: "M4 3h16v18H4zM14 15h6M14 18h6M14 15v6",
+  fit: "M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5",
+  layout: "M3 4h18v16H3zM8 4v16M16 4v16",
+  info: "M12 3a9 9 0 1 0 .01 0M12 11v6M12 7.5v.5",
+  options: "M4 6h16M4 12h16M4 18h16M8 4v4M16 10v4M10 16v4",
+  console: "M3 4h18v16H3zM6 9l3 3-3 3M11 15h6",
+  save: "M4 4h13l3 3v13H4zM8 4v5h8V4M7 20v-7h10v7",
+  undo: "M9 14L4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3",
+  redo: "M15 14l5-5-5-5M20 9H9a5 5 0 0 0 0 10h3",
+  newdoc: "M6 3h9l4 4v14H6zM15 3v4h4M12 11v6M9 14h6",
+  open: "M3 7h6l2 2h10v10H3z",
+  extrusion: "M5 9l7-4 7 4v8l-7 4-7-4zM5 9l7 4 7-4M12 13v8",
+  blend: "M6 4h12l-3 16H9z",
+  revolve: "M12 3v18M7 6a5 3 0 0 0 0 12M17 6a5 3 0 0 1 0 12",
+  sweep: "M4 18c4 0 4-12 8-12s4 12 8 12",
+  load: "M12 3v10M8 9l4 4 4-4M4 15v5h16v-5",
+  close: "M6 6l12 12M18 6L6 18",
+};
+
+/** An inline SVG icon element (an empty span if the name is unknown). */
+export function icon(name: string | undefined, size = 24): SVGSVGElement | HTMLSpanElement {
+  const d = name ? P[name] : undefined;
+  if (!d) return document.createElement("span");
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("width", String(size));
+  svg.setAttribute("height", String(size));
+  svg.setAttribute("aria-hidden", "true");
+  svg.classList.add("icon");
+  const path = document.createElementNS(ns, "path");
+  path.setAttribute("d", d);
+  svg.append(path);
+  return svg;
+}

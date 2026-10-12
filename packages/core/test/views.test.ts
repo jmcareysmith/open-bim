@@ -45,6 +45,18 @@ describe("temporary hide/isolate", () => {
     expect([wall, wall2, door].map((e) => v.isVisible(e))).toEqual([true, true, false]);
   });
 
+  it("unhides elements and categories, including into an isolation", () => {
+    const v = new TemporaryVisibility();
+    v.hide(["w1"]);
+    v.hideCategories(["Door"]);
+    v.unhide(["w1"]);
+    v.unhideCategories(["Door"]);
+    expect([wall, wall2, door].every((e) => v.isVisible(e))).toBe(true);
+    v.isolate(["w1"]);
+    v.unhide(["w2"]);
+    expect([wall, wall2, door].map((e) => v.isVisible(e))).toEqual([true, true, false]);
+  });
+
   it("combines hide with isolate and resets", () => {
     const v = new TemporaryVisibility();
     v.isolateCategories(["Wall"]);

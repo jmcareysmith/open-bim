@@ -1581,11 +1581,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   );
   info.onclick = openSettings;
   project.append(info);
-  const kImp = h("button", { textContent: "Load keynotes" });
-  kImp.onclick = () => ctx.importKeynotes();
-  const kExp = h("button", { textContent: "Export" });
-  kExp.onclick = () => ctx.exportKeynotes();
-  project.append(row(`Keynotes (${keynoteTable(doc).length})`, h("div", { class: "buttons" }, kImp, kExp)));
+  // Keynote files load/export from Annotate → Tag → Keynote ▾ (Keynoting settings).
 
   // Sheets.
   const sheetsSec = h("div", { class: "section" }, h("h3", {}, "Sheets"));

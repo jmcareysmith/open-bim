@@ -1,3 +1,4 @@
+import type { H1Settings } from "./h1.ts";
 import { registerCategory } from "../categories.ts";
 import type { Document, Transaction } from "../document.ts";
 import type { Element } from "../element.ts";
@@ -34,6 +35,8 @@ export type ProjectSettingsParams = {
   phases?: { id: string; name: string }[] | null;
   /** Design option sets (options.ts). */
   designOptions?: { id: string; name: string; options: { id: string; name: string }[]; primary: string }[] | null;
+  /** NZBC H1 settings (h1.ts). */
+  h1?: H1Settings | null;
 };
 
 /**

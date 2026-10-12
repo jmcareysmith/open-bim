@@ -149,7 +149,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Feature | Phase | Status |
 |---|---|---|
 | Energy analysis | 9 | ⬜ |
-| NZ H1 compliance (R-values, schedule method) | 7 | ⬜ |
+| NZ H1 compliance (R-values, schedule method) | 7 | ✅ (provisional minimums) |
 | NZS 3604 bracing | 7 | ⬜ |
 | Structural analysis export | 9 | ⬜ |
 

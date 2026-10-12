@@ -345,6 +345,15 @@ tools snap to grid endpoints, intersections and lines.
   glazing index range (`MeshData.glass`: windows, curtain panels), split into glass meshes.
   Materials carry optional render appearance (roughness, metalness, transparency).
 
+## NZ compliance
+- H1 (`core/model/h1.ts`): schedule method. Envelope types carry a construction R-value
+  (`ThermalTypeParams.rValue`, including framing); wall types an exterior/interior function, floor
+  types a slab/suspended/intermediate kind (automatic by level and concrete layers when unset).
+  `h1Check` compares each envelope type in use with the zone minimum and the glazing share
+  (windows + curtain walls over gross exterior wall area) with its limit. Requirements are a
+  per-project table (`ProjectSettingsParams.h1`) seeded with provisional H1/AS1 values.
+- The desktop NZ Checks pane (`apps/desktop/src/nzchecks.ts`) shows the reports.
+
 ## Collaboration (`packages/collab`)
 - Multi-user editing binds a `Document` to a Yjs `Y.Doc` (`bindDocument`): a map of element id →
   Y.Map (category, name, typeId, params as a nested Y.Map), so concurrent edits to different params

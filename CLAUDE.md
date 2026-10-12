@@ -94,4 +94,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Jeremy's answer: Yjs, self-hosted, one shared token, no accounts. Revisit if he wants a hosted service.
 - Render (toolbar, from a 3D view): path traced, sun from site/date/time, Save PNG. Materials have
   roughness/metalness/transparency. No textures, no AI render (needs a service decision).
-- Next: Phase 7 — NZ H1 / NZS 3604 bracing.
+- H1 energy: toolbar NZ Checks; R-values in type properties (Energy (H1)); zone and provisional
+  minimums in Project Information → H1 energy. Jeremy said build with my own figures for now.
+- Next: Phase 7 — NZS 3604 bracing, AI render (self-hosted img2img + optional Gemini with the
+  user's API key), then DWG via an external converter (ODA File Converter / LibreDWG CLI).

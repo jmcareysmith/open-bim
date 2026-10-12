@@ -115,6 +115,7 @@ import {
 } from "./tools.ts";
 import { Viewport, type ViewMode } from "./viewport.ts";
 import { openRender } from "./render.ts";
+import { renderNzChecks } from "./nzchecks.ts";
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 
@@ -526,6 +527,11 @@ const commands: Record<string, () => void | Promise<void>> = {
     } catch (err) {
       status(`⚠ Render failed: ${(err as Error).message}`);
     }
+  },
+  nzChecks() {
+    const pane = $<HTMLDivElement>("#nz-pane");
+    pane.hidden = !pane.hidden;
+    if (!pane.hidden) refreshNzChecks();
   },
   collaborate() {
     const pane = $<HTMLDivElement>("#collab-pane");
@@ -965,6 +971,7 @@ function attachDocument(d: Document): () => void {
     if (c.name !== "Load") dirty = true;
     selection = selection.filter((id) => doc.has(id));
     refreshAll();
+    refreshNzChecks();
     if (c.name.startsWith("Undo") || c.name.startsWith("Redo")) status(c.name);
   });
 }
@@ -1031,6 +1038,11 @@ async function importSurveyPoints(id: ElementId): Promise<void> {
 }
 
 let closeRender: (() => void) | undefined;
+
+function refreshNzChecks(): void {
+  const pane = $<HTMLDivElement>("#nz-pane");
+  if (!pane.hidden) renderNzChecks(pane, { doc, select: (ids) => ctx.setSelection(ids) });
+}
 
 // ---- multi-user editing -------------------------------------------------------------
 

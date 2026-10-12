@@ -11,6 +11,12 @@ import {
   createLegend,
   createSchedule,
   createRevision,
+  DEFAULT_H1,
+  H1_CLASS_LABELS,
+  h1Settings,
+  setH1Settings,
+  type H1Class,
+  type ThermalTypeParams,
   acceptPrimary,
   addOption,
   createOptionSet,
@@ -283,6 +289,61 @@ function numberInput(value: number, onCommit: (v: number) => void): HTMLInputEle
     onCommit(v);
   };
   return input;
+}
+
+/** R-value input (m²K/W); blank clears it. */
+function rValueInput(value: number | null | undefined, onCommit: (v: number | null) => void): HTMLInputElement {
+  const input = h("input", { type: "number", min: "0", step: "0.01", value: value ? String(value) : "", placeholder: "not set" });
+  input.onchange = () => {
+    if (!input.value.trim()) return onCommit(null);
+    const v = Number(input.value);
+    if (Number.isFinite(v) && v > 0) onCommit(v);
+    else input.value = value ? String(value) : "";
+  };
+  return input;
+}
+
+/** Thermal (H1) properties of envelope types. */
+function thermalRows(ctx: PanelContext, el: Element): HTMLElement[] {
+  if (el.category === Cat.CeilingType) return [];
+  const p = el.params as ThermalTypeParams;
+  const set = (name: string, patch: Partial<ThermalTypeParams>) => edit(ctx, name, (tx) => tx.update<ThermalTypeParams>(el.id, patch));
+  const rows: HTMLElement[] = [
+    h("div", { class: "subhead" }, "Energy (H1)"),
+    row("Construction R-value", rValueInput(p.rValue, (v) => set("Change R-value", { rValue: v }))),
+  ];
+  if (el.category === Cat.WallType)
+    rows.push(
+      row(
+        "Function",
+        select(
+          [
+            { value: "", label: "Automatic (by name)" },
+            { value: "exterior", label: "Exterior" },
+            { value: "interior", label: "Interior" },
+          ],
+          p.function ?? "",
+          (v) => set("Change wall function", { function: (v || null) as ThermalTypeParams["function"] }),
+        ),
+      ),
+    );
+  if (el.category === Cat.FloorType)
+    rows.push(
+      row(
+        "H1 floor",
+        select(
+          [
+            { value: "", label: "Automatic (by level)" },
+            { value: "slab", label: "Slab-on-ground" },
+            { value: "suspended", label: "Suspended (exposed)" },
+            { value: "intermediate", label: "Intermediate (not envelope)" },
+          ],
+          p.thermalKind ?? "",
+          (v) => set("Change H1 floor kind", { thermalKind: (v || null) as ThermalTypeParams["thermalKind"] }),
+        ),
+      ),
+    );
+  return rows;
 }
 
 /** A 0–1 value (render appearance). */
@@ -1234,7 +1295,33 @@ function settingsSections(ctx: PanelContext, id: ElementId, p: ProjectSettingsPa
     setList([...list, { id: `phase${n}`, name: `Phase ${n}` }]);
   };
   phSec.append(row("", addPhase));
-  return [info, unitsSec, locSec, phSec];
+  // H1 energy: climate zone and (provisional, editable) schedule-method minimums for that zone.
+  const h1 = h1Settings(ctx.doc);
+  const req = h1.requirements ?? DEFAULT_H1;
+  const z = h1.climateZone;
+  const h1Sec = h("div", { class: "section" }, h("h3", {}, "H1 energy"));
+  const setReq = (next: typeof req) => edit(ctx, "Edit H1 requirements", (tx) => setH1Settings(tx, ctx.doc, { requirements: next }));
+  h1Sec.append(
+    row(
+      "Climate zone",
+      select([1, 2, 3, 4, 5, 6].map((n) => ({ value: String(n), label: `Zone ${n}` })), String(z), (v) =>
+        edit(ctx, "Change climate zone", (tx) => setH1Settings(tx, ctx.doc, { climateZone: Number(v) as typeof z })),
+      ),
+    ),
+  );
+  for (const cls of Object.keys(H1_CLASS_LABELS) as H1Class[]) {
+    h1Sec.append(
+      row(
+        `${H1_CLASS_LABELS[cls]} min R`,
+        rValueInput(req.minR[cls][z - 1], (v) => v && setReq({ ...req, minR: { ...req.minR, [cls]: req.minR[cls].map((x, i) => (i === z - 1 ? v : x)) } })),
+      ),
+    );
+  }
+  h1Sec.append(
+    row("Max glazing (% of wall)", intInput(Math.round(req.maxGlazingRatio * 100), 1, 100, (v) => setReq({ ...req, maxGlazingRatio: v / 100 }))),
+    row("", h("span", { class: "muted" }, "Provisional H1/AS1 schedule-method values: check them against the current edition. Run the check from NZ Checks.")),
+  );
+  return [info, unitsSec, locSec, phSec, h1Sec];
 }
 
 function deleteButton(ctx: PanelContext, el: Element): HTMLButtonElement {
@@ -2418,6 +2505,7 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         : [["width", "Width"], ["height", "Height"], ["frameWidth", "Frame width"], ["defaultSill", "Default sill"]];
       sec.append(row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename type", (tx) => tx.setName(el.id, v || undefined)))));
       for (const [key, label] of fields) sec.append(row(label, numberInput(p[key]!, (v) => setType({ [key]: v }))));
+      sec.append(...thermalRows(ctx, el));
       break;
     }
     case Cat.WallType:
@@ -2428,6 +2516,7 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       sec.append(
         row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename type", (tx) => tx.setName(el.id, v || undefined)))),
         row("Total", len(totalThickness(t))),
+        ...thermalRows(ctx, el),
       );
       const matOpts = materialElements(doc).map((m) => ({ value: m.id, label: m.name ?? m.id }));
       const stack = t.params.stack;

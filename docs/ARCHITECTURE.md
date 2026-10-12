@@ -275,6 +275,15 @@ boxes, skips hosted pairs, and asks the kernel for the shared volume (`OcctKerne
 BRepAlgoAPI_Common + volume properties), so touching elements don't clash; without OCCT it falls back
 to the box overlap.
 
+**Modify tools** — `model/modify.ts`: one 2D affine transform (`translation`, `rotationAbout`,
+`mirrorAcross`, `compose`) drives Move/Copy/Rotate/Mirror/Array through `transformElements` and
+`arrayElements`, with a per-category mapping of the plan points each element stores. Hosted
+elements ride on their wall (sliding along it when moved alone); copies bring dependants (doors,
+stair railings, strip footings) and remap their host ids; groups move rigidly via `moveGroup` /
+`placeGroup`. Mirroring reverses loops (sketches stay counter-clockwise; roof slopes remapped by
+`normaliseFootprint`), swaps wall and section-line ends, flips door hands and railing sides. Moving
+walls drags joined wall ends (corners and tees) unless `disjoin`. App: `apps/desktop/src/modifytools.ts`.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

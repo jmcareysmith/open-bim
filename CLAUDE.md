@@ -50,6 +50,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Annotation (view-owned): live aligned dimensions (M), detail lines (L), filled regions, text (T).
 - Sheets with a built-in title block, viewports, and vector PDF export (`geometry/src/pdf.ts`).
 - UI: box select, type selector, temporary hide/isolate (H/I/U), properties for everything, browser.
+- Modify: Move/Copy/Rotate/Mirror/Array (MV, CO, RO, MM, AR; toolbar). Type a value + Enter; options
+  strip (Copy, Multiple, Disjoin, Number) top-left of the view. Mirror by drawn axis only.
 - Known gaps: joins whole-wall (no per-layer cleanup), no disallow-join, crossing walls overlap; walls
   don't attach to floors/roofs; grids straight only, no grip editing (no drag-to-edit anywhere yet);
   floors lack pick-walls/slope arrows; roofs exact for convex/L/T/U only; doors/windows parametric;
@@ -102,4 +104,4 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   NZ Checks → NZS 3604 bracing (enter tabulated demand there). Demand is a provisional estimate.
 - AI render: Render pane → AI render… (self-hosted SD WebUI API, or Gemini with the user's key).
   Tested against a mock server only, not a real model.
-- Next: Phase 7a — modify tools (Move/Copy/Rotate/Mirror/Array).
+- Next: Phase 7a — Align, Offset, Trim/Extend, Split.

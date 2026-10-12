@@ -164,7 +164,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 15. Editing & interface
 | Feature | Phase | Status |
 |---|---|---|
-| Move, copy, rotate, mirror, array | 7a | ⬜ |
+| Move, copy, rotate, mirror, array | 7a | ✅ (mirror by drawn axis; radial array via API only) |
 | Align, offset, trim/extend, split | 7a | ⬜ |
 | Grips, drag editing, temporary dimensions | 7a | ⬜ |
 | Ribbon, contextual tabs, options bar | 7b | ⬜ |

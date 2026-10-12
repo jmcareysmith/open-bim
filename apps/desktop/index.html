@@ -27,6 +27,11 @@
       </div>
       <div class="group">
         <button data-tool="select" class="active" title="Select (Esc)">Select</button>
+        <button data-tool="move" title="Move the selection: base point, then destination; type a distance (MV)">Move</button>
+        <button data-tool="copy" title="Copy the selection: base point, then each destination (CO)">Copy</button>
+        <button data-tool="rotate" title="Rotate the selection about its centre (C to move it); type an angle (RO)">Rotate</button>
+        <button data-tool="mirror" title="Mirror the selection about an axis you draw (MM)">Mirror</button>
+        <button data-tool="array" title="Linear array of the selection: base point, then the second item (AR)">Array</button>
         <button data-tool="refplane" title="Reference plane (R)">Ref Plane</button>
       </div>
       <div class="group family-only">
@@ -108,7 +113,7 @@
         <h2>Project Browser</h2>
         <div id="browser-body"></div>
       </aside>
-      <div id="viewport"><div id="schedule-pane" hidden></div><div id="console" hidden></div><div id="clash-pane" hidden></div><div id="collab-pane" hidden></div><div id="nz-pane" hidden></div></div>
+      <div id="viewport"><div id="tool-options" hidden></div><div id="schedule-pane" hidden></div><div id="console" hidden></div><div id="clash-pane" hidden></div><div id="collab-pane" hidden></div><div id="nz-pane" hidden></div></div>
       <aside id="properties">
         <h2>Properties</h2>
         <div id="properties-body"></div>

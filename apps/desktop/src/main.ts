@@ -116,6 +116,7 @@ import {
 import { Viewport, type ViewMode } from "./viewport.ts";
 import { openRender } from "./render.ts";
 import { renderNzChecks } from "./nzchecks.ts";
+import { ModifyTool, type ModifyToolContext, type ToolOption } from "./modifytools.ts";
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 
@@ -172,11 +173,12 @@ const status = (text: string): void => {
   $("#status").textContent = text;
 };
 
-const ctx: ToolContext & PanelContext = {
+const ctx: ModifyToolContext & PanelContext = {
   get doc() {
     return doc;
   },
   viewport,
+  setToolOptions: (options) => renderToolOptions(options),
   formIsVoid: () => $<HTMLInputElement>("#void-form").checked,
   activeComponent() {
     const defs = familyDefs(doc);
@@ -398,9 +400,14 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   tag: new TagTool(ctx, "category"),
   keynote: new TagTool(ctx, "keynote"),
   areaboundary: new AreaBoundaryTool(ctx),
+  move: new ModifyTool(ctx, "move"),
+  copy: new ModifyTool(ctx, "copy"),
+  rotate: new ModifyTool(ctx, "rotate"),
+  mirror: new ModifyTool(ctx, "mirror"),
+  array: new ModifyTool(ctx, "array"),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
-const DRAWING_TOOLS = new Set(["select", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution"]);
+const DRAWING_TOOLS = new Set(["select", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution"]);
 let tool: Tool = tools.select!;
 
 function setTool(name: string): void {
@@ -829,6 +836,15 @@ window.addEventListener("keydown", (ev) => {
   if (mod && ev.key.toLowerCase() === "g") return run(ev, "group");
   if (ev.key === "`") return run(ev, "console");
   if (mod) return;
+  // Revit's two-letter shortcuts (MV, CO, RO, MM, AR) take over from the first letter's tool.
+  const pair = lastKey && ev.timeStamp - lastKey.at < 1000 ? lastKey.key + ev.key.toLowerCase() : "";
+  lastKey = { key: ev.key.toLowerCase(), at: ev.timeStamp };
+  const two = TWO_LETTER[pair];
+  if (two) {
+    lastKey = null;
+    ev.preventDefault();
+    return setTool(two);
+  }
   if (tool.key?.(ev)) return ev.preventDefault();
   if (ev.key === "Escape") return setTool("select");
   if (ev.key.toLowerCase() === "w") return setTool("wall");
@@ -846,6 +862,35 @@ window.addEventListener("keydown", (ev) => {
   if (ev.key.toLowerCase() === "i") return run(ev, ev.shiftKey ? "isolateCategory" : "isolate");
   if (ev.key.toLowerCase() === "u") return run(ev, "resetVisibility");
 });
+
+/** The tool a single-letter shortcut started may hand its selection on to a two-letter one. */
+const TWO_LETTER: Record<string, string> = { mv: "move", co: "copy", cc: "copy", ro: "rotate", mm: "mirror", dm: "mirror", ar: "array" };
+let lastKey: { key: string; at: number } | null = null;
+
+/** Options strip for the active tool (Copy, Disjoin, Number…), over the top of the view. */
+function renderToolOptions(options: ToolOption[] | null): void {
+  const bar = $<HTMLDivElement>("#tool-options");
+  bar.hidden = !options?.length;
+  bar.replaceChildren(
+    ...(options ?? []).map((o) => {
+      const label = document.createElement("label");
+      const input = document.createElement("input");
+      if (o.kind === "check") {
+        input.type = "checkbox";
+        input.checked = o.value;
+        input.onchange = () => o.set(input.checked);
+        label.append(input, ` ${o.label}`);
+      } else {
+        input.type = "number";
+        input.min = String(o.min);
+        input.value = String(o.value);
+        input.onchange = () => o.set(Number(input.value));
+        label.append(`${o.label} `, input);
+      }
+      return label;
+    }),
+  );
+}
 
 function run(ev: KeyboardEvent, cmd: string): void {
   ev.preventDefault();

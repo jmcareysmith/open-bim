@@ -178,6 +178,18 @@ export class GripLayer {
       input.onblur = () => this.refresh();
     };
     this.root.append(label);
-    this.placed.push({ el: label, at: () => mid });
+    // Walls: on the interior side, clear of the flip arrows (which sit on the exterior side).
+    const L = Math.hypot(end.x - start.x, end.y - start.y);
+    const wall = el.category === Cat.Wall && L > 0;
+    const n = wall ? { x: -(end.y - start.y) / L, y: (end.x - start.x) / L } : { x: 0, y: 0 };
+    const half = wall ? wallThickness(this.ctx.doc, el as never) / 2 : 0;
+    if (wall) label.classList.add("temp-dim-side");
+    this.placed.push({
+      el: label,
+      at: () => {
+        const off = half + 16 * this.ctx.viewport.mmPerPixel();
+        return { x: mid.x - n.x * off, y: mid.y - n.y * off };
+      },
+    });
   }
 }

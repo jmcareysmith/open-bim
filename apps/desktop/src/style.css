@@ -190,6 +190,7 @@ aside h2 {
   position: absolute; transform: translate(-50%, -150%); pointer-events: auto; cursor: text;
   padding: 1px 5px; background: var(--accent); color: #fff; border-radius: 3px; font-size: 12px;
 }
+.temp-dim.temp-dim-side { transform: translate(-50%, -50%); }
 .temp-dim input { width: 80px; padding: 1px 4px; }
 #tool-options label { display: flex; gap: 4px; align-items: center; color: var(--text); }
 #tool-options input[type="checkbox"] { width: auto; }

@@ -74,7 +74,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 
 ## Phase 7a — Close known gaps (current)
 - [x] Modify tools: Move, Copy, Rotate, Mirror, Array (MV, CO, RO, MM, AR) — hosted elements follow their hosts; moved walls drag joined walls (Disjoin to stop); typed distance/angle; mirror by drawn axis (no pick-axis yet); linear arrays in the UI (radial in the API)
-- [ ] Align, Offset, Trim/Extend, Split (walls, lines, beams, grids)
+- [x] Align, Offset, Trim/Extend, Split (walls, lines, beams, grids) — align to wall faces/centrelines, grids, planes, polygon edges; trim to corner or to a boundary (multiple); doors kept in place or refused if cut; plans/3D only
 - [ ] Drag to edit: grips on wall/line/datum ends, drag to move, temporary dimensions (click to type)
 - [ ] Walls attach top/base to floors, ceilings and roofs
 - [ ] Wall joins: per-layer cleanup, disallow join, clean crossing (X) walls

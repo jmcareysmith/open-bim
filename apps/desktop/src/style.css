@@ -49,6 +49,7 @@ aside h2 {
   position: absolute; top: 8px; left: 8px; z-index: 5; display: flex; gap: 12px; align-items: center;
   padding: 4px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 4px;
 }
+#tool-options[hidden] { display: none; }
 #tool-options label { display: flex; gap: 4px; align-items: center; color: var(--text); }
 #tool-options input[type="checkbox"] { width: auto; }
 #tool-options input[type="number"] { width: 60px; }

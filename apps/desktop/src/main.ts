@@ -117,6 +117,7 @@ import { Viewport, type ViewMode } from "./viewport.ts";
 import { openRender } from "./render.ts";
 import { renderNzChecks } from "./nzchecks.ts";
 import { ModifyTool, type ModifyToolContext, type ToolOption } from "./modifytools.ts";
+import { AlignTool, OffsetTool, SplitTool, TrimTool } from "./edittools.ts";
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 
@@ -405,6 +406,10 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   rotate: new ModifyTool(ctx, "rotate"),
   mirror: new ModifyTool(ctx, "mirror"),
   array: new ModifyTool(ctx, "array"),
+  align: new AlignTool(ctx),
+  offset: new OffsetTool(ctx),
+  trim: new TrimTool(ctx),
+  split: new SplitTool(ctx),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
 const DRAWING_TOOLS = new Set(["select", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution"]);
@@ -836,7 +841,7 @@ window.addEventListener("keydown", (ev) => {
   if (mod && ev.key.toLowerCase() === "g") return run(ev, "group");
   if (ev.key === "`") return run(ev, "console");
   if (mod) return;
-  // Revit's two-letter shortcuts (MV, CO, RO, MM, AR) take over from the first letter's tool.
+  // Revit's two-letter shortcuts (MV, CO, RO, MM, AR, AL, OF, TR, SL) take over from the first letter's tool.
   const pair = lastKey && ev.timeStamp - lastKey.at < 1000 ? lastKey.key + ev.key.toLowerCase() : "";
   lastKey = { key: ev.key.toLowerCase(), at: ev.timeStamp };
   const two = TWO_LETTER[pair];
@@ -864,7 +869,7 @@ window.addEventListener("keydown", (ev) => {
 });
 
 /** The tool a single-letter shortcut started may hand its selection on to a two-letter one. */
-const TWO_LETTER: Record<string, string> = { mv: "move", co: "copy", cc: "copy", ro: "rotate", mm: "mirror", dm: "mirror", ar: "array" };
+const TWO_LETTER: Record<string, string> = { mv: "move", co: "copy", cc: "copy", ro: "rotate", mm: "mirror", dm: "mirror", ar: "array", al: "align", of: "offset", tr: "trim", sl: "split" };
 let lastKey: { key: string; at: number } | null = null;
 
 /** Options strip for the active tool (Copy, Disjoin, Number…), over the top of the view. */

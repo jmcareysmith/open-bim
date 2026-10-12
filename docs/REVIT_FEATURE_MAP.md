@@ -165,7 +165,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Feature | Phase | Status |
 |---|---|---|
 | Move, copy, rotate, mirror, array | 7a | ✅ (mirror by drawn axis; radial array via API only) |
-| Align, offset, trim/extend, split | 7a | ⬜ |
+| Align, offset, trim/extend, split | 7a | ✅ (plans/3D) |
 | Grips, drag editing, temporary dimensions | 7a | ⬜ |
 | Ribbon, contextual tabs, options bar | 7b | ⬜ |
 | File menu, Quick Access Toolbar | 7b | ⬜ |

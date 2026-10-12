@@ -283,6 +283,10 @@ stair railings, strip footings) and remap their host ids; groups move rigidly vi
 `placeGroup`. Mirroring reverses loops (sketches stay counter-clockwise; roof slopes remapped by
 `normaliseFootprint`), swaps wall and section-line ends, flips door hands and railing sides. Moving
 walls drags joined wall ends (corners and tees) unless `disjoin`. App: `apps/desktop/src/modifytools.ts`.
+`model/edits.ts` adds Align / Offset / Trim-Extend / Split on lines (`Line2`): walls offer their
+centreline and both faces; trims keep hosted elements in place (shifting positions when the start
+moves) and refuse to cut through them; splits move hosted elements past the cut to the new wall.
+App: `apps/desktop/src/edittools.ts`.
 
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.

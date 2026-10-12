@@ -1,6 +1,7 @@
 import {
   Cat,
   Document,
+  detachWall,
   DETAIL_GROUPABLE,
   isDetailFamily,
   createLegend,
@@ -140,6 +141,7 @@ import { ribbonTabs } from "./ribbondefs.ts";
 import { openFindReplace, openSpelling } from "./textdialogs.ts";
 import { SymbolTool } from "./symboltool.ts";
 import { DetailComponentTool } from "./detailtool.ts";
+import { AttachTool } from "./attachtool.ts";
 
 /** The family editor's Void toggle; one element, shown on the Create tab. */
 const voidForm = Object.assign(document.createElement("input"), { type: "checkbox", id: "void-form" });
@@ -455,9 +457,10 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   split: new SplitTool(ctx),
   symbol: new SymbolTool(ctx),
   detailcomponent: new DetailComponentTool(ctx),
+  attach: new AttachTool(ctx),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
-const DRAWING_TOOLS = new Set(["select", "symbol", "detailcomponent", "placegroup", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution"]);
+const DRAWING_TOOLS = new Set(["select", "symbol", "detailcomponent", "placegroup", "attach", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution"]);
 let tool: Tool = tools.select!;
 /** Grips and temporary dimensions for the selection (Select tool only). */
 let grips: GripLayer | undefined = new GripLayer(ctx, $("#viewport"));
@@ -939,6 +942,8 @@ const commands: Record<string, () => void | Promise<void>> = {
   findReplace: () => openFindReplace(textHost),
   checkSpelling: () => openSpelling(textHost),
   resetLayout: () => docking.reset(),
+  attachTop: () => startAttach("top"),
+  attachBase: () => startAttach("base"),
   visibilityGraphics() {
     const v = activeView();
     if (!v || v.category !== Cat.View) return status("Visibility/Graphics: open a view first (not a sheet or schedule).");
@@ -1120,6 +1125,12 @@ function renderToolOptions(options: ToolOption[] | null): void {
 
 let vgDialog: { refresh(): void; close(): void } | null = null;
 
+/** Attach Top/Base for the selected walls: pick the target next. */
+function startAttach(end: "top" | "base"): void {
+  (tools.attach as AttachTool).end = end;
+  setTool("attach");
+}
+
 const textHost = {
   get doc() {
     return doc;
@@ -1183,6 +1194,17 @@ function openCanvasMenu(ev: MouseEvent): void {
       { label: "Array", hint: "AR", action: () => setTool("array") },
     );
     if (walls.length) {
+      items.push(
+        { label: "Attach Top", action: () => startAttach("top") },
+        { label: "Attach Base", action: () => startAttach("base") },
+      );
+      const attached = walls.filter((w) => (w.params as { topAttachId?: unknown; baseAttachId?: unknown }).topAttachId || (w.params as { baseAttachId?: unknown }).baseAttachId);
+      if (attached.length) {
+        items.push({
+          label: "Detach Top/Base",
+          action: () => edit("Detach", (tx) => attached.forEach((w) => (detachWall(tx, doc, w.id, "top"), detachWall(tx, doc, w.id, "base")))),
+        });
+      }
       items.push({
         label: walls.length > 1 ? `Flip ${walls.length} walls` : "Flip orientation",
         action: () => edit(`Flip wall${walls.length > 1 ? "s" : ""}`, (tx) => walls.forEach((w) => flipWall(tx, doc, w.id))),

@@ -1,3 +1,4 @@
+import { slopedTopWallMesh } from "./wallattach.ts";
 import type { OpenCascadeInstance, TopoDS_Shape } from "replicad-opencascadejs";
 import {
   Cat,
@@ -13,6 +14,7 @@ import {
   type Wall,
   type WallCut,
   curtainOf,
+  hasSlopedTop,
 } from "@open-bim/core";
 import { mergeMeshes } from "./doors.ts";
 import { formMesh } from "./forms.ts";
@@ -155,6 +157,8 @@ export class OcctKernel implements GeometryKernel {
       return o;
     };
     try {
+      // Under a sloped roof: the sliced, roof-following wall sewn into a solid.
+      const sloped = hasSlopedTop(doc, wall) ? slopedTopWallMesh(doc, wall) : null;
       // Wall solid: the joined plan footprint extruded from bottom to top.
       const fp = joinedWallFootprint(doc, wall);
       const wire = keep(new oc.BRepBuilderAPI_MakeWire());
@@ -164,7 +168,7 @@ export class OcctKernel implements GeometryKernel {
         wire.Add(keep(edge.Edge()));
       });
       const face = keep(keep(new oc.BRepBuilderAPI_MakeFace(keep(wire.Wire()), true)).Shape());
-      let solid: TopoDS_Shape = keep(keep(new oc.BRepPrimAPI_MakePrism(face, keep(new oc.gp_Vec(0, 0, top - bottom)), false, true)).Shape());
+      let solid: TopoDS_Shape = sloped ? this.meshToSolid(sloped, keep) : keep(keep(new oc.BRepPrimAPI_MakePrism(face, keep(new oc.gp_Vec(0, 0, top - bottom)), false, true)).Shape());
 
       // Each cut: a box aligned with the wall (x along it, y across), through its full thickness.
       const d = wallDirection(wall);

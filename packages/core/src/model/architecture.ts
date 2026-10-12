@@ -193,6 +193,10 @@ export type WallParams = {
   height: number;
   /** Bounds rooms (default true). */
   roomBounding?: boolean;
+  /** Attach Top: a roof, floor or ceiling the top follows (its underside). See model/wallattach.ts. */
+  topAttachId?: ElementId | null;
+  /** Attach Base: a floor the base sits on (its top). */
+  baseAttachId?: ElementId | null;
 };
 export type Wall = Element<WallParams>;
 
@@ -206,8 +210,21 @@ export function wallLength(wall: Wall): number {
   return Math.hypot(end.x - start.x, end.y - start.y);
 }
 
-/** Absolute bottom and top Z of the wall, mm. */
+type WallAttachHook = (doc: Document, wall: Wall, ext: { bottom: number; top: number }) => { bottom: number; top: number };
+let attachHook: WallAttachHook | null = null;
+/** Set by model/wallattach.ts so wall heights everywhere respect top/base attachments. */
+export function setWallAttachHook(hook: WallAttachHook): void {
+  attachHook = hook;
+}
+
+/** Absolute bottom and top Z of the wall, mm (after any top/base attachment; a sloped top's highest point). */
 export function wallExtent(doc: Document, wall: Wall): { bottom: number; top: number } {
+  const ext = wallExtentRaw(doc, wall);
+  return attachHook && (wall.params.topAttachId || wall.params.baseAttachId) ? attachHook(doc, wall, ext) : ext;
+}
+
+/** Bottom and top from the wall's own levels, offsets and height, ignoring attachments. */
+export function wallExtentRaw(doc: Document, wall: Wall): { bottom: number; top: number } {
   const p = wall.params;
   const base = doc.require<LevelParams>(p.baseLevelId).params.elevation;
   const bottom = base + p.baseOffset;
@@ -292,6 +309,7 @@ registerCategory({
 registerCategory({
   name: Cat.Floor,
   dependencies: (el) => [(el.params as FloorParams).levelId, ...typeDeps(el)],
+  related: (doc, el) => attachedWalls(doc, el.id),
   cascadeDelete: true,
   isType: false,
 });
@@ -299,9 +317,18 @@ registerCategory({
 registerCategory({
   name: Cat.Ceiling,
   dependencies: (el) => [(el.params as CeilingParams).levelId, ...typeDeps(el)],
+  related: (doc, el) => attachedWalls(doc, el.id),
   cascadeDelete: true,
   isType: false,
 });
+
+/** Walls attached (top or base) to an element: they regenerate when it changes. */
+export function attachedWalls(doc: Document, id: ElementId): ElementId[] {
+  return doc
+    .byCategory<WallParams>(Cat.Wall)
+    .filter((w) => w.params.topAttachId === id || w.params.baseAttachId === id)
+    .map((w) => w.id);
+}
 
 // ---- creation helpers ----------------------------------------------------
 

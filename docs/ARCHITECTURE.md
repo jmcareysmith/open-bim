@@ -302,6 +302,11 @@ one plan view) hold detail lines and filled regions; `Cat.DetailComponent` insta
 position, rotation, mirrored) draw that content via `detailContent` (cached per loaded JSON) in
 `geometry/src/detailcomponents.ts`.
 
+**Wall attach** — `model/wallattach.ts`: `topAttachId` (roof/floor/ceiling) and `baseAttachId` (floor) on
+walls; `wallExtent` applies them through a hook set from wallattach.ts (keeps architecture.ts free of
+roof imports). Sloped tops: `wallTopBreaks` finds kinks; `geometry/src/wallattach.ts` builds a closed
+sliced mesh (OCCT sews it to cut openings). Roofs/floors/ceilings list attached walls as `related`.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

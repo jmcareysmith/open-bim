@@ -100,7 +100,7 @@ export class GripLayer {
         at = g.point;
         if (Math.hypot(to.x - from.x, to.y - from.y) < 0.5) return this.refresh();
         try {
-          this.ctx.doc.transact("Drag", (tx) => dragGrip(tx, this.ctx.doc, id, g.key, to));
+          this.ctx.doc.transact("Drag", (tx) => dragGrip(tx, this.ctx.doc, id, g.key, to, this.ctx.selection()));
           this.ctx.status("Dragged. Ctrl+Z to undo.");
         } catch (e) {
           this.ctx.status(`⚠ ${(e as Error).message}`);

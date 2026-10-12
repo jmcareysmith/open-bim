@@ -30,7 +30,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Feature | Phase | Status |
 |---|---|---|
 | Basic walls (layered compound structure) | 0–1 | 🟨 |
-| Wall joins, cleanup, wall attach top/base | 1 | 🟨 |
+| Wall joins, cleanup, wall attach top/base | 1 | 🟨 (attach done; no per-layer join cleanup) |
 | Stacked walls | 6 | ✅ |
 | Curtain walls, grids, mullions, panels | 6 | 🟨 |
 | Floors (sketch-based, layered, slope arrows) | 1 | 🟨 |

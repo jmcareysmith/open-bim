@@ -68,12 +68,13 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Ctrl+G on one view's drafting) makes a detail group; Place Group puts copies in the open view. Options bar under the ribbon holds Level/Type.
 - Double-click: section/elevation/callout marker opens its view; sheet viewport opens its view;
   a component opens its family in the family editor.
+- Wall attach: Modify → Attach Top/Base (or right-click a wall), then click the roof/floor/ceiling;
+  Properties shows it with Detach. Dragging a wall end only drags joined walls that are selected too.
 - Reveal Hidden mode: right-click a magenta element → Unhide Element / Unhide Category. Docking:
   drop on a docked panel's top/bottom half to split it there.
 - Under the view: open-view tabs (bottom, Revit-style per Jeremy) and the view control bar (scale,
   detail level, visual style for 3D, temporary hide/isolate, reveal hidden in magenta).
-- Known gaps: joins whole-wall (no per-layer cleanup), no disallow-join, crossing walls overlap; walls
-  don't attach to floors/roofs; grids straight only;
+- Known gaps: joins whole-wall (no per-layer cleanup), no disallow-join, crossing walls overlap; grids straight only;
   floors lack pick-walls/slope arrows; roofs exact for convex/L/T/U only; doors/windows parametric;
   dimensions only in plans via the tool; no 3D view camera saved per view; viewport (interactive)
   and sheet/PDF drawing paths are separate (fold the viewport onto `viewDrawing` later).

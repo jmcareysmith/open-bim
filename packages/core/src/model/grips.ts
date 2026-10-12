@@ -94,8 +94,11 @@ function joinedEnds(doc: Document, wallId: ElementId, p: Vec2): { wall: Wall; en
   return out;
 }
 
-/** Drag grip `key` of element `id` to `to` (plan mm, or the view's 2D coordinates for annotations). */
-export function dragGrip(tx: Transaction, doc: Document, id: ElementId, key: string, to: Vec2): void {
+/**
+ * Drag grip `key` of element `id` to `to` (plan mm, or the view's 2D coordinates for annotations).
+ * A wall end drags the ends of walls joined there only if they're in `together` (also selected).
+ */
+export function dragGrip(tx: Transaction, doc: Document, id: ElementId, key: string, to: Vec2, together: ElementId[] = []): void {
   const el = doc.require(id);
   const p = structuredClone(el.params) as Record<string, unknown>;
   const grip = elementGrips(doc, el).find((g) => g.key === key);
@@ -120,8 +123,8 @@ export function dragGrip(tx: Transaction, doc: Document, id: ElementId, key: str
   }
   if (isLinear(el) && (key === "start" || key === "end")) {
     const { start, end } = p as { start: Vec2; end: Vec2 };
-    // A wall corner drags the walls joined at it, so the join holds.
-    const followers = el.category === Cat.Wall ? joinedEnds(doc, id, key === "start" ? start : end) : [];
+    // Joined walls that are selected too follow the corner, so their join holds; others stay put.
+    const followers = el.category === Cat.Wall ? joinedEnds(doc, id, key === "start" ? start : end).filter((f) => together.includes(f.wall.id)) : [];
     setLineEnds(tx, doc, el, key === "start" ? to : start, key === "end" ? to : end);
     for (const f of followers) {
       const w = doc.require<WallParams>(f.wall.id) as Wall;

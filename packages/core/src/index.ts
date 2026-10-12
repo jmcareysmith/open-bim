@@ -49,3 +49,4 @@ export * from "./model/edits.ts";
 export * from "./model/grips.ts";
 export * from "./model/symbols.ts";
 export * from "./model/detailcomponents.ts";
+export * from "./model/wallattach.ts";

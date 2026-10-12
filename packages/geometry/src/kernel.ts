@@ -1,3 +1,4 @@
+import { slopedTopWallMesh } from "./wallattach.ts";
 import {
   Cat,
   ceilingExtent,
@@ -13,6 +14,7 @@ import {
   type Wall,
   curtainOf,
   stackSegments,
+  hasSlopedTop,
 } from "@open-bim/core";
 import { buildGridLines, buildOpeningLines, buildReferencePlaneLines, type LineData } from "./datums.ts";
 import { buildDoor, buildDoorLines, buildWindow, buildWindowLines } from "./doors.ts";
@@ -82,6 +84,8 @@ export function buildWall(doc: Document, el: Element): MeshData | null {
   if (grid) return buildCurtainWall(doc, wall, grid);
   const segments = stackSegments(doc, wall);
   if (segments.length) return buildStackedWall(doc, wall, segments);
+  // Attached under a sloped roof: the top follows it.
+  if (hasSlopedTop(doc, wall)) return slopedTopWallMesh(doc, wall);
   return extrudePolygon(joinedWallFootprint(doc, wall), [], bottom, top);
 }
 

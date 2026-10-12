@@ -31,11 +31,14 @@ function box() {
 const W = (doc: Document, id: string) => doc.require<WallParams>(id).params;
 
 describe("grips", () => {
-  it("dragging a wall corner drags the joined wall too", () => {
+  it("dragging a wall end moves a joined wall's end only when that wall is selected too", () => {
     const { doc, walls } = box();
     expect(elementGrips(doc, walls[0]!).map((g) => g.key)).toEqual(["start", "end"]);
     doc.transact("Drag", (tx) => dragGrip(tx, doc, walls[0]!.id, "end", { x: 5000, y: 0 }));
     expect(W(doc, walls[0]!.id).end).toEqual({ x: 5000, y: 0 });
+    expect(W(doc, walls[1]!.id).start).toEqual({ x: 4000, y: 0 });
+    doc.undo();
+    doc.transact("Drag", (tx) => dragGrip(tx, doc, walls[0]!.id, "end", { x: 5000, y: 0 }, [walls[0]!.id, walls[1]!.id]));
     expect(W(doc, walls[1]!.id).start).toEqual({ x: 5000, y: 0 });
   });
 

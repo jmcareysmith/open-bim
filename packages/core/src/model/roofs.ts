@@ -1,7 +1,7 @@
 import { registerCategory } from "../categories.ts";
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
-import { Cat, layerMaterialDeps, type LevelParams } from "./architecture.ts";
+import { Cat, attachedWalls, layerMaterialDeps, type LevelParams } from "./architecture.ts";
 import { polygonArea, validateRegion } from "./sketch.ts";
 
 // Footprint roofs (Revit "Roof by Footprint"): a boundary loop where each edge either defines
@@ -28,6 +28,7 @@ registerCategory({ name: Cat.RoofType, dependencies: layerMaterialDeps, cascadeD
 registerCategory({
   name: Cat.Roof,
   dependencies: (el) => [(el.params as RoofParams).levelId, ...(el.typeId ? [el.typeId] : [])],
+  related: (doc, el) => attachedWalls(doc, el.id),
   cascadeDelete: true,
   isType: false,
 });

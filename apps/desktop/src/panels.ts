@@ -120,6 +120,7 @@ import {
   validateViewRange,
   dimensionLayout,
   flipWall,
+  detachWall,
   associateGlobal,
   createGlobalParameter,
   createProjectParameter,
@@ -1858,6 +1859,15 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       const flip = h("button", { textContent: "Flip (swap exterior side)" });
       flip.onclick = () => edit(ctx, "Flip wall", (tx) => flipWall(tx, doc, w.id));
       sec.append(row("Orientation", flip));
+      // Attach Top/Base (Modify tab or right-click to attach; detach here).
+      for (const end of ["top", "base"] as const) {
+        const id = end === "top" ? p.topAttachId : p.baseAttachId;
+        const t = id ? doc.get(id) : undefined;
+        if (!t) continue;
+        const det = h("button", { textContent: "Detach" });
+        det.onclick = () => edit(ctx, `Detach ${end}`, (tx) => detachWall(tx, doc, w.id, end));
+        sec.append(row(end === "top" ? "Top attached to" : "Base attached to", h("div", { class: "buttons" }, h("span", { class: "value" }, `${t.category} ${t.name ?? ""}`.trim()), det)));
+      }
       sec.append(
         row("Type", select(typeOpts(Cat.WallType), w.typeId ?? "", (v) => edit(ctx, "Change wall type", (tx) => tx.setType(w.id, v)))),
         row("Base level", select(levelOpts, p.baseLevelId, (v) => update<WallParams>("Change base level", { baseLevelId: v }))),

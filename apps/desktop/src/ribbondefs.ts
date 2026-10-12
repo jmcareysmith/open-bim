@@ -322,6 +322,13 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
         { title: "Select", items: [{ label: "Modify", icon: "select", tool: "select", large: true, title: "Select (Esc)" }] },
         { title: "Modify", items: modify },
         {
+          title: "Modify Wall",
+          items: [
+            { label: "Attach Top", icon: "roof", cmd: "attachTop", title: "Attach the selected walls' tops to a roof, floor or ceiling (click it next)" },
+            { label: "Attach Base", icon: "floor", cmd: "attachBase", title: "Attach the selected walls' bases to a floor (click it next)" },
+          ],
+        },
+        {
           title: "View",
           items: [
             { label: "Hide", icon: "hide", cmd: "hide", title: "Temporarily hide (H; Shift = category)" },

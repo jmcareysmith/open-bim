@@ -10,18 +10,21 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@open-bim/collab": "0.1.0",
     "@open-bim/core": "0.1.0",
     "@open-bim/geometry": "0.1.0",
     "@open-bim/ifc": "0.1.0",
-    "@open-bim/collab": "0.1.0",
-    "web-ifc": "0.0.77",
     "@open-bim/library": "0.1.0",
     "@salusoft89/planegcs": "1.2.0",
     "@tauri-apps/api": "^2.8.0",
     "@tauri-apps/plugin-dialog": "^2.4.0",
     "@tauri-apps/plugin-fs": "^2.4.0",
     "replicad-opencascadejs": "^1.1.0",
-    "three": "^0.186.1"
+    "three": "^0.186.1",
+    "three-gpu-pathtracer": "^0.0.24",
+    "three-mesh-bvh": "^0.9.14",
+    "web-ifc": "0.0.77",
+    "xatlas-web": "^0.1.0"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.8.0",

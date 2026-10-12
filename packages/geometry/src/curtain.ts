@@ -66,10 +66,11 @@ export function buildCurtainWall(doc: Document, wall: Wall, grid: CurtainGrid): 
   for (let i = 0; i + 1 < us.length; i++) {
     for (let j = 0; j + 1 < zs.length; j++) box(us[i]! + hw, us[i + 1]! - hw, -hp, hp, zs[j]! + hw, zs[j + 1]! - hw, glass);
   }
+  const glassCount = idx.length;
   // Vertical mullions (end ones kept inside the wall), then horizontals between them.
   for (const u of us) box(Math.max(0, u - hw), Math.min(len, u + hw), -hd, hd, bottom, top, metal);
   for (const z of zs) {
     for (let i = 0; i + 1 < us.length; i++) box(us[i]! + hw, us[i + 1]! - hw, -hd, hd, Math.max(bottom, z - hw), Math.min(top, z + hw), metal);
   }
-  return { positions: new Float32Array(pos), normals: new Float32Array(nor), indices: new Uint32Array(idx), colors: new Float32Array(col) };
+  return { positions: new Float32Array(pos), normals: new Float32Array(nor), indices: new Uint32Array(idx), colors: new Float32Array(col), glass: { start: 0, count: glassCount } };
 }

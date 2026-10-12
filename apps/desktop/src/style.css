@@ -134,3 +134,9 @@ input.invalid { outline: 1px solid var(--danger); }
 #collab-pane label { display: grid; grid-template-columns: 90px 1fr; gap: 6px; align-items: center; margin-bottom: 6px; }
 #collab-pane .peer { display: flex; gap: 8px; align-items: center; padding: 3px 0; cursor: pointer; }
 #collab-pane .swatch { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+#render-pane { position: absolute; inset: 0; z-index: 4; display: flex; flex-direction: column; background: #111; }
+#render-pane .render-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--line); font-size: 12px; }
+#render-pane .render-canvas { flex: 1; min-height: 0; position: relative; }
+#render-pane canvas { width: 100%; height: 100%; display: block; }
+#render-pane .render-bar input { width: auto; }
+#render-pane .render-bar input[type="range"] { width: 120px; }

@@ -285,6 +285,17 @@ function numberInput(value: number, onCommit: (v: number) => void): HTMLInputEle
   return input;
 }
 
+/** A 0–1 value (render appearance). */
+function fractionInput(value: number, onCommit: (v: number) => void): HTMLInputElement {
+  const input = h("input", { type: "number", min: "0", max: "1", step: "0.05", value: String(value) });
+  input.onchange = () => {
+    const v = Number(input.value);
+    if (Number.isFinite(v) && v >= 0 && v <= 1) onCommit(v);
+    else input.value = String(value);
+  };
+  return input;
+}
+
 function intInput(value: number, min: number, max: number, onCommit: (v: number) => void): HTMLInputElement {
   const input = h("input", { type: "number", min: String(min), max: String(max), step: "1", value: String(value) });
   input.onchange = () => {
@@ -2277,6 +2288,10 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
           "Surface pattern",
           select(patternOpts, p.surfacePattern, (v) => update<MaterialParams>("Change surface pattern", { surfacePattern: v as PatternName })),
         ),
+        h("div", { class: "subhead" }, "Render appearance"),
+        row("Roughness", fractionInput(p.roughness ?? 0.85, (v) => update<MaterialParams>("Change roughness", { roughness: v }))),
+        row("Metalness", fractionInput(p.metalness ?? 0, (v) => update<MaterialParams>("Change metalness", { metalness: v }))),
+        row("Transparency", fractionInput(p.transparency ?? 0, (v) => update<MaterialParams>("Change transparency", { transparency: v }))),
       );
       break;
     }

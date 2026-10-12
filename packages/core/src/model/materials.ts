@@ -27,6 +27,10 @@ export type MaterialParams = {
   color: number;
   cutPattern: PatternName;
   surfacePattern: PatternName;
+  /** Render appearance: roughness and metalness 0–1 (defaults 0.85 and 0), transparency 0–1. */
+  roughness?: number;
+  metalness?: number;
+  transparency?: number;
 };
 export type Material = Element<MaterialParams>;
 

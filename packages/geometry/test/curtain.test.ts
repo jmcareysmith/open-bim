@@ -17,6 +17,7 @@ describe("curtain walls", () => {
     // 5 x 2 panels, 6 vertical mullions, 3 rows of 5 horizontal mullions; 24 vertices per box.
     expect(m.positions.length / 3 / 24).toBe(10 + 6 + 15);
     expect(m.colors).toBeDefined();
+    expect(m.glass).toEqual({ start: 0, count: 10 * 36 });
     expect(meshVolume(m)).toBeGreaterThan(0);
     const bb = boundingBox(m);
     expect(bb.max[1] - bb.min[1]).toBeCloseTo(100);

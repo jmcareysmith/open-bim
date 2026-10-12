@@ -41,3 +41,4 @@ export * from "./model/options.ts";
 export * from "./model/settings.ts";
 export * from "./model/template.ts";
 export * from "./scripting.ts";
+export * from "./model/solar.ts";

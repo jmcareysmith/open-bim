@@ -557,6 +557,25 @@ export class Viewport {
 
   // ---- views & camera -----------------------------------------------------
 
+  /** The 3D view's camera (for renders). */
+  get perspectiveCamera(): THREE.PerspectiveCamera {
+    return this.camera3d;
+  }
+
+  /** Model solids as shown now (visible ones, with their shaded colour), for the renderer. */
+  renderMeshes(): { id: ElementId; mesh: MeshData; color: number }[] {
+    const out: { id: ElementId; mesh: MeshData; color: number }[] = [];
+    for (const [id, mesh] of this.meshes) {
+      const group = this.objects.get(id);
+      if (!group?.visible || !group.userData.solid) continue;
+      const solid = group.children.find((c): c is THREE.Mesh => c instanceof THREE.Mesh);
+      const mat = solid?.material as THREE.MeshStandardMaterial | undefined;
+      if (!mat || mat.opacity < 1) continue;
+      out.push({ id, mesh, color: (group.userData.baseColor as number | undefined) ?? mat.color.getHex() });
+    }
+    return out;
+  }
+
   get camera(): THREE.PerspectiveCamera | THREE.OrthographicCamera {
     return this.mode === "plan" ? this.cameraPlan : this.mode === "drawing" ? this.cameraDraw : this.camera3d;
   }

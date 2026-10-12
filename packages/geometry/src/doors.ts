@@ -117,13 +117,14 @@ export function buildWindow(doc: Document, el: Element): MeshData {
   const z1 = z0 + p.height;
   const fw = t.frameWidth;
   const d = Math.min(WINDOW_DEPTH, f.half * 2) / 2;
-  return mergeMeshes([
+  const frame = mergeMeshes([
     box(f, u0, u0 + fw, -d, d, z0, z1),
     box(f, u1 - fw, u1, -d, d, z0, z1),
     box(f, u0 + fw, u1 - fw, -d, d, z0, z0 + fw),
     box(f, u0 + fw, u1 - fw, -d, d, z1 - fw, z1),
-    box(f, u0 + fw, u1 - fw, -GLASS / 2, GLASS / 2, z0 + fw, z1 - fw),
   ]);
+  const glass = box(f, u0 + fw, u1 - fw, -GLASS / 2, GLASS / 2, z0 + fw, z1 - fw);
+  return { ...mergeMeshes([frame, glass]), glass: { start: frame.indices.length, count: glass.indices.length } };
 }
 
 /** Plan symbol: frame outline through the wall and the glass line, drawn just above the floor. */

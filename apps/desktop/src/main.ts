@@ -114,6 +114,7 @@ import {
   type ToolContext,
 } from "./tools.ts";
 import { Viewport, type ViewMode } from "./viewport.ts";
+import { openRender } from "./render.ts";
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 
@@ -507,6 +508,24 @@ const commands: Record<string, () => void | Promise<void>> = {
   },
   fit() {
     viewport.zoomToFit();
+  },
+  async render() {
+    if (viewport.viewMode !== "3d") return status("Render: open a 3D view first.");
+    closeRender?.();
+    try {
+      closeRender = await openRender({
+        container: $<HTMLDivElement>("#viewport"),
+        viewport,
+        doc,
+        status,
+        savePng: async (bytes) => {
+          const path = await saveBytes(bytes, "render.png", { name: "PNG image", extensions: ["png"] }, "image/png");
+          if (path) status(`Saved ${path}.`);
+        },
+      });
+    } catch (err) {
+      status(`⚠ Render failed: ${(err as Error).message}`);
+    }
   },
   collaborate() {
     const pane = $<HTMLDivElement>("#collab-pane");
@@ -1010,6 +1029,8 @@ async function importSurveyPoints(id: ElementId): Promise<void> {
     status(`\u26a0 Survey import failed: ${(err as Error).message}`);
   }
 }
+
+let closeRender: (() => void) | undefined;
 
 // ---- multi-user editing -------------------------------------------------------------
 

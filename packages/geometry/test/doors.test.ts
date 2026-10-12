@@ -49,6 +49,8 @@ describe("window geometry", () => {
     const frame = (2 * 50 * 1200 + 2 * 1100 * 50) * 100;
     const glass = 1100 * 1100 * 10;
     expect(meshVolume(m)).toBeCloseTo(frame + glass, -3);
+    // The glazing is the last box, flagged for rendering.
+    expect(m.glass).toEqual({ start: m.indices.length - 36, count: 36 });
   });
 });
 

@@ -8,6 +8,8 @@ export interface MeshData {
   indices: Uint32Array;
   /** Optional per-vertex RGB (0–1), for elements with more than one material (curtain walls). */
   colors?: Float32Array;
+  /** Optional index range that is glazing (rendered transparent): windows, curtain panels. */
+  glass?: { start: number; count: number };
 }
 
 export interface Box3 {

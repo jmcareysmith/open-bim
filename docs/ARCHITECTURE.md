@@ -336,6 +336,15 @@ tools snap to grid endpoints, intersections and lines.
   Shift+I / U, with a cyan viewport border while active (Revit convention).
 - Rust side exposes commands for open/save via Tauri plugins (dialog + fs).
 
+## Rendering
+- `core/model/solar.ts`: NZTM2000 → latitude/longitude and NOAA sun position; `sunDirection`
+  gives the sun in project axes from the project location and rotation (grid convergence ignored).
+- `apps/desktop/src/render.ts`: Render (3D view) builds a separate scene from the viewport's visible
+  solids (`Viewport.renderMeshes`) and path traces it progressively with three-gpu-pathtracer
+  (lazy-loaded): directional sun + gradient sky, ground plane, ACES tone mapping. Meshes flag their
+  glazing index range (`MeshData.glass`: windows, curtain panels), split into glass meshes.
+  Materials carry optional render appearance (roughness, metalness, transparency).
+
 ## Collaboration (`packages/collab`)
 - Multi-user editing binds a `Document` to a Yjs `Y.Doc` (`bindDocument`): a map of element id →
   Y.Map (category, name, typeId, params as a nested Y.Map), so concurrent edits to different params

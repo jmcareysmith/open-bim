@@ -92,4 +92,6 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Multi-user editing (Phase 7): toolbar Collaborate → Share this project / Join, via the sync server
   (`npm run serve -w @open-bim/collab`; PORT, OPEN_BIM_DATA, OPEN_BIM_TOKEN). Defaults chosen without
   Jeremy's answer: Yjs, self-hosted, one shared token, no accounts. Revisit if he wants a hosted service.
-- Next: Phase 7 — rendering, NZ H1 / NZS 3604 bracing.
+- Render (toolbar, from a 3D view): path traced, sun from site/date/time, Save PNG. Materials have
+  roughness/metalness/transparency. No textures, no AI render (needs a service decision).
+- Next: Phase 7 — NZ H1 / NZS 3604 bracing.

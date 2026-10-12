@@ -67,7 +67,8 @@ Each phase ends with something usable. Work one feature per session; tick items 
 ## Phase 7 — Collaboration, rendering, NZ tools (current)
 - [x] CRDT document model (Yjs) for multi-user editing — per-param merge, remote edits kept out of local undo, orphan repair, presence
 - [x] Cloud sync — self-hosted sync server (`packages/collab`, rooms saved to disk, shared access token); no accounts or hosted service yet
-- Realistic rendering + AI render
+- [x] Realistic rendering — progressive GPU path tracer (three-gpu-pathtracer) of the 3D view; sun for the site, date and time; glass; material roughness/metalness/transparency; Save PNG
+- AI render — needs a service/API decision (not started)
 - NZ H1 compliance and NZS 3604 bracing modules
 
 ## Phase 8 — MEP & visual programming

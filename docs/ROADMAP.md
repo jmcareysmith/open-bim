@@ -13,7 +13,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] three.js 3D viewport with orbit controls
 - [x] Save/load project as JSON (`.obim`)
 - [x] Run on Windows PC via `npm run tauri dev`
-- [ ] App icon + CI (GitHub Actions: tests + build)
+- [x] App icon + CI (GitHub Actions: tests + build) — typecheck, tests, web build on Ubuntu; Tauri build on Windows
 
 ## Phase 1 — Architectural modelling (done)
 - [x] Wall drawing tool (click-click in plan/3D work plane), snapping, ortho — plan is a clipped top-down view; true 2D plans in Phase 2
@@ -72,5 +72,36 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] NZ H1 compliance — schedule method: construction R-values on types, climate zones, glazing limit (provisional minimums, editable per project)
 - [x] NZS 3604 bracing module — panels on walls, automatic bracing lines per storey/direction, wind + EQ demand (provisional estimate or tabulated override), line minimum and spacing checks
 
-## Phase 8 — MEP & visual programming (next: needs planning)
+## Phase 7a — Close known gaps (current)
+- [ ] Modify tools: Move, Copy, Rotate, Mirror, Array (MV, CO, RO, MM, AR) — hosted elements follow their hosts
+- [ ] Align, Offset, Trim/Extend, Split (walls, lines, beams, grids)
+- [ ] Drag to edit: grips on wall/line/datum ends, drag to move, temporary dimensions (click to type)
+- [ ] Walls attach top/base to floors, ceilings and roofs
+- [ ] Wall joins: per-layer cleanup, disallow join, clean crossing (X) walls
+- [ ] Floors: pick walls (with offset), slope arrows
+- [ ] 3D views save their camera; perspective camera views
+- [ ] Schedules on sheets; calculated fields
+- [ ] Beam plan symbols (dashed centre lines at Coarse/Medium)
+- [ ] Fold the interactive viewport onto `viewDrawing` (one drawing path for screen and sheet/PDF)
+
+## Phase 7b — Revit-style interface
+- [ ] Ribbon: tabs and labelled panels, split-button dropdowns, contextual Modify tab, options bar
+- [ ] File menu (New, Open, Save, Export ▸, Import ▸, recent files) and Quick Access Toolbar
+- [ ] Drag and drop from the Project Browser: views/schedules/legends onto sheets, families into views
+- [ ] Dockable panels (Properties, Project Browser): dock, tab, float, collapse; layout remembered
+- [ ] View tabs (tile/cascade), status bar with selection filter, view control bar (scale, detail level, visual style, hide/isolate)
+- [ ] Right-click menus (Select All Instances, Edit Type, Hide in View…), two-letter shortcuts, shortcut editor
+
+## Phase 8 — MEP & visual programming
+- [ ] Connectors and MEP systems (supply/return air, cold/hot water, sanitary, power); system browser
+- [ ] Ducts with auto fittings (elbows, tees, transitions), round/rectangular types, sizing from airflow
+- [ ] Pipes with auto fittings, falls on waste pipes, pipe materials
+- [ ] Mechanical equipment and air terminals (library families with connectors)
+- [ ] Plumbing fixtures and drainage; G13/AS1 discharge units, pipe size and fall checks
+- [ ] Electrical: fixtures and devices, circuits, switchboard schedules with load totals
+- [ ] Cable tray and conduit
+- [ ] MEP display (single-line at Coarse, plan symbols), MEP in schedules and clash checks
+- [ ] Visual programming engine: node graphs with incremental re-run, saved in the project
+- [ ] Node editor and node library (selection, parameters, geometry, maths/lists, element creation)
+
 ## Phase 9 — Analysis, rebar, point clouds

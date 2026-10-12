@@ -160,3 +160,16 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Scripting console | 4 | ✅ |
 | Visual programming (Dynamo equivalent) | 8 | ⬜ |
 | Add-in manager | 4 | 🟨 |
+
+## 15. Editing & interface
+| Feature | Phase | Status |
+|---|---|---|
+| Move, copy, rotate, mirror, array | 7a | ⬜ |
+| Align, offset, trim/extend, split | 7a | ⬜ |
+| Grips, drag editing, temporary dimensions | 7a | ⬜ |
+| Ribbon, contextual tabs, options bar | 7b | ⬜ |
+| File menu, Quick Access Toolbar | 7b | ⬜ |
+| Drag and drop from the Project Browser | 7b | ⬜ |
+| Dockable panels | 7b | ⬜ |
+| View tabs, status bar, view control bar | 7b | ⬜ |
+| Context menus, keyboard shortcuts | 7b | ⬜ |

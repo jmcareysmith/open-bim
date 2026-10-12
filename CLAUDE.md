@@ -37,7 +37,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - End each session by updating the "Current state" section below and pushing to GitHub.
 
 ## Current state (update at the end of each session)
-- Phase 0 done except CI green (runs on Windows via `npm run tauri dev`). Phases 1–7 done.
+- Phases 0–7 done. Order agreed with Jeremy: Phase 7a (close known gaps), 7b (Revit-style
+  interface: ribbon, menus, drag and drop), then 8 (MEP & visual programming).
 - Modelling: levels, layered wall/floor/ceiling/roof types with materials, walls (W; auto L/T/X joins,
   Flip), floors/ceilings/roofs from sketches (roofs: per-edge slope or gable), doors (D) and windows (N)
   as parametric hosted types, wall openings, grids (G), reference planes (R), project units + info.
@@ -101,4 +102,4 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   NZ Checks → NZS 3604 bracing (enter tabulated demand there). Demand is a provisional estimate.
 - AI render: Render pane → AI render… (self-hosted SD WebUI API, or Gemini with the user's key).
   Tested against a mock server only, not a real model.
-- Next: Phase 8 (MEP & visual programming) has no item list yet — plan it with Jeremy first.
+- Next: Phase 7a — modify tools (Move/Copy/Rotate/Mirror/Array).

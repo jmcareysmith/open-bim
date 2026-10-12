@@ -46,6 +46,10 @@ main { display: flex; min-height: 0; }
 .dock .panel { flex: 1 1 0; min-height: 0; border: 0; }
 .dock .panel + .panel { border-top: 1px solid var(--line); }
 .dock .panel.collapsed { flex: none; }
+.dock.all-collapsed { width: 28px; }
+.dock.all-collapsed .panel { flex: none; }
+.dock.all-collapsed .panel-head { writing-mode: vertical-rl; padding: 10px 4px; gap: 8px; justify-content: flex-start; cursor: pointer; }
+.dock.all-collapsed .panel-tools { display: none; }
 .panel { display: flex; flex-direction: column; overflow: hidden; }
 .panel[hidden] { display: none; }
 .panel > div { overflow-y: auto; min-height: 0; flex: 1; }

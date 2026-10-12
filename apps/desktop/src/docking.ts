@@ -133,7 +133,10 @@ export class Docking {
       const dock = this.docks[side];
       dock.replaceChildren();
       dock.hidden = !d.panels.length;
-      dock.style.width = `${d.width}px`;
+      // Every panel collapsed: the dock shrinks to a thin strip of titles (click one to expand).
+      const strip = !d.tabbed && d.panels.length > 0 && d.panels.every((id) => l.collapsed.includes(id));
+      dock.classList.toggle("all-collapsed", strip);
+      dock.style.width = strip ? "" : `${d.width}px`;
       if (d.tabbed) {
         const strip = document.createElement("div");
         strip.className = "dock-tabs";
@@ -168,7 +171,7 @@ export class Docking {
       grip.className = "dock-resizer";
       grip.title = "Drag to resize";
       grip.onpointerdown = (ev) => this.resizeDock(side, ev);
-      dock.append(grip);
+      if (!strip) dock.append(grip);
     }
     for (const [id, f] of Object.entries(l.floats)) {
       const p = this.spec(id);
@@ -246,40 +249,53 @@ export class Docking {
     return { target: { kind: "float", at }, rect: new DOMRect(at.x, at.y, at.w, at.h) };
   }
 
+  /**
+   * Drag a panel by its title (or tab): it lifts out and follows the pointer at once; drop it at a
+   * side to dock, on another title to tab, or anywhere else to leave it floating. A click without
+   * dragging expands a collapsed panel.
+   */
   private drag(p: PanelSpec, ev: PointerEvent): void {
     ev.preventDefault();
-    const head = ev.currentTarget as HTMLElement;
-    head.setPointerCapture(ev.pointerId);
     const r = p.el.getBoundingClientRect();
-    const floating = placeOf(this.layout, p.id) === "float";
-    // A hidden tab has no size of its own: float it at a default size, grabbed by its title.
-    const sized = r.width > 0 && r.height > 0;
-    const grab = sized
-      ? { dx: ev.clientX - r.left, dy: ev.clientY - r.top, w: floating ? r.width : Math.max(260, r.width), h: floating ? r.height : Math.max(240, Math.min(520, r.height)) }
-      : { dx: 40, dy: 12, w: 280, h: 480 };
+    const wasFloating = placeOf(this.layout, p.id) === "float";
+    const collapsed = this.layout.collapsed.includes(p.id);
+    const saved = this.layout.floats[p.id];
+    // Docked panels lift out at a window size; hidden tabs and collapsed panels have no size of their own.
+    const w = wasFloating && r.width ? r.width : Math.max(260, Math.min(360, r.width || 280));
+    const h = wasFloating && !collapsed && r.height ? r.height : (saved?.h ?? Math.max(240, Math.min(520, collapsed ? 480 : r.height || 480)));
+    const grab = { dx: r.width ? Math.min(ev.clientX - r.left, w - 40) : 40, dy: r.height ? Math.min(ev.clientY - r.top, 20) : 12, w, h };
     const x0 = ev.clientX;
     const y0 = ev.clientY;
     let moved = false;
+    let lifted = wasFloating;
     let target: Target | null = null;
-    head.onpointermove = (mv) => {
+    const move = (mv: PointerEvent) => {
       if (!moved && Math.hypot(mv.clientX - x0, mv.clientY - y0) < 6) return;
       moved = true;
+      const at = { x: mv.clientX - grab.dx, y: mv.clientY - grab.dy, w: grab.w, h: grab.h };
+      if (!lifted) {
+        // Undock now, so the panel itself follows the pointer.
+        lifted = true;
+        this.layout = movePanel(this.layout, p.id, { kind: "float", at });
+        this.render();
+      }
+      Object.assign(p.el.style, { left: `${at.x}px`, top: `${at.y}px` });
       const t = this.targetAt(p.id, mv.clientX, mv.clientY, grab);
       target = t.target;
-      if (floating && t.target.kind === "float") {
-        // A floating panel just follows the pointer.
-        this.hint.hidden = true;
-        Object.assign(p.el.style, { left: `${t.rect.x}px`, top: `${t.rect.y}px` });
+      this.hint.hidden = t.target.kind === "float";
+      if (!this.hint.hidden) Object.assign(this.hint.style, { left: `${t.rect.x}px`, top: `${t.rect.y}px`, width: `${t.rect.width}px`, height: `${t.rect.height}px` });
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      this.hint.hidden = true;
+      if (!moved) {
+        if (collapsed) this.set(toggleCollapsed(this.layout, p.id));
         return;
       }
-      this.hint.hidden = false;
-      this.hint.classList.toggle("float", t.target.kind === "float");
-      Object.assign(this.hint.style, { left: `${t.rect.x}px`, top: `${t.rect.y}px`, width: `${t.rect.width}px`, height: `${t.rect.height}px` });
+      this.set(target ? movePanel(this.layout, p.id, target) : this.layout);
     };
-    head.onpointerup = () => {
-      head.onpointermove = head.onpointerup = null;
-      this.hint.hidden = true;
-      if (moved && target) this.set(movePanel(this.layout, p.id, target));
-    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
   }
 }

@@ -1458,7 +1458,6 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
     ["Sections", allViews.filter((v) => v.params.kind === "section")],
     ["Elevations", allViews.filter((v) => v.params.kind === "elevation")],
     ["3D Views", allViews.filter((v) => v.params.kind === "3d")],
-    ["Legends", allViews.filter((v) => v.params.kind === "legend")],
   ];
   for (const [title, list] of groups) {
     if (!list.length) continue;
@@ -1494,7 +1493,14 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
       const v = createLegend(tx, doc);
       queueMicrotask(() => ctx.setActiveView(v.id));
     });
-  viewsSec.append(row("", newLegend));
+  // Legends get their own section, like schedules (Revit's browser does the same).
+  const legendSec = h("div", { class: "section" }, h("h3", {}, "Legends"));
+  for (const v of allViews.filter((x) => x.params.kind === "legend")) {
+    const div = h("div", { class: `list-item${v.id === ctx.activeViewId() ? " selected" : ""}` }, h("span", {}, v.name ?? v.id));
+    div.onclick = () => ctx.setActiveView(v.id);
+    legendSec.append(div);
+  }
+  legendSec.append(row("", newLegend));
   const views = viewsSec;
 
   const lv = h("div", { class: "section" }, h("h3", {}, "Levels"));
@@ -1792,7 +1798,8 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
     h("div", { class: "buttons wrap" }, imp, exp),
   );
 
-  root.replaceChildren(project, views, schedSec, sheetsSec, revSec, linkSec, optSec, fams, paramsSec, lv, types, mats, vg, counts);
+  // Revit order: views, then sheets right below, then legends and schedules.
+  root.replaceChildren(project, views, sheetsSec, legendSec, schedSec, fams, revSec, linkSec, optSec, paramsSec, lv, types, mats, vg, counts);
 }
 
 // ---- Properties -----------------------------------------------------------

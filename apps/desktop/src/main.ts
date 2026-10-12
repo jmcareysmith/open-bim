@@ -35,6 +35,7 @@ import {
   loadFamily,
   familyFile,
   readFamilyFile,
+  zipStore,
   createLink,
   reloadLink,
   type Link,
@@ -67,7 +68,7 @@ import {
   type FamilyCategory,
   type FamilyDef,
 } from "@open-bim/core";
-import { OcctKernel, SimpleKernel, areaLoopsFromWalls, drawingDxf, parseDxf, viewDrawing, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
+import { OcctKernel, SimpleKernel, exportGlb, exportObj, exportParts, areaLoopsFromWalls, drawingDxf, parseDxf, viewDrawing, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
 import gcsWasmUrl from "@salusoft89/planegcs/dist/planegcs_dist/planegcs.wasm?url";
 import { LIBRARY } from "@open-bim/library";
@@ -586,6 +587,31 @@ const commands: Record<string, () => void | Promise<void>> = {
       status(`Linked ${link.name} by shared coordinates. Change positioning or offset in Properties.`);
     } catch (err) {
       status(`\u26a0 Link failed: ${(err as Error).message}`);
+    }
+  },
+  async exportGlb() {
+    try {
+      const name = (filePath?.split(/[\\/]/).pop() ?? "Untitled").replace(/\.obim$/i, "");
+      const glb = exportGlb(exportParts(doc, viewport.geometryKernel), projectSettings(doc)?.params.info.name || name);
+      const path = await saveBytes(glb, `${name}.glb`, { name: "glTF binary", extensions: ["glb"] }, "model/gltf-binary");
+      if (path) status(`glTF exported to ${path}`);
+    } catch (err) {
+      status(`⚠ glTF export failed: ${(err as Error).message}`);
+    }
+  },
+  async exportObj() {
+    try {
+      const name = (filePath?.split(/[\\/]/).pop() ?? "Untitled").replace(/\.obim$/i, "");
+      const { obj, mtl } = exportObj(exportParts(doc, viewport.geometryKernel), `${name}.mtl`);
+      const enc = new TextEncoder();
+      const zip = zipStore([
+        [`${name}.obj`, enc.encode(obj)],
+        [`${name}.mtl`, enc.encode(mtl)],
+      ]);
+      const path = await saveBytes(zip, `${name}-obj.zip`, { name: "Zip", extensions: ["zip"] }, "application/zip");
+      if (path) status(`OBJ + MTL exported to ${path}`);
+    } catch (err) {
+      status(`⚠ OBJ export failed: ${(err as Error).message}`);
     }
   },
   async exportIfc() {

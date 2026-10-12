@@ -36,7 +36,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - End each session by updating the "Current state" section below and pushing to GitHub.
 
 ## Current state (update at the end of each session)
-- Phase 0 done except CI green (runs on Windows via `npm run tauri dev`). Phases 1–4 done.
+- Phase 0 done except CI green (runs on Windows via `npm run tauri dev`). Phases 1–5 done (DWG pending a licence decision).
 - Modelling: levels, layered wall/floor/ceiling/roof types with materials, walls (W; auto L/T/X joins,
   Flip), floors/ceilings/roofs from sketches (roofs: per-edge slope or gable), doors (D) and windows (N)
   as parametric hosted types, wall openings, grids (G), reference planes (R), project units + info.
@@ -78,4 +78,5 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   (needs a licence decision: LibreDWG is GPL; ODA is proprietary).
 - Shared coordinates (Project Information & Units → Location; NZTM2000) and links (browser → Links →
   Link project…; by shared coordinates or origin; Reload). Links draw in one colour, aren't scheduled.
-- Next: Phase 5 — glTF/OBJ export (last Phase 5 item).
+- glTF (.glb) and OBJ (+MTL, zipped) export.
+- Next: Phase 6 — advanced modelling (see ROADMAP), top item first.

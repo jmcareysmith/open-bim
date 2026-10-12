@@ -50,13 +50,13 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Revisions, groups — model groups (place copies, apply to all instances); detail groups later
 - [x] Plugin API + scripting console — JS plugins (ES modules) and console; see docs/PLUGINS.md
 
-## Phase 5 — Interoperability (current)
+## Phase 5 — Interoperability (done)
 - [x] IFC4 export, then import (web-ifc; IfcOpenShell if needed) — import as DirectShapes (no conversion to native walls yet)
 - [x] DXF/DWG import & export — DXF (R12) export of views/sheets and import into a view; DWG pending a licence decision
 - [x] Shared coordinates, links — NZTM2000 location, IFC map conversion; .obim links (one colour, not scheduled)
-- glTF/OBJ export
+- [x] glTF/OBJ export — .glb (node per element, metres Y-up) and zipped OBJ + MTL
 
-## Phase 6 — Advanced modelling
+## Phase 6 — Advanced modelling (current)
 - Stairs, railings, ramps
 - Curtain walls
 - Stacked walls

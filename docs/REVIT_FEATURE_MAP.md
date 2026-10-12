@@ -134,7 +134,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | DWG/DXF import & export | 5 | 🟨 |
 | PDF / image underlays | 5 | ⬜ |
 | Point clouds | 9 | ⬜ |
-| glTF / OBJ export | 5 | ⬜ |
+| glTF / OBJ export | 5 | ✅ |
 | Revit .rvt import | — | Not feasible (closed format); use IFC |
 
 ## 12. Collaboration

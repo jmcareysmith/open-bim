@@ -227,6 +227,10 @@ offset and rotation. `geometry/src/links.ts` builds every linked element with th
 merges them (cached per kernel and snapshot) and applies the transform, so links draw in 3D and in
 plan cuts. Linked elements are read-only and not scheduled or tagged yet.
 
+**Visualisation export** — `geometry/src/gltf.ts`: `exportParts` builds every element's mesh with
+its colour; `exportGlb` writes binary glTF 2.0 (one node per element with id/category extras, a
+material per colour, metres Y-up) and `exportObj` writes OBJ + MTL (zipped by the app).
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

@@ -83,7 +83,7 @@ describe("view markers in plan", () => {
     const s = doc.transact("S", (tx) => createSection(tx, doc, p(0, 4000), p(10000, 4000)));
     const c = doc.transact("C", (tx) => createCallout(tx, doc, floorPlanFor(doc, ids.levels.ground)!.id, p(0, 0), p(2000, 2000)));
     expect(k.buildLines(doc, s)!.planOnly).toBe(true);
-    expect(k.buildLines(doc, s)!.labels[0]!.text).toBe("Section 1");
+    expect(k.buildLines(doc, s)!.labels[0]!.text).toBe("1"); // bubbles show the view number;
     expect(k.buildLines(doc, c)!.dashed).toBe(true);
     expect(k.buildLines(doc, floorPlanFor(doc, ids.levels.ground)!)).toBeNull();
   });

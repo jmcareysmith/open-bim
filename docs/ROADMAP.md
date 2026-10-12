@@ -82,7 +82,8 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [ ] 3D views save their camera; perspective camera views
 - [ ] Schedules on sheets; calculated fields
 - [ ] Beam plan symbols (dashed centre lines at Coarse/Medium)
-- [ ] Annotation symbols (north arrow, generic symbols), detail components (2D detail families), detail groups — on the Annotate tab, not built yet
+- [x] Annotation symbols — north arrow (up or true north), graphic scale bar, break line; views and sheets; paper-sized
+- [ ] Detail components (2D detail families) and detail groups — on the Annotate tab, not built yet
 - [x] Find/Replace and Check Spelling for text notes (Annotate → Text)
 - [ ] Fold the interactive viewport onto `viewDrawing` (one drawing path for screen and sheet/PDF)
 

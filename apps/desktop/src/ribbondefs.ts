@@ -1,4 +1,4 @@
-import { SCHEDULE_CATEGORIES, TAKEOFF_CATEGORIES } from "@open-bim/core";
+import { SCHEDULE_CATEGORIES, SYMBOL_KINDS, TAKEOFF_CATEGORIES, type SymbolKind } from "@open-bim/core";
 import type { MenuItem } from "./dialog.ts";
 import type { RibbonItem, RibbonTab } from "./ribbon.ts";
 
@@ -9,6 +9,7 @@ export interface RibbonMenus {
   loadLibraryFamily(name: string): void;
   newSchedule(category: string, kind: "schedule" | "takeoff"): void;
   cmd(name: string): void;
+  placeSymbol(kind: SymbolKind): void;
 }
 
 const SOON = "coming next";
@@ -196,7 +197,19 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
             },
           ],
         },
-        { title: "Symbol", items: [{ label: "Symbol", icon: "symbol", large: true, soon: SOON, title: "Symbols (north arrow, etc.)" }] },
+        {
+          title: "Symbol",
+          items: [
+            {
+              label: "Symbol",
+              icon: "symbol",
+              tool: "symbol",
+              large: true,
+              title: "Place a symbol (▾: north arrow, scale bar, break line)",
+              menu: () => [{ heading: "Symbol" }, ...SYMBOL_KINDS.map((k) => ({ label: k.label, action: () => m.placeSymbol(k.value) }))],
+            },
+          ],
+        },
         {
           title: "Revisions",
           items: [

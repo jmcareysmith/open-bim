@@ -54,6 +54,7 @@ export const Cat = {
   Schedule: "Schedule",
   Revision: "Revision",
   RevisionCloud: "RevisionCloud",
+  Symbol: "Symbol",
   GroupType: "GroupType",
   Group: "Group",
   DirectShape: "DirectShape",

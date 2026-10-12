@@ -136,6 +136,7 @@ import { makeCollapsible } from "./collapse.ts";
 import { Ribbon } from "./ribbon.ts";
 import { ribbonTabs } from "./ribbondefs.ts";
 import { openFindReplace, openSpelling } from "./textdialogs.ts";
+import { SymbolTool } from "./symboltool.ts";
 
 /** The family editor's Void toggle; one element, shown on the Create tab. */
 const voidForm = Object.assign(document.createElement("input"), { type: "checkbox", id: "void-form" });
@@ -449,9 +450,10 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   offset: new OffsetTool(ctx),
   trim: new TrimTool(ctx),
   split: new SplitTool(ctx),
+  symbol: new SymbolTool(ctx),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
-const DRAWING_TOOLS = new Set(["select", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution"]);
+const DRAWING_TOOLS = new Set(["select", "symbol", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution"]);
 let tool: Tool = tools.select!;
 /** Grips and temporary dimensions for the selection (Select tool only). */
 let grips: GripLayer | undefined = new GripLayer(ctx, $("#viewport"));
@@ -468,6 +470,10 @@ let ribbon: Ribbon | undefined = new Ribbon(
           queueMicrotask(() => ctx.setActiveView(s.id));
         }),
       cmd: (c) => void commands[c]?.(),
+      placeSymbol: (kind) => {
+        (tools.symbol as SymbolTool).kind = kind;
+        setTool("symbol");
+      },
     },
     voidToggle,
   ),

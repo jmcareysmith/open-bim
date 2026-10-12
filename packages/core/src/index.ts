@@ -47,3 +47,4 @@ export * from "./model/bracing.ts";
 export * from "./model/modify.ts";
 export * from "./model/edits.ts";
 export * from "./model/grips.ts";
+export * from "./model/symbols.ts";

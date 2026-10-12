@@ -35,6 +35,7 @@ import { buildToposolid, buildToposolidLines } from "./site.ts";
 import { buildBeam, buildColumn, buildPadFooting, buildStripFooting } from "./structure.ts";
 import { buildCadImportLines } from "./dxf.ts";
 import { buildRevisionCloudLines } from "./revisions.ts";
+import { buildSymbolLines } from "./symbols.ts";
 import { buildAreaBoundaryLines, buildAreaLines, buildRoomLines, buildRoomSeparatorLines } from "./rooms.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
 
@@ -141,6 +142,7 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.LegendComponent, buildLegendLines],
     [Cat.KeynoteLegend, buildLegendLines],
     [Cat.RevisionCloud, buildRevisionCloudLines],
+    [Cat.Symbol, buildSymbolLines],
     [Cat.CadImport, buildCadImportLines],
     [Cat.Stair, buildStairLines],
     [Cat.Railing, buildRailingLines],

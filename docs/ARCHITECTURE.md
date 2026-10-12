@@ -294,6 +294,9 @@ ends, a door's slide, a move handle); `dragGrip` applies one; `setLineLength` ba
 dimensions. The app's `GripLayer` (`apps/desktop/src/grips.ts`) draws them as HTML over the view,
 placed each frame with `Viewport.toScreen` / `onFrame`.
 
+**Symbols** — `model/symbols.ts` (`Cat.Symbol`, view/sheet-owned annotation: north arrow, scale bar, break
+line; paper size × view scale; true north from the site location) drawn by `geometry/src/symbols.ts`.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

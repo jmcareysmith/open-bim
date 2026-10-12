@@ -183,6 +183,10 @@ import {
   type FilledRegionParams,
   type LineStyle,
   type TextNoteParams,
+  type SymbolParams,
+  type SymbolKind,
+  SYMBOL_KINDS,
+  DEFAULT_SYMBOL_SIZE,
   views as viewElements,
   SCALES,
   type View,
@@ -1104,6 +1108,7 @@ const VG_CATEGORIES: [string, string][] = [
   [Cat.TextNote, "Text"],
   [Cat.Tag, "Tags"],
   [Cat.DetailLine, "Detail lines"],
+  [Cat.Symbol, "Symbols"],
   [Cat.FilledRegion, "Filled regions"],
 ];
 
@@ -2489,6 +2494,18 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       const colour = h("input", { type: "color", value: `#${p.color.toString(16).padStart(6, "0")}` });
       colour.onchange = () => update<FilledRegionParams>("Change region colour", { color: parseInt(colour.value.slice(1), 16) });
       sec.append(row("Colour", colour), row("Area", formatArea(regionArea(p), units)), editBoundaryButton(ctx, el.id));
+      break;
+    }
+    case Cat.Symbol: {
+      const p = el.params as SymbolParams;
+      sec.append(
+        row("Symbol", select(SYMBOL_KINDS, p.kind, (v) => update<SymbolParams>("Change symbol", { kind: v as SymbolKind, size: DEFAULT_SYMBOL_SIZE[v as SymbolKind] }))),
+        row("Size (paper mm)", numberInput(p.size, (v) => (v > 0 ? update<SymbolParams>("Symbol size", { size: v }) : ctx.status("⚠ Size must be positive")))),
+      );
+      if (p.kind === "northArrow") sec.append(row("Points to true north", checkbox(!!p.trueNorth, (v) => update<SymbolParams>("North arrow", { trueNorth: v }))));
+      if (p.kind !== "northArrow" || !p.trueNorth) {
+        sec.append(row("Rotation (°)", numberInput(+((p.rotation * 180) / Math.PI).toFixed(2), (v) => update<SymbolParams>("Rotate symbol", { rotation: (v * Math.PI) / 180 }))));
+      }
       break;
     }
     case Cat.TextNote: {

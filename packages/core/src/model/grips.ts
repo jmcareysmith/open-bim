@@ -28,6 +28,7 @@ const POINT_KEY: Record<string, string> = {
   [Cat.Room]: "point",
   [Cat.Area]: "point",
   [Cat.TextNote]: "position",
+  [Cat.Symbol]: "position",
   [Cat.Column]: "position",
   [Cat.PadFooting]: "position",
   [Cat.FamilyInstance]: "position",

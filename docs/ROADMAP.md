@@ -65,8 +65,8 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Phasing, design options, clash detection — phase filters, option sets, OCCT volume clashes
 
 ## Phase 7 — Collaboration, rendering, NZ tools (current)
-- CRDT document model (Yjs/Automerge) for multi-user editing
-- Cloud sync
+- [x] CRDT document model (Yjs) for multi-user editing — per-param merge, remote edits kept out of local undo, orphan repair, presence
+- [x] Cloud sync — self-hosted sync server (`packages/collab`, rooms saved to disk, shared access token); no accounts or hosted service yet
 - Realistic rendering + AI render
 - NZ H1 compliance and NZS 3604 bracing modules
 

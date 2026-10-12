@@ -199,3 +199,32 @@ describe("serialisation", () => {
     ).toThrow(/Unknown category/);
   });
 });
+
+describe("remote changes", () => {
+  it("applies remote edits without undo, and drops local steps that touch them", () => {
+    const { doc, ids } = setup();
+    const a = doc.transact("Wall A", (tx) => createWall(tx, ids.wallTypes.exterior, { x: 0, y: 0 }, { x: 3000, y: 0 }, ids.levels.ground));
+    const b = doc.transact("Wall B", (tx) => createWall(tx, ids.wallTypes.exterior, { x: 0, y: 2000 }, { x: 3000, y: 2000 }, ids.levels.ground));
+    const sets: ChangeSet[] = [];
+    doc.on((c) => sets.push(c));
+    const moved = { ...doc.require(a.id), params: { ...doc.require<Wall["params"]>(a.id).params, end: { x: 5000, y: 0 } } };
+    doc.applyRemote("Remote", [moved]);
+    expect(wallLength(doc.require(a.id) as Wall)).toBe(5000);
+    expect(sets[0]).toMatchObject({ remote: true, modified: [a.id] });
+    // "Wall B" survives; "Wall A" and everything older are gone from the undo stack.
+    expect(doc.undoName).toBe("Wall B");
+    doc.undo();
+    expect(doc.has(b.id)).toBe(false);
+    expect(doc.canUndo).toBe(false);
+    doc.applyRemote("Remote", [], [a.id]);
+    expect(doc.has(a.id)).toBe(false);
+  });
+
+  it("reports orphans left by concurrent edits", () => {
+    const { doc, ids } = setup();
+    const w = doc.transact("Wall", (tx) => createWall(tx, ids.wallTypes.exterior, { x: 0, y: 0 }, { x: 3000, y: 0 }, ids.levels.ground));
+    expect(doc.orphans()).toEqual([]);
+    doc.applyRemote("Remote", [], [ids.wallTypes.exterior]);
+    expect(doc.orphans()).toEqual([w.id]);
+  });
+});

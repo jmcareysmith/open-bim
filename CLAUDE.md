@@ -11,6 +11,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 ## Layout
 - `packages/core` — document, elements, transactions, regeneration (no DOM, no three.js)
 - `packages/geometry` — kernel interface + builders (no three.js; outputs typed arrays)
+- `packages/collab` — Yjs binding, sync client and self-hosted sync server (multi-user editing)
 - `apps/desktop` — Vite + three.js UI; `src-tauri/` Rust shell
 
 ## Commands
@@ -88,5 +89,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Beams only show in plans where the view range cuts them (no dashed beam symbols yet).
 - Phasing (view Phase / Phase filter; element Phase created/demolished; Demolish tool), design options
   (browser → Design Options; element Design option; per-view option), Clashes panel (OCCT volumes).
-- Next: Phase 7 — CRDT multi-user editing, cloud sync, rendering, NZ H1 / NZS 3604 bracing.
-  (CRDT/cloud need design decisions: sync backend, auth — ask Jeremy before building.)
+- Multi-user editing (Phase 7): toolbar Collaborate → Share this project / Join, via the sync server
+  (`npm run serve -w @open-bim/collab`; PORT, OPEN_BIM_DATA, OPEN_BIM_TOKEN). Defaults chosen without
+  Jeremy's answer: Yjs, self-hosted, one shared token, no accounts. Revisit if he wants a hosted service.
+- Next: Phase 7 — rendering, NZ H1 / NZS 3604 bracing.

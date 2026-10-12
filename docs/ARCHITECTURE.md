@@ -336,6 +336,21 @@ tools snap to grid endpoints, intersections and lines.
   Shift+I / U, with a cyan viewport border while active (Revit convention).
 - Rust side exposes commands for open/save via Tauri plugins (dialog + fs).
 
+## Collaboration (`packages/collab`)
+- Multi-user editing binds a `Document` to a Yjs `Y.Doc` (`bindDocument`): a map of element id →
+  Y.Map (category, name, typeId, params as a nested Y.Map), so concurrent edits to different params
+  of one element merge and the same param resolves last-writer-wins.
+- Local transactions (and undo/redo) write into the Y.Doc. Remote updates arrive through
+  `doc.applyRemote`, which is not undoable and drops local undo/redo steps touching those elements,
+  so undo never overwrites someone else's work. Merges can leave dangling references (one person
+  deletes a type another just used); `doc.orphans()` finds them and the binding deletes them.
+- `SyncClient` speaks the y-websocket wire protocol (sync + awareness) to the sync server
+  (`src/server.ts`, run with `npm run serve -w @open-bim/collab`): one room per project, saved to
+  `<room>.ybin`, one shared access token (`OPEN_BIM_TOKEN`). Presence carries name, colour and
+  selection. Reconnects with backoff; offline edits are sent on reconnect.
+- No per-user accounts, element borrowing or hosted service yet; use TLS (wss://) in front of the
+  server when it is exposed to the internet.
+
 ## Units & coordinates
 - Internal: millimetres, right-handed, **Z up** (Revit convention). three.js scene is
   rotated so Z is up.
@@ -348,6 +363,7 @@ tools snap to grid endpoints, intersections and lines.
 | OpenCascade for B-rep | Writing a robust solid-modelling kernel is a multi-year project; OCCT is mature and LGPL. |
 | JSON snapshots for undo | Simple and correct; optimise to diffs only if profiling demands it. |
 | IFC as interchange | Open standard; Revit .rvt is closed. |
+| Yjs for multi-user | Mature CRDT, small, works offline; a plain WebSocket relay server is enough, self-hostable. |
 | Tauri over Electron | Smaller, faster, Rust backend for heavy native work. |
 
 ## Licence

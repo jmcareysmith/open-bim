@@ -1,0 +1,20 @@
+{
+  "name": "@open-bim/collab",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts"
+  },
+  "bin": { "open-bim-sync": "./src/bin.ts" },
+  "scripts": { "serve": "node src/bin.ts" },
+  "dependencies": {
+    "@open-bim/core": "0.1.0",
+    "yjs": "13.6.33",
+    "y-protocols": "1.0.7",
+    "lib0": "0.2.119",
+    "ws": "8.22.0"
+  },
+  "devDependencies": { "@types/ws": "8.18.1", "@types/node": "24.10.1" }
+}

@@ -140,9 +140,9 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 12. Collaboration
 | Feature | Phase | Status |
 |---|---|---|
-| Multi-user editing (worksharing equivalent, CRDT based) | 7 | ⬜ |
+| Multi-user editing (worksharing equivalent, CRDT based) | 7 | ✅ |
 | Element borrowing / ownership | 7 | ⬜ |
-| Cloud sync | 7 | ⬜ |
+| Cloud sync | 7 | ✅ (self-hosted server) |
 | Clash detection / interference check | 6 | ✅ |
 
 ## 13. Analysis

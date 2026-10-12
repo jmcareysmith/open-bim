@@ -76,6 +76,7 @@ import gcsWasmUrl from "@salusoft89/planegcs/dist/planegcs_dist/planegcs.wasm?ur
 import { LIBRARY } from "@open-bim/library";
 // The IFC exporter is small; web-ifc (import) loads on demand.
 import { exportIfc } from "@open-bim/ifc/export";
+import { SyncClient, bindDocument, newYDoc, type Binding } from "@open-bim/collab";
 import type { IfcApi } from "@open-bim/ifc";
 import ifcWasmUrl from "web-ifc/web-ifc.wasm?url";
 import { openBytes, openProject, openText, readProjectAt, saveBytes, savePdf, saveProject, saveText } from "./io.ts";
@@ -322,6 +323,7 @@ const ctx: ToolContext & PanelContext = {
   selection: () => selection,
   setSelection(ids) {
     selection = ids;
+    collab?.client.setSelection(ids);
     // A selected group highlights its members.
     viewport.setSelection(ids.flatMap((id) => (doc.get(id)?.category === Cat.Group ? [id, ...groupMembers(doc, id).map((m) => m.id)] : [id])));
     refreshPanels();
@@ -439,12 +441,14 @@ canvas.addEventListener("contextmenu", (ev) => ev.preventDefault());
 const commands: Record<string, () => void | Promise<void>> = {
   new() {
     if (dirty && !confirm("Discard unsaved changes?")) return;
+    leaveCollab();
     const fresh = new Document();
     applyResidentialTemplate(fresh);
     loadInto(fresh.toJSON(), null);
   },
   async open() {
     if (dirty && !confirm("Discard unsaved changes?")) return;
+    leaveCollab();
     try {
       const result = await openProject();
       if (result) loadInto(result.json, result.path);
@@ -503,6 +507,11 @@ const commands: Record<string, () => void | Promise<void>> = {
   },
   fit() {
     viewport.zoomToFit();
+  },
+  collaborate() {
+    const pane = $<HTMLDivElement>("#collab-pane");
+    pane.hidden = !pane.hidden;
+    if (!pane.hidden) renderCollabPane();
   },
   clashes() {
     const pane = $<HTMLDivElement>("#clash-pane");
@@ -1000,6 +1009,139 @@ async function importSurveyPoints(id: ElementId): Promise<void> {
   } catch (err) {
     status(`\u26a0 Survey import failed: ${(err as Error).message}`);
   }
+}
+
+// ---- multi-user editing -------------------------------------------------------------
+
+const COLLAB_STORE = "open-bim.collab";
+const PEER_COLOURS = ["#e8590c", "#2f9e44", "#1971c2", "#ae3ec9", "#f08c00", "#0c8599", "#c2255c"];
+let collab: { client: SyncClient; binding: Binding; room: string } | null = null;
+type CollabSettings = { server: string; room: string; token: string; name: string };
+
+function collabSettings(): CollabSettings {
+  let saved: Partial<CollabSettings> = {};
+  try {
+    saved = JSON.parse(localStorage.getItem(COLLAB_STORE) ?? "{}") as Partial<CollabSettings>;
+  } catch {
+    /* no saved settings */
+  }
+  return { server: "ws://localhost:4455", room: "", token: "", name: "", ...saved };
+}
+
+function leaveCollab(): void {
+  if (!collab) return;
+  collab.binding.destroy();
+  collab.client.close();
+  collab = null;
+  status("Left the shared session. The model stays open as a local copy.");
+  if (!$<HTMLDivElement>("#collab-pane").hidden) renderCollabPane();
+}
+
+/** Share the open project into an empty room, or join a room's model (replacing the open one). */
+async function startCollab(mode: "share" | "join", s: CollabSettings): Promise<void> {
+  leaveCollab();
+  if (!s.room.trim() || !s.name.trim()) return status("Collaborate: enter a project name and your name.");
+  if (projectSession) return status("Collaborate: close the family editor first.");
+  if (mode === "join" && dirty && !confirm("Joining replaces the open model. Discard unsaved changes?")) return;
+  try {
+    localStorage.setItem(COLLAB_STORE, JSON.stringify(s));
+  } catch {
+    /* settings just aren't remembered */
+  }
+  const ydoc = newYDoc();
+  const colour = PEER_COLOURS[Math.floor(Math.random() * PEER_COLOURS.length)]!;
+  const client = new SyncClient(ydoc, s.server.trim(), s.room.trim(), { token: s.token || undefined, user: { name: s.name.trim(), colour } });
+  status(`Connecting to ${s.server}\u2026`);
+  try {
+    await Promise.race([client.synced, new Promise((_, rej) => setTimeout(() => rej(new Error("no answer from the server")), 10000))]);
+  } catch (err) {
+    client.close();
+    return status(`\u26a0 Could not connect: ${(err as Error).message}`);
+  }
+  const occupied = ydoc.getMap("elements").size > 0;
+  if (mode === "share" && occupied) {
+    client.close();
+    return status(`\u26a0 "${s.room}" already holds a model. Use Join instead, or pick another name.`);
+  }
+  if (mode === "join" && !occupied) {
+    client.close();
+    return status(`\u26a0 "${s.room}" is empty. Use Share this project to start it.`);
+  }
+  const binding = bindDocument(doc, ydoc);
+  collab = { client, binding, room: s.room.trim() };
+  if (mode === "join") {
+    filePath = null;
+    dirty = false;
+    selection = [];
+    activeLevelId = levels(doc)[0]?.id ?? "";
+    activeViewId = floorPlanFor(doc, activeLevelId)?.id ?? views(doc)[0]?.id;
+    refreshAll();
+    viewport.zoomToFit();
+  }
+  const paneOpen = () => !$<HTMLDivElement>("#collab-pane").hidden;
+  client.onStatus((st) => {
+    status(st === "connected" ? `Reconnected to "${s.room}".` : st === "offline" ? "\u26a0 Sync server unreachable; edits will be sent when it is back." : "Reconnecting\u2026");
+    if (paneOpen()) renderCollabPane();
+  });
+  client.awareness.on("change", () => paneOpen() && renderCollabPane());
+  status(mode === "share" ? `Sharing as "${collab.room}". Others can now join it.` : `Joined "${collab.room}".`);
+  renderCollabPane();
+}
+
+function renderCollabPane(): void {
+  const pane = $<HTMLDivElement>("#collab-pane");
+  const el = (tag: string, text = "") => Object.assign(document.createElement(tag), { textContent: text });
+  const items: Node[] = [el("h2", "Collaborate")];
+  const bar = el("div");
+  bar.className = "buttons";
+  if (collab) {
+    const c = collab.client;
+    const state = c.status === "connected" ? "connected" : c.status === "offline" ? "offline (edits queued)" : "connecting";
+    items.push(el("p", `Project "${collab.room}" on ${c.url} \u2014 ${state}.`));
+    const peers = c.peers();
+    items.push(el("strong", peers.length ? "Also here" : "Nobody else is here yet."));
+    for (const p of peers) {
+      const row = el("div");
+      row.className = "peer";
+      const sw = el("span");
+      sw.className = "swatch";
+      sw.style.background = p.colour;
+      const sel = (p.selection ?? []).filter((id) => doc.has(id));
+      row.append(sw, el("span", `${p.name}${sel.length ? ` \u2014 ${sel.length} selected` : ""}`));
+      row.title = "Select what they have selected";
+      row.onclick = () => sel.length && ctx.setSelection(sel);
+      items.push(row);
+    }
+    const leave = el("button", "Leave") as HTMLButtonElement;
+    leave.onclick = leaveCollab;
+    bar.append(leave);
+  } else {
+    const s = collabSettings();
+    const field = (label: string, key: keyof CollabSettings, type = "text", hint = "") => {
+      const lab = el("label");
+      const input = Object.assign(document.createElement("input"), { type, value: s[key], placeholder: hint });
+      input.oninput = () => (s[key] = input.value);
+      lab.append(label, input);
+      return lab;
+    };
+    items.push(
+      el("p", "Several people edit one model live through an Open-BIM sync server (npm run serve -w @open-bim/collab), which keeps the shared copy."),
+      field("Server", "server", "text", "ws://host:4455"),
+      field("Project", "room", "text", "e.g. smith-house"),
+      field("Access token", "token", "password", "if the server needs one"),
+      field("Your name", "name"),
+    );
+    const share = el("button", "Share this project") as HTMLButtonElement;
+    share.onclick = () => void startCollab("share", s);
+    const join = el("button", "Join") as HTMLButtonElement;
+    join.onclick = () => void startCollab("join", s);
+    bar.append(share, join);
+  }
+  const close = el("button", "Close") as HTMLButtonElement;
+  close.onclick = () => (pane.hidden = true);
+  bar.append(close);
+  items.push(bar);
+  pane.replaceChildren(...items);
 }
 
 // ---- interference check ----------------------------------------------------------

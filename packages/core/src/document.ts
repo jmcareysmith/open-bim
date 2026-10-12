@@ -21,6 +21,8 @@ export interface ChangeSet {
   removed: ElementId[];
   /** Existing elements whose derived data (geometry) must be rebuilt: added + modified + dependents. */
   regenerate: ElementId[];
+  /** True when the change came from another user (via `applyRemote`), not a local edit. */
+  remote?: boolean;
 }
 
 export type ChangeListener = (changes: ChangeSet) => void;
@@ -169,6 +171,46 @@ export class Document {
     return true;
   }
 
+  /**
+   * Apply another user's edits (multi-user sync): `put` elements are written whole, `remove` ids
+   * deleted. Not undoable here, and not validated: a merge of concurrent edits can leave dangling
+   * references (see `orphans`). Local undo/redo steps that touch these elements are dropped, with
+   * everything older (undo) or newer (redo), so undo never overwrites someone else's work.
+   */
+  applyRemote(name: string, put: Element[], remove: ElementId[] = []): void {
+    if (this.active) throw new Error("Cannot apply remote changes inside a transaction");
+    const changes: ElementChange[] = [];
+    for (const el of put) {
+      getCategory(el.category);
+      const before = this.elements.get(el.id);
+      changes.push({ id: el.id, before, after: clone(el) });
+      this.elements.set(el.id, clone(el));
+    }
+    for (const id of remove) {
+      const before = this.elements.get(id);
+      if (!before) continue;
+      changes.push({ id, before, after: undefined });
+      this.elements.delete(id);
+    }
+    if (!changes.length) return;
+    const ids = new Set(changes.map((c) => c.id));
+    const touches = (e: Committed) => e.changes.some((c) => ids.has(c.id));
+    const lastTouching = (stack: Committed[]) => {
+      for (let i = stack.length - 1; i >= 0; i--) if (touches(stack[i]!)) return i;
+      return -1;
+    };
+    this.undoStack = this.undoStack.slice(lastTouching(this.undoStack) + 1);
+    this.redoStack = this.redoStack.slice(lastTouching(this.redoStack) + 1);
+    this.emit(name, changes, true);
+  }
+
+  /** Elements whose dependencies are missing (possible after merging concurrent remote edits). */
+  orphans(): ElementId[] {
+    return this.all()
+      .filter((e) => this.depsOf(e).some((d) => !this.elements.has(d)) || (e.typeId !== undefined && !this.elements.has(e.typeId)))
+      .map((e) => e.id);
+  }
+
   // ---- serialisation -----------------------------------------------------
 
   toJSON(): DocumentJSON {
@@ -297,7 +339,7 @@ export class Document {
     return tx;
   }
 
-  private emit(name: string, changes: ElementChange[]): void {
+  private emit(name: string, changes: ElementChange[], remote = false): void {
     const added: ElementId[] = [];
     const modified: ElementId[] = [];
     const removed: ElementId[] = [];
@@ -337,6 +379,7 @@ export class Document {
     const regenerate = [...regen].filter((id) => this.elements.has(id));
 
     const set: ChangeSet = { name, added, modified, removed, regenerate };
+    if (remote) set.remote = true;
     for (const l of this.listeners) l(set);
   }
 }

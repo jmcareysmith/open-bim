@@ -167,6 +167,21 @@ aside h2 {
 .context-menu button:hover kbd { color: #fff; }
 .context-menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 .context-heading { padding: 4px 12px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+.ovr { display: flex; flex-direction: column; gap: 8px; }
+.ovr-group { border: 1px solid var(--line); border-radius: 5px; padding: 6px 10px 8px; margin: 0; }
+.ovr-group legend { padding: 0 4px; font-weight: 600; }
+.ovr-row { display: grid; grid-template-columns: 110px 1fr auto auto; gap: 8px; align-items: center; margin: 3px 0; }
+.ovr-row select, .ovr-row input[type="range"] { width: 100%; }
+.ovr-pct { width: 60px; }
+.ovr-layer { padding: 2px 0 4px; }
+.ovr-layer + .ovr-layer { border-top: 1px dashed var(--line); }
+.ovr-sub { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin: 2px 0; }
+.ovr-colour { display: inline-flex; gap: 4px; align-items: center; }
+.ovr-colour input[type="color"] { width: 44px; height: 22px; padding: 0 2px; }
+.ovr-colour input.unset { opacity: 0.35; }
+.ovr-clear { padding: 0 6px; }
+.ovr-buttons { display: flex; gap: 6px; align-items: center; }
+.ovr-gap { flex: 1; }
 .dialog-backdrop { position: fixed; inset: 0; z-index: 40; background: rgb(0 0 0 / 0.25); display: grid; place-items: center; }
 .dialog {
   width: min(560px, calc(100vw - 32px)); max-height: calc(100vh - 64px); display: flex; flex-direction: column;

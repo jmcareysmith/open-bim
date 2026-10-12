@@ -5,6 +5,7 @@ import {
   createDoor,
   createFloor,
   createRoom,
+  createGrid,
   createSection,
   createCallout,
   floorPlanFor,
@@ -99,5 +100,12 @@ describe("grips", () => {
     expect(calloutHeadPosition(doc.require<ViewParams>(c.id).params)).toEqual({ x: -1500, y: 2500 });
     doc.transact("Move", (tx) => dragGrip(tx, doc, c.id, "cmax", { x: 3000, y: 3000 }));
     expect(calloutHeadPosition(doc.require<ViewParams>(c.id).params)).toEqual({ x: -1500, y: 2500 });
+  });
+
+  it("grid ends slide along the grid; the angle never changes", () => {
+    const { doc } = box();
+    const g = doc.transact("G", (tx) => createGrid(tx, doc, { x: 0, y: -1000 }, { x: 0, y: 4000 }, "Z"));
+    doc.transact("Drag", (tx) => dragGrip(tx, doc, g.id, "end", { x: 700, y: 6000 }));
+    expect(doc.require<{ end: Vec2 }>(g.id).params.end).toEqual({ x: 0, y: 6000 });
   });
 });

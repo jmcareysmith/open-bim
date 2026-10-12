@@ -26,6 +26,7 @@ import {
   viewCrop,
   planLevelOf,
   defaultGraphics,
+  type PatternName,
 } from "@open-bim/core";
 import {
   GRID_BUBBLE_RADIUS,
@@ -355,15 +356,31 @@ export class Viewport {
       return;
     }
     if (d && el) {
+      const vg = this.resolveGraphics(el);
       d.traverse((o) => {
         if (!(o instanceof THREE.Mesh || o instanceof THREE.LineSegments || o instanceof THREE.LineLoop)) return;
-        (o.material as THREE.MeshBasicMaterial).color.setHex(this.displayColor(el, o.userData.baseColor as number));
+        const base = o.userData.baseColor as number;
+        const role = o.userData.role as string | undefined;
+        // Override Graphics: cut/projection lines, surface and cut patterns each have their own.
+        const own =
+          role === "cut" ? vg.cut.color : role === "projection" ? vg.projection.color : role === "surface" ? vg.surface.foreground.color : role === "hatch" || role === "poche" ? vg.cutFill.foreground.color : null;
+        if (role === "surface") o.visible = vg.surface.foreground.visible;
+        if (role === "hatch" || role === "poche") o.visible = vg.cutFill.foreground.visible;
+        const m = o.material as THREE.MeshBasicMaterial;
+        m.color.setHex(this.displayColor(el, own ?? base, own !== null));
+        if (o instanceof THREE.Mesh && vg.transparency > 0) {
+          m.transparent = true;
+          m.opacity = 1 - vg.transparency / 100;
+        }
       });
     }
     if (!g || !el) return;
     const mesh = g.children[0] as THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial | THREE.LineBasicMaterial>;
     const base = (g.userData.baseColor as number | undefined) ?? COLORS[el.category] ?? 0xcccccc;
-    const color = this.displayColor(el, base);
+    const vgr = this.resolveGraphics(el);
+    // Faces take the surface pattern colour when overridden, else the element's override colour.
+    const sf = vgr.surface.foreground;
+    const color = this.displayColor(el, sf.color ?? base, sf.color !== null);
     const mat = mesh.material;
     if (!(mat instanceof THREE.MeshStandardMaterial)) {
       mat.color.setHex(color);
@@ -376,6 +393,11 @@ export class Viewport {
     const vg = this.resolveGraphics(el);
     const plain = style === "hiddenLine" && !this.selected.has(el.id) && !this.revealedOnly(el) && vg.color == null && !vg.halftone;
     mat.visible = style !== "wireframe";
+    const t = vgr.transparency / 100;
+    const baseOpacity = (g.userData.opacity as number | undefined) ?? 1;
+    mat.transparent = t > 0 || baseOpacity < 1;
+    mat.opacity = baseOpacity * (1 - t);
+    mat.depthWrite = t < 0.5;
     mat.color.setHex(flat ? 0x000000 : color);
     mat.emissive.setHex(flat ? (plain ? 0xffffff : color) : 0x000000);
     const edges = g.children[1];
@@ -384,7 +406,10 @@ export class Viewport {
       em.visible = style !== "realistic";
       em.depthTest = style !== "wireframe";
       // Wireframe is black lines on white; the selection (blue) and revealed elements (magenta) keep their colour.
-      em.color.setHex(style === "wireframe" && (this.selected.has(el.id) || this.revealedOnly(el)) ? color : 0x14171b);
+      const edge = vgr.projection.color ?? 0x14171b;
+      em.color.setHex(this.selected.has(el.id) || this.revealedOnly(el) ? (style === "wireframe" ? color : 0x14171b) : vgr.halftone ? blend(edge, HALFTONE_TOWARD, 0.6) : edge);
+      em.transparent = t > 0;
+      em.opacity = 1 - t;
     }
     // Glazing meshes (curtain walls, windows) follow the faces.
     for (const c of g.children.slice(2)) if (c instanceof THREE.Mesh) (c.material as THREE.Material).visible = style !== "wireframe";
@@ -484,11 +509,11 @@ export class Viewport {
   }
 
   /** Colour after selection, V/G colour override and halftone. */
-  private displayColor(el: Element, base: number): number {
+  private displayColor(el: Element, base: number, exact = false): number {
     if (this.selected.has(el.id)) return SELECTED;
     if (this.revealedOnly(el)) return REVEALED;
     const g = this.resolveGraphics(el);
-    const c = g.color ?? base;
+    const c = exact ? base : (g.color ?? base);
     return g.halftone ? blend(c, HALFTONE_TOWARD, 0.6) : c;
   }
 
@@ -826,10 +851,12 @@ export class Viewport {
     for (const lw of linework) {
       const el = this.doc.require(lw.id);
       // Medium/fine: split cuts into layers, each hatched with its material's cut pattern.
+      const fg = this.resolveGraphics(el).cutFill.foreground;
       const regions = detailed
         ? layerRegions(this.doc, el, lw.cutLoops, frame).map((r) => {
             const m = r.materialId ? this.doc.get<MaterialParams>(r.materialId) : undefined;
-            const pattern = m?.params.cutPattern ?? "diagonal";
+            const pattern = (fg.pattern as PatternName | null) ?? m?.params.cutPattern ?? "diagonal";
+            if (!fg.visible) return { loop: r.loop, solid: false, hatch: [] };
             const fam = patternFamilies(pattern, this.graphics.scale);
             return { loop: r.loop, solid: pattern === "solid", hatch: fam ? hatch([r.loop], fam) : [] };
           })
@@ -1071,6 +1098,7 @@ function makeGroup(mesh: MeshData, color: number, opacity = 1): THREE.Group {
     new THREE.LineBasicMaterial({ color: 0x14171b, transparent: opacity < 1, opacity }),
   );
   const g = new THREE.Group();
+  g.userData.opacity = opacity;
   g.add(new THREE.Mesh(geom, mat), edges);
   return g;
 }
@@ -1097,6 +1125,7 @@ function makeDrawingGroup(lw: PlanLinework, z: number, regions: CutRegion[] | nu
   const g = new THREE.Group();
   const flat = (o: THREE.Object3D, color: number, order: number) => {
     o.userData.baseColor = color;
+    o.userData.role = color === CUT_LINE ? "cut" : color === BEYOND ? "projection" : color === SURFACE ? "surface" : color === HATCH ? "hatch" : "poche";
     o.renderOrder = order;
     g.add(o);
   };

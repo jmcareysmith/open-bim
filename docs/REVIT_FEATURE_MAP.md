@@ -88,7 +88,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Drafting views | 2 | ⬜ |
 | Legends | 4 | ✅ |
 | Detail levels (coarse/medium/fine) | 2 | 🟨 |
-| Visibility/Graphics overrides, filters | 2 | 🟨 |
+| Visibility/Graphics overrides, filters | 2 | ✅ (incl. Override Graphics by element; line weights in PDF only) |
 | View templates | 2 | ✅ |
 | Hidden-line, shaded, realistic styles | 2 | ✅ (3D views; plans/sections are 2D drawings) |
 | Camera / perspective views | 2 | ⬜ |

@@ -181,6 +181,12 @@ export function dragGrip(tx: Transaction, doc: Document, id: ElementId, key: str
   }
   if (isLinear(el) && (key === "start" || key === "end")) {
     const { start, end } = p as { start: Vec2; end: Vec2 };
+    // Grids and reference planes keep their line: their ends only slide along it.
+    if (el.category === Cat.Grid || el.category === Cat.ReferencePlane) {
+      const l = elementLine(el);
+      const t = (to.x - l.point.x) * l.dir.x + (to.y - l.point.y) * l.dir.y;
+      to = { x: l.point.x + l.dir.x * t, y: l.point.y + l.dir.y * t };
+    }
     // Joined walls that are selected too follow the corner, so their join holds; others stay put.
     const followers = el.category === Cat.Wall ? joinedEnds(doc, id, key === "start" ? start : end).filter((f) => together.includes(f.wall.id)) : [];
     setLineEnds(tx, doc, el, key === "start" ? to : start, key === "end" ? to : end);

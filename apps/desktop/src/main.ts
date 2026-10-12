@@ -143,6 +143,7 @@ import { Ribbon } from "./ribbon.ts";
 import { ribbonTabs } from "./ribbondefs.ts";
 import { openFindReplace, openSpelling } from "./textdialogs.ts";
 import { SymbolTool } from "./symboltool.ts";
+import { openOverrideDialog } from "./overridedialog.ts";
 import { DetailComponentTool } from "./detailtool.ts";
 import { AttachTool } from "./attachtool.ts";
 import { ElevationTool } from "./elevationtool.ts";
@@ -1258,6 +1259,12 @@ function openCanvasMenu(ev: MouseEvent): void {
       { label: "Hide Element", hint: "H", action: () => void commands.hide?.() },
       { label: "Hide Category", hint: "\u21e7H", action: () => void commands.hideCategory?.() },
       { label: "Isolate Element", hint: "I", action: () => void commands.isolate?.() },
+      "-",
+      { heading: "Override Graphics in View" },
+      { label: "By Element…", action: () => overrideGraphics("element") },
+      { label: "By Category…", action: () => overrideGraphics("category") },
+      { label: "By Filter…", action: () => void commands.visibilityGraphics?.() },
+      "-",
       { label: "Visibility/Graphics\u2026", hint: "VV", action: () => void commands.visibilityGraphics?.() },
       "-",
       { label: "Group", hint: "Ctrl+G", action: () => void commands.group?.() },
@@ -1320,6 +1327,16 @@ function nudge(key: string, far: boolean): void {
   } catch (e) {
     status(`⚠ ${(e as Error).message}`);
   }
+}
+
+/** Override Graphics in View for the selection (By Element) or its category (By Category). */
+function overrideGraphics(kind: "element" | "category"): void {
+  const v = activeView();
+  if (!v || v.category !== Cat.View) return status("Override Graphics: open a view first (not a sheet or schedule).");
+  const ids = selection.filter((id) => doc.has(id));
+  if (!ids.length) return status("Override Graphics: select something first.");
+  const category = doc.require(ids[0]!).category;
+  openOverrideDialog(doc, kind === "element" ? { kind, viewId: v.id, ids } : { kind, viewId: v.id, category }, status);
 }
 
 /** Run a model change, reporting errors in the status bar. */

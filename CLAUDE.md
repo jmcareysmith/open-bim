@@ -80,6 +80,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   a component opens its family in the family editor.
 - Wall attach: Modify → Attach Top/Base (or right-click a wall), then click the roof/floor/ceiling;
   Properties shows it with Detach. Dragging a wall end only drags joined walls that are selected too.
+- Override Graphics in View: right-click → By Element / By Category (dialog: visible, halftone,
+  transparency, projection/cut lines, surface/cut patterns fg/bg) or By Filter (V/G). Stored as
+  view `elementOverrides` / category overrides (template if any); line weights only in PDF.
 - Reveal Hidden mode: right-click a magenta element → Unhide Element / Unhide Category. Docking:
   drop on a docked panel's top/bottom half to split it there.
 - Under the view: open-view tabs (bottom, Revit-style per Jeremy) and the view control bar (scale,

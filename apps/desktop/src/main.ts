@@ -67,6 +67,7 @@ import { OcctKernel, SimpleKernel, areaLoopsFromWalls, scheduleTable, createPlan
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
 import gcsWasmUrl from "@salusoft89/planegcs/dist/planegcs_dist/planegcs.wasm?url";
 import { LIBRARY } from "@open-bim/library";
+import { exportIfc } from "@open-bim/ifc";
 import { openProject, openText, saveBytes, savePdf, saveProject, saveText } from "./io.ts";
 import { renderBrowser, renderProperties, renderSchedulePane, type PanelContext } from "./panels.ts";
 import { PluginHost, mountConsole } from "./plugins.ts";
@@ -519,6 +520,17 @@ const commands: Record<string, () => void | Promise<void>> = {
     if (!cats.length) return status("Isolate category: select something first.");
     viewport.visibility.isolateCategories(cats);
     afterVisibility(`Isolated ${cats.join(", ")}`);
+  },
+  async exportIfc() {
+    if (projectSession) return status("Export IFC: close the family editor first.");
+    try {
+      const name = (filePath?.split(/[\\/]/).pop() ?? "Untitled").replace(/\.obim$/i, "");
+      const text = exportIfc(doc, { kernel: viewport.geometryKernel, fileName: `${name}.ifc` });
+      const path = await saveText(text, `${name}.ifc`, { name: "IFC", extensions: ["ifc"] });
+      if (path) status(`IFC exported to ${path}`);
+    } catch (err) {
+      status(`⚠ IFC export failed: ${(err as Error).message}`);
+    }
   },
   async exportPdf() {
     const all = sheets(doc);

@@ -13,6 +13,8 @@ apps/desktop (Tauri 2)
  ├─ src/            UI: viewport, panels, tools  (TypeScript, three.js)
  └─ src-tauri/      Native shell: file IO, menus, OS integration (Rust)
         │
+packages/ifc        IFC4 export (hand-written STEP) and import (web-ifc)
+        │
 packages/library    Built-in parametric families (written against the core family API)
         │
 packages/geometry   Kernel interface + implementations → mesh/edge data
@@ -198,6 +200,13 @@ desktop `PluginHost` (`apps/desktop/src/plugins.ts`) builds the version-1 `OpenB
 core/geometry exports, selection, views, commands), loads plugin source as a blob-URL ES module,
 and keeps loaded plugins in local storage. Plugins are trusted code (like Revit macros). See
 `docs/PLUGINS.md`.
+
+**IFC** — `packages/ifc` writes IFC4 STEP itself (`StepWriter`, no dependency): project → site →
+building → storeys, elements (IfcWall/Slab/Roof/Covering/Door/Window/Space/Furniture/Proxy) with
+triangulated bodies (from the kernel, so OCCT gives cut walls) in storey placements, element types,
+material layer sets with surface colours, Pset_*Common + an "Open-BIM" set (Mark, Keynote, project
+parameters) and Qto_*BaseQuantities. GlobalIds come from element UUIDs, so re-exports are stable.
+Tests re-read the output with web-ifc.
 
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.

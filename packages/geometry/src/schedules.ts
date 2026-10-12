@@ -159,7 +159,7 @@ function typeThickness(doc: Document, el: Element): number | undefined {
   return t?.params.layers ? totalThickness(t) : undefined;
 }
 
-function elementVolume(doc: Document, el: Element): number | undefined {
+export function elementVolume(doc: Document, el: Element): number | undefined {
   if (el.category === Cat.Room) {
     const r = el as Room;
     const a = roomBoundary(doc, r)?.area;

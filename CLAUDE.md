@@ -74,4 +74,6 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Ctrl+G; Place copy; Apply to other instances; Ungroup).
 - Plugins + scripting console (toolbar Console or `; docs/PLUGINS.md, examples/plugins).
 - IFC: Export IFC (IFC4, packages/ifc) and Import IFC (web-ifc → DirectShapes on matching levels).
-- Next: Phase 5 — DXF/DWG import & export, then shared coordinates/links, then glTF/OBJ.
+- DXF: Export DXF (open view/sheet) and Import DXF (into the open view as a CadImport). DWG not done
+  (needs a licence decision: LibreDWG is GPL; ODA is proprietary).
+- Next: Phase 5 — shared coordinates/links, then glTF/OBJ.

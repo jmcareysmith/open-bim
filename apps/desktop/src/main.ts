@@ -35,6 +35,7 @@ import {
   loadFamily,
   familyFile,
   readFamilyFile,
+  createCadImport,
   createGroup,
   groupMembers,
   GROUPABLE,
@@ -63,7 +64,7 @@ import {
   type FamilyCategory,
   type FamilyDef,
 } from "@open-bim/core";
-import { OcctKernel, SimpleKernel, areaLoopsFromWalls, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
+import { OcctKernel, SimpleKernel, areaLoopsFromWalls, drawingDxf, parseDxf, viewDrawing, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
 import gcsWasmUrl from "@salusoft89/planegcs/dist/planegcs_dist/planegcs.wasm?url";
 import { LIBRARY } from "@open-bim/library";
@@ -539,6 +540,32 @@ const commands: Record<string, () => void | Promise<void>> = {
       viewport.zoomToFit();
     } catch (err) {
       status(`\u26a0 IFC import failed: ${(err as Error).message}`);
+    }
+  },
+  async exportDxf() {
+    const v = activeViewId ? doc.get(activeViewId) : undefined;
+    if (!v || (v.category === Cat.View && (v.params as ViewParams).kind === "3d")) return status("Export DXF: open a plan, section, elevation, legend or sheet.");
+    try {
+      const d = v.category === Cat.Sheet ? sheetDrawing(doc, viewport.geometryKernel, v as Sheet) : viewDrawing(doc, viewport.geometryKernel, v as View);
+      const name = `${(v.category === Cat.Sheet ? `${(v as Sheet).params.number} ` : "") + (v.name ?? "View")}`.replace(/[\\/:*?"<>|]/g, "-");
+      const path = await saveText(drawingDxf(d, doc), `${name}.dxf`, { name: "DXF", extensions: ["dxf"] });
+      if (path) status(`DXF exported to ${path}${v.category === Cat.Sheet ? " (paper mm)" : " (model mm)"}`);
+    } catch (err) {
+      status(`\u26a0 DXF export failed: ${(err as Error).message}`);
+    }
+  },
+  async importDxf() {
+    const v = activeViewId ? doc.get<ViewParams>(activeViewId) : undefined;
+    if (!v || v.category !== Cat.View || v.params.kind === "3d") return status("Import DXF: open a plan, section, elevation or legend first.");
+    try {
+      const file = await openBytes({ name: "DXF", extensions: ["dxf"] });
+      if (!file) return;
+      const content = parseDxf(new TextDecoder().decode(file.bytes));
+      const imp = doc.transact(`Import ${file.name}`, (tx) => createCadImport(tx, doc, v.id, content, file.name));
+      ctx.setSelection([imp.id]);
+      status(`Imported ${content.segments.length / 4} line(s) and ${content.texts.length} text(s) from ${file.name} into ${v.name}. Move it with Offset in Properties.`);
+    } catch (err) {
+      status(`\u26a0 DXF import failed: ${(err as Error).message}`);
     }
   },
   async exportIfc() {

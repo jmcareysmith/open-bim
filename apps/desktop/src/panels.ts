@@ -11,6 +11,7 @@ import {
   createLegend,
   createSchedule,
   createRevision,
+  type CadImportParams,
   type DirectShapeParams,
   groupInstances,
   groupMembers,
@@ -1595,6 +1596,18 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         ),
         row("X", numberInput(p.position.x, (v) => update<KeynoteLegendParams>("Move keynote legend", { position: { ...p.position, x: v } }))),
         row("Y", numberInput(p.position.y, (v) => update<KeynoteLegendParams>("Move keynote legend", { position: { ...p.position, y: v } }))),
+      );
+      break;
+    }
+    case Cat.CadImport: {
+      const p = el.params as CadImportParams;
+      sec.append(
+        row("File", el.name ?? ""),
+        row("Lines", String(p.segments.length / 4)),
+        row("Texts", String(p.texts.length)),
+        row("Offset X", numberInput(p.offset.x, (v) => update<CadImportParams>("Move CAD import", { offset: { ...p.offset, x: v } }))),
+        row("Offset Y", numberInput(p.offset.y, (v) => update<CadImportParams>("Move CAD import", { offset: { ...p.offset, y: v } }))),
+        row("Layers", p.layers.join(", ") || "\u2014"),
       );
       break;
     }

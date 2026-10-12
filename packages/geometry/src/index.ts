@@ -21,3 +21,4 @@ export * from "./legends.ts";
 export * from "./revisions.ts";
 export * from "./directshape.ts";
 export * from "./schedules.ts";
+export * from "./dxf.ts";

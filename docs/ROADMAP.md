@@ -52,7 +52,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 
 ## Phase 5 — Interoperability (current)
 - [x] IFC4 export, then import (web-ifc; IfcOpenShell if needed) — import as DirectShapes (no conversion to native walls yet)
-- DXF/DWG import & export
+- [x] DXF/DWG import & export — DXF (R12) export of views/sheets and import into a view; DWG pending a licence decision
 - Shared coordinates, links
 - glTF/OBJ export
 

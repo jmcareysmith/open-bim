@@ -131,7 +131,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Native project file (.obim) save/open | 0–1 | 🟨 |
 | IFC export (IFC4 / IFC4x3) | 5 | 🟨 |
 | IFC import | 5 | 🟨 |
-| DWG/DXF import & export | 5 | ⬜ |
+| DWG/DXF import & export | 5 | 🟨 |
 | PDF / image underlays | 5 | ⬜ |
 | Point clouds | 9 | ⬜ |
 | glTF / OBJ export | 5 | ⬜ |

@@ -211,6 +211,11 @@ storeys to levels (reusing levels within 1 mm) and every product body to a `Dire
 mesh in model mm/Z-up, IFC class, GlobalId, colour, flattened "Pset.Property" values), in one
 transaction.
 
+**DXF** — `geometry/src/dxf.ts` writes any `Drawing` (views in model mm, sheets in paper mm) as
+R12 ASCII DXF with layers "<Category>-<Kind>", a DASHED linetype and TEXT, and parses DXF line work
+(LINE, LWPOLYLINE, POLYLINE, CIRCLE, ARC, TEXT/MTEXT, nested INSERTs; $INSUNITS to mm). Imports are
+`CadImport` elements owned by one view (Revit's "current view only"), moved by an offset.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

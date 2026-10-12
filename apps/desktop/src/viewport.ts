@@ -71,6 +71,7 @@ const COLORS: Record<string, number> = {
   [Cat.RoomSeparator]: 0x1f2328,
   [Cat.Area]: 0x9a6b2f,
   [Cat.AreaBoundary]: 0x9a3fb5,
+  [Cat.CadImport]: 0x5a6470,
 };
 const SELECTED = 0x3d8bfd;
 const VOID_COLOR = 0xff8c1a;

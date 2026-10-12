@@ -60,3 +60,19 @@ describe("CAD import element", () => {
     expect(() => doc.transact("X", (tx) => createCadImport(tx, doc, v3d.id, content, "x"))).toThrow(/plans/);
   });
 });
+
+describe("DXF in shared coordinates", () => {
+  it("writes plans in map metres", () => {
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    doc.transact("W", (tx) => createWall(tx, ids.wallTypes.exterior, { x: 0, y: 0 }, { x: 5000, y: 0 }, ids.levels.ground, { topLevelId: ids.levels.first }));
+    const d = viewDrawing(doc, new SimpleKernel(), floorPlanFor(doc, ids.levels.ground)!);
+    const loc = { epsg: 2193, eastings: 1756000, northings: 5920000, height: 0, rotation: 0 };
+    const back = parseDxf(drawingDxf(d, doc, { shared: loc }));
+    expect(back.scale).toBe(1000);
+    const xs = back.segments.filter((_, i) => i % 2 === 0);
+    // Back in mm after the $INSUNITS = metres scale: around 1 756 000 000 mm east.
+    expect(Math.min(...xs)).toBeGreaterThan(1755990 * 1000);
+    expect(Math.max(...xs)).toBeLessThan(1756010 * 1000);
+  });
+});

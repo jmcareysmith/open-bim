@@ -1,4 +1,4 @@
-import type { CadImportParams, Document, Element, Vec2 } from "@open-bim/core";
+import { toShared, type CadImportParams, type Document, type Element, type SiteLocation, type Vec2 } from "@open-bim/core";
 import type { LineData } from "./datums.ts";
 import type { Drawing, StrokeKind } from "./drawing.ts";
 
@@ -16,8 +16,12 @@ function layerName(doc: Document | undefined, id: string | undefined, kind: stri
   return (cat ? `${cat}-${k}` : k).replace(/[^A-Za-z0-9_-]/g, "_");
 }
 
-/** DXF text of a drawing. Coordinates are the drawing's (model mm for views, paper mm for sheets). */
-export function drawingDxf(d: Drawing, doc?: Document): string {
+/**
+ * DXF text of a drawing. Coordinates are the drawing's (model mm for views, paper mm for sheets),
+ * or — for plans with `shared` — map coordinates in metres (Revit's "shared" coordinate basis).
+ */
+export function drawingDxf(d0: Drawing, doc?: Document, opts: { shared?: SiteLocation } = {}): string {
+  const d = opts.shared ? sharedDrawing(d0, opts.shared) : d0;
   const out: string[] = [];
   const g = (code: number, value: string | number) => out.push(String(code), typeof value === "number" ? num(value) : value);
   const layers = new Map<string, number>();
@@ -90,7 +94,7 @@ export function drawingDxf(d: Drawing, doc?: Document): string {
   g(9, "$ACADVER");
   g(1, "AC1009");
   g(9, "$INSUNITS");
-  g(70, 4); // millimetres
+  g(70, opts.shared ? 6 : 4); // metres or millimetres
   g(9, "$EXTMIN");
   g(10, d.bounds.min.x);
   g(20, d.bounds.min.y);
@@ -135,6 +139,29 @@ export function drawingDxf(d: Drawing, doc?: Document): string {
   g(0, "ENDSEC");
   g(0, "EOF");
   return out.join("\r\n") + "\r\n";
+}
+
+/** A plan drawing moved into map coordinates (metres). */
+function sharedDrawing(d: Drawing, loc: SiteLocation): Drawing {
+  const pt = (x: number, y: number) => {
+    const q = toShared(loc, { x, y });
+    return [q.e, q.n] as const;
+  };
+  const seg = (s: number[]) => {
+    const out: number[] = [];
+    for (let i = 0; i + 1 < s.length; i += 2) out.push(...pt(s[i]!, s[i + 1]!));
+    return out;
+  };
+  const corners = [pt(d.bounds.min.x, d.bounds.min.y), pt(d.bounds.max.x, d.bounds.max.y), pt(d.bounds.min.x, d.bounds.max.y), pt(d.bounds.max.x, d.bounds.min.y)];
+  return {
+    strokes: d.strokes.map((s) => ({ ...s, segments: seg(s.segments) })),
+    fills: d.fills.map((f) => ({ ...f, loops: f.loops.map((l) => l.map((p) => ({ x: pt(p.x, p.y)[0], y: pt(p.x, p.y)[1] }))) })),
+    texts: d.texts.map((t) => ({ ...t, x: pt(t.x, t.y)[0], y: pt(t.x, t.y)[1], size: t.size / 1000 })),
+    bounds: {
+      min: { x: Math.min(...corners.map((c) => c[0])), y: Math.min(...corners.map((c) => c[1])) },
+      max: { x: Math.max(...corners.map((c) => c[0])), y: Math.max(...corners.map((c) => c[1])) },
+    },
+  };
 }
 
 function num(v: number): string {

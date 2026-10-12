@@ -9,6 +9,8 @@ import {
   levels,
   parametersFor,
   projectSettings,
+  projectLocation,
+  CRS_OPTIONS,
   roomExtent,
   totalThickness,
   wallExtent,
@@ -113,6 +115,14 @@ export function exportIfc(doc: Document, opts: IfcExportOptions = {}): string {
   // ---- spatial structure ------------------------------------------------------------------
   const projectName = info?.name || "Open-BIM project";
   const project = w.add("IfcProject", guid("project"), null, projectName, info?.number || null, null, info?.name || null, null, [ctx], units);
+  // Shared coordinates: georeference the model context (IFC4 IfcMapConversion, metres).
+  const loc = projectLocation(doc);
+  if (projectSettings(doc)?.params.location) {
+    const crs = CRS_OPTIONS.find((c) => c.epsg === loc.epsg);
+    const metre = w.add("IfcSIUnit", DERIVED, en("LENGTHUNIT"), null, en("METRE"));
+    const target = w.add("IfcProjectedCRS", `EPSG:${loc.epsg}`, crs?.name ?? null, crs?.datum ?? null, crs?.vertical ?? null, crs ? "Transverse Mercator" : null, null, metre);
+    w.add("IfcMapConversion", ctx, target, real(loc.eastings), real(loc.northings), real(loc.height), real(Math.cos(loc.rotation)), real(Math.sin(loc.rotation)), real(0.001));
+  }
   const sitePlacement = w.add("IfcLocalPlacement", null, world);
   const site = w.add("IfcSite", guid("site"), null, "Site", null, null, sitePlacement, null, null, en("ELEMENT"), null, null, null, null, null);
   const buildingPlacement = w.add("IfcLocalPlacement", sitePlacement, world);

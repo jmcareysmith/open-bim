@@ -28,7 +28,56 @@ export type ProjectSettingsParams = {
   info: ProjectInfo;
   /** Keynote table (keynotes.ts). */
   keynotes?: { key: string; text: string; parent: string | null }[] | null;
+  /** Shared coordinates (survey point) — see `toShared`. */
+  location?: SiteLocation | null;
 };
+
+/**
+ * Where the project sits in a map coordinate system (Revit: shared coordinates / survey point).
+ * Project origin = (eastings, northings, height) in metres; project north is turned
+ * `rotation` radians anticlockwise from grid north (so project X points along `rotation` from east).
+ */
+export type SiteLocation = {
+  /** EPSG code of the projected CRS; NZTM2000 (2193) by default. */
+  epsg: number;
+  eastings: number;
+  northings: number;
+  height: number;
+  rotation: number;
+  /** Export DXF plans in these map coordinates (metres) rather than project mm. */
+  dxfShared?: boolean;
+};
+
+export const DEFAULT_LOCATION: SiteLocation = { epsg: 2193, eastings: 0, northings: 0, height: 0, rotation: 0 };
+
+/** Coordinate systems offered in the UI (NZ first). */
+export const CRS_OPTIONS: { epsg: number; name: string; datum: string; vertical: string }[] = [
+  { epsg: 2193, name: "NZGD2000 / New Zealand Transverse Mercator 2000", datum: "NZGD2000", vertical: "NZVD2016" },
+  { epsg: 2105, name: "NZGD2000 / Mount Eden 2000", datum: "NZGD2000", vertical: "NZVD2016" },
+  { epsg: 2134, name: "NZGD2000 / Wellington 2000", datum: "NZGD2000", vertical: "NZVD2016" },
+  { epsg: 2124, name: "NZGD2000 / Mount Pleasant 2000", datum: "NZGD2000", vertical: "NZVD2016" },
+  { epsg: 2136, name: "NZGD2000 / Mount Nicholas 2000", datum: "NZGD2000", vertical: "NZVD2016" },
+];
+
+export function projectLocation(doc: Document): SiteLocation {
+  return projectSettings(doc)?.params.location ?? DEFAULT_LOCATION;
+}
+
+/** Project point (mm) → shared/map coordinates (metres). */
+export function toShared(loc: SiteLocation, p: { x: number; y: number; z?: number }): { e: number; n: number; h: number } {
+  const c = Math.cos(loc.rotation);
+  const s = Math.sin(loc.rotation);
+  return { e: loc.eastings + (p.x * c - p.y * s) / 1000, n: loc.northings + (p.x * s + p.y * c) / 1000, h: loc.height + (p.z ?? 0) / 1000 };
+}
+
+/** Shared/map coordinates (metres) → project point (mm). */
+export function fromShared(loc: SiteLocation, q: { e: number; n: number; h?: number }): { x: number; y: number; z: number } {
+  const c = Math.cos(loc.rotation);
+  const s = Math.sin(loc.rotation);
+  const de = (q.e - loc.eastings) * 1000;
+  const dn = (q.n - loc.northings) * 1000;
+  return { x: de * c + dn * s, y: -de * s + dn * c, z: ((q.h ?? loc.height) - loc.height) * 1000 };
+}
 export type ProjectSettings = Element<ProjectSettingsParams>;
 
 /** NZ practice: drawings dimensioned in millimetres, areas in square metres. */

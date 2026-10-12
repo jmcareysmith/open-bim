@@ -111,6 +111,23 @@ describe("IFC export", () => {
     api.CloseModel(model);
   });
 
+  it("georeferences the model with shared coordinates (IfcMapConversion to NZTM)", async () => {
+    const { ensureProjectSettings } = await import("@open-bim/core");
+    const { doc } = house();
+    doc.transact("Location", (tx) => {
+      const st = ensureProjectSettings(tx, doc);
+      tx.update(st.id, { location: { epsg: 2193, eastings: 1756123.4, northings: 5920456.7, height: 25, rotation: 0.1 } });
+    });
+    const text = exportIfc(doc, { timestamp: "t" });
+    expect(text).toContain("IFCPROJECTEDCRS('EPSG:2193'");
+    const model = api.OpenModel(new TextEncoder().encode(text));
+    const mc = api.GetLine(model, api.GetLineIDsWithType(model, WebIFC.IFCMAPCONVERSION).get(0));
+    expect(mc.Eastings.value).toBeCloseTo(1756123.4);
+    expect(mc.Scale.value).toBeCloseTo(0.001);
+    expect(mc.XAxisOrdinate.value).toBeCloseTo(Math.sin(0.1));
+    api.CloseModel(model);
+  });
+
   it("is deterministic for the same model", () => {
     const { doc } = house();
     expect(exportIfc(doc, { timestamp: "t" })).toBe(exportIfc(doc, { timestamp: "t" }));

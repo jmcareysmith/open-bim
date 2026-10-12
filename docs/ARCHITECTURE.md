@@ -216,6 +216,11 @@ R12 ASCII DXF with layers "<Category>-<Kind>", a DASHED linetype and TEXT, and p
 (LINE, LWPOLYLINE, POLYLINE, CIRCLE, ARC, TEXT/MTEXT, nested INSERTs; $INSUNITS to mm). Imports are
 `CadImport` elements owned by one view (Revit's "current view only"), moved by an offset.
 
+**Shared coordinates** — `ProjectSettings.location` (EPSG code, default NZTM2000 2193; eastings,
+northings, height in metres; rotation of project north anticlockwise from grid north). `toShared` /
+`fromShared` convert; IFC export writes `IfcMapConversion` + `IfcProjectedCRS`, and DXF plans can be
+exported in map metres.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

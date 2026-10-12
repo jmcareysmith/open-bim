@@ -548,8 +548,11 @@ const commands: Record<string, () => void | Promise<void>> = {
     try {
       const d = v.category === Cat.Sheet ? sheetDrawing(doc, viewport.geometryKernel, v as Sheet) : viewDrawing(doc, viewport.geometryKernel, v as View);
       const name = `${(v.category === Cat.Sheet ? `${(v as Sheet).params.number} ` : "") + (v.name ?? "View")}`.replace(/[\\/:*?"<>|]/g, "-");
-      const path = await saveText(drawingDxf(d, doc), `${name}.dxf`, { name: "DXF", extensions: ["dxf"] });
-      if (path) status(`DXF exported to ${path}${v.category === Cat.Sheet ? " (paper mm)" : " (model mm)"}`);
+      // Plans can go out in shared (map) coordinates when the project's location asks for it.
+      const loc = projectSettings(doc)?.params.location;
+      const shared = loc?.dxfShared && v.category === Cat.View && isPlanView(v as View) ? loc : undefined;
+      const path = await saveText(drawingDxf(d, doc, { shared }), `${name}.dxf`, { name: "DXF", extensions: ["dxf"] });
+      if (path) status(`DXF exported to ${path}${v.category === Cat.Sheet ? " (paper mm)" : shared ? ` (EPSG:${shared.epsg}, metres)` : " (project mm)"}`);
     } catch (err) {
       status(`\u26a0 DXF export failed: ${(err as Error).message}`);
     }

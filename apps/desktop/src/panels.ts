@@ -11,6 +11,9 @@ import {
   createLegend,
   createSchedule,
   createRevision,
+  CRS_OPTIONS,
+  DEFAULT_LOCATION,
+  type SiteLocation,
   type CadImportParams,
   type DirectShapeParams,
   groupInstances,
@@ -1108,7 +1111,31 @@ function settingsSections(ctx: PanelContext, id: ElementId, p: ProjectSettingsPa
     row("Angle decimals", intInput(u.angle.decimals, 0, 6, (v) => setUnits({ angle: { ...u.angle, decimals: v } }))),
     row("Example", `${len(12500)} \u00b7 ${formatArea(24.16e6, units)}`),
   );
-  return [info, unitsSec];
+  // Shared coordinates (survey point).
+  const loc = p.location ?? DEFAULT_LOCATION;
+  const setLoc = (patch: Partial<SiteLocation>) => set("Change project location", { location: { ...loc, ...patch } });
+  const locSec = h("div", { class: "section" }, h("h3", {}, "Location (shared coordinates)"));
+  const metres = (v: number, onCommit: (x: number) => void) => {
+    const input = h("input", { type: "number", step: "0.001", value: String(v) });
+    input.onchange = () => {
+      const x = Number(input.value);
+      if (Number.isFinite(x)) onCommit(x);
+    };
+    return input;
+  };
+  locSec.append(
+    row("Coordinate system", select(CRS_OPTIONS.map((c) => ({ value: String(c.epsg), label: `EPSG:${c.epsg} ${c.name.replace("NZGD2000 / ", "")}` })), String(loc.epsg), (v) => setLoc({ epsg: Number(v) }))),
+    row("Eastings (m)", metres(loc.eastings, (v) => setLoc({ eastings: v }))),
+    row("Northings (m)", metres(loc.northings, (v) => setLoc({ northings: v }))),
+    row("Height (m)", metres(loc.height, (v) => setLoc({ height: v }))),
+    row(
+      "Angle to true north (\u00b0)",
+      metres(Math.round(((loc.rotation * 180) / Math.PI) * 1e4) / 1e4, (v) => setLoc({ rotation: (v * Math.PI) / 180 })),
+    ),
+    row("DXF plans in shared coordinates", checkbox(loc.dxfShared === true, (v) => setLoc({ dxfShared: v }))),
+    row("", h("span", { class: "muted" }, "Project origin's map position; project north turned anticlockwise from grid north. Written to IFC as IfcMapConversion.")),
+  );
+  return [info, unitsSec, locSec];
 }
 
 function deleteButton(ctx: PanelContext, el: Element): HTMLButtonElement {

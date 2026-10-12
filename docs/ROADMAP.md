@@ -83,7 +83,8 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [ ] Schedules on sheets; calculated fields
 - [ ] Beam plan symbols (dashed centre lines at Coarse/Medium)
 - [x] Annotation symbols — north arrow (up or true north), graphic scale bar, break line; views and sheets; paper-sized
-- [ ] Detail components (2D detail families) and detail groups — on the Annotate tab, not built yet
+- [x] Detail components — "Detail Item" families (detail lines + filled regions in one plan view), placed per view with rotation/mirror; library: timber sections, concrete block, steel angle. Not parametric yet (fixed size per family)
+- [ ] Detail groups
 - [x] Find/Replace and Check Spelling for text notes (Annotate → Text)
 - [ ] Fold the interactive viewport onto `viewDrawing` (one drawing path for screen and sheet/PDF)
 

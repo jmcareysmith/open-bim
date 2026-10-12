@@ -101,7 +101,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Text, leaders | 2 | 🟨 |
 | Tags (by category, multi-category, material) | 4 | 🟨 |
 | Keynotes | 4 | ✅ |
-| Detail lines, filled regions, detail components, insulation | 2 | 🟨 |
+| Detail lines, filled regions, detail components, insulation | 2 | 🟨 (detail components fixed-size; no insulation tool) |
 | Symbols, north arrow, section/elevation heads | 2 | 🟨 (north arrow, scale bar, break line; view markers drawn) |
 | Revision clouds & revisions | 4 | ✅ |
 | Sheets, title blocks, viewports | 2 | 🟨 |

@@ -121,7 +121,7 @@ const MOVABLE = new Set<string>([
   Cat.FamilyInstance, Cat.Room, Cat.RoomSeparator, Cat.Area, Cat.AreaBoundary, Cat.DetailLine, Cat.FilledRegion,
   Cat.TextNote, Cat.Dimension, Cat.Tag, Cat.RevisionCloud, Cat.LegendComponent, Cat.KeynoteLegend, Cat.DirectShape,
   Cat.CadImport, Cat.Link, Cat.Stair, Cat.Ramp, Cat.Railing, Cat.Toposolid, Cat.Column, Cat.Beam, Cat.PadFooting,
-  Cat.StripFooting, Cat.Viewport, Cat.View, Cat.Group, Cat.Symbol,
+  Cat.StripFooting, Cat.Viewport, Cat.View, Cat.Group, Cat.Symbol, Cat.DetailComponent,
 ]);
 
 /** Can this element be moved/copied with the modify tools? */
@@ -209,6 +209,17 @@ function transformed(c: Ctx, el: Element): Record<string, unknown> | null {
     case Cat.Area:
       pt("point");
       return p;
+    case Cat.DetailComponent: {
+      pt("position");
+      const th = p.rotation as number;
+      if (mirror) {
+        // Mirroring flips the component; the rotation that goes with the flip keeps it a true mirror image.
+        const v = applyLinear(t, { x: -Math.cos(th), y: -Math.sin(th) });
+        p.rotation = Math.atan2(v.y, v.x);
+        p.mirrored = !p.mirrored;
+      } else p.rotation = mapAngle(t, th);
+      return p;
+    }
     case Cat.Symbol:
       pt("position");
       p.rotation = mapAngle(t, p.rotation as number);

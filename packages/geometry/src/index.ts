@@ -33,3 +33,4 @@ export * from "./site.ts";
 export * from "./structure.ts";
 export * from "./clash.ts";
 export * from "./symbols.ts";
+export * from "./detailcomponents.ts";

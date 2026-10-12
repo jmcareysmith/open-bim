@@ -63,7 +63,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Ribbon (apps/desktop/src/ribbon.ts + ribbondefs.ts, icons.ts): File menu, QAT, Revit-order tabs;
   Annotate: Dimension, Detail (line, region, cloud), Text (+ Check Spelling, Find/Replace), Tag (+
   Keynote ▾ load/export keynote files), Revisions, Groups. Symbol ▾ places a north arrow
-  (true north option), scale bar or break line. Detail Component and Detail Group are placeholders. Options bar under the ribbon holds Level/Type.
+  (true north option), scale bar or break line. Detail → Component ▾ places Detail Item
+  families (library or your own: New family → Detail Item, draw detail lines/regions). Detail Group
+  is still a placeholder. Options bar under the ribbon holds Level/Type.
 - Double-click: section/elevation/callout marker opens its view; sheet viewport opens its view;
   a component opens its family in the family editor.
 - Reveal Hidden mode: right-click a magenta element → Unhide Element / Unhide Category. Docking:

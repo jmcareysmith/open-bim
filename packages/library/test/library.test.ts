@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   Document,
   applyResidentialTemplate,
+  createDetailComponent,
   createWall,
   familyFile,
   familyInfo,
@@ -9,10 +10,11 @@ import {
   loadFamily,
   placeFamilyInstance,
   readFamilyFile,
+  views,
   wallCuts,
   type FamilyInstance,
 } from "@open-bim/core";
-import { OcctKernel, SimpleKernel, boundingBox, meshVolume } from "@open-bim/geometry";
+import { OcctKernel, SimpleKernel, boundingBox, buildDetailComponentLines, meshVolume } from "@open-bim/geometry";
 import { LIBRARY, baseCabinet, casementWindow, roundTable } from "../src/index.ts";
 
 let occt: OcctKernel;
@@ -35,6 +37,14 @@ describe("family library", () => {
 
     const { doc, ids } = project();
     const def = doc.transact("Load", (tx) => loadFamily(tx, doc, back, lib.name));
+    if (lib.category === "DetailItem") {
+      // 2D: placed in a view as a detail component; it must draw something.
+      const plan = views(doc).find((v) => v.params.kind === "floorPlan")!;
+      const d = doc.transact("P", (tx) => createDetailComponent(tx, doc, plan.id, def.id, { x: 0, y: 0 }));
+      expect(buildDetailComponentLines(doc, d)!.segments.length).toBeGreaterThan(0);
+      expect(() => doc.transact("P", (tx) => placeFamilyInstance(tx, doc, def.id, "Default", { levelId: ids.levels.ground }))).toThrow(/detail item/);
+      return;
+    }
     const k = new SimpleKernel();
     for (const type of familyTypeNames(def)) {
       let inst: FamilyInstance;

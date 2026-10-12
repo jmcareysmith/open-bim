@@ -55,6 +55,7 @@ export const Cat = {
   Revision: "Revision",
   RevisionCloud: "RevisionCloud",
   Symbol: "Symbol",
+  DetailComponent: "DetailComponent",
   GroupType: "GroupType",
   Group: "Group",
   DirectShape: "DirectShape",

@@ -1,6 +1,7 @@
 import {
   Cat,
   Document,
+  isDetailFamily,
   createLegend,
   createOptionSet,
   createRevision,
@@ -137,6 +138,7 @@ import { Ribbon } from "./ribbon.ts";
 import { ribbonTabs } from "./ribbondefs.ts";
 import { openFindReplace, openSpelling } from "./textdialogs.ts";
 import { SymbolTool } from "./symboltool.ts";
+import { DetailComponentTool } from "./detailtool.ts";
 
 /** The family editor's Void toggle; one element, shown on the Create tab. */
 const voidForm = Object.assign(document.createElement("input"), { type: "checkbox", id: "void-form" });
@@ -221,7 +223,7 @@ const ctx: ModifyToolContext & PanelContext = {
   setToolOptions: (options) => renderToolOptions(options),
   formIsVoid: () => voidForm.checked,
   activeComponent() {
-    const defs = familyDefs(doc);
+    const defs = familyDefs(doc).filter((d) => !isDetailFamily(d));
     const [id, type] = (activeComponentKey ?? "").split("|");
     const def = defs.find((d) => d.id === id) ?? defs[0];
     if (!def) return undefined;
@@ -451,9 +453,10 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   trim: new TrimTool(ctx),
   split: new SplitTool(ctx),
   symbol: new SymbolTool(ctx),
+  detailcomponent: new DetailComponentTool(ctx),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
-const DRAWING_TOOLS = new Set(["select", "symbol", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution"]);
+const DRAWING_TOOLS = new Set(["select", "symbol", "detailcomponent", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution"]);
 let tool: Tool = tools.select!;
 /** Grips and temporary dimensions for the selection (Select tool only). */
 let grips: GripLayer | undefined = new GripLayer(ctx, $("#viewport"));
@@ -470,6 +473,20 @@ let ribbon: Ribbon | undefined = new Ribbon(
           queueMicrotask(() => ctx.setActiveView(s.id));
         }),
       cmd: (c) => void commands[c]?.(),
+      detailFamilies: () => (tools.detailcomponent as DetailComponentTool).families().map((f) => ({ id: f.id, name: f.name ?? f.id })),
+      libraryDetailItems: () => LIBRARY.filter((f) => f.category === "DetailItem").map((f) => f.name),
+      placeDetail: (familyId) => {
+        (tools.detailcomponent as DetailComponentTool).familyId = familyId;
+        setTool("detailcomponent");
+      },
+      loadDetail: (name) => {
+        ctx.loadLibraryFamily(name);
+        const def = familyDefs(doc).find((f) => f.name === name);
+        if (def) {
+          (tools.detailcomponent as DetailComponentTool).familyId = def.id;
+          setTool("detailcomponent");
+        }
+      },
       placeSymbol: (kind) => {
         (tools.symbol as SymbolTool).kind = kind;
         setTool("symbol");
@@ -1283,10 +1300,24 @@ function refreshToolbar(): void {
 function refreshTypeSelector(): void {
   const sel = $<HTMLSelectElement>("#active-type");
   const label = $<HTMLSpanElement>("#active-type-label");
+  if (tool.name === "detailcomponent") {
+    const dt = tools.detailcomponent as DetailComponentTool;
+    const fams = dt.families();
+    label.textContent = "Detail item";
+    sel.disabled = !fams.length;
+    sel.replaceChildren(...fams.map((f) => new Option(f.name ?? f.id, f.id, false, f.id === (dt.familyId ?? fams[0]?.id))));
+    sel.onchange = () => {
+      dt.familyId = sel.value;
+      dt.activate();
+    };
+    return;
+  }
   if (tool.name === "component") {
     // Component: every loaded family's types, "Family : Type".
     const current = ctx.activeComponent();
-    const opts = familyDefs(doc).flatMap((d) => familyTypeNames(d).map((t) => ({ key: `${d.id}|${t}`, label: `${d.name} : ${t}` })));
+    const opts = familyDefs(doc)
+      .filter((d) => !isDetailFamily(d))
+      .flatMap((d) => familyTypeNames(d).map((t) => ({ key: `${d.id}|${t}`, label: `${d.name} : ${t}` })));
     sel.disabled = !opts.length;
     label.textContent = "Family type";
     sel.replaceChildren(

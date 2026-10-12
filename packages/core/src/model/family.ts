@@ -13,7 +13,8 @@ import { create3DView, createElevation, createFloorPlan } from "./viewdefs.ts";
 // planes, parameters, types and forms. Forms are defined in family coordinates (origin at the
 // insertion point, X right, Y back, Z up) with formulas over the family parameters.
 
-export type FamilyCategory = "GenericModel" | "Furniture" | "Casework" | "Door" | "Window";
+/** "DetailItem": a 2D detail component (drawn with detail lines and regions in its plan view). */
+export type FamilyCategory = "GenericModel" | "Furniture" | "Casework" | "Door" | "Window" | "DetailItem";
 export type FamilyHosting = "none" | "wall";
 
 export type FamilyTypeValues = { name: string; values: Values };
@@ -265,6 +266,7 @@ const STARTER: Record<FamilyCategory, [string, number][]> = {
     ["Width", 1200],
     ["Height", 1200],
   ],
+  DetailItem: [],
 };
 
 /** New family document: reference level, views, centre reference planes, starter parameters. */
@@ -272,10 +274,13 @@ export function applyFamilyTemplate(doc: Document, category: FamilyCategory = "G
   return doc.transact(`New ${category} family`, (tx) => {
     createProjectSettings(tx, doc);
     const level = createLevel(tx, "Ref. Level", 0);
-    createFloorPlan(tx, doc, level.id, { name: "Ref. Level" });
-    createElevation(tx, doc, { x: -3000, y: -3000 }, { x: 3000, y: -3000 }, { name: "Front", farClip: 8000, zRange: { bottom: -500, top: 3000 } });
-    createElevation(tx, doc, { x: 3000, y: -3000 }, { x: 3000, y: 3000 }, { name: "Right", farClip: 8000, zRange: { bottom: -500, top: 3000 } });
-    create3DView(tx, doc, "{3D}");
+    // Detail items are 2D: drawn full size (mm) in one plan view, shown at 1:5 for drawing.
+    createFloorPlan(tx, doc, level.id, { name: category === "DetailItem" ? "Detail" : "Ref. Level", ...(category === "DetailItem" ? { scale: 5 } : {}) });
+    if (category !== "DetailItem") {
+      createElevation(tx, doc, { x: -3000, y: -3000 }, { x: 3000, y: -3000 }, { name: "Front", farClip: 8000, zRange: { bottom: -500, top: 3000 } });
+      createElevation(tx, doc, { x: 3000, y: -3000 }, { x: 3000, y: 3000 }, { name: "Right", farClip: 8000, zRange: { bottom: -500, top: 3000 } });
+      create3DView(tx, doc, "{3D}");
+    }
     for (const rp of [
       createReferencePlane(tx, doc, { x: 0, y: -2500 }, { x: 0, y: 2500 }, "Center (Left/Right)"),
       createReferencePlane(tx, doc, { x: -2500, y: 0 }, { x: 2500, y: 0 }, "Center (Front/Back)"),

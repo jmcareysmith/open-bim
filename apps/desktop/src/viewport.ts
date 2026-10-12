@@ -65,6 +65,8 @@ const COLORS: Record<string, number> = {
   [Cat.ReferencePlane]: 0x2e8b57,
   [Cat.View]: 0x2b2f36,
   [Cat.DetailLine]: 0x1f2328,
+  [Cat.DetailComponent]: 0x1f2328,
+  [Cat.Symbol]: 0x1f2328,
   [Cat.Dimension]: 0x1f2328,
   [Cat.TextNote]: 0x1f2328,
   [Cat.FilledRegion]: 0x1f2328,

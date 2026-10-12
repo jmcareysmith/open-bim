@@ -10,6 +10,10 @@ export interface RibbonMenus {
   newSchedule(category: string, kind: "schedule" | "takeoff"): void;
   cmd(name: string): void;
   placeSymbol(kind: SymbolKind): void;
+  detailFamilies(): { id: string; name: string }[];
+  libraryDetailItems(): string[];
+  placeDetail(familyId: string): void;
+  loadDetail(name: string): void;
 }
 
 const SOON = "coming next";
@@ -168,7 +172,22 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
           items: [
             { label: "Detail Line", icon: "detailline", tool: "detailline", large: true, title: "Detail line (L)" },
             { label: "Region", icon: "region", tool: "region", title: "Filled region" },
-            { label: "Component", icon: "detailcomp", soon: SOON, title: "Detail component" },
+            {
+              label: "Component",
+              icon: "detailcomp",
+              tool: "detailcomponent",
+              title: "Detail component (\u25be: pick or load a detail item)",
+              menu: () => {
+                const loaded = m.detailFamilies();
+                const lib = m.libraryDetailItems().filter((n) => !loaded.some((f) => f.name === n));
+                return [
+                  { heading: "Loaded detail items" },
+                  ...(loaded.length ? loaded.map((f) => ({ label: f.name, action: () => m.placeDetail(f.id) })) : [{ label: "(none yet)", disabled: true, action: () => {} }]),
+                  { heading: "Load from library" },
+                  ...lib.map((n) => ({ label: n, action: () => m.loadDetail(n) })),
+                ];
+              },
+            },
             { label: "Revision Cloud", icon: "cloud", tool: "cloud" },
           ],
         },

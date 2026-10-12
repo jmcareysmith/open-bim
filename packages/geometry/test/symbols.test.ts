@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Document, applyResidentialTemplate, createSheet, createSymbol, views, type SymbolParams } from "@open-bim/core";
-import { SimpleKernel, buildSymbolLines, viewDrawing } from "../src/index.ts";
+import { Document, applyFamilyTemplate, applyResidentialTemplate, createDetailComponent, createDetailLine, createSheet, createSymbol, loadFamily, views, type SymbolParams } from "@open-bim/core";
+import { SimpleKernel, buildDetailComponentLines, buildSymbolLines, viewDrawing } from "../src/index.ts";
 
 function setup() {
   const doc = new Document();
@@ -44,5 +44,20 @@ describe("symbol line work", () => {
     const b = doc.transact("B", (tx) => createSymbol(tx, doc, plan.id, "breakLine", { x: 0, y: 0 }));
     const d = viewDrawing(doc, new SimpleKernel(), plan);
     expect(d.strokes.some((s) => s.kind === "annotation" && s.id === b.id)).toBe(true);
+  });
+
+  it("detail components draw their family's lines where they're placed", () => {
+    const { doc, plan } = setup();
+    const fam = new Document();
+    applyFamilyTemplate(fam, "DetailItem", "Mark");
+    fam.transact("Draw", (tx) => createDetailLine(tx, fam, views(fam)[0]!.id, { x: 0, y: 0 }, { x: 100, y: 0 }));
+    const def = doc.transact("Load", (tx) => loadFamily(tx, doc, fam, "Mark"));
+    const d = doc.transact("Place", (tx) => createDetailComponent(tx, doc, plan.id, def.id, { x: 1000, y: 1000 }, { rotation: Math.PI / 2 }));
+    const seg = [...buildDetailComponentLines(doc, d)!.segments];
+    expect(seg[0]).toBeCloseTo(1000);
+    expect(seg[1]).toBeCloseTo(1000);
+    expect(seg[3]).toBeCloseTo(1000);
+    expect(seg[4]).toBeCloseTo(1100);
+    expect(viewDrawing(doc, new SimpleKernel(), plan).strokes.some((s) => s.id === d.id)).toBe(true);
   });
 });

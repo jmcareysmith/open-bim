@@ -1,7 +1,9 @@
 import {
   Document,
   applyFamilyTemplate,
+  createDetailLine,
   createExtrusion,
+  createFilledRegion,
   createFamilyParameter,
   createRevolution,
   familyInfo,
@@ -11,6 +13,8 @@ import {
   type NumPt,
   type Transaction,
   type Values,
+  type Vec2,
+  views,
 } from "@open-bim/core";
 
 // The Open-BIM family library: parametric families written against the family API, so they're
@@ -275,4 +279,83 @@ export const roundTable: LibraryFamily = {
 };
 
 /** Everything in the library, in browser order. */
-export const LIBRARY: LibraryFamily[] = [singleDoor, casementWindow, diningTable, chair, bed, baseCabinet, roundTable];
+// ---- detail items (2D, drawn full size about the origin) ------------------------------------
+
+function detailFamily(name: string, draw: (line: (a: Vec2, b: Vec2) => void, region: (boundary: Vec2[], holes?: Vec2[][], color?: number) => void) => void): Document {
+  const doc = new Document();
+  applyFamilyTemplate(doc, "DetailItem", name);
+  const view = views(doc)[0]!;
+  doc.transact("Draw detail", (tx) =>
+    draw(
+      (a, b) => void createDetailLine(tx, doc, view.id, a, b),
+      (boundary, holes = [], color) => void createFilledRegion(tx, doc, view.id, boundary, { holes, ...(color !== undefined ? { color } : {}) }),
+    ),
+  );
+  return doc;
+}
+const box = (w: number, h: number, cx = 0, cy = 0): Vec2[] => [
+  { x: cx - w / 2, y: cy - h / 2 },
+  { x: cx + w / 2, y: cy - h / 2 },
+  { x: cx + w / 2, y: cy + h / 2 },
+  { x: cx - w / 2, y: cy + h / 2 },
+];
+
+/** Sawn timber in section: outline with a cross (NZ drafting convention). */
+const timberSection = (d: number, b: number): LibraryFamily => ({
+  name: `Timber ${d}x${b} Section`,
+  category: "DetailItem",
+  description: `${d} × ${b} mm timber in section, crossed`,
+  build: () =>
+    detailFamily(`Timber ${d}x${b} Section`, (line) => {
+      const [p0, p1, p2, p3] = box(d, b);
+      line(p0!, p1!);
+      line(p1!, p2!);
+      line(p2!, p3!);
+      line(p3!, p0!);
+      line(p0!, p2!);
+      line(p1!, p3!);
+    }),
+});
+
+export const concreteBlock: LibraryFamily = {
+  name: "Concrete Block 20 Series Section",
+  category: "DetailItem",
+  description: "390 × 190 mm hollow concrete masonry unit in section (two cores)",
+  build: () => detailFamily("Concrete Block 20 Series Section", (_line, region) => region(box(390, 190), [box(130, 110, -95), box(130, 110, 95)], 0xb8b8b8)),
+};
+
+export const steelAngle: LibraryFamily = {
+  name: "Steel Angle 75x75x6 Section",
+  category: "DetailItem",
+  description: "75 × 75 × 6 mm equal angle in section",
+  build: () =>
+    detailFamily("Steel Angle 75x75x6 Section", (_line, region) =>
+      region(
+        [
+          { x: 0, y: 0 },
+          { x: 75, y: 0 },
+          { x: 75, y: 6 },
+          { x: 6, y: 6 },
+          { x: 6, y: 75 },
+          { x: 0, y: 75 },
+        ],
+        [],
+        0x3c4048,
+      ),
+    ),
+};
+
+export const LIBRARY: LibraryFamily[] = [
+  singleDoor,
+  casementWindow,
+  diningTable,
+  chair,
+  bed,
+  baseCabinet,
+  roundTable,
+  timberSection(90, 45),
+  timberSection(140, 45),
+  timberSection(190, 45),
+  concreteBlock,
+  steelAngle,
+];

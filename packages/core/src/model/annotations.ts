@@ -62,7 +62,7 @@ export type Dimension = Element<DimensionParams>;
 /** Revit default annotation text height, mm on paper. */
 export const DEFAULT_TEXT_SIZE = 2.5;
 
-export const ANNOTATION_CATEGORIES = [Cat.DetailLine, Cat.FilledRegion, Cat.TextNote, Cat.Dimension, Cat.Area, Cat.AreaBoundary, Cat.Tag, Cat.LegendComponent, Cat.KeynoteLegend, Cat.RevisionCloud, Cat.CadImport, Cat.Symbol] as const;
+export const ANNOTATION_CATEGORIES = [Cat.DetailLine, Cat.FilledRegion, Cat.TextNote, Cat.Dimension, Cat.Area, Cat.AreaBoundary, Cat.Tag, Cat.LegendComponent, Cat.KeynoteLegend, Cat.RevisionCloud, Cat.CadImport, Cat.Symbol, Cat.DetailComponent] as const;
 
 const refIds = (r: DimRef): ElementId[] => (r.kind === "point" ? [] : [r.id]);
 

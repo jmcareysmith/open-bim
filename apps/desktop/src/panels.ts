@@ -184,6 +184,7 @@ import {
   type LineStyle,
   type TextNoteParams,
   type SymbolParams,
+  type DetailComponentParams,
   type SymbolKind,
   SYMBOL_KINDS,
   DEFAULT_SYMBOL_SIZE,
@@ -699,6 +700,7 @@ const FAMILY_CATEGORIES: [FamilyCategory, string][] = [
   ["Casework", "Casework"],
   ["Door", "Door (wall hosted)"],
   ["Window", "Window (wall hosted)"],
+  ["DetailItem", "Detail Item (2D)"],
 ];
 
 /** A number or formula: numeric text is stored as a number, anything else as a formula. */
@@ -1109,6 +1111,7 @@ const VG_CATEGORIES: [string, string][] = [
   [Cat.Tag, "Tags"],
   [Cat.DetailLine, "Detail lines"],
   [Cat.Symbol, "Symbols"],
+  [Cat.DetailComponent, "Detail items"],
   [Cat.FilledRegion, "Filled regions"],
 ];
 
@@ -2494,6 +2497,18 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       const colour = h("input", { type: "color", value: `#${p.color.toString(16).padStart(6, "0")}` });
       colour.onchange = () => update<FilledRegionParams>("Change region colour", { color: parseInt(colour.value.slice(1), 16) });
       sec.append(row("Colour", colour), row("Area", formatArea(regionArea(p), units)), editBoundaryButton(ctx, el.id));
+      break;
+    }
+    case Cat.DetailComponent: {
+      const p = el.params as DetailComponentParams;
+      sec.append(
+        row("Detail item", doc.get(p.familyId)?.name ?? "?"),
+        row("Rotation (\u00b0)", numberInput(+((p.rotation * 180) / Math.PI).toFixed(2), (v) => update<DetailComponentParams>("Rotate detail", { rotation: (v * Math.PI) / 180 }))),
+        row("Mirrored", checkbox(p.mirrored, (v) => update<DetailComponentParams>("Mirror detail", { mirrored: v }))),
+      );
+      const editFam = h("button", { textContent: "Edit family" });
+      editFam.onclick = () => ctx.editFamily(p.familyId);
+      sec.append(row("", editFam));
       break;
     }
     case Cat.Symbol: {

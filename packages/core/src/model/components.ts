@@ -165,6 +165,7 @@ export function placeFamilyInstance(
 ): FamilyInstance {
   const def = doc.require<FamilyDefParams>(familyId) as FamilyDef;
   if (def.category !== Cat.FamilyDef) throw new Error("Not a loaded family");
+  if (def.params.category === "DetailItem") throw new Error(`${def.name} is a detail item: place it with Annotate → Detail → Component`);
   if (!familyTypeNames(def).includes(typeName)) throw new Error(`${def.name} has no type "${typeName}"`);
   let levelId = opts.levelId;
   if (def.params.hosting === "wall") {

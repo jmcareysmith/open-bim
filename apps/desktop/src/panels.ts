@@ -13,6 +13,7 @@ import {
   createRevision,
   createStackedWallType,
   stairLayout,
+  type ToposolidParams,
   rampLayout,
   rampLengthNeeded,
   type Ramp,
@@ -223,6 +224,7 @@ export interface PanelContext {
   exportKeynotes(): void;
   exportSchedule(id: ElementId, format: "csv" | "xlsx"): void;
   linkProject(): void;
+  importSurvey(id: ElementId): void;
   reloadLink(id: ElementId): void;
   /** Start placing copies of a selected group. */
   placeGroupCopy(): void;
@@ -932,6 +934,7 @@ const VG_CATEGORIES: [string, string][] = [
   [Cat.Stair, "Stairs"],
   [Cat.Railing, "Railings"],
   [Cat.Ramp, "Ramps"],
+  [Cat.Toposolid, "Topography"],
   [Cat.Room, "Rooms"],
   [Cat.RoomSeparator, "Room separators"],
   [Cat.Area, "Areas"],
@@ -1690,6 +1693,24 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         h("h3", {}, "NZBC D1/AS1 (private stairway)"),
       );
       for (const c of L.checks) sec.append(row(c.ok ? "\u2713" : "\u2717", h("span", { class: c.ok ? "" : "warn" }, c.label)));
+      break;
+    }
+    case Cat.Toposolid: {
+      const p = el.params as ToposolidParams;
+      const imp = h("button", { textContent: "Import survey CSV\u2026" });
+      imp.title = "Rows of E, N, RL (or id, E, N, RL) in metres; converted with the project's shared coordinates";
+      imp.onclick = () => ctx.importSurvey(el.id);
+      const clear = h("button", { textContent: "Clear points", disabled: !p.points.length });
+      clear.onclick = () => update<ToposolidParams>("Clear survey points", { points: [] });
+      const matOpts = [{ value: "", label: "\u2014" }, ...materialElements(doc).map((m) => ({ value: m.id, label: m.name ?? m.id }))];
+      sec.append(
+        row("Level", select(levelOpts, p.levelId, (v) => update<ToposolidParams>("Change toposolid level", { levelId: v }))),
+        row("Spot heights", String(p.points.length)),
+        row("Thickness below lowest", numberInput(p.thickness, (v) => (v > 0 ? update<ToposolidParams>("Change thickness", { thickness: v }) : ctx.status("\u26a0 Must be positive")))),
+        row("Contour interval", numberInput(p.contourInterval, (v) => update<ToposolidParams>("Change contour interval", { contourInterval: Math.max(0, v) }))),
+        row("Material", select(matOpts, p.materialId ?? "", (v) => update<ToposolidParams>("Change toposolid material", { materialId: v || null }))),
+        row("", h("div", { class: "buttons wrap" }, imp, clear)),
+      );
       break;
     }
     case Cat.Ramp: {

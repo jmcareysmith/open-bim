@@ -249,6 +249,12 @@ per-vertex colours (`MeshData.colors`); OCCT skips opening cuts for curtain wall
 types list member wall types bottom to top (`stack`, one variable height) and copy their thickest
 member's layers for joins; each segment is the joined footprint narrowed to its own thickness.
 
+**Site** — a `Toposolid` is a boundary plus spot heights (z relative to its level). `core/site.ts`
+triangulates them (Bowyer–Watson Delaunay; boundary vertices get inverse-distance heights, triangles
+outside the boundary are dropped) and parses survey CSVs (E, N, RL metres) through the shared
+coordinates. Geometry adds sides and a flat bottom `thickness` below the lowest point; plans draw
+contours by marching the triangles, labelling every fifth.
+
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 

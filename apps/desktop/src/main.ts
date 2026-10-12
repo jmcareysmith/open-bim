@@ -35,6 +35,8 @@ import {
   loadFamily,
   familyFile,
   readFamilyFile,
+  parseSurveyCsv,
+  type ToposolidParams,
   zipStore,
   createLink,
   reloadLink,
@@ -242,6 +244,7 @@ const ctx: ToolContext & PanelContext = {
   },
   placeGroupCopy: () => void commands.placeGroupCopy?.(),
   linkProject: () => void commands.linkProject?.(),
+  importSurvey: (id: ElementId) => void importSurveyPoints(id),
   reloadLink: (id: ElementId) => void reloadLinkFile(id),
   async exportSchedule(id: ElementId, format: "csv" | "xlsx") {
     try {
@@ -368,6 +371,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   detailline: new DetailLineTool(ctx),
   region: new SketchTool(ctx, "region"),
   cloud: new SketchTool(ctx, "cloud"),
+  toposolid: new SketchTool(ctx, "toposolid"),
   text: new TextTool(ctx),
   dimension: new DimensionTool(ctx),
   room: new RoomTool(ctx),
@@ -964,6 +968,22 @@ function loadFamilyIntoProject(fam: Document, name: string): void {
     status(`${reload ? "Reloaded" : "Loaded"} ${name}. Place it with the Component tool (C).`);
   } catch (err) {
     status(`⚠ ${(err as Error).message}`);
+  }
+}
+
+/** Survey CSV (E, N, RL in metres) into a toposolid's spot heights, via shared coordinates. */
+async function importSurveyPoints(id: ElementId): Promise<void> {
+  const t = doc.get<ToposolidParams>(id);
+  if (!t) return;
+  try {
+    const text = await openText({ name: "Survey points (CSV)", extensions: ["csv", "txt"] });
+    if (!text) return;
+    const pts = parseSurveyCsv(doc, text, t.params.levelId);
+    if (!pts.length) throw new Error("No E, N, RL rows found");
+    doc.transact("Import survey points", (tx) => tx.update<ToposolidParams>(id, { points: [...t.params.points, ...pts] }));
+    status(`Added ${pts.length} survey point(s). Points outside the boundary only shape its edges.`);
+  } catch (err) {
+    status(`\u26a0 Survey import failed: ${(err as Error).message}`);
   }
 }
 

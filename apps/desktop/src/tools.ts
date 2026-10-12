@@ -60,6 +60,7 @@ import {
   type Room,
   createArea,
   createAreaBoundary,
+  createToposolid,
   createStair,
   ensureStairType,
   createRamp,
@@ -511,7 +512,7 @@ export class ReferencePlaneTool extends DatumLineTool {
 
 // ---- Sketch (floors, ceilings) --------------------------------------------
 
-type SketchKind = "floor" | "ceiling" | "roof" | "region" | "cloud" | "extrusion" | "blend" | "revolution";
+type SketchKind = "floor" | "ceiling" | "roof" | "region" | "cloud" | "toposolid" | "extrusion" | "blend" | "revolution";
 
 const SKETCH: Record<SketchKind, { category: string; typeCategory: string; label: string }> = {
   floor: { category: Cat.Floor, typeCategory: Cat.FloorType, label: "Floor" },
@@ -519,6 +520,7 @@ const SKETCH: Record<SketchKind, { category: string; typeCategory: string; label
   roof: { category: Cat.Roof, typeCategory: Cat.RoofType, label: "Roof" },
   region: { category: Cat.FilledRegion, typeCategory: "", label: "Filled region" },
   cloud: { category: Cat.RevisionCloud, typeCategory: "", label: "Revision cloud" },
+  toposolid: { category: Cat.Toposolid, typeCategory: "", label: "Toposolid" },
   extrusion: { category: Cat.Extrusion, typeCategory: "", label: "Extrusion" },
   blend: { category: Cat.Blend, typeCategory: "", label: "Blend (bottom loop, then top loop)" },
   revolution: { category: Cat.Revolution, typeCategory: "", label: "Revolve (profile right of the centre line)" },
@@ -681,6 +683,15 @@ export class SketchTool implements Tool {
         doc.transact(`Edit ${this.def.label.toLowerCase()} boundary`, (tx) => tx.update(editing, patch));
         id = editing;
       } else {
+        if (this.name === "toposolid") {
+          const levelId = this.ctx.activeLevelId();
+          const t = doc.transact("Create toposolid", (tx) => createToposolid(tx, doc, levelId, region.boundary));
+          this.reset();
+          this.redraw();
+          this.ctx.setSelection([t.id]);
+          this.ctx.status("Toposolid created (flat). Import survey points in Properties.");
+          return;
+        }
         if (this.name === "cloud") {
           const viewId = this.ctx.activeViewId();
           if (!viewId) throw new Error("Open a view or sheet first");

@@ -60,7 +60,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Stairs, railings, ramps — straight runs with landings (no winders/curved runs yet); D1/AS1, F4/AS1, NZS 4121 checks
 - [x] Curtain walls — wall types with a curtain grid (equal divisions, mullions, glazed panels); no per-panel editing yet
 - [x] Stacked walls — member wall types bottom to top, one variable segment
-- Toposolids & site
+- [x] Toposolids & site — spot heights (survey CSV via shared coordinates), Delaunay surface, contours; no pads/sub-regions yet
 - Structural columns, beams, foundations
 - Phasing, design options, clash detection
 

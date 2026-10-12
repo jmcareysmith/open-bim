@@ -64,6 +64,9 @@ export function layerMaterial(doc: Document, layer: Layer): Material | undefined
  * of its type — the exterior finish for walls, the top for floors and roofs.
  */
 export function elementMaterial(doc: Document, el: Element): Material | undefined {
+  // Elements without types (toposolids) may name their material directly.
+  const own = (el.params as { materialId?: unknown }).materialId;
+  if (typeof own === "string") return doc.get<MaterialParams>(own) as Material | undefined;
   if (!el.typeId) return undefined;
   const t = doc.get<LayeredTypeParams>(el.typeId);
   const first = t?.params.layers?.[0];

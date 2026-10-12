@@ -31,6 +31,7 @@ import { buildLink } from "./links.ts";
 import { buildStair, buildStairLines } from "./stairs.ts";
 import { buildRailing, buildRailingLines } from "./railings.ts";
 import { buildRamp, buildRampLines } from "./ramps.ts";
+import { buildToposolid, buildToposolidLines } from "./site.ts";
 import { buildCadImportLines } from "./dxf.ts";
 import { buildRevisionCloudLines } from "./revisions.ts";
 import { buildAreaBoundaryLines, buildAreaLines, buildRoomLines, buildRoomSeparatorLines } from "./rooms.ts";
@@ -102,6 +103,7 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.Stair, buildStair],
     [Cat.Railing, buildRailing],
     [Cat.Ramp, buildRamp],
+    [Cat.Toposolid, buildToposolid],
     [Cat.Link, (doc, el) => buildLink(doc, el, this)],
     [Cat.Floor, buildFloor],
     [Cat.Ceiling, buildCeiling],
@@ -138,6 +140,7 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.Stair, buildStairLines],
     [Cat.Railing, buildRailingLines],
     [Cat.Ramp, buildRampLines],
+    [Cat.Toposolid, buildToposolidLines],
   ]);
 
   register(category: string, builder: Builder): void {

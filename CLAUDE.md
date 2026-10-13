@@ -60,7 +60,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Panels: Project Browser / Properties dock left or right (drag the title), tab together (drop on
   the other's title), or float (drop elsewhere, or ⧉); empty-space menu → Reset Panel Layout.
   UI chrome is light grey (Jeremy asked: no black menus). Browser groups fold (click headings).
-- Ribbon (apps/desktop/src/ribbon.ts + ribbondefs.ts, icons.ts): File menu, QAT, Revit-order tabs;
+- Ribbon (apps/desktop/src/ribbon.ts + ribbondefs.ts, icons.ts): File menu (with Recent, desktop
+  only, local storage; untested in the Tauri app), QAT, Revit-order tabs;
   Annotate: Dimension, Detail (line, region, cloud), Text (+ Check Spelling, Find/Replace), Tag (+
   Keynote ▾ load/export keynote files), Revisions, Groups. Symbol ▾ places a north arrow
   (true north option), scale bar or break line. Detail → Component ▾ places Detail Item

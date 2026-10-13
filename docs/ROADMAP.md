@@ -92,7 +92,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 
 ## Phase 7b — Revit-style interface
 - [x] Ribbon: tabs and labelled panels, split-button dropdowns, contextual Modify tab, options bar — Architecture/Structure/Insert/Annotate/Massing & Site/Analyse/Collaborate/View/Manage/Modify (+ Create in the family editor); own line icons; "Modify | <category>" label
-- [ ] File menu (New, Open, Save, Export ▸, Import ▸, recent files) and Quick Access Toolbar — File menu and QAT done; no recent files yet
+- [x] File menu (New, Open, Save, Export ▸, Import ▸, recent files) and Quick Access Toolbar
 - [ ] Drag and drop from the Project Browser: views/schedules/legends onto sheets, families into views
 - [x] Dockable panels (Properties, Project Browser): dock, tab, float, collapse; layout remembered — drag titles/tabs; dock widths resizable; light theme (Jeremy: no dark chrome)
 - [ ] View tabs (tile/cascade), status bar with selection filter, view control bar (scale, detail level, visual style, hide/isolate) — done: open-view tabs along the bottom (close, close others), view control bar (scale, detail level, Wireframe/Hidden Line/Shaded/Consistent Colours/Realistic/Rendered, temporary hide/isolate, reveal hidden); collapsible browser groups. Still to do: tile/cascade, selection filter

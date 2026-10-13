@@ -1,3 +1,4 @@
+import { addRecentFile, fileName, recentFiles, removeRecentFile } from "./recent.ts";
 import { CameraTool } from "./cameratool.ts";
 import { SlopeArrowTool } from "./slopetool.ts";
 import {
@@ -99,7 +100,7 @@ import { exportIfc } from "@open-bim/ifc/export";
 import { SyncClient, bindDocument, newYDoc, type Binding } from "@open-bim/collab";
 import type { IfcApi } from "@open-bim/ifc";
 import ifcWasmUrl from "web-ifc/web-ifc.wasm?url";
-import { dwgConverterPath, openBytes, openCad, openProject, openText, readProjectAt, saveBytes, saveCad, savePdf, saveProject, saveText, setDwgConverterPath } from "./io.ts";
+import { dwgConverterPath, isTauri, openBytes, openCad, openProject, openText, readProjectAt, saveBytes, saveCad, savePdf, saveProject, saveText, setDwgConverterPath } from "./io.ts";
 import { renderBrowser, renderProperties, renderSchedulePane, viewGraphicsEditor, type PanelContext } from "./panels.ts";
 import { PluginHost, mountConsole } from "./plugins.ts";
 import { buildSample } from "./sample.ts";
@@ -526,6 +527,7 @@ let ribbon: Ribbon | undefined = new Ribbon(
       { label: "New", hint: "Ctrl+N", action: () => void commands.new?.() },
       { label: "Open\u2026", hint: "Ctrl+O", action: () => void commands.open?.() },
       { label: "Save", hint: "Ctrl+S", action: () => void commands.save?.() },
+      ...recentMenu(),
       "-",
       { heading: "Export" },
       { label: "PDF (all sheets)\u2026", action: () => void commands.exportPdf?.() },
@@ -661,7 +663,10 @@ const commands: Record<string, () => void | Promise<void>> = {
     leaveCollab();
     try {
       const result = await openProject();
-      if (result) loadInto(result.json, result.path);
+      if (result) {
+        loadInto(result.json, result.path);
+        if (isTauri()) addRecentFile(result.path);
+      }
     } catch (err) {
       status(`⚠ Could not open: ${(err as Error).message}`);
     }
@@ -701,6 +706,7 @@ const commands: Record<string, () => void | Promise<void>> = {
       saveViewCamera();
       const path = await saveProject(doc.toJSON(), filePath);
       if (path) {
+        if (isTauri()) addRecentFile(path);
         filePath = path;
         dirty = false;
         status(`Saved ${path}`);
@@ -1000,6 +1006,37 @@ function afterVisibility(message: string): void {
   refreshPanels();
   viewBar?.render();
   status(viewport.visibility.active ? `${message} \u00b7 temporary hide/isolate is on (U to reset)` : message);
+}
+
+/** File menu: recently opened or saved projects (desktop, where files can be reopened by path). */
+function recentMenu(): MenuItem[] {
+  const list = isTauri() ? recentFiles() : [];
+  if (!list.length) return [];
+  return [
+    "-",
+    { heading: "Recent" },
+    ...list.map(
+      (path): MenuItem => ({
+        label: fileName(path),
+        hint: path.length > 48 ? `…${path.slice(-46)}` : path,
+        action: () => void openRecent(path),
+      }),
+    ),
+  ];
+}
+
+async function openRecent(path: string): Promise<void> {
+  if (dirty && !confirm("Discard unsaved changes?")) return;
+  leaveCollab();
+  try {
+    const json = await readProjectAt(path);
+    if (!json) return;
+    loadInto(json, path);
+    addRecentFile(path);
+  } catch (err) {
+    removeRecentFile(path);
+    status(`⚠ Could not open ${fileName(path)}: ${(err as Error).message}`);
+  }
 }
 
 function loadInto(json: ReturnType<Document["toJSON"]>, path: string | null): void {

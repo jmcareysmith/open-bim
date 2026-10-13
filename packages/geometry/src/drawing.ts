@@ -28,6 +28,7 @@ import { planLinework, type PlanLinework } from "./hlr.ts";
 import type { GeometryKernel } from "./kernel.ts";
 import { planFrame } from "./layers.ts";
 import { cleanCuts } from "./wallcleanup.ts";
+import { ductPlanLevel } from "./ducts.ts";
 import { hatch, patternFamilies } from "./patterns.ts";
 import { sectionAnnotations, sectionLinework, type Rect } from "./sections.ts";
 
@@ -136,6 +137,9 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
     if (lines.planOnly && section) continue;
     // Beam symbols belong to plans of the beam's level.
     if (el.category === Cat.Beam && (view.params as ViewParams).levelId !== (el.params as { levelId?: string }).levelId) continue;
+    // So do duct outlines.
+    const ductLevel = ductPlanLevel(doc, el);
+    if (ductLevel && (view.params as ViewParams).levelId !== ductLevel) continue;
     const r = elementGraphics(doc, g, el);
     addLineData(out, lines, owner ? "annotation" : el.category === Cat.Grid || el.category === Cat.ReferencePlane ? "datum" : "symbol", lineStyle(r, r.projection, el.id));
   }

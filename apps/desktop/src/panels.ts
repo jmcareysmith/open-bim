@@ -237,6 +237,16 @@ import {
   type ConnectorParams,
   type MEPSystem,
   type SystemClassification,
+  ductFlows,
+  ductLength,
+  ductShape,
+  ductSizeLabel,
+  ductSystems,
+  sizeDucts,
+  type Duct,
+  type DuctFittingParams,
+  type DuctParams,
+  type DuctTypeParams,
 } from "@open-bim/core";
 
 type Child = Node | string | null | undefined | false;
@@ -2609,6 +2619,41 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       } else sec.append(f("load", "Load (W)"));
       break;
     }
+    case Cat.Duct: {
+      const d = el as Duct;
+      const p = d.params;
+      const set = (name: string, patch: Partial<DuctParams>) => update<DuctParams>(name, patch);
+      const round = ductShape(doc, d) === "round";
+      const flowIn = ductSystems(doc).filter((s) => s.params.classification === p.classification);
+      const flow = flowIn.map((s) => ductFlows(doc, s).get(d.id)).find((x) => x !== undefined);
+      sec.append(
+        row("Type", select(typeOpts(Cat.DuctType), d.typeId ?? "", (v) => edit(ctx, "Change duct type", (tx) => tx.setType(d.id, v)))),
+        row("System", select(SYSTEM_CLASSIFICATIONS.filter((c) => c.domain === "duct").map((c) => ({ value: c.value, label: c.label })), p.classification, (v) => set("Duct system", { classification: v as SystemClassification }))),
+        ...(round
+          ? [row("Diameter", numberInput(p.diameter, (v) => set("Duct diameter", { diameter: v })))]
+          : [row("Width", numberInput(p.width, (v) => set("Duct width", { width: v }))), row("Height", numberInput(p.height, (v) => set("Duct height", { height: v })))]),
+        row("Start elevation", numberInput(p.start.z, (v) => set("Duct start elevation", { start: { ...p.start, z: v } }))),
+        row("End elevation", numberInput(p.end.z, (v) => set("Duct end elevation", { end: { ...p.end, z: v } }))),
+        row("Length", len(ductLength(d))),
+        row("Size", ductSizeLabel(doc, d)),
+        ...(flow !== undefined ? [row("Flow", `${flow.toFixed(0)} L/s`)] : []),
+      );
+      break;
+    }
+    case Cat.DuctFitting: {
+      const f = el.params as DuctFittingParams;
+      sec.append(row("Fitting", f.kind[0]!.toUpperCase() + f.kind.slice(1)), row("Joins", `${f.ends.length} ducts`), h("div", { class: "muted" }, "Fittings follow their ducts: edit or delete the ducts."));
+      break;
+    }
+    case Cat.DuctType: {
+      const t = el.params as DuctTypeParams;
+      sec.append(
+        row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename type", (tx) => tx.setName(el.id, v || undefined)))),
+        row("Shape", select([{ value: "round", label: "Round" }, { value: "rectangular", label: "Rectangular" }], t.shape, (v) => update<DuctTypeParams>("Duct shape", { shape: v as DuctTypeParams["shape"] }))),
+        row("Material", textInput(t.material, (v) => update<DuctTypeParams>("Duct material", { material: v }))),
+      );
+      break;
+    }
     case Cat.MEPSystem: {
       const sys = el as MEPSystem;
       const info = classificationInfo(sys.params.classification);
@@ -2616,6 +2661,17 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       const members = systemMembers(doc, sys);
       const pick = h("button", { textContent: "Select members" });
       pick.onclick = () => ctx.setSelection(members.map((m) => m.id));
+      if (info.domain === "duct") {
+        // Duct Sizing (velocity method) from the air each duct carries.
+        const vel = h("input", { type: "number", value: "5", min: "1", step: "0.5", title: "Target velocity, m/s" }) as HTMLInputElement;
+        const size = h("button", { textContent: "Size ducts" });
+        size.onclick = () => {
+          let n = 0;
+          edit(ctx, "Size ducts", (tx) => (n = sizeDucts(tx, doc, sys.id, { velocity: Number(vel.value) || 5 })));
+          if (n) ctx.status(`Sized ${n} duct(s) for ${vel.value} m/s.`);
+        };
+        sec.append(row("Duct sizing (m/s)", h("div", { class: "buttons" }, vel, size)));
+      }
       sec.append(
         row("Name", textInput(el.name ?? "", (v) => v.trim() && edit(ctx, "Rename system", (tx) => tx.setName(el.id, v.trim())))),
         row("System", info.label),

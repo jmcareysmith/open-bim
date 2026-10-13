@@ -100,7 +100,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 
 ## Phase 8 — MEP & visual programming (current)
 - [x] Connectors and MEP systems (supply/return air, cold/hot water, sanitary, power); system browser
-- [ ] Ducts with auto fittings (elbows, tees, transitions), round/rectangular types, sizing from airflow
+- [x] Ducts with auto fittings (elbows, tees, transitions), round/rectangular types, sizing from airflow
 - [ ] Pipes with auto fittings, falls on waste pipes, pipe materials
 - [ ] Mechanical equipment and air terminals (library families with connectors)
 - [ ] Plumbing fixtures and drainage; G13/AS1 discharge units, pipe size and fall checks

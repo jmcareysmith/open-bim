@@ -36,3 +36,4 @@ export * from "./symbols.ts";
 export * from "./detailcomponents.ts";
 export * from "./wallattach.ts";
 export * from "./wallcleanup.ts";
+export * from "./ducts.ts";

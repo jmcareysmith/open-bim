@@ -58,7 +58,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 5. MEP
 | Feature | Phase | Status |
 |---|---|---|
-| Ducts, pipes, fittings, routing | 8 | ⬜ |
+| Ducts, pipes, fittings, routing | 8 | 🟨 (ducts: round/rect, auto elbows/tees/transitions/crosses, risers, sizing by velocity; pipes next) |
 | Systems (supply, return, sanitary…) | 8 | ✅ (connectors in families; systems with flow/load totals; system browser) |
 | Electrical circuits, panels, cable trays, conduit | 8 | ⬜ |
 | Fixtures & equipment | 8 | 🟨 (MEP family categories with connectors; no library families yet) |

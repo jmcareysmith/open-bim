@@ -75,6 +75,9 @@ export const Cat = {
   StripFooting: "StripFooting",
   Connector: "Connector",
   MEPSystem: "MEPSystem",
+  DuctType: "DuctType",
+  Duct: "Duct",
+  DuctFitting: "DuctFitting",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

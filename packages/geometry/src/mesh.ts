@@ -17,7 +17,7 @@ export interface Box3 {
   max: [number, number, number];
 }
 
-class MeshBuilder {
+export class MeshBuilder {
   private pos: number[] = [];
   private nor: number[] = [];
   private idx: number[] = [];

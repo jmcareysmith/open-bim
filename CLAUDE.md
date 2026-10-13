@@ -168,4 +168,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   plumbing/electrical fixtures, lighting); family editor → Family Types → Add connector (system,
   position, facing, size, flow L/s, load W, units as formulas). Systems: right-click elements →
   Create … system / Add to …; browser → MEP Systems (by classification, flow/load totals).
-- Next: Phase 8 — ducts with auto fittings.
+- Ducts (core/model/ducts.ts, geometry/src/ducts.ts): Systems tab → Duct (DT): click to route,
+  middle elevation/size/system in the options strip, change elevation between clicks for a riser,
+  click a connector to join it. Fittings (elbow, transition, tee, cross) are elements kept by a
+  commit hook (`enableDuctFittings`); a run ending on another's side splits it for a tee.
+  Plans show duct outlines on their level. System Properties → Size ducts (velocity method).
+- Next: Phase 8 — pipes with auto fittings and falls.

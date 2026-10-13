@@ -138,6 +138,21 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
       ],
     },
     {
+      id: "systems",
+      label: "Systems",
+      mode: "project",
+      panels: [
+        {
+          title: "HVAC",
+          items: [
+            { label: "Duct", icon: "duct", tool: "duct", large: true, title: "Duct: route runs; elbows, tees and transitions are automatic (DT)" },
+            { label: "Air Terminal", icon: "component", tool: "component", title: "Place an air terminal family (choose it in the type selector)" },
+            { label: "Mechanical Equipment", icon: "component", tool: "component", title: "Place a mechanical equipment family" },
+          ],
+        },
+      ],
+    },
+    {
       id: "insert",
       label: "Insert",
       mode: "project",

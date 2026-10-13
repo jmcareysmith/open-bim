@@ -1,3 +1,4 @@
+import { buildDuct, buildDuctFitting, buildDuctFittingLines, buildDuctLines } from "./ducts.ts";
 import { slopedTopWallMesh } from "./wallattach.ts";
 import {
   Cat,
@@ -164,6 +165,8 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.StripFooting, buildStripFooting],
     [Cat.Link, (doc, el) => buildLink(doc, el, this)],
     [Cat.Floor, buildFloor],
+    [Cat.Duct, buildDuct],
+    [Cat.DuctFitting, buildDuctFitting],
     [Cat.Ceiling, buildCeiling],
     [Cat.Roof, buildRoof],
     [Cat.Door, buildDoor],
@@ -203,6 +206,8 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.Toposolid, buildToposolidLines],
     [Cat.Floor, buildFloorLines],
     [Cat.Beam, buildBeamLines],
+    [Cat.Duct, buildDuctLines],
+    [Cat.DuctFitting, buildDuctFittingLines],
     [Cat.Connector, buildConnectorLines],
   ]);
 

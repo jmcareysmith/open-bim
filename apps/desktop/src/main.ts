@@ -1,3 +1,4 @@
+import { DuctTool } from "./ducttool.ts";
 import { Panes, type PaneLayout } from "./panes.ts";
 import { openShortcutEditor, shortcutTable } from "./shortcuts.ts";
 import { BROWSER_DRAG } from "./panels.ts";
@@ -99,6 +100,7 @@ import {
   connectableClassifications,
   createSystem,
   mepSystems,
+  enableDuctFittings,
 } from "@open-bim/core";
 import { OcctKernel, SimpleKernel, findClashes, exportGlb, exportObj, exportParts, areaLoopsFromWalls, drawingDxf, parseDxf, viewDrawing, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
@@ -183,6 +185,7 @@ buildSample(doc);
 doc.clearHistory();
 // Global parameters drive element values inside every transaction of the project.
 enableGlobalParameters(doc);
+enableDuctFittings(doc);
 /** While a family is open, the project's state to return to. */
 let projectSession: Session | null = null;
 interface Session {
@@ -206,6 +209,7 @@ const activeTypes = new Map<string, ElementId>();
 /** Type category each placing tool creates. */
 const TOOL_TYPES: Record<string, string> = {
   wall: Cat.WallType,
+  duct: Cat.DuctType,
   floor: Cat.FloorType,
   ceiling: Cat.CeilingType,
   roof: Cat.RoofType,
@@ -483,6 +487,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   detailcomponent: new DetailComponentTool(ctx),
   attach: new AttachTool(ctx),
   slopeArrow: new SlopeArrowTool(ctx),
+  duct: new DuctTool(ctx),
   camera: new CameraTool(ctx, (id) => {
     setTool("select");
     ctx.setActiveView(id);

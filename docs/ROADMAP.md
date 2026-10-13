@@ -99,7 +99,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Right-click menus (Select All Instances, Edit Type, Hide in View…), two-letter shortcuts, shortcut editor — menus done (element: modify tools, Flip, Edit Type, Select All Instances, hide/isolate, V/G, Group, Delete; empty space: V/G dialog, Zoom to Fit, Reset); two-letter shortcuts; Keyboard Shortcuts editor (KS or File menu; saved per machine)
 
 ## Phase 8a — Massing & Site (asked for by Jeremy; next)
-- [ ] Conceptual masses: in-place and loadable mass families (extrusion/blend/revolve/sweep), Show Mass
+- [x] Conceptual masses: in-place and loadable mass families (extrusion/blend/revolve/sweep), Show Mass
 - [ ] Mass floors (per level) with areas and a mass floor schedule (GFA)
 - [ ] Model by Face: walls, floors, roofs and curtain systems from mass faces
 - [ ] Building pads (cut the toposolid), subregions (material areas), graded regions with cut/fill

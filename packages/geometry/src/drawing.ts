@@ -22,6 +22,8 @@ import {
   type PatternName,
   type ResolvedGraphics,
   type ResolvedLine,
+  graphicsCategory,
+  MASS_CATEGORY,
 } from "@open-bim/core";
 import { GRID_BUBBLE_RADIUS, type LineData } from "./datums.ts";
 import { planLinework, type PlanLinework } from "./hlr.ts";
@@ -89,6 +91,7 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
   const g = effectiveGraphics(doc, view);
   const shown = (el: Element) => {
     if (el.category === Cat.View && el.id === view.id) return false; // a view doesn't show its own marker
+    if (graphicsCategory(doc, el) === MASS_CATEGORY) return false; // masses are a design aid, not drawn
     const owner = annotationView(el);
     if (owner && owner !== view.id) return false;
     // Rooms and separators: only in plans of their level.

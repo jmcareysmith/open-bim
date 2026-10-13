@@ -253,10 +253,23 @@ function layer(r: ResolvedGraphics, o: GraphicOverride): void {
  * How an element shows in a view: category visibility and overrides first, then filters in
  * priority order (the first filter to set a property wins over later filters and the category).
  */
+/** The category V/G uses for an element: masses (family instances of Mass families) are "Mass". */
+export function graphicsCategory(doc: Document, el: Element): string {
+  if (el.category === Cat.FamilyInstance) {
+    const def = doc.get((el.params as { familyId?: string }).familyId ?? "");
+    if ((def?.params as { category?: string } | undefined)?.category === "Mass") return MASS_CATEGORY;
+  }
+  return el.category;
+}
+
+/** V/G category for conceptual masses. */
+export const MASS_CATEGORY = "Mass";
+
 export function elementGraphics(doc: Document, g: ViewGraphicsParams, el: Element): ResolvedGraphics {
   const r = defaultGraphics();
-  r.visible = !g.hiddenCategories.includes(el.category);
-  const cat = g.categoryOverrides?.[el.category];
+  const category = graphicsCategory(doc, el);
+  r.visible = !g.hiddenCategories.includes(category);
+  const cat = g.categoryOverrides?.[category];
   if (cat) {
     // A hidden category stays hidden even if its override says visible.
     const v = r.visible;

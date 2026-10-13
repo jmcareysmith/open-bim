@@ -840,6 +840,7 @@ const FAMILY_CATEGORIES: [FamilyCategory, string][] = [
   ["ElectricalEquipment", "Electrical Equipment (MEP)"],
   ["ElectricalFixture", "Electrical Fixture (MEP)"],
   ["LightingFixture", "Lighting Fixture (MEP)"],
+  ["Mass", "Mass (conceptual)"],
 ];
 
 /** A number or formula: numeric text is stored as a number, anything else as a formula. */
@@ -1262,6 +1263,7 @@ function graphicsRows(ctx: PanelContext, id: ElementId, p: ViewGraphicsParams): 
 
 /** Categories shown in the V/G table, model first then annotation (Revit's two tabs). */
 const VG_CATEGORIES: [string, string][] = [
+  ["Mass", "Mass"],
   [Cat.Wall, "Walls"],
   [Cat.Floor, "Floors"],
   [Cat.Ceiling, "Ceilings"],
@@ -1630,7 +1632,7 @@ function browserDrag(div: HTMLElement, kind: "view" | "family", id: ElementId): 
 export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   if (familyInfo(ctx.doc)) return renderFamilyBrowser(root, ctx);
   const s = projectSections(ctx);
-  root.replaceChildren(s.views!, s.legends!, s.schedules!, s.sheets!, s.families!, s.groups!, s.links!);
+  root.replaceChildren(s.views!, s.sheets!, s.legends!, s.schedules!, s.families!, s.groups!, s.links!);
 }
 
 /** Manage-tab dialogs: which project section each shows. */

@@ -271,7 +271,17 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
       id: "site",
       label: "Massing & Site",
       mode: "project",
-      panels: [{ title: "Model Site", items: [{ label: "Toposolid", icon: "toposolid", tool: "toposolid", large: true, title: "Sketch the site boundary, then import survey points" }] }],
+      panels: [
+        {
+          title: "Conceptual Mass",
+          items: [
+            { label: "Show Mass", icon: "mass", cmd: "showMass", large: true, title: "Show or hide conceptual masses in every view (a session setting, as in Revit)" },
+            { label: "In-Place Mass", icon: "extrusion", cmd: "inPlaceMass", title: "Model a new mass (opens the family editor; Load into Project places it)" },
+            { label: "Place Mass", icon: "component", cmd: "placeMass", title: "Place a loaded mass family (loads Mass - Box if there's none)" },
+          ],
+        },
+        { title: "Model Site", items: [{ label: "Toposolid", icon: "toposolid", tool: "toposolid", large: true, title: "Sketch the site boundary, then import survey points" }] },
+      ],
     },
     {
       id: "analyse",

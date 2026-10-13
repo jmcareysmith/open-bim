@@ -29,6 +29,8 @@ import {
   viewCrop,
   planLevelOf,
   defaultGraphics,
+  graphicsCategory,
+  MASS_CATEGORY,
 } from "@open-bim/core";
 import {
   GRID_BUBBLE_RADIUS,
@@ -52,6 +54,9 @@ import {
 
 // Model space is millimetres with Z up (Revit convention).
 THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
+
+/** Conceptual masses. */
+const MASS_COLOR = 0x7fa7d9;
 
 const COLORS: Record<string, number> = {
   [Cat.Wall]: 0xd9d4c7,
@@ -320,7 +325,9 @@ export class Viewport {
         const material = elementMaterial(this.doc, el);
         // Family voids show as translucent orange in the family editor (Revit convention).
         const isVoid = isFormCategory(el.category) && (el.params as { isVoid?: boolean }).isVoid;
-        group = isVoid ? makeGroup(mesh, VOID_COLOR, 0.35) : makeGroup(mesh, material?.params.color ?? (el.params as { color?: number }).color ?? COLORS[el.category] ?? 0xcccccc);
+        // Masses: translucent blue, as Revit draws them.
+        const mass = graphicsCategory(this.doc, el) === MASS_CATEGORY;
+        group = isVoid ? makeGroup(mesh, VOID_COLOR, 0.35) : mass ? makeGroup(mesh, MASS_COLOR, 0.45) : makeGroup(mesh, material?.params.color ?? (el.params as { color?: number }).color ?? COLORS[el.category] ?? 0xcccccc);
         group.userData.baseColor = material?.params.color;
         group.userData.solid = true;
         // Symbols drawn with a solid (door swings) ride along in the same group.
@@ -535,7 +542,16 @@ export class Viewport {
     return g.halftone ? blend(c, HALFTONE_TOWARD, 0.6) : c;
   }
 
+  /** Show Mass (Revit's session toggle): conceptual masses only show while it's on. */
+  showMass = false;
+
+  setShowMass(on: boolean): void {
+    this.showMass = on;
+    this.refreshVisibility();
+  }
+
   private isShown(el: { id: ElementId; category: string; params: unknown }): boolean {
+    if (!this.showMass && graphicsCategory(this.doc, el as Element) === MASS_CATEGORY) return false;
     const owner = annotationView(el as never);
     if (owner && owner !== this.annotationViewId) return false;
     const lvl = planLevelOf(el as Element);

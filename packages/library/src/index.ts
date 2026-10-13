@@ -436,6 +436,59 @@ export const VIEW_MARKERS: LibraryFamily[] = [
   }),
 ];
 
+
+// ---- Conceptual masses (Massing & Site → Place Mass) -----------------------
+
+export const massBox: LibraryFamily = {
+  name: "Mass - Box",
+  category: "Mass",
+  description: "Rectangular mass, Width x Depth x Height, centred on its insertion point.",
+  build: () =>
+    family("Mass", "Mass - Box", [], [["12 x 8 x 6 m", { Width: 12000, Depth: 8000, Height: 6000 }]], (tx) => {
+      createExtrusion(tx, rect("-Width/2", "-Depth/2", "Width/2", "Depth/2"), { end: "Height" });
+    }),
+};
+
+export const massCylinder: LibraryFamily = {
+  name: "Mass - Cylinder",
+  category: "Mass",
+  description: "Round mass (Radius, Height), for towers and silos.",
+  build: () =>
+    family("Mass", "Mass - Cylinder", [["Radius", 5000]], [["10 m diameter", { Radius: 5000, Height: 12000 }]], (tx) => {
+      createRevolution(tx, rect(0, 0, "Radius", "Height"), { plane: { kind: "XZ", offset: 0 }, axis: 0 });
+    }),
+};
+
+export const massGable: LibraryFamily = {
+  name: "Mass - Gable",
+  category: "Mass",
+  description: "House-form mass: walls to Eave Height, a gable roof to Ridge Height along the Depth.",
+  build: () =>
+    family(
+      "Mass",
+      "Mass - Gable",
+      [
+        ["Eave Height", 2700],
+        ["Ridge Height", 5400],
+      ],
+      [["12 x 8 m house", { Width: 12000, Depth: 8000 }]],
+      (tx) => {
+        // Gable profile in the front (XZ) plane, extruded through the depth.
+        createExtrusion(
+          tx,
+          [
+            { x: "-Width/2", y: 0 },
+            { x: "Width/2", y: 0 },
+            { x: "Width/2", y: "Eave Height" },
+            { x: 0, y: "Ridge Height" },
+            { x: "-Width/2", y: "Eave Height" },
+          ],
+          { plane: { kind: "XZ", offset: "-Depth/2" }, end: "Depth" },
+        );
+      },
+    ),
+};
+
 export const LIBRARY: LibraryFamily[] = [
   singleDoor,
   casementWindow,
@@ -449,5 +502,8 @@ export const LIBRARY: LibraryFamily[] = [
   timberSection(190, 45),
   concreteBlock,
   steelAngle,
+  massBox,
+  massCylinder,
+  massGable,
   ...VIEW_MARKERS,
 ];

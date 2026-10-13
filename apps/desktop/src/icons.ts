@@ -74,6 +74,7 @@ const P: Record<string, string> = {
   material: "M12 3a9 9 0 1 0 .01 0M5 9h14M4 14h16M8 4l8 16",
   parameters: "M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0M14 4v4M8 10v4M16 16v4",
   level: "M3 17h14l2-2-2-2H3M3 7h14l2-2-2-2H3",
+  mass: "M4 8l8-4 8 4v9l-8 4-8-4zM4 8l8 4 8-4M12 12v9",
   info: "M12 3a9 9 0 1 0 .01 0M12 11v6M12 7.5v.5",
   options: "M4 6h16M4 12h16M4 18h16M8 4v4M16 10v4M10 16v4",
   console: "M3 4h18v16H3zM6 9l3 3-3 3M11 15h6",

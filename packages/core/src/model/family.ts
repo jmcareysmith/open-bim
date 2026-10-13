@@ -28,7 +28,8 @@ export type FamilyCategory =
   | "PlumbingFixture"
   | "ElectricalEquipment"
   | "ElectricalFixture"
-  | "LightingFixture";
+  | "LightingFixture"
+  | "Mass";
 
 /** Family categories that carry MEP connectors. */
 export const MEP_FAMILY_CATEGORIES: FamilyCategory[] = ["MechanicalEquipment", "AirTerminal", "PlumbingFixture", "ElectricalEquipment", "ElectricalFixture", "LightingFixture"];
@@ -310,6 +311,11 @@ const STARTER: Record<FamilyCategory, [string, number][]> = {
   ],
   ElectricalFixture: [],
   LightingFixture: [],
+  Mass: [
+    ["Width", 12000],
+    ["Depth", 8000],
+    ["Height", 6000],
+  ],
 };
 
 /** New family document: reference level, views, centre reference planes, starter parameters. */

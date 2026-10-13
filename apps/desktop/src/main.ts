@@ -103,6 +103,8 @@ import {
   createSystem,
   mepSystems,
   enableDuctFittings,
+  placeFamilyInstance,
+  type FamilyInstanceParams,
 } from "@open-bim/core";
 import { OcctKernel, SimpleKernel, findClashes, exportGlb, exportObj, exportParts, areaLoopsFromWalls, drawingDxf, parseDxf, viewDrawing, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
@@ -754,6 +756,15 @@ const commands: Record<string, () => void | Promise<void>> = {
     try {
       const def = doc.transact(`Load family ${name}`, (tx) => loadFamily(tx, doc, fam, name));
       activeComponentKey = undefined;
+      // A new mass (In-Place Mass) goes where it was modelled: at the origin of the active level.
+      if (def.params.category === "Mass" && !doc.byCategory<FamilyInstanceParams>(Cat.FamilyInstance).some((i) => i.params.familyId === def.id)) {
+        const inst = doc.transact(`Place ${name}`, (tx) =>
+          placeFamilyInstance(tx, doc, def.id, familyTypeNames(def)[0] ?? "Default", { levelId: activeLevelId, position: { x: 0, y: 0 } }),
+        );
+        viewport.setShowMass(true);
+        ctx.setSelection([inst.id]);
+        return status(`${name} placed. Show Mass is on (Massing & Site); edit it with Edit family.`);
+      }
       status(`Loaded ${name}. ${placeHint(def.params.category)}`);
     } catch (err) {
       status(`\u26a0 ${(err as Error).message}`);
@@ -1050,6 +1061,29 @@ const commands: Record<string, () => void | Promise<void>> = {
       queueMicrotask(() => ctx.setSelection([r.id]));
     });
     status("New revision: edit it in Properties (Project Browser \u2192 Revisions lists them).");
+  },
+  showMass() {
+    viewport.setShowMass(!viewport.showMass);
+    ribbon?.markTool();
+    status(viewport.showMass ? "Show Mass on: conceptual masses show in every view." : "Show Mass off.");
+  },
+  inPlaceMass() {
+    // Revit's In-Place Mass: a new mass family, placed where it was modelled when you finish.
+    viewport.setShowMass(true);
+    ctx.newFamily("Mass");
+    status("In-Place Mass: model it with Extrusion / Blend / Revolve / Sweep, then Load into Project to place it.");
+  },
+  placeMass() {
+    viewport.setShowMass(true);
+    let def = familyDefs(doc).find((f) => f.params.category === "Mass");
+    if (!def) {
+      ctx.loadLibraryFamily("Mass - Box");
+      def = familyDefs(doc).find((f) => f.params.category === "Mass");
+    }
+    if (!def) return;
+    activeComponentKey = `${def.id}|${familyTypeNames(def)[0] ?? ""}`;
+    setTool("component");
+    refreshAll();
   },
   manageLevels: () => openManage("levels"),
   manageMaterials: () => openMaterialBrowser(doc, status),

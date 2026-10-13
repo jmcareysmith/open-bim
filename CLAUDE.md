@@ -87,7 +87,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Each open view is a live window (a Viewport each, up to 9): drag the title bar, resize by the
   edges (snap to the area and each other), double-click to maximise, × closes. The active window
   holds the interactive viewport; click another to work in it.
-- Project Browser is Revit's: Views (all), Legends, Schedules/Quantities, Sheets (all), Families
+- Project Browser is Revit's: Views (all), Sheets (all) just below (Jeremy), Legends, Schedules, Families
   (system families Walls/Floors/…/Ducts/Pipes and loadable ones, by category → family → type),
   Groups (model/detail), Links. Project Information, Materials, Project Parameters, Levels,
   Filters & Templates, Design Options, Revisions, System Browser (F9) and Model Statistics are
@@ -182,4 +182,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   (PI); DN sizes; types by material/use (PE-X, copper, uPVC sanitary/stormwater); drainage falls
   as drawn (minimum 1:40 ≤DN65, 1:60 DN80–100, 1:100 above — provisional, Jeremy's go-ahead to use
   own figures); `pipeFallChecks`. Fittings: elbow/transition/tee/cross, as for ducts.
-- Next: Phase 8 — mechanical equipment and air terminals (library families).
+- Massing (Phase 8a): Mass family category; Massing & Site → Show Mass (session toggle; masses
+  translucent blue, not on sheets/PDF), In-Place Mass (family editor; Load into Project places it
+  at the origin), Place Mass (library Mass - Box/Cylinder/Gable). V/G category "Mass".
+- Next: Phase 8a — mass floors; then the rest of 8a, then Phase 8 (mechanical equipment, …).

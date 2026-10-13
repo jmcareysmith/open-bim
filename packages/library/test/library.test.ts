@@ -16,9 +16,10 @@ import {
   views,
   wallCuts,
   type FamilyInstance,
+  graphicsCategory,
 } from "@open-bim/core";
 import { OcctKernel, SimpleKernel, boundingBox, buildDetailComponentLines, buildViewMarker, meshVolume } from "@open-bim/geometry";
-import { LIBRARY, baseCabinet, casementWindow, roundTable } from "../src/index.ts";
+import { LIBRARY, baseCabinet, casementWindow, massGable, roundTable } from "../src/index.ts";
 
 let occt: OcctKernel;
 beforeAll(async () => {
@@ -106,5 +107,18 @@ describe("family library", () => {
     const bb = boundingBox(new SimpleKernel().build(doc, inst)!);
     expect(bb.max[0] - bb.min[0]).toBeCloseTo(900, -1);
     expect(bb.max[2]).toBeCloseTo(750);
+  });
+
+  it("masses build to their parameters and show as the Mass category", () => {
+    const { doc, ids } = project();
+    const def = doc.transact("Load", (tx) => loadFamily(tx, doc, massGable.build(), "Gable"));
+    const inst = doc.transact("P", (tx) => placeFamilyInstance(tx, doc, def.id, familyTypeNames(def)[0]!, { levelId: ids.levels.ground }));
+    const mesh = new SimpleKernel().build(doc, inst)!;
+    const bb = boundingBox(mesh);
+    expect(bb.max[2]).toBeCloseTo(5400);
+    expect(bb.max[1] - bb.min[1]).toBeCloseTo(8000);
+    // Walls to the eaves plus the gable triangle, through the depth.
+    expect(meshVolume(mesh)).toBeCloseTo((12000 * 2700 + (12000 * 2700) / 2) * 8000, -6);
+    expect(graphicsCategory(doc, inst)).toBe("Mass");
   });
 });

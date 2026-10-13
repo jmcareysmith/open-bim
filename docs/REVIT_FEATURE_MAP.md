@@ -45,6 +45,8 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Rooms, room separation, room bounding | 4 | ✅ |
 | Areas & area plans (GFA, NLA) | 4 | ✅ |
 | Toposolid / topography, building pads, site components | 6 | 🟨 |
+| Conceptual masses (in-place, loadable, Show Mass) | 8a | ✅ |
+| Mass floors, Model by Face | 8a | ⬜ |
 
 ## 4. Structural
 | Feature | Phase | Status |

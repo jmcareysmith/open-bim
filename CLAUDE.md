@@ -164,4 +164,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   NZ Checks → NZS 3604 bracing (enter tabulated demand there). Demand is a provisional estimate.
 - AI render: Render pane → AI render… (self-hosted SD WebUI API, or Gemini with the user's key).
   Tested against a mock server only, not a real model.
-- Next: Phases 7a and 7b done. Phase 8 (MEP & visual programming).
+- MEP (Phase 8, core/model/mep.ts): MEP family categories (mechanical equipment, air terminals,
+  plumbing/electrical fixtures, lighting); family editor → Family Types → Add connector (system,
+  position, facing, size, flow L/s, load W, units as formulas). Systems: right-click elements →
+  Create … system / Add to …; browser → MEP Systems (by classification, flow/load totals).
+- Next: Phase 8 — ducts with auto fittings.

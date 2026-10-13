@@ -59,9 +59,9 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Feature | Phase | Status |
 |---|---|---|
 | Ducts, pipes, fittings, routing | 8 | ⬜ |
-| Systems (supply, return, sanitary…) | 8 | ⬜ |
+| Systems (supply, return, sanitary…) | 8 | ✅ (connectors in families; systems with flow/load totals; system browser) |
 | Electrical circuits, panels, cable trays, conduit | 8 | ⬜ |
-| Fixtures & equipment | 8 | ⬜ |
+| Fixtures & equipment | 8 | 🟨 (MEP family categories with connectors; no library families yet) |
 | Sizing & pressure-loss calcs | 9 | ⬜ |
 
 ## 6. Families & parameters

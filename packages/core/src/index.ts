@@ -51,4 +51,5 @@ export * from "./model/symbols.ts";
 export * from "./model/detailcomponents.ts";
 export * from "./model/wallattach.ts";
 export * from "./model/pickwalls.ts";
+export * from "./model/mep.ts";
 export * from "./model/markers.ts";

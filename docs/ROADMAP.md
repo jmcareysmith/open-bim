@@ -99,7 +99,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Right-click menus (Select All Instances, Edit Type, Hide in View…), two-letter shortcuts, shortcut editor — menus done (element: modify tools, Flip, Edit Type, Select All Instances, hide/isolate, V/G, Group, Delete; empty space: V/G dialog, Zoom to Fit, Reset); two-letter shortcuts; Keyboard Shortcuts editor (KS or File menu; saved per machine)
 
 ## Phase 8 — MEP & visual programming (current)
-- [ ] Connectors and MEP systems (supply/return air, cold/hot water, sanitary, power); system browser
+- [x] Connectors and MEP systems (supply/return air, cold/hot water, sanitary, power); system browser
 - [ ] Ducts with auto fittings (elbows, tees, transitions), round/rectangular types, sizing from airflow
 - [ ] Pipes with auto fittings, falls on waste pipes, pipe materials
 - [ ] Mechanical equipment and air terminals (library families with connectors)

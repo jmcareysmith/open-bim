@@ -19,7 +19,7 @@ import {
   stackSegments,
   hasSlopedTop,
 } from "@open-bim/core";
-import { buildGridLines, buildOpeningLines, buildReferencePlaneLines, type LineData } from "./datums.ts";
+import { buildConnectorLines, buildGridLines, buildOpeningLines, buildReferencePlaneLines, type LineData } from "./datums.ts";
 import { buildDoor, buildDoorLines, buildWindow, buildWindowLines } from "./doors.ts";
 import { joinedWallFootprint } from "./joins.ts";
 import { buildRoof } from "./roof.ts";
@@ -203,6 +203,7 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.Toposolid, buildToposolidLines],
     [Cat.Floor, buildFloorLines],
     [Cat.Beam, buildBeamLines],
+    [Cat.Connector, buildConnectorLines],
   ]);
 
   register(category: string, builder: Builder): void {

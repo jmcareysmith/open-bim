@@ -15,7 +15,23 @@ import { create3DView, createElevation, createFloorPlan } from "./viewdefs.ts";
 
 /** "DetailItem": a 2D detail component (drawn with detail lines and regions in its plan view). */
 /** "ViewMarker": an elevation mark, section head/tail or callout head (2D, drawn at paper size). */
-export type FamilyCategory = "GenericModel" | "Furniture" | "Casework" | "Door" | "Window" | "DetailItem" | "ViewMarker";
+export type FamilyCategory =
+  | "GenericModel"
+  | "Furniture"
+  | "Casework"
+  | "Door"
+  | "Window"
+  | "DetailItem"
+  | "ViewMarker"
+  | "MechanicalEquipment"
+  | "AirTerminal"
+  | "PlumbingFixture"
+  | "ElectricalEquipment"
+  | "ElectricalFixture"
+  | "LightingFixture";
+
+/** Family categories that carry MEP connectors. */
+export const MEP_FAMILY_CATEGORIES: FamilyCategory[] = ["MechanicalEquipment", "AirTerminal", "PlumbingFixture", "ElectricalEquipment", "ElectricalFixture", "LightingFixture"];
 /** What a View Marker family draws. */
 export type MarkerRole = "elevation" | "sectionHead" | "sectionTail" | "calloutHead";
 export type FamilyHosting = "none" | "wall";
@@ -273,6 +289,27 @@ const STARTER: Record<FamilyCategory, [string, number][]> = {
   ],
   DetailItem: [],
   ViewMarker: [],
+  MechanicalEquipment: [
+    ["Width", 900],
+    ["Depth", 600],
+    ["Height", 600],
+  ],
+  AirTerminal: [
+    ["Width", 600],
+    ["Depth", 600],
+  ],
+  PlumbingFixture: [
+    ["Width", 500],
+    ["Depth", 450],
+    ["Height", 850],
+  ],
+  ElectricalEquipment: [
+    ["Width", 400],
+    ["Height", 600],
+    ["Depth", 150],
+  ],
+  ElectricalFixture: [],
+  LightingFixture: [],
 };
 
 /** New family document: reference level, views, centre reference planes, starter parameters. */

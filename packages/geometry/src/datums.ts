@@ -1,4 +1,9 @@
 import {
+  classificationInfo,
+  evaluate,
+  familyValues,
+  type ConnectorParams,
+  type Num,
   wallCuts,
   wallDirection,
   wallThickness,
@@ -111,4 +116,46 @@ export function buildOpeningLines(doc: Document, el: Element): LineData | null {
     corners.forEach((c, i) => seg.push(...c, ...corners[(i + 1) % 4]!));
   }
   return { segments: new Float32Array(seg), labels: [], placement: "model" };
+}
+
+/**
+ * Family editor: a connector as a circle the size of the duct or pipe (electrical: 150 mm) with an
+ * arrow the way it faces (a cross when it faces up or down).
+ */
+export function buildConnectorLines(doc: Document, el: Element): LineData | null {
+  const values = familyValues(doc);
+  const p = el.params as ConnectorParams;
+  const num = (n: Num) => {
+    try {
+      return evaluate(n, values);
+    } catch {
+      return 0;
+    }
+  };
+  const x = num(p.x);
+  const y = num(p.y);
+  const z = num(p.z);
+  const domain = classificationInfo(p.classification).domain;
+  const r = domain === "electrical" ? 75 : Math.max(25, (p.shape === "round" ? num(p.diameter) : Math.max(num(p.width), num(p.height))) / 2);
+  const seg: number[] = [];
+  const n = 32;
+  for (let i = 0; i < n; i++) {
+    const a0 = (i / n) * 2 * Math.PI;
+    const a1 = ((i + 1) / n) * 2 * Math.PI;
+    seg.push(x + r * Math.cos(a0), y + r * Math.sin(a0), z, x + r * Math.cos(a1), y + r * Math.sin(a1), z);
+  }
+  const d = { "+x": [1, 0], "-x": [-1, 0], "+y": [0, 1], "-y": [0, -1] }[p.facing as "+x"] as [number, number] | undefined;
+  if (d) {
+    const tip = [x + d[0] * r * 2, y + d[1] * r * 2];
+    seg.push(x, y, z, tip[0]!, tip[1]!, z);
+    const back = 0.5 * r;
+    const nx = -d[1];
+    const ny = d[0];
+    seg.push(tip[0]!, tip[1]!, z, tip[0]! - d[0] * back + nx * back * 0.6, tip[1]! - d[1] * back + ny * back * 0.6, z);
+    seg.push(tip[0]!, tip[1]!, z, tip[0]! - d[0] * back - nx * back * 0.6, tip[1]! - d[1] * back - ny * back * 0.6, z);
+  } else {
+    const k = r * 0.7;
+    seg.push(x - k, y - k, z, x + k, y + k, z, x - k, y + k, z, x + k, y - k, z);
+  }
+  return { segments: new Float32Array(seg), labels: [{ text: classificationInfo(p.classification).prefix, position: [x, y - r - 60, z], size: 60 }], placement: "model" };
 }

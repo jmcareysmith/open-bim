@@ -73,6 +73,8 @@ export const Cat = {
   Beam: "Beam",
   PadFooting: "PadFooting",
   StripFooting: "StripFooting",
+  Connector: "Connector",
+  MEPSystem: "MEPSystem",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

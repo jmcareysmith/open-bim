@@ -226,6 +226,17 @@ import {
   floorSlope,
   type Floor,
   type CalculatedField,
+  SYSTEM_CLASSIFICATIONS,
+  classificationInfo,
+  createConnector,
+  mepSystems,
+  removeFromSystem,
+  systemMembers,
+  systemTotals,
+  type ConnectorFacing,
+  type ConnectorParams,
+  type MEPSystem,
+  type SystemClassification,
 } from "@open-bim/core";
 
 type Child = Node | string | null | undefined | false;
@@ -804,6 +815,12 @@ const FAMILY_CATEGORIES: [FamilyCategory, string][] = [
   ["Window", "Window (wall hosted)"],
   ["DetailItem", "Detail Item (2D)"],
   ["ViewMarker", "View Marker (elevation mark, section head/tail, callout head)"],
+  ["MechanicalEquipment", "Mechanical Equipment (MEP)"],
+  ["AirTerminal", "Air Terminal (MEP)"],
+  ["PlumbingFixture", "Plumbing Fixture (MEP)"],
+  ["ElectricalEquipment", "Electrical Equipment (MEP)"],
+  ["ElectricalFixture", "Electrical Fixture (MEP)"],
+  ["LightingFixture", "Lighting Fixture (MEP)"],
 ];
 
 /** A number or formula: numeric text is stored as a number, anything else as a formula. */
@@ -932,6 +949,25 @@ function familyTypesSection(ctx: PanelContext): HTMLElement {
       createFamilyType(tx, doc, `Type ${n}`);
     });
   sec.append(row("", newType));
+  // MEP connectors: where ducts, pipes and wiring attach (and the flow or load there).
+  const connectors = doc.byCategory<ConnectorParams>(Cat.Connector);
+  sec.append(h("h3", {}, `Connectors (${connectors.length})`));
+  for (const c of connectors) {
+    const div = h("div", { class: "list-item" }, h("span", {}, classificationInfo(c.params.classification).label), h("span", { class: "muted" }, c.params.facing));
+    div.onclick = () => ctx.setSelection([c.id]);
+    sec.append(div);
+  }
+  sec.append(
+    row(
+      "Add connector",
+      select([{ value: "", label: "System\u2026" }, ...SYSTEM_CLASSIFICATIONS.map((x) => ({ value: x.value, label: x.label }))], "", (v) => {
+        if (!v) return;
+        let id: ElementId | undefined;
+        edit(ctx, "Add connector", (tx) => (id = createConnector(tx, { classification: v as SystemClassification }).id));
+        if (id) ctx.setSelection([id]);
+      }),
+    ),
+  );
 
   let values: Record<string, number> = {};
   let error = "";
@@ -1944,7 +1980,30 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   );
 
   // Revit order: views, then sheets right below, then legends and schedules.
-  root.replaceChildren(project, views, sheetsSec, legendSec, schedSec, fams, revSec, linkSec, optSec, paramsSec, lv, types, mats, vg, counts);
+  // MEP systems (Revit's System Browser): by system, with members and flow or load.
+  const sysSec = h("div", { class: "section" }, h("h3", {}, "MEP Systems"));
+  const allSystems = mepSystems(doc);
+  for (const info of SYSTEM_CLASSIFICATIONS) {
+    const list = allSystems.filter((s) => s.params.classification === info.value);
+    if (!list.length) continue;
+    sysSec.append(h("div", { class: "subhead" }, info.label));
+    for (const s of list) {
+      const t = systemTotals(doc, s);
+      const swatch = h("span", { class: "swatch" });
+      swatch.style.background = `#${info.color.toString(16).padStart(6, "0")}`;
+      const div = h(
+        "div",
+        { class: `list-item indent${sel.has(s.id) ? " selected" : ""}` },
+        h("span", {}, s.name ?? s.id),
+        h("span", { class: "muted" }, info.domain === "electrical" ? `${(t.load / 1000).toFixed(1)} kW` : `${t.flow.toFixed(0)} L/s`),
+        swatch,
+      );
+      div.onclick = () => ctx.setSelection([s.id]);
+      sysSec.append(div);
+    }
+  }
+  if (!allSystems.length) sysSec.append(h("div", { class: "muted" }, "Select terminals, fixtures or equipment, then right-click \u2192 Create System."));
+  root.replaceChildren(project, views, sheetsSec, legendSec, schedSec, fams, sysSec, revSec, linkSec, optSec, paramsSec, lv, types, mats, vg, counts);
 }
 
 // ---- Properties -----------------------------------------------------------
@@ -2524,6 +2583,59 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
     case Cat.Revolution:
     case Cat.Sweep: {
       sec.append(...formRows(ctx, el));
+      break;
+    }
+    case Cat.Connector: {
+      const p = el.params as ConnectorParams;
+      const set = (name: string, patch: Partial<ConnectorParams>) => update<ConnectorParams>(name, patch);
+      const values = familyInfo(doc) ? familyValues(doc) : {};
+      const check = (v: Num) => void evaluate(v, values);
+      const f = (key: "x" | "y" | "z" | "diameter" | "width" | "height" | "flow" | "load" | "units", label: string) =>
+        row(label, formulaInput(p[key] ?? 0, (v) => set(`Connector ${label.toLowerCase()}`, { [key]: v }), check));
+      const domain = classificationInfo(p.classification).domain;
+      sec.append(
+        row("System", select(SYSTEM_CLASSIFICATIONS.map((x) => ({ value: x.value, label: x.label })), p.classification, (v) => set("Connector system", { classification: v as SystemClassification }))),
+        f("x", "X"),
+        f("y", "Y"),
+        f("z", "Z (height)"),
+        row("Facing", select((["+x", "-x", "+y", "-y", "+z", "-z"] as const).map((x) => ({ value: x, label: x })), p.facing, (v) => set("Connector facing", { facing: v as ConnectorFacing }))),
+        row("Flow direction", select([{ value: "in", label: "In" }, { value: "out", label: "Out" }, { value: "both", label: "Both" }], p.flowDirection, (v) => set("Connector flow direction", { flowDirection: v as ConnectorParams["flowDirection"] }))),
+      );
+      if (domain !== "electrical") {
+        sec.append(row("Shape", select([{ value: "round", label: "Round" }, { value: "rectangular", label: "Rectangular" }], p.shape, (v) => set("Connector shape", { shape: v as ConnectorParams["shape"] }))));
+        sec.append(...(p.shape === "round" ? [f("diameter", "Diameter")] : [f("width", "Width"), f("height", "Height")]));
+        sec.append(f("flow", "Flow (L/s)"));
+        if (domain === "pipe") sec.append(f("units", "Discharge / loading units"));
+      } else sec.append(f("load", "Load (W)"));
+      break;
+    }
+    case Cat.MEPSystem: {
+      const sys = el as MEPSystem;
+      const info = classificationInfo(sys.params.classification);
+      const t = systemTotals(doc, sys);
+      const members = systemMembers(doc, sys);
+      const pick = h("button", { textContent: "Select members" });
+      pick.onclick = () => ctx.setSelection(members.map((m) => m.id));
+      sec.append(
+        row("Name", textInput(el.name ?? "", (v) => v.trim() && edit(ctx, "Rename system", (tx) => tx.setName(el.id, v.trim())))),
+        row("System", info.label),
+        row("Members", String(t.members)),
+        ...(info.domain === "electrical" ? [row("Connected load", `${(t.load / 1000).toFixed(2)} kW`)] : [row("Flow", `${t.flow.toFixed(1)} L/s`)]),
+        ...(info.domain === "pipe" && t.units ? [row("Units", String(t.units))] : []),
+        row("", pick),
+      );
+      for (const m of members) {
+        const fam = m.category === Cat.FamilyInstance ? doc.get((m.params as FamilyInstanceParams).familyId) : undefined;
+        const div = h("div", { class: "list-item" }, h("span", {}, m.name ?? fam?.name ?? m.category), h("span", { class: "muted" }, fam ? (m.params as FamilyInstanceParams).typeName : m.category));
+        div.onclick = () => ctx.setSelection([m.id]);
+        const rm = h("button", { textContent: "\u00d7", title: "Remove from system", class: "mini" });
+        rm.onclick = (ev) => {
+          ev.stopPropagation();
+          edit(ctx, "Remove from system", (tx) => removeFromSystem(tx, doc, sys.id, [m.id]));
+        };
+        div.append(rm);
+        sec.append(div);
+      }
       break;
     }
     case Cat.FamilyDef: {

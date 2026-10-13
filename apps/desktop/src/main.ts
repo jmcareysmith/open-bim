@@ -94,6 +94,11 @@ import {
   viewSun,
   type WallParams,
   placeView,
+  SYSTEM_CLASSIFICATIONS,
+  addToSystem,
+  connectableClassifications,
+  createSystem,
+  mepSystems,
 } from "@open-bim/core";
 import { OcctKernel, SimpleKernel, findClashes, exportGlb, exportObj, exportParts, areaLoopsFromWalls, drawingDxf, parseDxf, viewDrawing, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
@@ -1380,6 +1385,23 @@ function openCanvasMenu(ev: MouseEvent): void {
       { label: "Mirror", hint: "MM", action: () => setTool("mirror") },
       { label: "Array", hint: "AR", action: () => setTool("array") },
     );
+    // MEP: put the selection in a system (Revit: Create Duct/Piping/Power System), or an existing one.
+    const conns = selection.map((s) => doc.get(s)).filter((e): e is ModelElement => !!e).map((e) => connectableClassifications(doc, e));
+    const common = conns.length && conns.every((c) => c.length) ? SYSTEM_CLASSIFICATIONS.filter((c) => conns.every((list) => list.includes(c.value))) : [];
+    for (const c of common) {
+      items.push({
+        label: `Create ${c.label.toLowerCase()} system`,
+        action: () => {
+          let id: ElementId | undefined;
+          edit(`Create ${c.label.toLowerCase()} system`, (tx) => (id = createSystem(tx, doc, c.value, selection).id));
+          if (id) ctx.setSelection([id]);
+        },
+      });
+      for (const s of mepSystems(doc).filter((x) => x.params.classification === c.value)) {
+        if (selection.every((id) => s.params.memberIds.includes(id))) continue;
+        items.push({ label: `Add to ${s.name}`, action: () => edit(`Add to ${s.name}`, (tx) => addToSystem(tx, doc, s.id, selection.filter((id) => !s.params.memberIds.includes(id)))) });
+      }
+    }
     if (walls.length) {
       items.push(
         { label: "Attach Top", action: () => startAttach("top") },

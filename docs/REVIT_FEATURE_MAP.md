@@ -89,10 +89,11 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Sections & callouts | 2 | 🟨 |
 | Drafting views | 2 | ⬜ |
 | Legends | 4 | ✅ |
-| Detail levels (coarse/medium/fine) | 2 | 🟨 |
+| Detail levels (coarse/medium/fine) | 2 | ✅ (Coarse: types' Coarse Scale Fill Pattern, hollow by default; Medium/Fine: layers) |
 | Visibility/Graphics overrides, filters | 2 | ✅ (incl. Override Graphics by element; line weights in PDF only) |
 | View templates | 2 | ✅ |
 | Hidden-line, shaded, realistic styles | 2 | ✅ (3D views; plans/sections are 2D drawings) |
+| Graphic Display Options (edges, transparency, silhouettes, shadows, lighting, depth cueing) | 8b | ✅ (smooth lines always on) |
 | Camera / perspective views | 2 | ✅ (Camera tool; each 3D view keeps its camera) |
 | Temporary hide/isolate | 1 | ✅ |
 

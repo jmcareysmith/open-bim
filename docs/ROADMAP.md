@@ -109,7 +109,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Object Styles and line weights: pens per category, paper widths by scale, on screen and PDF; Thin Lines (TL)
 - [x] 3D view look: white background, no work-plane grid, ViewCube and navigation, orthographic 3D
 - [x] Section box for 3D views (grips to drag its faces)
-- [ ] Coarse fill patterns per type (Revit's default hollow walls at Coarse); Graphic Display Options (edges, silhouettes, smooth lines)
+- [x] Coarse fill patterns per type (Revit's default hollow walls at Coarse); Graphic Display Options (edges, silhouettes, smooth lines)
 - [ ] Wall sweeps and reveals; edit wall profile
 - [ ] Stairs: L- and U-shaped runs with landings, winders
 - [ ] Curtain walls: add/remove grid lines, mullion types, panel swaps (doors, solid panels)

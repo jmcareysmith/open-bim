@@ -92,6 +92,8 @@ export type ViewParams = {
   lighting?: ViewLighting | null;
   /** 3D views: how the model is drawn (default shaded). */
   visualStyle?: VisualStyle | null;
+  /** Graphic Display Options → Model Display: edges, transparency, silhouettes. */
+  display?: ViewDisplay | null;
   phaseFilter?: "all" | "complete" | "new" | "previous" | "none" | null;
   /** Design options: which option this view shows per option set (default primary). */
   designOptions?: Record<string, string> | null;
@@ -389,6 +391,22 @@ export type ViewLighting = {
   /** Depth cueing: things fade towards the background with distance. Start/end are % of the model's depth from the front; fade is how much the far end fades, %. */
   depthCue?: { start: number; end: number; fade: number } | null;
 };
+
+/** Graphic Display Options → Model Display (Revit). */
+export type ViewDisplay = {
+  /** Show edges on shaded faces (default on, off in Realistic; Wireframe/Hidden Line always). */
+  edges?: boolean;
+  /** Whole-view transparency, 0–100 (default 0). */
+  transparency?: number;
+  /** Silhouette edges: the pen (1–16) for outlines against the background and other objects; none when unset. */
+  silhouettes?: number | null;
+};
+
+/** Whether a visual style shows face edges under the view's display options. */
+export function showsEdges(style: VisualStyle, display: ViewDisplay | null | undefined): boolean {
+  if (style === "wireframe" || style === "hiddenLine") return true;
+  return display?.edges ?? (style !== "realistic" && style !== "rendered");
+}
 
 export const DEFAULT_LIGHTING = { sun: 80, ambient: 50, shadow: 50 } as const;
 

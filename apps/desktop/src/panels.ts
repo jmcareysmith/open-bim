@@ -417,6 +417,22 @@ function bracingRows(ctx: PanelContext, w: Wall): HTMLElement[] {
   return out;
 }
 
+/** Graphics: Coarse Scale Fill Pattern and colour (cuts at Coarse; hollow when none). */
+function coarseFillRows(ctx: PanelContext, t: Element<LayeredTypeParams>): HTMLElement[] {
+  if (t.params.stack) return [];
+  const cf = t.params.coarseFill ?? null;
+  const set = (next: LayeredTypeParams["coarseFill"]) => edit(ctx, "Coarse fill pattern", (tx) => tx.update<LayeredTypeParams>(t.id, { coarseFill: next }));
+  const opts = [{ value: "", label: "<None> (hollow)" }, ...PATTERNS.filter((n) => n !== "none").map((n) => ({ value: n, label: n[0]!.toUpperCase() + n.slice(1) }))];
+  const colour = h("input", { type: "color", value: `#${(cf?.color ?? 0).toString(16).padStart(6, "0")}` }) as HTMLInputElement;
+  colour.disabled = !cf;
+  colour.onchange = () => cf && set({ ...cf, color: parseInt(colour.value.slice(1), 16) });
+  return [
+    h("div", { class: "subhead" }, "Graphics"),
+    row("Coarse scale fill pattern", select(opts, cf?.pattern ?? "", (v) => set(v ? { pattern: v as PatternName, color: cf?.color ?? null } : null))),
+    row("Coarse scale fill colour", colour),
+  ];
+}
+
 /** Thermal (H1) properties of envelope types. */
 function thermalRows(ctx: PanelContext, el: Element): HTMLElement[] {
   if (el.category === Cat.CeilingType) return [];
@@ -3314,6 +3330,7 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       sec.append(
         row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename type", (tx) => tx.setName(el.id, v || undefined)))),
         row("Total", len(totalThickness(t))),
+        ...coarseFillRows(ctx, t),
         ...thermalRows(ctx, el),
       );
       const matOpts = materialElements(doc).map((m) => ({ value: m.id, label: m.name ?? m.id }));

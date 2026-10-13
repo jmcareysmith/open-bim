@@ -224,4 +224,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - 3D views: white background, no ground grid; ViewCube top right (apps/desktop/src/viewcube.ts:
   faces/corners turn the view, ⌂ home, right-click Orthographic/Perspective/Fit); {3D} is
   orthographic by default (view `projection`; camera views perspective).
+- Coarse: layered types draw cuts hollow unless the type sets Coarse Scale Fill Pattern/colour (type
+  Properties → Graphics; `coarseFill`). Graphic Display Options (view bar ▾ next to Shadows): style, show
+  edges, view transparency, silhouettes (pen; screen-space depth pass in viewport.ts), shadows, lighting,
+  depth cueing — view `display` param.
 - Next (Jeremy, 2026-10-14): Phase 8b — Revit look & architectural parity, before the rest of 8.

@@ -8,6 +8,7 @@ import {
   createWall,
   floorPlanFor,
   placeView,
+  type LayeredTypeParams,
   type ProjectSettingsParams,
   type Vec2,
   type ViewParams,
@@ -35,13 +36,30 @@ const strokeLength = (segs: number[]) => {
 };
 
 describe("view drawings", () => {
-  it("a plan has cut lines and poche for walls, in model mm", () => {
+  it("a plan has cut lines for walls, hollow at Coarse (Revit's default), in model mm", () => {
     const { doc, ids, k } = model();
     const d = viewDrawing(doc, k, floorPlanFor(doc, ids.levels.ground)!);
     const cut = d.strokes.filter((s) => s.kind === "cut");
     expect(cut.length).toBe(4);
-    expect(d.fills.filter((f) => f.kind === "poche").length).toBe(4);
+    expect(d.fills.filter((f) => f.id && doc.get(f.id)?.category === "Wall")).toEqual([]);
     expect(d.bounds.max.x - d.bounds.min.x).toBeGreaterThan(8000);
+  });
+
+  it("a type's Coarse Scale Fill Pattern fills its cuts at Coarse only", () => {
+    const { doc, ids, k } = model();
+    const plan = floorPlanFor(doc, ids.levels.ground)!;
+    doc.transact("Coarse fill", (tx) => tx.update<LayeredTypeParams>(ids.wallTypes.exterior, { coarseFill: { pattern: "solid", color: 0x404040 } }));
+    const solid = viewDrawing(doc, k, doc.require<ViewParams>(plan.id) as never);
+    const fills = solid.fills.filter((f) => f.kind === "solid");
+    expect(fills.length).toBe(4);
+    expect(fills[0]!.color).toBe(0x404040);
+    doc.transact("Hatch", (tx) => tx.update<LayeredTypeParams>(ids.wallTypes.exterior, { coarseFill: { pattern: "diagonal" } }));
+    const hatched = viewDrawing(doc, k, doc.require<ViewParams>(plan.id) as never);
+    expect(hatched.strokes.some((s) => s.kind === "hatch" && s.segments.length > 0)).toBe(true);
+    // Medium ignores it and draws the layers' material patterns.
+    doc.transact("Medium", (tx) => tx.update<ViewParams>(plan.id, { detailLevel: "medium" }));
+    const med = viewDrawing(doc, k, doc.require<ViewParams>(plan.id) as never);
+    expect(med.fills.filter((f) => f.kind === "solid" && f.color === 0x404040)).toEqual([]);
   });
 
   it("medium detail adds layer hatching; V/G hiding removes the walls", () => {

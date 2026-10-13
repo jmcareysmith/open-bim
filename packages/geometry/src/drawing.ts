@@ -20,6 +20,7 @@ import {
   planLevelOf,
   type LinePattern,
   type PatternName,
+  type LayeredTypeParams,
   type ResolvedGraphics,
   type ResolvedLine,
   graphicsCategory,
@@ -195,16 +196,18 @@ export function lineworkDrawing(
     const fg = r.cutFill.foreground;
     const bg = r.cutFill.background;
     // Cut patterns: the background (a solid fill when set), then the foreground pattern.
-    const cutFill = (loops: Vec2[][], materialPattern: string | null, kind: Fill["kind"]) => {
+    const cutFill = (loops: Vec2[][], materialPattern: string | null, kind: Fill["kind"], typeColor: number | null = null) => {
       if (bg.visible && bg.pattern === "solid") out.fills.push({ kind: "solid", loops, ...(bg.color !== null ? { color: bg.color } : {}), id: lw.id });
       if (!fg.visible) return;
       const pattern = fg.pattern ?? materialPattern;
+      const color = fg.color ?? typeColor;
+      if (pattern === "none") return;
       if (pattern === "solid" || (pattern === null && kind === "poche")) {
-        out.fills.push({ kind: pattern === "solid" ? "solid" : "poche", loops, ...(fg.color !== null ? { color: fg.color } : {}), id: lw.id });
+        out.fills.push({ kind: pattern === "solid" ? "solid" : "poche", loops, ...(color !== null ? { color } : {}), id: lw.id });
         return;
       }
       const fam = pattern ? patternFamilies(pattern as PatternName, g.scale) : null;
-      if (fam) out.strokes.push({ kind: "hatch", segments: hatch(loops, fam), ...proj, width: penWidth(1, g.scale), ...(fg.color !== null ? { color: fg.color } : {}) });
+      if (fam) out.strokes.push({ kind: "hatch", segments: hatch(loops, fam), ...proj, width: penWidth(1, g.scale), ...(color !== null ? { color } : {}) });
     };
     if (detailed) {
       for (const reg of cc.regions ?? []) {
@@ -213,7 +216,13 @@ export function lineworkDrawing(
         if (reg.lines.length) out.strokes.push({ kind: "beyond", segments: reg.lines, ...layerLine });
       }
     } else if (cc.loops.length) {
-      cutFill(cc.loops, null, "poche");
+      // Coarse: layered types (walls, floors, roofs, ceilings) use their Coarse Scale Fill Pattern,
+      // hollow when unset (Revit); other cuts are pochéd.
+      const type = el.typeId ? doc.get<LayeredTypeParams>(el.typeId)?.params : undefined;
+      if (type && Array.isArray(type.layers)) {
+        const cf = type.coarseFill;
+        cutFill(cc.loops, cf?.pattern ?? null, "solid", cf?.color ?? null);
+      } else cutFill(cc.loops, null, "poche");
     }
     if (lw.projection.length) out.strokes.push({ kind: "beyond", segments: lw.projection, ...proj });
     const sf = r.surface.foreground;

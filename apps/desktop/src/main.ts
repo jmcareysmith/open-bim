@@ -1338,6 +1338,7 @@ function configureViewport(vp: Viewport, target: ModelElement, primary: boolean)
   const planLike = v.params.kind === "floorPlan" || v.params.kind === "callout" || v.params.kind === "areaPlan";
   vp.setVisualStyle(v.params.kind === "3d" ? (v.params.visualStyle ?? "shaded") : v.params.kind === "legend" ? "hiddenLine" : (v.params.visualStyle ?? "hiddenLine"));
   // Sun, shadows and lighting (any model view): the true sun for the site, at the view's date and time.
+  vp.setDisplay(v.params.kind === "legend" ? {} : (v.params.display ?? {}));
   if (v.params.kind !== "legend") vp.setSun(viewSun(doc, v.params), !!v.params.shadows, v.params.lighting ?? {});
   else vp.setSun(null, false);
   if (isPlanView(v)) {

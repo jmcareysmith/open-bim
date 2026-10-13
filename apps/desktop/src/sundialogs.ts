@@ -8,6 +8,10 @@ import {
   type View,
   type ViewLighting,
   type ViewParams,
+  type ViewDisplay,
+  type VisualStyle,
+  VISUAL_STYLES,
+  showsEdges,
 } from "@open-bim/core";
 import { openDialog } from "./dialog.ts";
 import type { ViewBarHost } from "./viewbar.ts";
@@ -63,6 +67,8 @@ function slider(form: HTMLElement, label: string, value: number, onInput: (v: nu
 /** Show `params` in the viewport without saving (previews). */
 function preview(host: ViewBarHost, params: ViewParams): void {
   host.viewport.setSun(viewSun(host.doc, params), !!params.shadows, params.lighting ?? {});
+  host.viewport.setDisplay(params.display ?? {});
+  host.viewport.setVisualStyle(params.visualStyle ?? (params.kind === "3d" ? "shaded" : "hiddenLine"));
 }
 
 export function openSunSettings(host: ViewBarHost, view: View): void {
@@ -203,20 +209,50 @@ export function openSunSettings(host: ViewBarHost, view: View): void {
   update();
 }
 
+/** Graphic Display Options (Revit): model display (style, edges, transparency, silhouettes), shadows, lighting, depth cueing. */
 export function openShadowSettings(host: ViewBarHost, view: View): void {
   const { doc } = host;
   const p = view.params;
   const light: ViewLighting = { ...(p.lighting ?? {}) };
+  const display: ViewDisplay = { ...(p.display ?? {}) };
+  let style: VisualStyle = p.visualStyle ?? (p.kind === "3d" ? "shaded" : "hiddenLine");
   let shadows = !!p.shadows;
   const form = document.createElement("div");
   form.className = "dlg-form";
-  const draft = (): ViewParams => ({ ...p, shadows, lighting: light });
+  const draft = (): ViewParams => ({ ...p, shadows, lighting: light, display, visualStyle: style });
   const update = () => preview(host, draft());
 
+  form.append(Object.assign(document.createElement("div"), { className: "ovr-sub", textContent: "Model display" }));
+  const styleSel = document.createElement("select");
+  for (const o of VISUAL_STYLES.filter((o) => o.value !== "rendered")) styleSel.append(new Option(o.label, o.value, false, o.value === style));
+  field(form, "Style", styleSel);
+  const edges = input("checkbox", "", { checked: showsEdges(style, display) });
+  const syncEdges = () => {
+    edges.disabled = style === "wireframe" || style === "hiddenLine";
+    edges.checked = showsEdges(style, display);
+  };
+  styleSel.onchange = () => {
+    style = styleSel.value as VisualStyle;
+    syncEdges();
+    update();
+  };
+  edges.onchange = () => ((display.edges = edges.checked), update());
+  field(form, "Show edges", edges);
+  syncEdges();
+  slider(form, "Transparency", display.transparency ?? 0, (v) => ((display.transparency = v), update()));
+  const sil = document.createElement("select");
+  sil.append(new Option("<None>", "", false, !display.silhouettes));
+  for (let i = 1; i <= 16; i++) sil.append(new Option(`Pen ${i}`, String(i), false, display.silhouettes === i));
+  sil.onchange = () => ((display.silhouettes = sil.value ? Number(sil.value) : null), update());
+  field(form, "Silhouettes", sil);
+
+  form.append(Object.assign(document.createElement("div"), { className: "ovr-sub", textContent: "Shadows" }));
   const cast = input("checkbox", "", { checked: shadows });
   cast.onchange = () => ((shadows = cast.checked), update());
   field(form, "Cast shadows", cast);
   slider(form, "Shadow intensity", light.shadow ?? DEFAULT_LIGHTING.shadow, (v) => ((light.shadow = v), update()));
+  form.append(Object.assign(document.createElement("div"), { className: "ovr-sub", textContent: "Lighting" }));
+  slider(form, "Sun", light.sun ?? DEFAULT_LIGHTING.sun, (v) => ((light.sun = v), update()));
   slider(form, "Ambient light", light.ambient ?? DEFAULT_LIGHTING.ambient, (v) => ((light.ambient = v), update()));
   const ao = input("checkbox", "", { checked: !!light.ambientShadows });
   ao.onchange = () => ((light.ambientShadows = ao.checked), update());
@@ -238,7 +274,7 @@ export function openShadowSettings(host: ViewBarHost, view: View): void {
   const apply = Object.assign(document.createElement("button"), { textContent: "Apply", className: "primary" });
   form.append(apply);
   let applied = false;
-  const dlg = openDialog("Shadows & Lighting", () => form, () => {
+  const dlg = openDialog("Graphic Display Options", () => form, () => {
     if (!applied) {
       const v = doc.get<ViewParams>(view.id);
       if (v) preview(host, v.params);
@@ -246,7 +282,7 @@ export function openShadowSettings(host: ViewBarHost, view: View): void {
   });
   apply.onclick = () => {
     try {
-      doc.transact("Shadows and lighting", (tx) => tx.update<ViewParams>(view.id, { shadows, lighting: light }));
+      doc.transact("Graphic display options", (tx) => tx.update<ViewParams>(view.id, { shadows, lighting: light, display, visualStyle: style }));
       applied = true;
     } catch (e) {
       host.status(`⚠ ${(e as Error).message}`);

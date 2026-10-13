@@ -130,3 +130,14 @@ describe("sections, elevations and callouts", () => {
     ).toThrow(/Crop top/);
   });
 });
+
+describe("graphic display options", () => {
+  it("edges show in shaded styles unless turned off, never in realistic by default", async () => {
+    const { showsEdges } = await import("../src/index.ts");
+    expect(showsEdges("shaded", null)).toBe(true);
+    expect(showsEdges("shaded", { edges: false })).toBe(false);
+    expect(showsEdges("realistic", {})).toBe(false);
+    expect(showsEdges("realistic", { edges: true })).toBe(true);
+    expect(showsEdges("hiddenLine", { edges: false })).toBe(true);
+  });
+});

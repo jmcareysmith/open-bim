@@ -196,7 +196,7 @@ export class ViewBar {
       const shadows = el("button", { textContent: "\u25d0 Shadows", title: "Shadows on/off" });
       shadows.classList.toggle("active", !!p.shadows);
       shadows.onclick = () => set(p.shadows ? "Shadows off" : "Shadows on", { shadows: !p.shadows });
-      const shadowOpts = el("button", { textContent: "\u25be", title: "Shadows & Lighting: shadow intensity, ambient light, ambient shadows, depth cueing" });
+      const shadowOpts = el("button", { textContent: "\u25be", title: "Graphic Display Options: style, edges, transparency, silhouettes, shadows, lighting, depth cueing" });
       shadowOpts.onclick = () => openShadowSettings(this.host, view);
       this.bar.append(sunBtn, shadows, shadowOpts);
     }

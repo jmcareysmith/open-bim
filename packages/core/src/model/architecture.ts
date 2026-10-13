@@ -3,6 +3,7 @@ import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
 import { relatedWalls } from "./joins.ts";
 import { validateRegion } from "./sketch.ts";
+import type { PatternName } from "./materials.ts";
 
 // ---- categories ----------------------------------------------------------
 
@@ -127,7 +128,15 @@ export type LayeredTypeParams = {
   curtain?: CurtainGrid | null;
   /** Wall types only: a stacked wall — other wall types bottom to top (Revit: Stacked Wall). */
   stack?: StackSegment[] | null;
+  /**
+   * Coarse Scale Fill Pattern (Revit): how cuts of this type fill at Coarse detail. Unset, they
+   * draw hollow (outline only), as Revit's types do by default.
+   */
+  coarseFill?: CoarseFill | null;
 };
+
+/** A type's fill for its cuts at Coarse: a pattern (or solid) and an optional colour. */
+export type CoarseFill = { pattern: PatternName; color?: number | null };
 
 /** One wall type in a stack; `height` 0 marks the single variable-height segment. */
 export type StackSegment = { typeId: ElementId; height: number };

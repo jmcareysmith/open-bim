@@ -25,6 +25,8 @@ import {
   type Sheet,
   type ViewParams,
   type VisualStyle,
+  type ViewDisplay,
+  showsEdges,
   type ChangeSet,
   type Document,
   type ElementId,
@@ -502,7 +504,8 @@ export class Viewport {
     const vg = this.resolveGraphics(el);
     const plain = style === "hiddenLine" && !this.selected.has(el.id) && !this.revealedOnly(el) && vg.color == null && !vg.halftone;
     mat.visible = style !== "wireframe";
-    const t = vgr.transparency / 100;
+    // Element (V/G) transparency combined with the view's (Graphic Display Options).
+    const t = 1 - (1 - vgr.transparency / 100) * (1 - Math.min(100, Math.max(0, this.display.transparency ?? 0)) / 100);
     const baseOpacity = (g.userData.opacity as number | undefined) ?? 1;
     mat.transparent = t > 0 || baseOpacity < 1;
     mat.opacity = baseOpacity * (1 - t);
@@ -512,7 +515,7 @@ export class Viewport {
     const edges = g.children[1];
     if (edges instanceof THREE.LineSegments) {
       const em = edges.material as THREE.LineBasicMaterial;
-      em.visible = style !== "realistic";
+      em.visible = showsEdges(style, this.display);
       em.depthTest = style !== "wireframe";
       // Wireframe is black lines on white; the selection (blue) and revealed elements (magenta) keep their colour.
       const edge = vgr.projection.color ?? 0x14171b;
@@ -526,6 +529,111 @@ export class Viewport {
 
   private visualStyle: VisualStyle = "shaded";
   private revealHidden = false;
+  /** Graphic Display Options → Model Display (edges, transparency, silhouettes). */
+  private display: ViewDisplay = {};
+
+  setDisplay(d: ViewDisplay): void {
+    this.display = { ...d };
+    for (const id of this.objects.keys()) this.applyHighlight(id);
+    this.needsRender = true;
+  }
+
+  private sil: { target: THREE.WebGLRenderTarget; depth: THREE.ShaderMaterial; quad: THREE.Mesh<THREE.PlaneGeometry, THREE.ShaderMaterial>; scene: THREE.Scene; cam: THREE.OrthographicCamera } | null = null;
+
+  /**
+   * Silhouettes (3D): model solids' view depth into a float target, then a full-screen pass draws
+   * the pen's width of line wherever a solid's edge stands in front of something farther away
+   * (or the background) — Revit's silhouette edges.
+   */
+  private drawSilhouettes(cam: THREE.Camera): void {
+    const pen = this.display.silhouettes;
+    if (!pen || this.visualStyle === "wireframe") return;
+    const r = this.renderer;
+    const size = r.getDrawingBufferSize(new THREE.Vector2());
+    if (!this.sil) {
+      const target = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.FloatType, depthBuffer: true });
+      const depth = new THREE.ShaderMaterial({
+        clipping: true,
+        side: THREE.DoubleSide,
+        vertexShader: `#include <common>
+#include <clipping_planes_pars_vertex>
+varying float vDepth;
+void main() {
+#include <begin_vertex>
+#include <project_vertex>
+  vDepth = -mvPosition.z;
+#include <clipping_planes_vertex>
+}`,
+        fragmentShader: `#include <clipping_planes_pars_fragment>
+varying float vDepth;
+void main() {
+#include <clipping_planes_fragment>
+  gl_FragColor = vec4(vDepth, 0.0, 0.0, 1.0);
+}`,
+      });
+      const quad = new THREE.Mesh(
+        new THREE.PlaneGeometry(2, 2),
+        new THREE.ShaderMaterial({
+          transparent: true,
+          depthTest: false,
+          depthWrite: false,
+          uniforms: { tDepth: { value: target.texture }, texel: { value: new THREE.Vector2() }, width: { value: 1 }, color: { value: new THREE.Color(0x14171b) } },
+          vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+          fragmentShader: `uniform sampler2D tDepth; uniform vec2 texel; uniform float width; uniform vec3 color; varying vec2 vUv;
+void main() {
+  vec4 c = texture2D(tDepth, vUv);
+  if (c.a < 0.5) discard;
+  float d = c.r;
+  float far = 0.0;
+  for (int i = 0; i < 8; i++) {
+    float a = float(i) * 0.7853982;
+    vec4 n = texture2D(tDepth, vUv + vec2(cos(a), sin(a)) * texel * width);
+    far = max(far, (n.a < 0.5 ? 1e9 : n.r) - d);
+  }
+  if (far < d * 0.04 + 60.0) discard;
+  gl_FragColor = vec4(color, 1.0);
+}`,
+        }),
+      );
+      quad.frustumCulled = false;
+      const scene = new THREE.Scene();
+      scene.add(quad);
+      this.sil = { target, depth, quad, scene, cam: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1) };
+    }
+    const s = this.sil;
+    if (s.target.width !== size.x || s.target.height !== size.y) s.target.setSize(size.x, size.y);
+    // Only model solids go into the depth pass.
+    const hidden: THREE.Object3D[] = [];
+    this.scene.traverse((o) => {
+      if ((o instanceof THREE.Mesh || o instanceof THREE.Line || o instanceof THREE.Sprite || o instanceof THREE.Points) && !o.userData.modelSolid && o.visible) {
+        o.visible = false;
+        hidden.push(o);
+      }
+    });
+    const fog = this.scene.fog;
+    this.scene.fog = null;
+    this.scene.overrideMaterial = s.depth;
+    const clear = r.getClearColor(new THREE.Color());
+    const alpha = r.getClearAlpha();
+    r.setRenderTarget(s.target);
+    r.setClearColor(0x000000, 0);
+    r.clear();
+    r.render(this.scene, cam);
+    r.setRenderTarget(null);
+    r.setClearColor(clear, alpha);
+    this.scene.overrideMaterial = null;
+    this.scene.fog = fog;
+    for (const o of hidden) o.visible = true;
+    const u = s.quad.material.uniforms;
+    u.texel!.value.set(1 / size.x, 1 / size.y);
+    u.width!.value = Math.max(1, pen * 0.6) * r.getPixelRatio();
+    const clip = r.clippingPlanes;
+    r.clippingPlanes = [];
+    r.autoClear = false;
+    r.render(s.scene, s.cam);
+    r.autoClear = true;
+    r.clippingPlanes = clip;
+  }
 
   /** The 3D view's visual style (Wireframe, Hidden Line, Shaded, Consistent Colours, Realistic). */
   setVisualStyle(style: VisualStyle): void {
@@ -1386,6 +1494,7 @@ export class Viewport {
         this.scene.fog = (in3d || shaded) && this.depthCue ? this.cueFog(this.camera) : null;
         if ((in3d || shaded) && this.ambientShadows) this.composer(this.camera).render();
         else this.renderer.render(this.scene, this.camera);
+        if (in3d) this.drawSilhouettes(this.camera);
         if (in3d && this.sectionBox) {
           // The section box's outline and arrows, unclipped, over the model.
           const clip = this.renderer.clippingPlanes;

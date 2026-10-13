@@ -56,6 +56,8 @@ THREE.Object3D.DEFAULT_UP.set(0, 0, 1);
 const COLORS: Record<string, number> = {
   [Cat.Wall]: 0xd9d4c7,
   [Cat.Duct]: 0xb9c3cc,
+  [Cat.Pipe]: 0x4f8fbf,
+  [Cat.PipeFitting]: 0x3f7faf,
   [Cat.DuctFitting]: 0xa9b4be,
   [Cat.Floor]: 0x9aa3ad,
   [Cat.Ceiling]: 0xe8e6df,

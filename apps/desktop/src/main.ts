@@ -1,4 +1,4 @@
-import { DuctTool } from "./ducttool.ts";
+import { RunTool } from "./runtool.ts";
 import { Panes, type PaneLayout } from "./panes.ts";
 import { openShortcutEditor, shortcutTable } from "./shortcuts.ts";
 import { BROWSER_DRAG } from "./panels.ts";
@@ -487,7 +487,8 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   detailcomponent: new DetailComponentTool(ctx),
   attach: new AttachTool(ctx),
   slopeArrow: new SlopeArrowTool(ctx),
-  duct: new DuctTool(ctx),
+  duct: new RunTool(ctx, "duct"),
+  pipe: new RunTool(ctx, "pipe"),
   camera: new CameraTool(ctx, (id) => {
     setTool("select");
     ctx.setActiveView(id);

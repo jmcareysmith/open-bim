@@ -1,7 +1,7 @@
 import { registerCategory } from "../categories.ts";
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId } from "../element.ts";
-import { Cat, type LevelParams } from "./architecture.ts";
+import { Cat } from "./architecture.ts";
 import {
   classificationInfo,
   elementConnectors,
@@ -12,15 +12,25 @@ import {
   type ModelConnector,
   type SystemClassification,
 } from "./mep.ts";
+import {
+  JOIN_TOL,
+  dist,
+  enableMepFittings,
+  fittingsOfRun,
+  registerRunKind,
+  runEnds,
+  runInward,
+  runLength,
+  splitRun,
+  syncFittings,
+  type Fitting,
+  type FittingParams,
+  type P3,
+  type Run,
+} from "./runs.ts";
 
-// Ducts (Revit: Systems → Duct). A duct is a straight run between two 3D points (heights above its
-// level), round or rectangular by type, sized per instance. Fittings are kept automatically, as
-// Revit's routing preferences do: two duct ends meeting make an elbow (or a transition when they
-// run straight on at different sizes), a duct ending on the side of another splits it and makes a
-// tee, and four ends make a cross. Fittings are elements (they schedule and select) maintained by
-// a commit hook (`enableDuctFittings`), so every edit leaves the network consistent.
-
-export type P3 = { x: number; y: number; z: number };
+// Ducts (Revit: Systems → Duct): round or rectangular by type, sized per instance. Routing and
+// automatic fittings are shared with pipes (runs.ts).
 
 export type DuctTypeParams = {
   shape: "round" | "rectangular";
@@ -42,16 +52,8 @@ export type DuctParams = {
 };
 export type Duct = Element<DuctParams>;
 
-export type FittingKind = "elbow" | "transition" | "tee" | "cross";
-
-export type DuctFittingParams = {
-  kind: FittingKind;
-  /** The joint, absolute model coordinates. */
-  point: P3;
-  /** The ducts joined here, by end: a tee lists the two main pieces first, then the branch. */
-  ends: { ductId: ElementId; end: "start" | "end" }[];
-};
-export type DuctFitting = Element<DuctFittingParams>;
+export type DuctFittingParams = FittingParams;
+export type DuctFitting = Fitting;
 
 registerCategory({ name: Cat.DuctType, dependencies: () => [], cascadeDelete: false, isType: true });
 registerCategory({
@@ -70,8 +72,6 @@ registerCategory({
   isType: false,
 });
 
-/** Ends this close (mm) meet. */
-const JOIN_TOL = 2;
 /** Standard round duct sizes, mm. */
 export const ROUND_DUCT_SIZES = [100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 450, 500, 550, 600, 700, 800, 900, 1000, 1200];
 
@@ -104,16 +104,9 @@ export function ductSizeLabel(doc: Document, duct: Duct): string {
 }
 
 /** Absolute ends of a duct. */
-export function ductEnds(doc: Document, duct: Duct): { start: P3; end: P3 } {
-  const z0 = doc.get<LevelParams>(duct.params.levelId)?.params.elevation ?? 0;
-  const { start, end } = duct.params;
-  return { start: { x: start.x, y: start.y, z: start.z + z0 }, end: { x: end.x, y: end.y, z: end.z + z0 } };
-}
+export const ductEnds = (doc: Document, duct: Duct): { start: P3; end: P3 } => runEnds(doc, duct as unknown as Run);
 
-export function ductLength(duct: Duct): number {
-  const { start: a, end: b } = duct.params;
-  return Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
-}
+export const ductLength = (duct: Duct): number => runLength(duct as unknown as Run);
 
 export function createDuct(
   tx: Transaction,
@@ -144,24 +137,14 @@ export function createDuct(
 
 export const ducts = (doc: Document): Duct[] => doc.byCategory<DuctParams>(Cat.Duct) as Duct[];
 
-export function fittingsOf(doc: Document, ductId: ElementId): DuctFitting[] {
-  return (doc.byCategory<DuctFittingParams>(Cat.DuctFitting) as DuctFitting[]).filter((f) => f.params.ends.some((e) => e.ductId === ductId));
+/** Fittings at a duct's (or pipe's) ends. */
+export function fittingsOf(doc: Document, runId: ElementId): Fitting[] {
+  const r = doc.get(runId);
+  return r ? fittingsOfRun(doc, r as Run) : [];
 }
-
-const sub = (a: P3, b: P3): P3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
-const dot = (a: P3, b: P3) => a.x * b.x + a.y * b.y + a.z * b.z;
-const len = (a: P3) => Math.hypot(a.x, a.y, a.z);
-const dist = (a: P3, b: P3) => len(sub(a, b));
-const unit = (a: P3): P3 => {
-  const l = len(a) || 1;
-  return { x: a.x / l, y: a.y / l, z: a.z / l };
-};
 
 /** Unit vector from a duct end into the duct. */
-export function ductInward(doc: Document, duct: Duct, end: "start" | "end"): P3 {
-  const { start, end: e } = ductEnds(doc, duct);
-  return end === "start" ? unit(sub(e, start)) : unit(sub(start, e));
-}
+export const ductInward = (doc: Document, duct: Duct, end: "start" | "end"): P3 => runInward(doc, duct as unknown as Run, end);
 
 // Each duct end is a connector, facing out of the duct.
 registerConnectorSource(Cat.Duct, (doc, el) => {
@@ -192,153 +175,32 @@ registerConnectorSource(Cat.Duct, (doc, el) => {
 
 // ---- automatic fittings -----------------------------------------------------
 
-interface End {
-  duct: Duct;
-  end: "start" | "end";
-  p: P3;
-}
+export const DUCT_RUNS = {
+  category: Cat.Duct,
+  fittingCategory: Cat.DuctFitting,
+  size: (doc: Document, r: Run) => ductSize(doc, r as unknown as Duct),
+  sameSection: (doc: Document, a: Run, b: Run) => {
+    if (!a || !b) return true;
+    const p = (a as unknown as Duct).params;
+    const q = (b as unknown as Duct).params;
+    return (
+      ductShape(doc, a as unknown as Duct) === ductShape(doc, b as unknown as Duct) &&
+      Math.abs(p.diameter - q.diameter) < 0.5 &&
+      Math.abs(p.width - q.width) < 0.5 &&
+      Math.abs(p.height - q.height) < 0.5
+    );
+  },
+};
+registerRunKind(DUCT_RUNS);
 
-/** Where `p` lies inside duct `d` (clear of its ends), the distance along it; else null. */
-function onSide(doc: Document, d: Duct, p: P3): number | null {
-  const { start, end } = ductEnds(doc, d);
-  const ax = sub(end, start);
-  const L = len(ax);
-  const t = dot(sub(p, start), ax) / (L * L);
-  const along = t * L;
-  if (along <= ductSize(doc, d) / 2 + 10 || along >= L - ductSize(doc, d) / 2 - 10) return null;
-  const foot = { x: start.x + ax.x * t, y: start.y + ax.y * t, z: start.z + ax.z * t };
-  return dist(foot, p) <= JOIN_TOL ? along : null;
-}
-
-/**
- * Bring fittings in line with the ducts: split ducts where another ends on their side, then make
- * an elbow, transition, tee or cross wherever duct ends meet; remove fittings that no longer join
- * anything. Changes nothing when the network is already consistent.
- */
-export function syncDuctFittings(tx: Transaction, doc: Document): void {
-  // Tees: a duct end on the side of another splits that duct there.
-  for (let guard = 0; guard < 100; guard++) {
-    const all = ducts(doc);
-    let split = false;
-    outer: for (const d of all) {
-      for (const end of ["start", "end"] as const) {
-        const p = ductEnds(doc, d)[end];
-        for (const o of all) {
-          if (o.id === d.id) continue;
-          const along = onSide(doc, o, p);
-          if (along === null) continue;
-          splitDuct(tx, doc, o, along);
-          split = true;
-          break outer;
-        }
-      }
-    }
-    if (!split) break;
-  }
-
-  // Group duct ends meeting at a point.
-  const ends: End[] = ducts(doc).flatMap((d) => {
-    const e = ductEnds(doc, d);
-    return [
-      { duct: d, end: "start" as const, p: e.start },
-      { duct: d, end: "end" as const, p: e.end },
-    ];
-  });
-  const groups: End[][] = [];
-  for (const e of ends) {
-    const g = groups.find((x) => dist(x[0]!.p, e.p) <= JOIN_TOL);
-    if (g) g.push(e);
-    else groups.push([e]);
-  }
-  const wanted = groups
-    .filter((g) => g.length >= 2 && g.length <= 4)
-    .map((g): DuctFittingParams => {
-      const kind: FittingKind = g.length === 4 ? "cross" : g.length === 3 ? "tee" : collinear(doc, g[0]!, g[1]!) ? "transition" : "elbow";
-      let list = g;
-      if (kind === "tee") {
-        // Main first: the two ends that run straight through each other.
-        const pairs: [number, number][] = [[0, 1], [0, 2], [1, 2]];
-        const [i, j] = pairs.find(([a, b]) => collinear(doc, g[a]!, g[b]!)) ?? [0, 1];
-        const k = [0, 1, 2].find((x) => x !== i && x !== j)!;
-        list = [g[i]!, g[j]!, g[k]!];
-      }
-      return { kind, point: { ...g[0]!.p }, ends: list.map((e) => ({ ductId: e.duct.id, end: e.end })) };
-    })
-    // A transition between equal sizes is just a straight run: no fitting.
-    .filter((f) => !(f.kind === "transition" && sameSize(doc, f)));
-
-  const key = (f: DuctFittingParams) =>
-    f.ends
-      .map((e) => `${e.ductId}:${e.end}`)
-      .sort()
-      .join("|");
-  const existing = doc.byCategory<DuctFittingParams>(Cat.DuctFitting) as DuctFitting[];
-  const byKey = new Map(existing.map((f) => [key(f.params), f]));
-  const keep = new Set<ElementId>();
-  for (const w of wanted) {
-    const f = byKey.get(key(w));
-    if (f) {
-      keep.add(f.id);
-      const same = f.params.kind === w.kind && dist(f.params.point, w.point) < 0.01 && JSON.stringify(f.params.ends) === JSON.stringify(w.ends);
-      if (!same) tx.update<DuctFittingParams>(f.id, w);
-    } else {
-      keep.add(tx.create<DuctFittingParams>(Cat.DuctFitting, w).id);
-    }
-  }
-  for (const f of existing) if (!keep.has(f.id) && doc.has(f.id)) tx.delete(f.id);
-}
-
-function collinear(doc: Document, a: End, b: End): boolean {
-  const u = ductInward(doc, a.duct, a.end);
-  const v = ductInward(doc, b.duct, b.end);
-  return dot(u, v) < -0.999;
-}
-
-function sameSize(doc: Document, f: DuctFittingParams): boolean {
-  const [a, b] = f.ends.map((e) => doc.get(e.ductId) as Duct);
-  if (!a || !b) return true;
-  const p = a.params;
-  const q = b.params;
-  return ductShape(doc, a) === ductShape(doc, b) && Math.abs(p.diameter - q.diameter) < 0.5 && Math.abs(p.width - q.width) < 0.5 && Math.abs(p.height - q.height) < 0.5;
-}
+/** Bring duct fittings in line with the ducts (see runs.ts). */
+export const syncDuctFittings = (tx: Transaction, doc: Document): void => syncFittings(tx, doc, DUCT_RUNS);
 
 /** Split a duct `along` mm from its start (for a tee); returns the new second piece. */
-export function splitDuct(tx: Transaction, doc: Document, duct: Duct, along: number): Duct {
-  const { start, end } = duct.params;
-  const L = ductLength(duct);
-  const t = along / L;
-  const cut = { x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t, z: start.z + (end.z - start.z) * t };
-  const second = tx.create<DuctParams>(Cat.Duct, { ...structuredClone(duct.params), start: cut, end: { ...end } }, duct.typeId ? { typeId: duct.typeId } : {});
-  tx.update<DuctParams>(duct.id, { end: cut });
-  return second as Duct;
-}
+export const splitDuct = (tx: Transaction, _doc: Document, duct: Duct, along: number): Duct => splitRun(tx, duct as unknown as Run, along) as unknown as Duct;
 
-/** Keep duct fittings up to date after every edit. */
-export function enableDuctFittings(doc: Document): () => void {
-  return doc.addCommitHook((tx) => {
-    if (doc.byCategory(Cat.Duct).length || doc.byCategory(Cat.DuctFitting).length) syncDuctFittings(tx, doc);
-  });
-}
-
-/** How far a fitting takes back each duct end it joins (so the fitting fills the gap), mm. */
-export function fittingTrim(doc: Document, f: DuctFitting, ductId: ElementId): number {
-  const sizes = f.params.ends.map((e) => {
-    const d = doc.get(e.ductId) as Duct | undefined;
-    return d ? ductSize(doc, d) : 0;
-  });
-  const i = f.params.ends.findIndex((e) => e.ductId === ductId);
-  const own = sizes[i] ?? 0;
-  const max = Math.max(...sizes);
-  switch (f.params.kind) {
-    case "elbow":
-      return own; // centreline radius ≈ the duct size
-    case "transition":
-      return Math.max(75, Math.abs(sizes[0]! - sizes[1]!)); // ~30° taper each side
-    case "tee":
-    case "cross":
-      return i < 2 || f.params.kind === "cross" ? max / 2 + 50 : max / 2 + 25;
-  }
-}
+/** Keep duct (and pipe) fittings up to date after every edit. */
+export const enableDuctFittings = enableMepFittings;
 
 // ---- network, flow and sizing ----------------------------------------------
 

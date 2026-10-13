@@ -247,6 +247,15 @@ import {
   type DuctFittingParams,
   type DuctParams,
   type DuctTypeParams,
+  PIPE_SIZES,
+  fallLabel,
+  minimumFall,
+  pipeFall,
+  pipeFalls,
+  pipeLength,
+  type Pipe,
+  type PipeParams,
+  type PipeTypeParams,
 } from "@open-bim/core";
 
 type Child = Node | string | null | undefined | false;
@@ -2640,6 +2649,35 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       );
       break;
     }
+    case Cat.Pipe: {
+      const pp = el as Pipe;
+      const p = pp.params;
+      const set = (name: string, patch: Partial<PipeParams>) => update<PipeParams>(name, patch);
+      const fall = pipeFall(pp);
+      const falls = pipeFalls(p.classification);
+      const tooFlat = falls && Math.hypot(p.end.x - p.start.x, p.end.y - p.start.y) > 1 && Math.abs(fall) + 1e-9 < minimumFall(p.diameter);
+      sec.append(
+        row("Type", select(typeOpts(Cat.PipeType), pp.typeId ?? "", (v) => edit(ctx, "Change pipe type", (tx) => tx.setType(pp.id, v)))),
+        row("System", select(SYSTEM_CLASSIFICATIONS.filter((c) => c.domain === "pipe").map((c) => ({ value: c.value, label: c.label })), p.classification, (v) => set("Pipe system", { classification: v as SystemClassification }))),
+        row("Size", select(PIPE_SIZES.map((d) => ({ value: String(d), label: `DN${d}` })), String(p.diameter), (v) => set("Pipe size", { diameter: Number(v) }))),
+        row("Start elevation", numberInput(p.start.z, (v) => set("Pipe start elevation", { start: { ...p.start, z: v } }))),
+        row("End elevation", numberInput(p.end.z, (v) => set("Pipe end elevation", { end: { ...p.end, z: v } }))),
+        row("Length", len(pipeLength(pp))),
+        row("Fall", fallLabel(fall)),
+        ...(tooFlat ? [h("div", { class: "empty" }, `\u26a0 Flatter than the ${fallLabel(minimumFall(p.diameter))} minimum for DN${p.diameter} (provisional, after G13/AS1).`)] : []),
+      );
+      break;
+    }
+    case Cat.PipeType: {
+      const t = el.params as PipeTypeParams;
+      sec.append(
+        row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename type", (tx) => tx.setName(el.id, v || undefined)))),
+        row("Material", textInput(t.material, (v) => update<PipeTypeParams>("Pipe material", { material: v }))),
+        row("Used for", t.use.map((c) => classificationInfo(c).label).join(", ") || "-"),
+      );
+      break;
+    }
+    case Cat.PipeFitting:
     case Cat.DuctFitting: {
       const f = el.params as DuctFittingParams;
       sec.append(row("Fitting", f.kind[0]!.toUpperCase() + f.kind.slice(1)), row("Joins", `${f.ends.length} ducts`), h("div", { class: "muted" }, "Fittings follow their ducts: edit or delete the ducts."));

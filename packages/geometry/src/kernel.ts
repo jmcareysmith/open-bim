@@ -167,6 +167,8 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.Floor, buildFloor],
     [Cat.Duct, buildDuct],
     [Cat.DuctFitting, buildDuctFitting],
+    [Cat.Pipe, buildDuct],
+    [Cat.PipeFitting, buildDuctFitting],
     [Cat.Ceiling, buildCeiling],
     [Cat.Roof, buildRoof],
     [Cat.Door, buildDoor],
@@ -208,6 +210,8 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.Beam, buildBeamLines],
     [Cat.Duct, buildDuctLines],
     [Cat.DuctFitting, buildDuctFittingLines],
+    [Cat.Pipe, buildDuctLines],
+    [Cat.PipeFitting, buildDuctFittingLines],
     [Cat.Connector, buildConnectorLines],
   ]);
 

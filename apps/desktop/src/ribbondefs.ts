@@ -150,6 +150,13 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
             { label: "Mechanical Equipment", icon: "component", tool: "component", title: "Place a mechanical equipment family" },
           ],
         },
+        {
+          title: "Plumbing & Piping",
+          items: [
+            { label: "Pipe", icon: "pipe", tool: "pipe", large: true, title: "Pipe: route runs; bends, junctions and reducers are automatic; drainage falls (PI)" },
+            { label: "Plumbing Fixture", icon: "component", tool: "component", title: "Place a plumbing fixture family" },
+          ],
+        },
       ],
     },
     {

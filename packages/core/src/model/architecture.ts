@@ -78,6 +78,9 @@ export const Cat = {
   DuctType: "DuctType",
   Duct: "Duct",
   DuctFitting: "DuctFitting",
+  PipeType: "PipeType",
+  Pipe: "Pipe",
+  PipeFitting: "PipeFitting",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

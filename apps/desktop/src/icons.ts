@@ -2,6 +2,7 @@
 
 const P: Record<string, string> = {
   select: "M5 3l13 8-6 1.5L9 19z",
+  pipe: "M3 10h9a3 3 0 0 1 3 3v8h4v-8a7 7 0 0 0-7-7H3z",
   duct: "M3 9h11v6H3zM14 9l4-4h3v6h-3M14 15l4 4h3v-6",
   tile: "M3 4h8v7H3zM13 4h8v7h-8zM3 13h8v7H3zM13 13h8v7h-8z",
   cascade: "M3 3h12v9H3zM7 7h12v9H7zM11 11h10v10H11z",

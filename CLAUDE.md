@@ -119,7 +119,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Known gaps: join cleanup is plan-only (3D solids overlap at crossings); grids straight only;
   floors: Pick Walls (sketch options strip: face/core/centre line + offset) and slope arrows (floor
   Properties → Add slope arrow; tail/head heights; plane top, sheared slab, 1:n arrow in plan); roofs exact for convex/L/T/U only; doors/windows parametric;
-  dimensions only in plans via the tool; 3D views are perspective only (no orthographic 3D).
+  dimensions only in plans via the tool.
   Screen and sheet/PDF share `lineworkDrawing` for cut/projection line work.
 - Families (Phase 3 started): family editor (Browser → Families → New family / Edit family) with
   Extrusion/Blend/Revolve/Sweep (+ Void), parameters with formulas, family types; Load into Project;
@@ -218,4 +218,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   projection/cut (+ colour, pattern); Revit-like line weights table by scale (`penWidth`); views
   start from them, V/G overrides on top. Plans/sections draw wide lines on screen (LineSegments2)
   and in PDF (`Stroke.width`); Thin Lines (TL, QAT, View tab) shows 1 px.
+- 3D views: white background, no ground grid; ViewCube top right (apps/desktop/src/viewcube.ts:
+  faces/corners turn the view, ⌂ home, right-click Orthographic/Perspective/Fit); {3D} is
+  orthographic by default (view `projection`; camera views perspective).
 - Next (Jeremy, 2026-10-14): Phase 8b — Revit look & architectural parity, before the rest of 8.

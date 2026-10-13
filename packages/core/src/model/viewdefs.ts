@@ -81,6 +81,8 @@ export type ViewParams = {
   phase?: string | null;
   /** 3D views: the saved camera (where the view looks from and to). */
   camera?: ViewCamera | null;
+  /** 3D views: orthographic (the default, as Revit's {3D}) or perspective (camera views). */
+  projection?: "orthographic" | "perspective" | null;
   /** 3D views: Sun Settings (solar study or direct lighting angles) and whether shadows show. */
   sun?: SunSettings | null;
   shadows?: boolean;
@@ -182,6 +184,7 @@ export function createCameraView(tx: Transaction, doc: Document, levelId: Elemen
       detailLevel: "medium",
       hiddenCategories: [],
       camera: { eye: [eye.x, eye.y, z], target: [target.x, target.y, z], fov: 50 },
+      projection: "perspective",
     },
     { name: opts.name ?? nextNumbered(doc, "3d", "3D View") },
   );

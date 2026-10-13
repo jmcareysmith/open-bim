@@ -1,5 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { ViewCube } from "./viewcube.ts";
+import { showContextMenu } from "./dialog.ts";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
 import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
@@ -124,7 +126,8 @@ const BACKGROUND_CATEGORIES = new Set<string>([Cat.Floor, Cat.Ceiling, Cat.Roof,
 const HALFTONE_TOWARD = 0xffffff;
 /** Backgrounds: white for plans, sections, elevations (Revit default); very light grey for 3D. */
 const BG_DRAWING = 0xffffff;
-const BG_3D = 0xe6e8eb;
+/** Revit's 3D background: white. */
+const BG_3D = 0xffffff;
 const BG_SHEET = 0xd5d8dc;
 
 function blend(a: number, b: number, t: number): number {
@@ -168,6 +171,74 @@ export class Viewport {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
   private readonly camera3d: THREE.PerspectiveCamera;
+  /** Orthographic 3D (Revit's default {3D}): follows the perspective camera, sized from its distance. */
+  private readonly ortho3d: THREE.OrthographicCamera;
+  ortho = false;
+  private cube: ViewCube | null = null;
+  /** Called when the cube's menu switches projection, so the view can remember it. */
+  onProjectionChange: ((ortho: boolean) => void) | null = null;
+
+  setOrtho(on: boolean): void {
+    if (on === this.ortho) return;
+    this.ortho = on;
+    this.needsRender = true;
+  }
+
+  /** Keep the orthographic camera on the perspective one, its height what the perspective sees at the target. */
+  private syncOrtho(): void {
+    const p = this.camera3d;
+    const o = this.ortho3d;
+    o.position.copy(p.position);
+    o.quaternion.copy(p.quaternion);
+    o.up.copy(p.up);
+    const dist = p.position.distanceTo(this.controls3d.target);
+    const h = dist * Math.tan(THREE.MathUtils.degToRad(p.fov / 2));
+    o.top = h;
+    o.bottom = -h;
+    o.left = -h * p.aspect;
+    o.right = h * p.aspect;
+    o.updateProjectionMatrix();
+    o.updateMatrixWorld();
+  }
+
+  /** ViewCube: look from a direction at the current target, eased over a moment. */
+  lookFrom(dir: [number, number, number]): void {
+    const target = this.controls3d.target.clone();
+    const cam = this.camera3d;
+    const dist = cam.position.distanceTo(target);
+    const to = new THREE.Vector3(...dir).normalize();
+    // Straight down or up: nudge so the camera keeps north up.
+    if (Math.abs(to.z) > 0.999) to.set(0, -0.0015 * Math.sign(to.z), to.z).normalize();
+    const from = cam.position.clone().sub(target).normalize();
+    const start = performance.now();
+    const step = () => {
+      const t = Math.min(1, (performance.now() - start) / 300);
+      const k = t * t * (3 - 2 * t);
+      const d = from.clone().lerp(to, k).normalize();
+      cam.position.copy(target).addScaledVector(d, dist);
+      cam.lookAt(target);
+      this.controls3d.update();
+      this.needsRender = true;
+      if (t < 1) requestAnimationFrame(step);
+    };
+    step();
+  }
+
+  private cubeMenu(ev: MouseEvent): void {
+    showContextMenu(ev.clientX, ev.clientY, [
+      { label: "Home", action: () => this.cubeHome() },
+      { label: this.ortho ? "Perspective" : "Orthographic", action: () => {
+        this.setOrtho(!this.ortho);
+        this.onProjectionChange?.(this.ortho);
+      } },
+      { label: "Fit to view", action: () => this.zoomToFit() },
+    ]);
+  }
+
+  private cubeHome(): void {
+    this.lookFrom([-1, -1, 0.8]);
+    setTimeout(() => this.zoomToFit(), 320);
+  }
   private readonly cameraPlan: THREE.OrthographicCamera;
   private readonly controls3d: OrbitControls;
   private readonly controlsPlan: OrbitControls;
@@ -225,6 +296,7 @@ export class Viewport {
     this.camera3d = new THREE.PerspectiveCamera(45, 1, 50, 2_000_000);
     this.camera3d.position.set(-12000, -16000, 11000);
 
+    this.ortho3d = new THREE.OrthographicCamera(-1, 1, 1, -1, -2_000_000, 4_000_000);
     this.controls3d = new OrbitControls(this.camera3d, this.renderer.domElement);
     this.controls3d.target.set(5000, 4000, 1200);
     this.controls3d.enableDamping = true;
@@ -272,6 +344,7 @@ export class Viewport {
 
     this.grid = new THREE.GridHelper(60000, 60, 0xc4c9cf, 0xd6dadf);
     this.grid.rotation.x = Math.PI / 2; // GridHelper is XZ; rotate into XY
+    this.grid.visible = false; // Revit shows no ground grid
     this.scene.add(this.grid);
 
     this.resizer = new ResizeObserver(() => this.resize());
@@ -280,6 +353,7 @@ export class Viewport {
 
     this.unsubscribe = doc.on((c) => this.sync(c));
     this.rebuildAll();
+    this.cube = new ViewCube(container, { lookFrom: (d) => this.lookFrom(d), home: () => this.cubeHome(), menu: (ev) => this.cubeMenu(ev) });
     this.loop();
   }
 
@@ -791,6 +865,10 @@ export class Viewport {
   }
 
   get camera(): THREE.PerspectiveCamera | THREE.OrthographicCamera {
+    if (this.mode === "3d" && this.ortho) {
+      this.syncOrtho();
+      return this.ortho3d;
+    }
     return this.mode === "plan" ? this.cameraPlan : this.mode === "drawing" ? this.cameraDraw : this.camera3d;
   }
 
@@ -862,7 +940,7 @@ export class Viewport {
     this.controlsPlan.enabled = mode === "plan";
     this.controlsDraw.enabled = mode === "drawing";
     this.applyBackground();
-    this.grid.visible = mode === "3d"; // the work-plane grid fights with floor tops in plan
+    this.grid.visible = false; // Revit shows no work-plane grid in 3D or plan
     for (const g of this.objects.values()) this.applyPlanOnly(g);
     this.drawingDirty = true;
     if (mode === "plan" && !this.planFramed) {
@@ -1158,6 +1236,10 @@ export class Viewport {
     }
     if (this.needsRender) {
       const in3d = this.mode === "3d";
+      if (this.cube) {
+        this.cube.visible = in3d;
+        if (in3d) this.cube.update(this.camera);
+      }
       const shaded = this.modelShaded();
       if (this.mode === "drawing" && shaded) {
         // Shaded section/elevation: the model through the section camera (with its sun, shadows,

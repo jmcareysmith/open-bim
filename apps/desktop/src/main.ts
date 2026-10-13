@@ -524,6 +524,11 @@ const DRAWING_TOOLS = new Set(["select", "symbol", "detailcomponent", "placegrou
 let tool: Tool = tools.select!;
 /** Grips and temporary dimensions for the selection (Select tool only). */
 let grips: GripLayer | undefined = new GripLayer(ctx, $("#viewport"));
+// The ViewCube's Orthographic/Perspective switch is the open 3D view's setting.
+viewport.onProjectionChange = (ortho) => {
+  const v = activeView();
+  if (v?.params.kind === "3d") edit(ortho ? "Orthographic" : "Perspective", (tx) => tx.update<ViewParams>(v.id, { projection: ortho ? "orthographic" : "perspective" }));
+};
 // Tile / Cascade / Tab Views: every open view in its own live pane; click one to work in it.
 let panes: Panes | undefined = new Panes($("#panes"), {
   get doc() {
@@ -1337,6 +1342,7 @@ function configureViewport(vp: Viewport, target: ModelElement, primary: boolean)
     vp.setDrawingView(v);
   } else {
     vp.setViewMode("3d");
+    vp.setOrtho(v.params.projection !== "perspective");
     // Each 3D view keeps its own camera: restore it on opening (or when its saved camera changes).
     if (primary) {
       const json = JSON.stringify(v.params.camera ?? null);

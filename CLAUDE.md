@@ -80,6 +80,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - 3D views keep their own camera (`camera` param, saved without an undo step on leaving the view
   or saving); View → 3D View ▾ → Camera: eye then target in a plan makes a perspective view at
   1750 eye height (eye/target elevation and field of view in Properties).
+- Drag from the Project Browser: views/legends/schedules onto the open sheet (placed where dropped);
+  families into a view start placing them (detail items via the detail component tool).
 - Double-click: section/elevation/callout marker opens its view; sheet viewport opens its view;
   a component opens its family in the family editor.
 - Wall attach: Modify → Attach Top/Base (or right-click a wall), then click the roof/floor/ceiling;

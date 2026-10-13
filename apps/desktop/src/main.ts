@@ -1,3 +1,4 @@
+import { BROWSER_DRAG } from "./panels.ts";
 import { addRecentFile, fileName, recentFiles, removeRecentFile } from "./recent.ts";
 import { CameraTool } from "./cameratool.ts";
 import { SlopeArrowTool } from "./slopetool.ts";
@@ -90,6 +91,7 @@ import {
   defaultGraphics,
   viewSun,
   type WallParams,
+  placeView,
 } from "@open-bim/core";
 import { OcctKernel, SimpleKernel, findClashes, exportGlb, exportObj, exportParts, areaLoopsFromWalls, drawingDxf, parseDxf, viewDrawing, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
@@ -485,6 +487,47 @@ const DRAWING_TOOLS = new Set(["select", "symbol", "detailcomponent", "placegrou
 let tool: Tool = tools.select!;
 /** Grips and temporary dimensions for the selection (Select tool only). */
 let grips: GripLayer | undefined = new GripLayer(ctx, $("#viewport"));
+// Drag from the Project Browser: views, legends and schedules onto the open sheet (placed where
+// dropped); families into a view (starts placing them, as Revit does).
+{
+  const host = $("#viewport");
+  host.addEventListener("dragover", (ev) => {
+    if (!ev.dataTransfer?.types.includes(BROWSER_DRAG)) return;
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = "copy";
+  });
+  host.addEventListener("drop", (ev) => {
+    const raw = ev.dataTransfer?.getData(BROWSER_DRAG);
+    if (!raw) return;
+    ev.preventDefault();
+    const { kind, id } = JSON.parse(raw) as { kind: "view" | "family"; id: ElementId };
+    const active = activeViewId ? doc.get(activeViewId) : undefined;
+    if (kind === "view") {
+      if (active?.category !== Cat.Sheet) return status("Open a sheet, then drag views and schedules onto it.");
+      const at = viewport.pickDrawing(ev);
+      try {
+        const vp = doc.transact("Place view on sheet", (tx) => placeView(tx, doc, active.id, id, at ?? undefined));
+        ctx.setSelection([vp.id]);
+        status(`Placed ${doc.get(id)?.name ?? "the view"} on sheet ${(active as Sheet).params.number}.`);
+      } catch (err) {
+        status(`⚠ ${(err as Error).message}`);
+      }
+      return;
+    }
+    const def = familyDefs(doc).find((d) => d.id === id);
+    if (!def) return;
+    if (def.params.category === "ViewMarker") return status("View Marker families are chosen in a view's Properties, not placed.");
+    if (isDetailFamily(def)) {
+      (tools.detailcomponent as DetailComponentTool).familyId = def.id;
+      return setTool("detailcomponent");
+    }
+    if (active?.category === Cat.Sheet) return status("Open a plan or 3D view to place families.");
+    activeComponentKey = `${def.id}|${familyTypeNames(def)[0] ?? ""}`;
+    setTool("component");
+    refreshAll();
+  });
+}
+
 /** The ribbon: File menu, Quick Access Toolbar, tabs. */
 let ribbon: Ribbon | undefined = new Ribbon(
   $("#ribbon"),

@@ -1553,6 +1553,19 @@ function editBoundaryButton(ctx: PanelContext, id: ElementId): HTMLElement {
 
 // ---- Project browser ------------------------------------------------------
 
+/** Drag data type for Project Browser items dropped on the view (Revit: drag views onto sheets). */
+export const BROWSER_DRAG = "application/x-open-bim-item";
+
+/** Let a browser row be dragged onto the view: views/schedules onto sheets, families into views. */
+function browserDrag(div: HTMLElement, kind: "view" | "family", id: ElementId): void {
+  div.draggable = true;
+  div.title = kind === "family" ? "Drag into a view to place it" : "Drag onto a sheet to place it";
+  div.ondragstart = (ev) => {
+    ev.dataTransfer?.setData(BROWSER_DRAG, JSON.stringify({ kind, id }));
+    if (ev.dataTransfer) ev.dataTransfer.effectAllowed = "copy";
+  };
+}
+
 export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   const { doc } = ctx;
   units = projectUnits(doc);
@@ -1597,6 +1610,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
     for (const v of list) {
       const div = h("div", { class: `list-item indent${v.id === ctx.activeViewId() ? " selected" : ""}` }, h("span", {}, v.name ?? v.id));
       div.onclick = () => ctx.setActiveView(v.id);
+      if (v.params.kind !== "3d") browserDrag(div, "view", v.id);
       viewsSec.append(div);
     }
   }
@@ -1630,6 +1644,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   for (const v of allViews.filter((x) => x.params.kind === "legend")) {
     const div = h("div", { class: `list-item${v.id === ctx.activeViewId() ? " selected" : ""}` }, h("span", {}, v.name ?? v.id));
     div.onclick = () => ctx.setActiveView(v.id);
+    browserDrag(div, "view", v.id);
     legendSec.append(div);
   }
   legendSec.append(row("", newLegend));
@@ -1770,6 +1785,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   for (const f of familyDefs(doc)) {
     const div = h("div", { class: `list-item${sel.has(f.id) ? " selected" : ""}` }, h("span", {}, f.name ?? f.id), h("span", { class: "muted" }, f.params.category));
     div.onclick = () => ctx.setSelection([f.id]);
+    browserDrag(div, "family", f.id);
     fams.append(div);
   }
   fams.append(
@@ -1857,6 +1873,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   for (const s of schedules(doc)) {
     const div = h("div", { class: `list-item${s.id === ctx.activeViewId() ? " selected" : ""}` }, h("span", {}, s.name ?? s.id));
     div.onclick = () => ctx.setActiveView(s.id);
+    browserDrag(div, "view", s.id);
     schedSec.append(div);
   }
   const newSchedule = (kind: "schedule" | "takeoff") =>

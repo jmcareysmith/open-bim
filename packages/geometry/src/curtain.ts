@@ -1,4 +1,5 @@
-import { wallExtent, wallLength, type CurtainEdits, type CurtainGrid, type CurtainPanelKind, type Document, type MaterialParams, type Wall } from "@open-bim/core";
+import { mullionProfile, wallExtent, wallLength, type CurtainEdits, type CurtainGrid, type CurtainPanelKind, type Document, type MaterialParams, type Vec2, type Wall } from "@open-bim/core";
+import { extrudePolygon } from "./mesh.ts";
 import type { MeshData } from "./mesh.ts";
 
 // Curtain wall geometry: grid lines divide the wall equally (spacing no more than the type's),
@@ -66,96 +67,118 @@ export function buildCurtainWall(doc: Document, wall: Wall, grid: CurtainGrid): 
     quad([[u0, v0, z0], [u0, v0, z1], [u0, v1, z1], [u0, v1, z0]], [-1, 0, 0], c);
     quad([[u1, v0, z0], [u1, v1, z0], [u1, v1, z1], [u1, v0, z1]], [1, 0, 0], c);
   };
-  // Circular mullions: 12-sided prisms, vertical (along z) or horizontal (along u).
-  const SIDES = 12;
-  const rod = (axis: "z" | "u", a0: number, a1: number, cu: number, cz: number, r: number, c: [number, number, number]) => {
+  // A mullion: its profile (x across, y through the wall) extruded along z (vertical) or u (horizontal).
+  const prism = (poly: Vec2[], axis: "z" | "u", a0: number, a1: number, cu: number, cz: number, c: [number, number, number]) => {
     if (a1 - a0 < 1e-6) return;
-    // End caps: fans round the axis (as quads with a doubled centre point).
-    const at = (t: number, a: number): [number, number, number] => (axis === "z" ? [cu + r * Math.cos(t), r * Math.sin(t), a] : [a, r * Math.cos(t), cz + r * Math.sin(t)]);
-    const mid = (a: number): [number, number, number] => (axis === "z" ? [cu, 0, a] : [a, 0, cz]);
-    const n0: [number, number, number] = axis === "z" ? [0, 0, -1] : [-1, 0, 0];
-    const n1: [number, number, number] = axis === "z" ? [0, 0, 1] : [1, 0, 0];
-    for (let k = 0; k < SIDES; k++) {
-      const t0 = (2 * Math.PI * k) / SIDES;
-      const t1 = (2 * Math.PI * (k + 1)) / SIDES;
-      const lo = [at(t1, a0), at(t0, a0)];
-      const hi = [at(t0, a1), at(t1, a1)];
-      quad([mid(a0), lo[0]!, lo[1]!, mid(a0)], n0, c);
-      quad([mid(a1), hi[0]!, hi[1]!, mid(a1)], n1, c);
+    const m = extrudePolygon(poly, [], a0, a1);
+    const base = pos.length / 3;
+    const P = m.positions;
+    const Nn = m.normals;
+    for (let q = 0; q < P.length; q += 3) {
+      const x = P[q]!;
+      const y = P[q + 1]!;
+      const a = P[q + 2]!;
+      const nx = Nn[q]!;
+      const ny = Nn[q + 1]!;
+      const na = Nn[q + 2]!;
+      const [u, v, z] = axis === "z" ? [cu + x, y, a] : [a, y, cz + x];
+      const [nu, nv, nz] = axis === "z" ? [nx, ny, na] : [na, ny, nx];
+      pos.push(...world(u, v, z));
+      nor.push(dir.x * nu + nrm.x * nv, dir.y * nu + nrm.y * nv, nz);
+      col.push(...c);
     }
-    for (let k = 0; k < SIDES; k++) {
-      const t0 = (2 * Math.PI * k) / SIDES;
-      const t1 = (2 * Math.PI * (k + 1)) / SIDES;
-      const tm = (t0 + t1) / 2;
-      if (axis === "z") {
-        const p0: [number, number] = [cu + r * Math.cos(t0), r * Math.sin(t0)];
-        const p1: [number, number] = [cu + r * Math.cos(t1), r * Math.sin(t1)];
-        quad([[p0[0], p0[1], a0], [p1[0], p1[1], a0], [p1[0], p1[1], a1], [p0[0], p0[1], a1]], [Math.cos(tm), Math.sin(tm), 0], c);
-      } else {
-        const p0: [number, number] = [r * Math.cos(t0), cz + r * Math.sin(t0)];
-        const p1: [number, number] = [r * Math.cos(t1), cz + r * Math.sin(t1)];
-        quad([[a0, p0[0], p0[1]], [a0, p1[0], p1[1]], [a1, p1[0], p1[1]], [a1, p0[0], p0[1]]], [0, Math.cos(tm), Math.sin(tm)], c);
-      }
+    // (x, y, a) → (z, v, u) mirrors: swap the winding back for horizontals.
+    for (let t = 0; t < m.indices.length; t += 3) {
+      const [i0, i1, i2] = [m.indices[t]!, m.indices[t + 1]!, m.indices[t + 2]!];
+      if (axis === "u") idx.push(base + i0, base + i2, base + i1);
+      else idx.push(base + i0, base + i1, base + i2);
     }
+  };
+  const parts: { key: string; start: number; count: number }[] = [];
+  const part = (key: string, fn: () => void) => {
+    const start = idx.length;
+    fn();
+    if (idx.length > start) parts.push({ key, start, count: idx.length - start });
   };
   const { u: us, z: zs } = curtainGridLines(len, bottom, top, grid, edits);
   const border = grid.borderMullions !== false;
-  const circular = grid.mullionShape === "circular";
-  const hw = grid.mullionWidth / 2;
-  const hd = grid.mullionDepth / 2;
   const hp = grid.panelThickness / 2;
   const nu = us.length - 1;
   const nz = zs.length - 1;
+  const own = edits?.mullions ?? {};
   // Which mullion segments exist: interior lines unless removed; edges when the type has border mullions.
-  const vSeg = (k: number, j: number) => ((k === 0 || k === nu) ? border : !removed.has(`v:${k}:${j}`));
-  const hSeg = (k: number, i: number) => ((k === 0 || k === nz) ? border : !removed.has(`h:${k}:${i}`));
+  const vSeg = (k: number, j: number) => (k === 0 || k === nu ? border : !removed.has(`v:${k}:${j}`));
+  const hSeg = (k: number, i: number) => (k === 0 || k === nz ? border : !removed.has(`h:${k}:${i}`));
+  const prof = (key: string, edge: boolean) => mullionProfile(grid, edge, own[key]);
+  const halfOf = (poly: Vec2[]) => Math.max(...poly.map((q) => Math.abs(q.x)));
+  // Vertical mullion k in row j: its centre along the wall (edge ones kept inside it) and half width.
+  const vm = (k: number, j: number) => {
+    const hw = halfOf(prof(`v:${k}:${j}`, k === 0 || k === nu));
+    return { c: k === 0 ? hw : k === nu ? len - hw : us[k]!, hw };
+  };
+  const hm = (k: number, i: number) => {
+    const hw = halfOf(prof(`h:${k}:${i}`, k === 0 || k === nz));
+    return { c: k === 0 ? bottom + hw : k === nz ? top - hw : zs[k]!, hw };
+  };
   const kind = (i: number, j: number): CurtainPanelKind => edits?.panels?.[`${i},${j}`] ?? "glass";
-  // Panels run to a cell edge with no mullion; glass first (the mesh's glass range).
-  const cell = (i: number, j: number) => ({
-    u0: us[i]! + (vSeg(i, j) ? hw : 0),
-    u1: us[i + 1]! - (vSeg(i + 1, j) ? hw : 0),
-    z0: zs[j]! + (hSeg(j, i) ? hw : 0),
-    z1: zs[j + 1]! - (hSeg(j + 1, i) ? hw : 0),
-  });
+  // Panels run to the faces of the mullions round them (to the grid line where there's none).
+  const cell = (i: number, j: number) => {
+    const L = vm(i, j);
+    const R = vm(i + 1, j);
+    const B = hm(j, i);
+    const T = hm(j + 1, i);
+    return {
+      u0: vSeg(i, j) ? L.c + L.hw : us[i]!,
+      u1: vSeg(i + 1, j) ? R.c - R.hw : us[i + 1]!,
+      z0: hSeg(j, i) ? B.c + B.hw : zs[j]!,
+      z1: hSeg(j + 1, i) ? T.c - T.hw : zs[j + 1]!,
+    };
+  };
+  const hd = grid.mullionDepth / 2;
+  // Glass first (the mesh's glass range).
   for (let i = 0; i < nu; i++)
-    for (let j = 0; j < nz; j++) {
-      const c = cell(i, j);
-      const k = kind(i, j);
-      if (k === "glass") box(c.u0, c.u1, -hp, hp, c.z0, c.z1, glass);
-      // A door: a glazed leaf inside a frame, down to the cell's floor.
-      if (k === "door") box(c.u0 + DOOR_FRAME, c.u1 - DOOR_FRAME, -hp, hp, zs[j]! + DOOR_FRAME, c.z1 - DOOR_FRAME, glass);
-    }
+    for (let j = 0; j < nz; j++)
+      part(`p:${i},${j}`, () => {
+        const c = cell(i, j);
+        const k = kind(i, j);
+        if (k === "glass") box(c.u0, c.u1, -hp, hp, c.z0, c.z1, glass);
+        // A door: a glazed leaf inside a frame, down to the cell's floor.
+        if (k === "door") box(c.u0 + DOOR_FRAME, c.u1 - DOOR_FRAME, -hp, hp, zs[j]! + DOOR_FRAME, c.z1 - DOOR_FRAME, glass);
+      });
   const glassCount = idx.length;
   for (let i = 0; i < nu; i++)
-    for (let j = 0; j < nz; j++) {
-      const k = kind(i, j);
-      const c = cell(i, j);
-      if (k === "solid") box(c.u0, c.u1, -hp, hp, c.z0, c.z1, SOLID);
-      if (k === "door") {
-        const z0 = zs[j]!;
-        box(c.u0, c.u0 + DOOR_FRAME, -hd, hd, z0, c.z1, metal);
-        box(c.u1 - DOOR_FRAME, c.u1, -hd, hd, z0, c.z1, metal);
-        box(c.u0 + DOOR_FRAME, c.u1 - DOOR_FRAME, -hd, hd, c.z1 - DOOR_FRAME, c.z1, metal);
-        box(c.u0 + DOOR_FRAME, c.u1 - DOOR_FRAME, -hp - 20, -hp, z0 + 980, z0 + 1020, metal); // push bar
-      }
-    }
-  // Vertical mullions, row by row (end ones kept inside the wall), then horizontals between them.
+    for (let j = 0; j < nz; j++)
+      part(`p:${i},${j}`, () => {
+        const k = kind(i, j);
+        const c = cell(i, j);
+        if (k === "solid") box(c.u0, c.u1, -hp, hp, c.z0, c.z1, SOLID);
+        if (k === "door") {
+          const z0 = zs[j]!;
+          box(c.u0, c.u0 + DOOR_FRAME, -hd, hd, z0, c.z1, metal);
+          box(c.u1 - DOOR_FRAME, c.u1, -hd, hd, z0, c.z1, metal);
+          box(c.u0 + DOOR_FRAME, c.u1 - DOOR_FRAME, -hd, hd, c.z1 - DOOR_FRAME, c.z1, metal);
+          box(c.u0 + DOOR_FRAME, c.u1 - DOOR_FRAME, -hp - 20, -hp, z0 + 980, z0 + 1020, metal); // push bar
+        }
+      });
+  // Vertical mullions row by row, then horizontals between them.
   for (let k = 0; k <= nu; k++)
     for (let j = 0; j < nz; j++) {
       if (!vSeg(k, j)) continue;
-      const u = us[k]!;
-      if (circular) rod("z", zs[j]!, zs[j + 1]!, Math.min(len - hw, Math.max(hw, u)), 0, hw, metal);
-      else box(Math.max(0, u - hw), Math.min(len, u + hw), -hd, hd, zs[j]!, zs[j + 1]!, metal);
+      const key = `v:${k}:${j}`;
+      const m = vm(k, j);
+      part(key, () => prism(prof(key, k === 0 || k === nu), "z", zs[j]!, zs[j + 1]!, m.c, 0, metal));
     }
   for (let k = 0; k <= nz; k++)
     for (let i = 0; i < nu; i++) {
       // No sill under a door.
       if (!hSeg(k, i) || (k < nz && kind(i, k) === "door")) continue;
-      const z = zs[k]!;
-      const u0 = us[i]! + (vSeg(i, Math.min(k, nz - 1)) ? hw : 0);
-      const u1 = us[i + 1]! - (vSeg(i + 1, Math.min(k, nz - 1)) ? hw : 0);
-      if (circular) rod("u", u0, u1, 0, Math.min(top - hw, Math.max(bottom + hw, z)), hw, metal);
-      else box(u0, u1, -hd, hd, Math.max(bottom, z - hw), Math.min(top, z + hw), metal);
+      const key = `h:${k}:${i}`;
+      const row = Math.min(k, nz - 1);
+      const L = vm(i, row);
+      const R = vm(i + 1, row);
+      const u0 = vSeg(i, row) ? L.c + L.hw : us[i]!;
+      const u1 = vSeg(i + 1, row) ? R.c - R.hw : us[i + 1]!;
+      part(key, () => prism(prof(key, k === 0 || k === nz), "u", u0, u1, 0, hm(k, i).c, metal));
     }
-  return { positions: new Float32Array(pos), normals: new Float32Array(nor), indices: new Uint32Array(idx), colors: new Float32Array(col), glass: { start: 0, count: glassCount } };
+  return { positions: new Float32Array(pos), normals: new Float32Array(nor), indices: new Uint32Array(idx), colors: new Float32Array(col), glass: { start: 0, count: glassCount }, parts };
 }

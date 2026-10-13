@@ -10,6 +10,8 @@ export interface MeshData {
   colors?: Float32Array;
   /** Optional index range that is glazing (rendered transparent): windows, curtain panels. */
   glass?: { start: number; count: number };
+  /** Optional named index ranges (curtain wall mullions "v:k:j"/"h:k:i" and panels "p:i,j"), for picking parts. */
+  parts?: { key: string; start: number; count: number }[];
 }
 
 export interface Box3 {

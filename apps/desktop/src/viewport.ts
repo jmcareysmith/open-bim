@@ -442,6 +442,7 @@ export class Viewport {
     this.objects.set(id, group);
     (group.userData.inDrawing ? this.drawScene : this.scene).add(group);
     this.applyHighlight(id);
+    if (this.partSel?.id === id) this.setPartHighlight(id, this.partSel.key);
   }
 
   // ---- selection -----------------------------------------------------------
@@ -679,6 +680,49 @@ void main() {
   /** Element under the cursor, nearest first. */
   pick(ev: { clientX: number; clientY: number }): ElementId | null {
     return this.pickHit(ev)?.id ?? null;
+  }
+
+  /** The named part (curtain mullion or panel) of element `id` under the cursor, 3D and plans. */
+  pickPart(ev: { clientX: number; clientY: number }, id: ElementId): string | null {
+    const mesh = this.meshes.get(id);
+    const g = this.objects.get(id);
+    if (!mesh?.parts || !g || this.mode === "drawing") return null;
+    this.setRay(ev);
+    for (const hit of this.raycaster.intersectObject(g.children[0]!, false)) {
+      if (this.renderer.clippingPlanes.some((pl) => pl.distanceToPoint(hit.point) < 0)) continue;
+      if (hit.faceIndex == null) continue;
+      const at = hit.faceIndex * 3;
+      const p = mesh.parts.find((q) => at >= q.start && at < q.start + q.count);
+      if (p) return p.key;
+    }
+    return null;
+  }
+
+  private partOverlay: THREE.Mesh | null = null;
+  private partSel: { id: ElementId; key: string } | null = null;
+
+  /** Highlight one part of an element (the picked curtain mullion or panel), or clear it. */
+  setPartHighlight(id: ElementId | null, key: string | null): void {
+    this.partSel = id && key ? { id, key } : null;
+    if (this.partOverlay) {
+      this.partOverlay.removeFromParent();
+      this.partOverlay.geometry.dispose();
+      (this.partOverlay.material as THREE.Material).dispose();
+      this.partOverlay = null;
+    }
+    const mesh = id ? this.meshes.get(id) : undefined;
+    const ranges = mesh?.parts?.filter((p) => p.key === key) ?? [];
+    if (mesh && ranges.length) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.BufferAttribute(mesh.positions, 3));
+      g.setAttribute("normal", new THREE.BufferAttribute(mesh.normals, 3));
+      g.setIndex(ranges.flatMap((r) => [...mesh.indices.subarray(r.start, r.start + r.count)]));
+      const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0x2f8cff, transparent: true, opacity: 0.75, depthTest: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
+      m.renderOrder = 5;
+      this.scene.add(m);
+      this.partOverlay = m;
+    }
+    this.needsRender = true;
   }
 
   /** Element under the cursor and the model point hit, nearest first. */

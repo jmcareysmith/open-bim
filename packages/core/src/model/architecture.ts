@@ -163,7 +163,60 @@ export type CurtainGrid = {
   mullionShape?: "rectangular" | "circular" | null;
   /** Mullions round the edge of the wall (default true). */
   borderMullions?: boolean | null;
+  /** Mullion profiles (MULLION_PROFILES) for interior grid lines and the border; unset = width × depth (or round). */
+  interiorMullion?: string | null;
+  borderMullion?: string | null;
 };
+
+/**
+ * Mullion profiles (Revit: Curtain Wall Mullion types): cross-sections in mm, x across the mullion
+ * (along the wall for vertical mullions, up it for horizontal ones), y through the wall (+ exterior),
+ * centred on the grid line.
+ */
+export const MULLION_PROFILES: Record<string, Vec2[]> = {
+  "Rectangular 50 x 150": rectProfile(50, 150),
+  "Rectangular 50 x 100": rectProfile(50, 100),
+  "Rectangular 30 x 150": rectProfile(30, 150),
+  "Rectangular 100 x 100": rectProfile(100, 100),
+  "Circular 50": circleProfile(25),
+  "Circular 100": circleProfile(50),
+  "Trapezoid 80 x 150": [
+    { x: -40, y: -75 },
+    { x: 40, y: -75 },
+    { x: 20, y: 75 },
+    { x: -20, y: 75 },
+  ],
+  "Capped 60 x 150": [
+    { x: -15, y: -75 },
+    { x: 15, y: -75 },
+    { x: 15, y: 55 },
+    { x: 30, y: 55 },
+    { x: 30, y: 75 },
+    { x: -30, y: 75 },
+    { x: -30, y: 55 },
+    { x: -15, y: 55 },
+  ],
+};
+
+function rectProfile(w: number, d: number): Vec2[] {
+  return [
+    { x: -w / 2, y: -d / 2 },
+    { x: w / 2, y: -d / 2 },
+    { x: w / 2, y: d / 2 },
+    { x: -w / 2, y: d / 2 },
+  ];
+}
+
+function circleProfile(r: number): Vec2[] {
+  return Array.from({ length: 16 }, (_, i) => ({ x: r * Math.cos((2 * Math.PI * i) / 16), y: r * Math.sin((2 * Math.PI * i) / 16) }));
+}
+
+/** The section of one mullion: its own profile, else the type's interior/border one, else width × depth. */
+export function mullionProfile(grid: CurtainGrid, border: boolean, own?: string | null): Vec2[] {
+  const name = own ?? (border ? grid.borderMullion : grid.interiorMullion) ?? null;
+  if (name && MULLION_PROFILES[name]) return MULLION_PROFILES[name]!;
+  return grid.mullionShape === "circular" ? circleProfile(grid.mullionWidth / 2) : rectProfile(grid.mullionWidth, grid.mullionDepth);
+}
 
 /** A curtain panel: glazed (default), solid, empty (no panel) or a glazed door. */
 export type CurtainPanelKind = "glass" | "solid" | "empty" | "door";
@@ -181,6 +234,8 @@ export type CurtainEdits = {
   panels?: Record<string, CurtainPanelKind> | null;
   /** Removed mullion segments: "v:k:j" (vertical line k in row j) or "h:k:i" (horizontal line k in bay i). */
   removed?: string[] | null;
+  /** Mullion profile swaps by segment key (as `removed`). */
+  mullions?: Record<string, string> | null;
 };
 
 /**
@@ -240,6 +295,7 @@ export function setCurtainEdits(tx: Transaction, doc: Document, id: ElementId, e
     check(edits.uLines, len, "Vertical");
     check(edits.zLines, top - bottom, "Horizontal");
     for (const k of Object.values(edits.panels ?? {})) if (!["glass", "solid", "empty", "door"].includes(k)) throw new Error(`Unknown panel ${k}`);
+    for (const m of Object.values(edits.mullions ?? {})) if (!MULLION_PROFILES[m]) throw new Error(`Unknown mullion profile ${m}`);
   }
   const sorted = (xs: number[] | null | undefined) => (xs ? [...new Set(xs.map((x) => Math.round(x * 10) / 10))].sort((a, b) => a - b) : xs);
   tx.update<WallParams>(id, { curtainEdits: edits ? { ...edits, uLines: sorted(edits.uLines), zLines: sorted(edits.zLines) } : null });

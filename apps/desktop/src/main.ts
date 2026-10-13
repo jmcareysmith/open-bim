@@ -1,6 +1,7 @@
 import { openObjectStyles } from "./objectstyles.ts";
 import { ContainmentTool } from "./containtool.ts";
 import { FaceTool } from "./facetool.ts";
+import { curtainPart, onCurtainPart, setCurtainPart } from "./curtainpart.ts";
 import { MANAGE_SECTIONS, projectSection } from "./panels.ts";
 import { openMaterialBrowser } from "./materialbrowser.ts";
 import { RunTool } from "./runtool.ts";
@@ -414,6 +415,8 @@ const ctx: ModifyToolContext & PanelContext = {
   selection: () => selection,
   setSelection(ids) {
     selection = ids;
+    const part = curtainPart();
+    if (part && (ids.length !== 1 || ids[0] !== part.id)) setCurtainPart(null);
     collab?.client.setSelection(ids);
     // A selected group highlights its members.
     viewport.setSelection(ids.flatMap((id) => (doc.get(id)?.category === Cat.Group ? [id, ...groupMembers(doc, id).map((m) => m.id)] : [id])));
@@ -1882,6 +1885,15 @@ function setPaneLayout(layout: PaneLayout, count?: number): void {
   if (layout !== "tab" && (viewBar?.openViews().length ?? 0) < 2) status("Open two or more views (they show as tabs below the view), then tile them.");
   panes.setLayout(layout, count);
 }
+
+// A picked curtain mullion/panel: highlight it and show it in Properties.
+onCurtainPart(() => {
+  const p = curtainPart();
+  // The wall shows in its own colours, only the part highlighted (Revit).
+  viewport.setSelection(p ? [] : selection);
+  viewport.setPartHighlight(p?.id ?? null, p?.key ?? null);
+  refreshPanels();
+});
 
 function refreshAll(): void {
   if (!doc.has(activeLevelId)) activeLevelId = levels(doc)[0]?.id ?? "";

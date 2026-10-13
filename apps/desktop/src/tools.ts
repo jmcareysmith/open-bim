@@ -76,6 +76,7 @@ import {
   createStair,
   createExtrusionRoof,
   resolveRef,
+  curtainOf,
   createSpotElevation,
   SPOT_HOSTS,
   refPoint,
@@ -103,6 +104,7 @@ import {
   createSubregion,
   createPropertyLine,
 } from "@open-bim/core";
+import { curtainPart, partLabel, setCurtainPart } from "./curtainpart.ts";
 import { areaBoundary, buildGridLines, buildReferencePlaneLines, buildRoomLines, extrudePolygon, roomBoundary, wallFootprint, type LineData } from "@open-bim/geometry";
 import type { Viewport } from "./viewport.ts";
 
@@ -175,6 +177,7 @@ export class SelectTool implements Tool {
   }
 
   pointerMove(ev: PointerEvent): void {
+    this.lastPointer = { clientX: ev.clientX, clientY: ev.clientY };
     if (this.moveFrom && ev.buttons & 1) {
       const from = this.dragFrom!;
       if (!this.moveTo && Math.hypot(ev.clientX - from.x, ev.clientY - from.y) < 5) return;
@@ -260,11 +263,37 @@ export class SelectTool implements Tool {
       else cur.add(id);
       this.ctx.setSelection([...cur]);
     } else {
+      // A curtain wall that's already selected: the click picks its mullion or panel (Revit: Tab).
+      const sel = this.ctx.selection();
+      if (sel.length === 1 && sel[0] === id && this.pickCurtainPart(ev, id)) return;
       this.ctx.setSelection([id]);
     }
   }
 
+  private lastPointer: { clientX: number; clientY: number } | null = null;
+
+  /** Select the mullion or panel of curtain wall `id` under the cursor; false if there isn't one. */
+  private pickCurtainPart(ev: { clientX: number; clientY: number }, id: ElementId): boolean {
+    const el = this.ctx.doc.get(id);
+    if (!el || el.category !== Cat.Wall || !curtainOf(this.ctx.doc, el)) return false;
+    const key = this.ctx.viewport.pickPart(ev, id);
+    if (!key) return false;
+    if (this.ctx.selection().join() !== id) this.ctx.setSelection([id]);
+    setCurtainPart({ id, key });
+    this.ctx.status(`${partLabel(key)} selected: change it in Properties. Esc goes back to the wall.`);
+    return true;
+  }
+
   key(ev: KeyboardEvent): boolean {
+    // Tab over a curtain wall picks the mullion or panel under the cursor.
+    if (ev.key === "Tab" && this.lastPointer) {
+      const id = this.ctx.viewport.pick(this.lastPointer);
+      if (id && this.pickCurtainPart(this.lastPointer, id)) return true;
+    }
+    if (ev.key === "Escape" && curtainPart()) {
+      setCurtainPart(null);
+      return true;
+    }
     if (ev.key === "Delete" || ev.key === "Backspace") {
       const ids = this.ctx.selection();
       if (!ids.length) return false;

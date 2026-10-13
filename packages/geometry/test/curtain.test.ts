@@ -48,4 +48,35 @@ describe("curtain walls", () => {
     doc.transact("Type", (tx) => tx.update<LayeredTypeParams>(ids.wallTypes.curtain, { curtain: { ...grid, mullionShape: "circular", borderMullions: false } }));
     expect(meshVolume(new SimpleKernel().build(doc, doc.require(w.id))!)).toBeGreaterThan(0);
   });
+
+  it("mullion profiles: per segment, per type, and every mullion and panel is a pickable part", () => {
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const w = doc.transact("CW", (tx) =>
+      createWall(tx, ids.wallTypes.curtain, { x: 0, y: 0 }, { x: 5000, y: 0 }, ids.levels.ground, { topLevelId: ids.levels.first }),
+    );
+    const m0 = new SimpleKernel().build(doc, w)!;
+    const keys = new Set(m0.parts!.map((q) => q.key));
+    expect(keys.has("v:1:0")).toBe(true);
+    expect(keys.has("h:1:2")).toBe(true);
+    expect(keys.has("p:4,1")).toBe(true);
+    // Parts cover the whole mesh.
+    expect(m0.parts!.reduce((a, q) => a + q.count, 0)).toBe(m0.indices.length);
+    // A 100 deep box mullion on one segment stands out less than the 150 one; a capped one more.
+    doc.transact("Swap", (tx) => setCurtainEdits(tx, doc, w.id, { mullions: { "v:2:0": "Capped 60 x 150" } }));
+    const m1 = new SimpleKernel().build(doc, doc.require(w.id))!;
+    const part = m1.parts!.find((q) => q.key === "v:2:0")!;
+    let maxY = -Infinity;
+    for (let t = part.start; t < part.start + part.count; t++) maxY = Math.max(maxY, m1.positions[m1.indices[t]! * 3 + 1]!);
+    expect(maxY).toBeCloseTo(75, 3);
+    expect(() => doc.transact("Bad", (tx) => setCurtainEdits(tx, doc, w.id, { mullions: { "v:1:0": "Nope" } }))).toThrow(/Unknown mullion/);
+    // The type's interior profile changes every interior mullion.
+    const grid = curtainOf(doc, w)!;
+    doc.transact("Type", (tx) => tx.update<LayeredTypeParams>(ids.wallTypes.curtain, { curtain: { ...grid, interiorMullion: "Circular 100" } }));
+    const m2 = new SimpleKernel().build(doc, doc.require(w.id))!;
+    const v1 = m2.parts!.find((q) => q.key === "v:1:0")!;
+    let minX = Infinity;
+    for (let t = v1.start; t < v1.start + v1.count; t++) minX = Math.min(minX, m2.positions[m2.indices[t]! * 3]!);
+    expect(minX).toBeCloseTo(1000 - 50, 3);
+  });
 });

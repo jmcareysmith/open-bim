@@ -158,6 +158,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Curtain walls: wall type "Curtain Wall - Aluminium 1200 x 1500" (grid, mullion type rectangular/circular, border
   mullions in type properties). Per wall (Properties → Curtain grid and panels): elevation diagram (click panel
   = glass → solid → empty → door; click grid line = remove/restore segment), typed line positions; `curtainEdits`.
+  Mullion profiles (core MULLION_PROFILES: rectangular, circular, trapezoid, capped): type interior/border
+  profile; click a selected curtain wall (or Tab over it) to pick a mullion/panel (apps/desktop/src/curtainpart.ts,
+  mesh `parts`, viewport pickPart/setPartHighlight) → Properties: profile (segment or whole line), remove, panel kind.
 - Stacked walls: browser Types → New stacked wall type (segments in its properties).
 - Toposolids: Toposolid tool (sketch boundary) + Import survey CSV (E,N,RL m) in Properties; contours.
 - Structure: Column / Beam / Footing tools; sections (NZ timber/steel/concrete) as Structural types.

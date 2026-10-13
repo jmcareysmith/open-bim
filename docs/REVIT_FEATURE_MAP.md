@@ -33,7 +33,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Wall joins, cleanup, wall attach top/base | 1 | ✅ (plan cleanup by layer priority; disallow join; crossing walls) |
 | Stacked walls | 6 | ✅ |
 | Wall sweeps and reveals, Edit Profile | 8b | ✅ (type and instance; built-in profiles; profile by presets/points, not sketched in elevation yet) |
-| Curtain walls, grids, mullions, panels | 6 | ✅ (per wall: own grid lines, removed mullion segments, panel swaps glass/solid/empty/door; rectangular/circular mullions, border mullions; edited in Properties, not in the view) |
+| Curtain walls, grids, mullions, panels | 6 | ✅ (per wall: own grid lines, removed mullion segments, panel swaps glass/solid/empty/door; mullion profiles per type (interior/border) and per segment; pick a mullion or panel in the view — click the selected wall or Tab) |
 | Floors (sketch-based, layered, slope arrows) | 1 | ✅ (Pick Walls for floors/ceilings/roofs; slope arrows with tail/head heights) |
 | Roofs (footprint, extrusion, slopes, fascia/gutter) | 1 | ✅ (footprint: exact for convex/L/T/U; extrusion: gable/mono/curved/points profile; fascia, gutter, soffit on eaves; no barge boards) |
 | Ceilings | 1 | 🟨 |

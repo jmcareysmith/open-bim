@@ -1,4 +1,5 @@
 import { areaBoundary, curtainGridLines, areaLoopsFromWalls, massFloorArea, massTotals, roomBoundary, scheduleFields, scheduleTable } from "@open-bim/geometry";
+import { curtainPart, partLabel, setCurtainPart } from "./curtainpart.ts";
 import {
   Cat,
   levels,
@@ -184,6 +185,7 @@ import {
   type RoofExtrusion,
   type RoofTrims,
   setCurtainEdits,
+  MULLION_PROFILES,
   curtainOf,
   type CurtainEdits,
   type CurtainPanelKind,
@@ -401,6 +403,71 @@ function rValueInput(value: number | null | undefined, onCommit: (v: number | nu
     else input.value = value ? String(value) : "";
   };
   return input;
+}
+
+/**
+ * The picked mullion or panel of a curtain wall (click the selected wall, or Tab over it): swap a
+ * mullion's profile (this segment or its whole grid line) or remove it; change a panel.
+ */
+function curtainPartRows(ctx: PanelContext, w: Wall, key: string): HTMLElement[] {
+  const { doc } = ctx;
+  const grid = curtainOf(doc, w)!;
+  const ed: CurtainEdits = w.params.curtainEdits ?? {};
+  const save = (next: CurtainEdits, name: string) => edit(ctx, name, (tx) => setCurtainEdits(tx, doc, w.id, next));
+  const out: HTMLElement[] = [h("div", { class: "subhead part-head" }, partLabel(key))];
+  const back = h("button", { textContent: "Back to the wall", title: "Esc" });
+  back.onclick = () => setCurtainPart(null);
+  if (key.startsWith("p:")) {
+    const cellKey = key.slice(2);
+    const kind = ed.panels?.[cellKey] ?? "glass";
+    out.push(
+      row(
+        "Panel",
+        select(
+          PANEL_CYCLE.map((k) => ({ value: k, label: { glass: "Glazed", solid: "Solid", empty: "Empty", door: "Door" }[k] })),
+          kind,
+          (v) => {
+            const panels = { ...(ed.panels ?? {}), [cellKey]: v as CurtainPanelKind };
+            if (v === "glass") delete panels[cellKey];
+            save({ ...ed, panels }, "Change curtain panel");
+          },
+        ),
+      ),
+      row("", back),
+    );
+    return out;
+  }
+  // Mullion segment "v:k:j" / "h:k:i": its line is everything sharing "v:k:".
+  const [axis, line] = key.split(":");
+  const { u: us, z: zs } = curtainGridLines(wallLength(w), wallExtent(doc, w).bottom, wallExtent(doc, w).top, grid, ed);
+  const lastLine = axis === "v" ? us.length - 1 : zs.length - 1;
+  const segments = axis === "v" ? zs.length - 1 : us.length - 1;
+  const edge = Number(line) === 0 || Number(line) === lastLine;
+  const typeName = (edge ? grid.borderMullion : grid.interiorMullion) ?? `${grid.mullionShape === "circular" ? "Circular" : "Rectangular"} ${grid.mullionWidth} \u00d7 ${grid.mullionDepth}`;
+  const opts = [{ value: "", label: `Type: ${typeName}` }, ...Object.keys(MULLION_PROFILES).map((n) => ({ value: n, label: n }))];
+  const setProfile = (keys: string[], v: string) => {
+    const mullions = { ...(ed.mullions ?? {}) };
+    for (const k of keys) {
+      if (v) mullions[k] = v;
+      else delete mullions[k];
+    }
+    save({ ...ed, mullions }, "Change mullion profile");
+  };
+  const lineKeys = Array.from({ length: segments }, (_, s) => `${axis}:${line}:${s}`);
+  const current = ed.mullions?.[key] ?? "";
+  const whole = h("button", { textContent: "Apply to the whole grid line", title: "Give every segment of this grid line this profile" });
+  whole.onclick = () => setProfile(lineKeys, current);
+  out.push(row("Profile", select(opts, current, (v) => setProfile([key], v))), row("", whole));
+  if (!edge) {
+    const rm = h("button", { textContent: "Remove segment", title: "Take this mullion segment out (restore it from the grid diagram below)" });
+    rm.onclick = () => {
+      setCurtainPart(null);
+      save({ ...ed, removed: [...new Set([...(ed.removed ?? []), key])] }, "Remove mullion segment");
+    };
+    out.push(row("", rm));
+  }
+  out.push(row("", back));
+  return out;
 }
 
 const PANEL_CYCLE: CurtainPanelKind[] = ["glass", "solid", "empty", "door"];
@@ -2556,6 +2623,8 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Room bounding", checkbox(p.roomBounding !== false, (v) => update<WallParams>("Change room bounding", { roomBounding: v }))),
       );
       if (curtainOf(doc, w)) {
+        const part = curtainPart();
+        if (part?.id === w.id) sec.firstElementChild!.after(...curtainPartRows(ctx, w, part.key));
         sec.append(...curtainRows(ctx, w));
         break;
       }
@@ -3671,6 +3740,7 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       if (grid) {
         // Curtain wall: grid, mullions and panels instead of layers.
         const setGrid = (patch: Partial<typeof grid>) => update<LayeredTypeParams>("Edit curtain grid", { curtain: { ...grid, ...patch } });
+        const profileOpts = [{ value: "", label: "Width \u00d7 depth (above)" }, ...Object.keys(MULLION_PROFILES).map((n) => ({ value: n, label: n }))];
         const num = (k: "uSpacing" | "vSpacing" | "mullionWidth" | "mullionDepth" | "panelThickness", label: string) =>
           row(label, numberInput(grid[k], (v) => (v > 0 ? setGrid({ [k]: v }) : ctx.status("⚠ Must be positive"))));
         sec.append(
@@ -3694,6 +3764,8 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
             ),
           ),
           row("Border mullions", checkbox(grid.borderMullions !== false, (v) => setGrid({ borderMullions: v }))),
+          row("Interior mullion profile", select(profileOpts, grid.interiorMullion ?? "", (v) => setGrid({ interiorMullion: v || null }))),
+          row("Border mullion profile", select(profileOpts, grid.borderMullion ?? "", (v) => setGrid({ borderMullion: v || null }))),
         );
         break;
       }

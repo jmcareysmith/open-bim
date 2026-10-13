@@ -389,3 +389,5 @@ body.pane-dragging canvas { pointer-events: none; }
 .cw-hit { cursor: pointer; }
 .cw-hit:hover { stroke: #2f6fd6; stroke-width: 5; }
 .cw-label { font: 600 10px system-ui, sans-serif; fill: #24303a; pointer-events: none; }
+
+.part-head { color: #2f6fd6; }

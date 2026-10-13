@@ -55,6 +55,7 @@ export * from "./model/mep.ts";
 export * from "./model/runs.ts";
 export * from "./model/ducts.ts";
 export * from "./model/pipes.ts";
+export * from "./model/drainage.ts";
 export * from "./model/massfloors.ts";
 export * from "./model/property.ts";
 export * from "./model/markers.ts";

@@ -18,6 +18,12 @@ import {
   type FamilyInstance,
   graphicsCategory,
   createDuct,
+  createPipe,
+  drainageCheck,
+  ensurePipeTypes,
+  pipeTypeFor,
+  pipes,
+  type PipeParams,
   createSystem,
   ductFlows,
   elementConnectors,
@@ -28,7 +34,7 @@ import {
   type MEPSystem,
 } from "@open-bim/core";
 import { OcctKernel, SimpleKernel, boundingBox, buildDetailComponentLines, buildViewMarker, meshVolume } from "@open-bim/geometry";
-import { LIBRARY, baseCabinet, casementWindow, ductedIndoorUnit, massGable, roundTable, supplyDiffuser } from "../src/index.ts";
+import { LIBRARY, baseCabinet, casementWindow, ductedIndoorUnit, massGable, roundTable, shower, supplyDiffuser, wc } from "../src/index.ts";
 
 let occt: OcctKernel;
 beforeAll(async () => {
@@ -160,5 +166,34 @@ describe("family library", () => {
     // 200 L/s at 4 m/s: Ø252 → 300.
     expect((doc.require(main.id) as Duct).params.diameter).toBe(300);
     void d2;
+  });
+
+  it("a WC and a shower to a graded drain: discharge units add up, and size/flow checks bite", () => {
+    const { doc, ids } = project();
+    enableMepFittings(doc);
+    doc.transact("Types", (tx) => ensurePipeTypes(tx, doc));
+    const load = (f: typeof wc) => doc.transact("Load", (tx) => loadFamily(tx, doc, f.build(), f.name));
+    const wcDef = load(wc);
+    const showerDef = load(shower);
+    const w = doc.transact("P", (tx) => placeFamilyInstance(tx, doc, wcDef.id, "Standard", { levelId: ids.levels.ground, position: { x: 0, y: 0 } }));
+    const s = doc.transact("P", (tx) => placeFamilyInstance(tx, doc, showerDef.id, "900 x 900", { levelId: ids.levels.ground, position: { x: 2000, y: 0 } }));
+    expect(elementConnectors(doc, w).find((c) => c.classification === "sanitary")!.position).toEqual([0, 250, 0]);
+    const t = pipeTypeFor(doc, "sanitary")!;
+    const pipe = (a: [number, number, number], b: [number, number, number], dn: number) =>
+      doc.transact("Pipe", (tx) => createPipe(tx, doc, t, ids.levels.ground, { x: a[0], y: a[1], z: a[2] }, { x: b[0], y: b[1], z: b[2] }, { classification: "sanitary", diameter: dn }));
+    pipe([0, 250, 0], [0, 250, -300], 100);
+    pipe([0, 250, -300], [3000, 250, -350], 100); // 1:60 to the outlet
+    pipe([2000, 450, 0], [2000, 450, -200], 50);
+    const branch = pipe([2000, 450, -200], [2000, 250, -300 - 50 * (2000 / 3000)], 50);
+    const r = drainageCheck(doc);
+    expect(r.issues).toEqual([]);
+    const units = r.pipes.map((d) => d.units).sort((a, b) => a - b);
+    // Shower stack and branch 2, WC stack and drain to the junction 4, junction to the outlet 6.
+    expect(units).toEqual([2, 2, 4, 4, 6]);
+    expect(pipes(doc)).toHaveLength(5);
+    // A DN40 branch is smaller than the shower's DN50 outlet… only where it meets the shower.
+    doc.transact("Shrink", (tx) => tx.update<PipeParams>(branch.id, { diameter: 40 }));
+    expect(drainageCheck(doc).issues.some((i) => /DN50 into DN40|gets smaller/.test(i.message))).toBe(true);
+    void s;
   });
 });

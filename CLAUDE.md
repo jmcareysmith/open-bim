@@ -201,4 +201,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - HVAC library (packages/library): Supply Diffuser - Square, Return Grille, Exhaust Fan - Ceiling,
   Ducted Heat Pump - Indoor Unit (supply/return/power/condensate), Heat Pump - Outdoor Unit.
   Systems → Air Terminal / Mechanical Equipment place them (terminals and lights at 2400).
-- Next: Phase 8 — plumbing fixtures and drainage (G13/AS1 discharge units, pipe size and fall checks).
+- Plumbing library: WC, basin, shower, bath, kitchen sink, laundry tub (sanitary connectors carry
+  discharge units + outlet DN; DN15 hot/cold), hot water cylinder. Systems → Plumbing Fixture.
+  NZ Checks → G13 drainage (core/model/drainage.ts): units per drain from its outlet, capacity by
+  DN and fall, outlet size, no reducing downstream, falls. Capacities provisional.
+- Next: Phase 8 — electrical (fixtures/devices, circuits, switchboard schedules with load totals).

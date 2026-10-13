@@ -275,6 +275,7 @@ import {
   type Leg,
   type PropertyLine,
   type PropertyLineParams,
+  drainageCheck,
 } from "@open-bim/core";
 
 type Child = Node | string | null | undefined | false;
@@ -2863,6 +2864,12 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("End elevation", numberInput(p.end.z, (v) => set("Pipe end elevation", { end: { ...p.end, z: v } }))),
         row("Length", len(pipeLength(pp))),
         row("Fall", fallLabel(fall)),
+        ...(p.classification === "sanitary"
+          ? (() => {
+              const d = drainageCheck(doc).pipes.find((x) => x.pipeId === pp.id);
+              return d ? [row("Discharge units", `${d.units} (takes ${d.capacity})`)] : [];
+            })()
+          : []),
         ...(tooFlat ? [h("div", { class: "empty" }, `\u26a0 Flatter than the ${fallLabel(minimumFall(p.diameter))} minimum for DN${p.diameter} (provisional, after G13/AS1).`)] : []),
       );
       break;

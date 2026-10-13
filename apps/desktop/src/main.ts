@@ -1114,6 +1114,13 @@ const commands: Record<string, () => void | Promise<void>> = {
   },
   siteComponent: () => placeFromCategory("Site", "Tree - Deciduous"),
   placeAirTerminal: () => placeFromCategory("AirTerminal", "Supply Diffuser - Square"),
+  placePlumbingFixture() {
+    if (!familyDefs(doc).some((f) => f.params.category === "PlumbingFixture")) {
+      for (const n of ["WC - Close Coupled", "Basin - Wall Hung", "Shower - Tray", "Bath - Built In", "Sink - Kitchen", "Tub - Laundry", "Hot Water Cylinder"]) ctx.loadLibraryFamily(n);
+    }
+    placeFromCategory("PlumbingFixture", "WC - Close Coupled");
+    status("Plumbing Fixture: pick the fixture in the type selector, click to place (Space turns it). Waste and supply connectors are on each.");
+  },
   placeMechanicalEquipment: () => placeFromCategory("MechanicalEquipment", "Ducted Heat Pump - Indoor Unit"),
   parkingComponent: () => placeFromCategory("Parking", "Parking Space"),
   gradedRegion() {

@@ -663,6 +663,116 @@ export const outdoorUnit: LibraryFamily = {
     ),
 };
 
+
+// ---- Plumbing fixtures (Systems → Plumbing Fixture) -------------------------
+// Origin at the wall face, family Y out from the wall. Sanitary connectors carry the fixture's
+// discharge units (provisional, after G13/AS1) and its outlet size; supply connectors are DN15.
+
+const supply = (tx: Transaction, x: Num, y: Num, z: Num, hot: boolean) => {
+  createConnector(tx, { classification: "coldWater", x, y, z, facing: "-y", diameter: 15, flow: 0.1, flowDirection: "in" });
+  if (hot) createConnector(tx, { classification: "hotWater", x: `${x} + 100`, y, z, facing: "-y", diameter: 15, flow: 0.1, flowDirection: "in" });
+};
+const waste = (tx: Transaction, x: Num, y: Num, z: Num, dn: number, units: number, facing: "-z" | "-y" = "-z") =>
+  createConnector(tx, { classification: "sanitary", x, y, z, facing, diameter: dn, units, flowDirection: "out" });
+
+export const wc: LibraryFamily = {
+  name: "WC - Close Coupled",
+  category: "PlumbingFixture",
+  description: "Floor-standing WC pan with cistern: DN100 waste through the floor (4 discharge units).",
+  build: () =>
+    family("PlumbingFixture", "WC - Close Coupled", [], [["Standard", { Width: 380, Depth: 700, Height: 800 }]], (tx) => {
+      createExtrusion(tx, rect("-Width/2 + 20", 150, "Width/2 - 20", "Depth"), { end: 400 });
+      createExtrusion(tx, rect("-Width/2", 0, "Width/2", 180), { start: 380, end: "Height" });
+      waste(tx, 0, 250, 0, 100, 4);
+      supply(tx, "-Width/2 + 60", 0, 600, false);
+    }),
+};
+
+export const basin: LibraryFamily = {
+  name: "Basin - Wall Hung",
+  category: "PlumbingFixture",
+  description: "Wall-hung vanity basin: DN40 waste to the wall (1 discharge unit), hot and cold.",
+  build: () =>
+    family("PlumbingFixture", "Basin - Wall Hung", [], [["500 x 400", { Width: 500, Depth: 400, Height: 850 }]], (tx) => {
+      createExtrusion(tx, rect("-Width/2", 0, "Width/2", "Depth"), { start: "Height - 180", end: "Height" });
+      waste(tx, 0, 0, 450, 40, 1, "-y");
+      supply(tx, -100, 0, 550, true);
+    }),
+};
+
+export const shower: LibraryFamily = {
+  name: "Shower - Tray",
+  category: "PlumbingFixture",
+  description: "Shower tray with a centre waste: DN50 (2 discharge units), hot and cold at the wall.",
+  build: () =>
+    family("PlumbingFixture", "Shower - Tray", [], [["900 x 900", { Width: 900, Depth: 900 }], ["1200 x 900", { Width: 1200, Depth: 900 }]], (tx) => {
+      createExtrusion(tx, rect("-Width/2", 0, "Width/2", "Depth"), { end: 60 });
+      waste(tx, 0, "Depth/2", 0, 50, 2);
+      supply(tx, -50, 0, 1000, true);
+    }),
+};
+
+export const bath: LibraryFamily = {
+  name: "Bath - Built In",
+  category: "PlumbingFixture",
+  description: "Built-in bath along the wall: DN40 waste (4 discharge units), hot and cold.",
+  build: () =>
+    family("PlumbingFixture", "Bath - Built In", [], [["1700 x 750", { Width: 1700, Depth: 750, Height: 550 }]], (tx) => {
+      createExtrusion(tx, rect("-Width/2", 0, "Width/2", "Depth"), { end: "Height" });
+      waste(tx, "-Width/2 + 200", "Depth/2", 0, 40, 4);
+      supply(tx, "-Width/2 + 100", 0, 650, true);
+    }),
+};
+
+export const kitchenSink: LibraryFamily = {
+  name: "Sink - Kitchen",
+  category: "PlumbingFixture",
+  description: "Single-bowl kitchen sink in a 600 deep bench: DN50 waste (3 discharge units), hot and cold.",
+  build: () =>
+    family("PlumbingFixture", "Sink - Kitchen", [], [["Single bowl", { Width: 800, Depth: 600, Height: 900 }]], (tx) => {
+      createExtrusion(tx, rect("-Width/2", 0, "Width/2", "Depth"), { start: "Height - 200", end: "Height" });
+      waste(tx, 0, 0, 500, 50, 3, "-y");
+      supply(tx, -100, 0, 600, true);
+    }),
+};
+
+export const laundryTub: LibraryFamily = {
+  name: "Tub - Laundry",
+  category: "PlumbingFixture",
+  description: "Laundry tub on a stand: DN50 waste (3 discharge units), hot and cold.",
+  build: () =>
+    family("PlumbingFixture", "Tub - Laundry", [], [["45 L", { Width: 600, Depth: 500, Height: 900 }]], (tx) => {
+      createExtrusion(tx, rect("-Width/2", 0, "Width/2", "Depth"), { start: "Height - 350", end: "Height" });
+      waste(tx, 0, 0, 450, 50, 3, "-y");
+      supply(tx, -100, 0, 1000, true);
+    }),
+};
+
+export const hotWaterCylinder: LibraryFamily = {
+  name: "Hot Water Cylinder",
+  category: "PlumbingFixture",
+  description: "Electric hot water cylinder: cold in low, hot out at the top, element load.",
+  build: () =>
+    family(
+      "PlumbingFixture",
+      "Hot Water Cylinder",
+      [
+        ["Diameter", 550],
+        ["Load", 3000],
+      ],
+      [
+        ["180 L", { Diameter: 550, Height: 1450, Load: 3000 }],
+        ["250 L", { Diameter: 600, Height: 1650, Load: 3000 }],
+      ],
+      (tx) => {
+        createRevolution(tx, rect(0, 0, "Diameter/2", "Height"), { axis: 0 });
+        createConnector(tx, { classification: "coldWater", x: "Diameter/2", z: 200, facing: "+x", diameter: 20, flowDirection: "in" });
+        createConnector(tx, { classification: "hotWater", z: "Height", facing: "+z", diameter: 20, flowDirection: "out" });
+        createConnector(tx, { classification: "power", x: "-Diameter/2", z: 300, facing: "-x", load: "Load" });
+      },
+    ),
+};
+
 export const LIBRARY: LibraryFamily[] = [
   singleDoor,
   casementWindow,
@@ -686,5 +796,12 @@ export const LIBRARY: LibraryFamily[] = [
   exhaustFan,
   ductedIndoorUnit,
   outdoorUnit,
+  wc,
+  basin,
+  shower,
+  bath,
+  kitchenSink,
+  laundryTub,
+  hotWaterCylinder,
   ...VIEW_MARKERS,
 ];

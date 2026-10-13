@@ -155,7 +155,7 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
           title: "Plumbing & Piping",
           items: [
             { label: "Pipe", icon: "pipe", tool: "pipe", large: true, title: "Pipe: route runs; bends, junctions and reducers are automatic; drainage falls (PI)" },
-            { label: "Plumbing Fixture", icon: "component", tool: "component", title: "Place a plumbing fixture family" },
+            { label: "Plumbing Fixture", icon: "component", cmd: "placePlumbingFixture", title: "Place a plumbing fixture (loads WC, basin, shower, bath, sinks and a hot water cylinder from the library if there are none)" },
           ],
         },
       ],

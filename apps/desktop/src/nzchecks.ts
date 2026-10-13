@@ -1,13 +1,13 @@
-import { H1_CLASS_LABELS, bracingCheck, bracingSettings, h1Check, setBracingSettings, type Document } from "@open-bim/core";
+import { H1_CLASS_LABELS, bracingCheck, bracingSettings, drainageCheck, fallLabel, h1Check, setBracingSettings, type Document } from "@open-bim/core";
 
-// NZ Checks pane: H1 energy (schedule method) and NZS 3604 bracing, run over the open model.
+// NZ Checks pane: H1 energy (schedule method), NZS 3604 bracing and G13 drainage, run over the open model.
 
 export interface NzChecksHost {
   doc: Document;
   select(ids: string[]): void;
 }
 
-let tab: "h1" | "bracing" = "h1";
+let tab: "h1" | "bracing" | "drainage" = "h1";
 
 export const el = (tag: string, text = "", cls = ""): HTMLElement => {
   const e = document.createElement(tag);
@@ -126,6 +126,43 @@ function bracingBody(host: NzChecksHost): Node[] {
   return out;
 }
 
+/** G13/AS1 drainage: discharge units per drain, capacity, outlet sizes and falls. */
+function drainageBody(host: NzChecksHost): Node[] {
+  const r = drainageCheck(host.doc);
+  const out: Node[] = [
+    el("p", "Foul water drains after G13/AS1: discharge units come from the fixtures' sanitary connectors and are added up from each drain's outlet (its lowest open end). Capacities are provisional.", "muted"),
+  ];
+  const head = el("p");
+  head.append(el("strong", "Overall: "), verdict(!r.issues.length));
+  out.push(head);
+  if (r.issues.length) {
+    const ul = el("ul");
+    for (const i of r.issues) {
+      const a = el("a", i.message);
+      a.style.cursor = "pointer";
+      a.onclick = () => host.select(i.ids);
+      const li = el("li");
+      li.append(a);
+      ul.append(li);
+    }
+    out.push(ul);
+  }
+  if (!r.pipes.length) {
+    out.push(el("p", "No sanitary pipes yet: draw them with Systems \u2192 Pipe (system Sanitary).", "muted"));
+    return out;
+  }
+  const rows = [...r.pipes]
+    .sort((a, b) => b.units - a.units)
+    .map((d) => {
+      const name = el("a", `DN${d.dn}`);
+      name.style.cursor = "pointer";
+      name.onclick = () => host.select([d.pipeId]);
+      return [name, d.vertical ? "stack" : fallLabel(d.fall), String(d.units), String(d.capacity), verdict(d.units <= d.capacity)] as (string | Node)[];
+    });
+  out.push(nzTable(["Drain", "Fall", "Units", "Takes", ""], rows));
+  return out;
+}
+
 export function renderNzChecks(pane: HTMLElement, host: NzChecksHost): void {
   const tabs = el("div", "", "buttons");
   const mk = (id: typeof tab, label: string) => {
@@ -137,7 +174,7 @@ export function renderNzChecks(pane: HTMLElement, host: NzChecksHost): void {
     };
     return b;
   };
-  tabs.append(mk("h1", "H1 energy"), mk("bracing", "NZS 3604 bracing"));
+  tabs.append(mk("h1", "H1 energy"), mk("bracing", "NZS 3604 bracing"), mk("drainage", "G13 drainage"));
   const rerun = el("button", "Re-run") as HTMLButtonElement;
   rerun.onclick = () => renderNzChecks(pane, host);
   const close = el("button", "Close") as HTMLButtonElement;
@@ -145,7 +182,7 @@ export function renderNzChecks(pane: HTMLElement, host: NzChecksHost): void {
   tabs.append(rerun, close);
   let body: Node[];
   try {
-    body = tab === "h1" ? h1Body(host) : bracingBody(host);
+    body = tab === "h1" ? h1Body(host) : tab === "bracing" ? bracingBody(host) : drainageBody(host);
   } catch (err) {
     body = [el("p", `⚠ ${(err as Error).message}`)];
   }

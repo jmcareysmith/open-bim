@@ -1,3 +1,5 @@
+import { MANAGE_SECTIONS, projectSection } from "./panels.ts";
+import { openMaterialBrowser } from "./materialbrowser.ts";
 import { RunTool } from "./runtool.ts";
 import { Panes, type PaneLayout } from "./panes.ts";
 import { openShortcutEditor, shortcutTable } from "./shortcuts.ts";
@@ -1049,6 +1051,14 @@ const commands: Record<string, () => void | Promise<void>> = {
     });
     status("New revision: edit it in Properties (Project Browser \u2192 Revisions lists them).");
   },
+  manageLevels: () => openManage("levels"),
+  manageMaterials: () => openMaterialBrowser(doc, status),
+  manageParameters: () => openManage("parameters"),
+  manageDesignOptions: () => openManage("designOptions"),
+  manageRevisions: () => openManage("revisions"),
+  manageFilters: () => openManage("filters"),
+  systemBrowser: () => openManage("systems"),
+  manageStatistics: () => openManage("statistics"),
   newOptionSet() {
     edit("New option set", (tx) => {
       let name = "Option Set 1";
@@ -1258,6 +1268,7 @@ window.addEventListener("keydown", (ev) => {
   if (mod && ev.key.toLowerCase() === "n") return run(ev, "new");
   if (mod && ev.key.toLowerCase() === "g") return run(ev, "group");
   if (ev.key === "`") return run(ev, "console");
+  if (ev.key === "F9") return run(ev, "systemBrowser");
   if (mod) return;
   // Arrow keys nudge the selection (plans, sections, sheets); Shift nudges ten times further.
   if (ev.key.startsWith("Arrow") && tool.name === "select" && selection.length && viewport.viewMode !== "3d") {
@@ -1709,6 +1720,17 @@ function refreshPanels(): void {
   makeCollapsible($("#properties-body"), "p:");
   const active = activeViewId ? doc.get(activeViewId) : undefined;
   if (active?.category === Cat.Schedule) renderSchedulePane($("#schedule-pane"), ctx, active as Schedule);
+}
+
+/** A project settings section (Revit's Manage tab dialogs), live while open. */
+function openManage(key: string): void {
+  let dlg: { refresh(): void; close(): void } | null = null;
+  const off = doc.on(() => dlg?.refresh());
+  dlg = openDialog(MANAGE_SECTIONS[key] ?? key, () => {
+    const box = projectSection(ctx, key);
+    box.classList.add("manage-dialog");
+    return box;
+  }, () => off());
 }
 
 function setPaneLayout(layout: PaneLayout, count?: number): void {

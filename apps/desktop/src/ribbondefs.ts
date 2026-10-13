@@ -145,6 +145,7 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
         {
           title: "HVAC",
           items: [
+            { label: "System Browser", icon: "duct", cmd: "systemBrowser", title: "MEP systems, their members and totals (F9)" },
             { label: "Duct", icon: "duct", tool: "duct", large: true, title: "Duct: route runs; elbows, tees and transitions are automatic (DT)" },
             { label: "Air Terminal", icon: "component", tool: "component", title: "Place an air terminal family (choose it in the type selector)" },
             { label: "Mechanical Equipment", icon: "component", tool: "component", title: "Place a mechanical equipment family" },
@@ -349,7 +350,24 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
           title: "Settings",
           items: [
             { label: "Project Information", icon: "info", cmd: "projectInfo", large: true, title: "Project information, units, location, phases, H1, bracing" },
-            { label: "Design Options", icon: "options", cmd: "newOptionSet", large: true, title: "New design option set" },
+            { label: "Materials", icon: "material", cmd: "manageMaterials", title: "Material Browser" },
+            { label: "Project Parameters", icon: "parameters", cmd: "manageParameters", title: "Project, shared and global parameters" },
+            { label: "Levels", icon: "level", cmd: "manageLevels", title: "Levels in the project" },
+            { label: "Filters & Templates", icon: "vg", cmd: "manageFilters", title: "View filters and view templates" },
+          ],
+        },
+        {
+          title: "Phasing & Options",
+          items: [
+            { label: "Design Options", icon: "options", cmd: "manageDesignOptions", large: true, title: "Design option sets and options" },
+            { label: "Revisions", icon: "cloud", cmd: "manageRevisions", title: "Sheet Issues/Revisions" },
+          ],
+        },
+        {
+          title: "Inquiry",
+          items: [
+            { label: "System Browser", icon: "duct", cmd: "systemBrowser", title: "MEP systems, their members and totals (F9)" },
+            { label: "Model Statistics", icon: "info", cmd: "manageStatistics", title: "How many of each element" },
           ],
         },
         { title: "Add-ins", items: [{ label: "Console & Plugins", icon: "console", cmd: "console", large: true, title: "Scripting console and plugins (`)" }] },

@@ -87,6 +87,11 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Each open view is a live window (a Viewport each, up to 9): drag the title bar, resize by the
   edges (snap to the area and each other), double-click to maximise, × closes. The active window
   holds the interactive viewport; click another to work in it.
+- Project Browser is Revit's: Views (all), Legends, Schedules/Quantities, Sheets (all), Families
+  (system families Walls/Floors/…/Ducts/Pipes and loadable ones, by category → family → type),
+  Groups (model/detail), Links. Project Information, Materials, Project Parameters, Levels,
+  Filters & Templates, Design Options, Revisions, System Browser (F9) and Model Statistics are
+  Manage-tab dialogs (`projectSection` in panels.ts).
 - Status bar: ⧩ selection count at the right; click to filter the selection by category.
 - Drag from the Project Browser: views/legends/schedules onto the open sheet (placed where dropped);
   families into a view start placing them (detail items via the detail component tool).

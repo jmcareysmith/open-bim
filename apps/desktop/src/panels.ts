@@ -1621,10 +1621,39 @@ function browserDrag(div: HTMLElement, kind: "view" | "family", id: ElementId): 
   };
 }
 
+/**
+ * The Project Browser, laid out as Revit's: Views (all), Legends, Schedules/Quantities, Sheets
+ * (all), Families (system and loadable, by category, family and type), Groups and Links. Project
+ * settings (information, levels, materials, parameters, design options, revisions, filters, MEP
+ * systems) open from the Manage tab as dialogs, like Revit's.
+ */
 export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
+  if (familyInfo(ctx.doc)) return renderFamilyBrowser(root, ctx);
+  const s = projectSections(ctx);
+  root.replaceChildren(s.views!, s.legends!, s.schedules!, s.sheets!, s.families!, s.groups!, s.links!);
+}
+
+/** Manage-tab dialogs: which project section each shows. */
+export const MANAGE_SECTIONS: Record<string, string> = {
+  projectInfo: "Project Information",
+  levels: "Levels",
+  materials: "Materials",
+  parameters: "Project & Global Parameters",
+  designOptions: "Design Options",
+  revisions: "Sheet Issues/Revisions",
+  filters: "Filters & View Templates",
+  systems: "System Browser",
+  statistics: "Model Statistics",
+};
+
+/** A project section on its own (Manage-tab dialogs), kept up to date while open. */
+export function projectSection(ctx: PanelContext, key: string): HTMLElement {
+  return projectSections(ctx)[key] ?? h("div", { class: "empty" }, "Nothing here.");
+}
+
+function projectSections(ctx: PanelContext): Record<string, HTMLElement> {
   const { doc } = ctx;
   units = projectUnits(doc);
-  if (familyInfo(doc)) return renderFamilyBrowser(root, ctx);
   const sel = new Set(ctx.selection());
   const item = (el: Element, right: string, onClick: () => void, active = false) => {
     const div = h(
@@ -1638,7 +1667,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   };
 
   // Views, grouped Revit-style. Floor plans are listed in level order.
-  const viewsSec = h("div", { class: "section" }, h("h3", {}, "Views"));
+  const viewsSec = h("div", { class: "section" }, h("h3", {}, "Views (all)"));
   const allViews = viewElements(doc);
   const levelOrder = new Map(levels(doc).map((l, i) => [l.id, i]));
   const groups: [string, View[]][] = [
@@ -1786,7 +1815,7 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   // Keynote files load/export from Annotate → Tag → Keynote ▾ (Keynoting settings).
 
   // Sheets.
-  const sheetsSec = h("div", { class: "section" }, h("h3", {}, "Sheets"));
+  const sheetsSec = h("div", { class: "section" }, h("h3", {}, "Sheets (all)"));
   for (const s of sheetElements(doc)) {
     const div = h(
       "div",
@@ -1837,11 +1866,52 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
 
   // Families: loaded (embedded) families and starting new ones.
   const fams = h("div", { class: "section" }, h("h3", {}, "Families"));
-  for (const f of familyDefs(doc)) {
-    const div = h("div", { class: `list-item${sel.has(f.id) ? " selected" : ""}` }, h("span", {}, f.name ?? f.id), h("span", { class: "muted" }, f.params.category));
-    div.onclick = () => ctx.setSelection([f.id]);
-    browserDrag(div, "family", f.id);
-    fams.append(div);
+  const typeRow = (t: Element, right: string, indent: string) => {
+    const div = h("div", { class: `list-item ${indent}${sel.has(t.id) ? " selected" : ""}`, title: "Click to edit the type in Properties" }, h("span", {}, t.name ?? t.id), h("span", { class: "muted" }, right));
+    div.onclick = () => ctx.setSelection([t.id]);
+    return div;
+  };
+  const familyGroup = (title: string, families: [string, Element[], (t: Element) => string][]) => {
+    const list = families.filter(([, ts]) => ts.length);
+    if (!list.length) return;
+    fams.append(h("div", { class: "subhead" }, title));
+    for (const [name, ts, right] of list) {
+      fams.append(h("div", { class: "list-item indent muted-head" }, h("span", {}, name)));
+      for (const t of ts) fams.append(typeRow(t, right(t), "indent2"));
+    }
+  };
+  const layered = (cat: string) => doc.byCategory<LayeredTypeParams>(cat);
+  const thick = (t: Element) => len(totalThickness(t as Element<LayeredTypeParams>));
+  const wallTypes = layered(Cat.WallType);
+  // System families (Revit: Walls → Basic Wall / Curtain Wall / Stacked Wall, Floors → Floor, …).
+  familyGroup("Walls", [
+    ["Basic Wall", wallTypes.filter((t) => !t.params.curtain && !t.params.stack?.length), thick],
+    ["Curtain Wall", wallTypes.filter((t) => !!t.params.curtain), () => ""],
+    ["Stacked Wall", wallTypes.filter((t) => !!t.params.stack?.length), () => ""],
+  ]);
+  familyGroup("Floors", [["Floor", layered(Cat.FloorType), thick]]);
+  familyGroup("Ceilings", [["Compound Ceiling", layered(Cat.CeilingType), thick]]);
+  familyGroup("Roofs", [["Basic Roof", layered(Cat.RoofType), thick]]);
+  familyGroup("Doors", [["Single Door", doc.byCategory<DoorTypeParams>(Cat.DoorType), (t) => `${(t as Element<DoorTypeParams>).params.leafWidth} \u00d7 ${(t as Element<DoorTypeParams>).params.leafHeight}`]]);
+  familyGroup("Windows", [["Window", doc.byCategory<WindowTypeParams>(Cat.WindowType), (t) => `${(t as Element<WindowTypeParams>).params.width} \u00d7 ${(t as Element<WindowTypeParams>).params.height}`]]);
+  familyGroup("Stairs", [["Stair", doc.byCategory(Cat.StairType), () => ""]]);
+  familyGroup("Railings", [["Railing", doc.byCategory(Cat.RailingType), () => ""]]);
+  familyGroup("Ramps", [["Ramp", doc.byCategory(Cat.RampType), () => ""]]);
+  familyGroup("Structural Sections", [["Section", doc.byCategory(Cat.StructuralType), () => ""]]);
+  familyGroup("Ducts", [["Duct", doc.byCategory(Cat.DuctType), () => ""]]);
+  familyGroup("Pipes", [["Pipe", doc.byCategory(Cat.PipeType), () => ""]]);
+  // Loadable families by category → family → types.
+  for (const [cat, label] of FAMILY_CATEGORIES) {
+    const defs = familyDefs(doc).filter((f) => f.params.category === cat);
+    if (!defs.length) continue;
+    fams.append(h("div", { class: "subhead" }, label.replace(/ \(.*\)$/, "")));
+    for (const f of defs) {
+      const div = h("div", { class: `list-item indent${sel.has(f.id) ? " selected" : ""}`, title: "Drag into a view to place it; click for its properties" }, h("span", {}, f.name ?? f.id));
+      div.onclick = () => ctx.setSelection([f.id]);
+      browserDrag(div, "family", f.id);
+      fams.append(div);
+      for (const t of familyTypeNames(f)) fams.append(h("div", { class: "list-item indent2 muted" }, h("span", {}, t)));
+    }
   }
   fams.append(
     row(
@@ -2022,7 +2092,44 @@ export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
     }
   }
   if (!allSystems.length) sysSec.append(h("div", { class: "muted" }, "Select terminals, fixtures or equipment, then right-click \u2192 Create System."));
-  root.replaceChildren(project, views, sheetsSec, legendSec, schedSec, fams, sysSec, revSec, linkSec, optSec, paramsSec, lv, types, mats, vg, counts);
+  // Groups: model and detail group types, with how many are placed.
+  const groupsSec = h("div", { class: "section" }, h("h3", {}, "Groups"));
+  const groupTypes = doc.byCategory(Cat.GroupType);
+  for (const [title, detail] of [["Model", false], ["Detail", true]] as const) {
+    const list = groupTypes.filter((t) => {
+      const inst = groupInstances(doc, t.id);
+      return inst.length && !!inst[0]!.params.viewId === detail;
+    });
+    if (!list.length) continue;
+    groupsSec.append(h("div", { class: "subhead" }, title));
+    for (const t of list) {
+      const inst = groupInstances(doc, t.id);
+      const div = h("div", { class: `list-item indent${inst.some((g) => sel.has(g.id)) ? " selected" : ""}`, title: "Click to select every instance" }, h("span", {}, t.name ?? t.id), h("span", { class: "muted" }, String(inst.length)));
+      div.onclick = () => ctx.setSelection(inst.map((g) => g.id));
+      groupsSec.append(div);
+    }
+  }
+  if (!groupsSec.querySelector(".list-item")) groupsSec.append(h("div", { class: "muted" }, "No groups yet (select elements, then Ctrl+G)."));
+  types.querySelector("h3")?.remove();
+  for (const b of types.querySelectorAll("button")) fams.append(row("", b));
+  return {
+    views,
+    legends: legendSec,
+    schedules: schedSec,
+    sheets: sheetsSec,
+    families: fams,
+    groups: groupsSec,
+    links: linkSec,
+    projectInfo: project,
+    levels: lv,
+    materials: mats,
+    parameters: paramsSec,
+    designOptions: optSec,
+    revisions: revSec,
+    filters: vg,
+    systems: sysSec,
+    statistics: counts,
+  };
 }
 
 // ---- Properties -----------------------------------------------------------

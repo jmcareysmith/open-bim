@@ -364,3 +364,6 @@ input.invalid { outline: 1px solid var(--danger); }
 body.pane-dragging, body.pane-dragging * { user-select: none; }
 body.pane-dragging canvas { pointer-events: none; }
 .tab-arrange { margin-left: 4px; padding: 0 8px; font-size: 12px; }
+.list-item.indent2 { padding-left: 30px; }
+.list-item.muted-head { cursor: default; font-weight: 600; }
+.manage-dialog { min-width: 360px; max-height: 70vh; overflow: auto; }

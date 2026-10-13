@@ -1211,7 +1211,7 @@ function overrideControls(o: GraphicOverride, visibleDefault: boolean, onChange:
 function visibilityGraphics(ctx: PanelContext, id: ElementId, p: ViewGraphicsParams): HTMLElement {
   const { doc } = ctx;
   const update = (name: string, patch: Partial<ViewGraphicsParams>) => edit(ctx, name, (tx) => tx.update<ViewGraphicsParams>(id, patch));
-  const box = h("div", { class: "vg" }, h("h3", {}, "Visibility/Graphics"), h("div", { class: "vg-head" }, h("span", {}, ""), h("span", {}, "Vis \u00b7 Half \u00b7 Colour")));
+  const box = h("div", { class: "vg" }, h("h3", {}, "Visibility/Graphics"), h("div", { class: "vg-head" }, h("span", {}, ""), h("div", { class: "vg-controls vg-cols" }, h("span", {}, "Vis"), h("span", {}, "Half"), h("span", { class: "vg-colour-head" }, "Colour"))));
   for (const [cat, label] of VG_CATEGORIES) {
     const o = p.categoryOverrides?.[cat] ?? {};
     const hidden = p.hiddenCategories.includes(cat);

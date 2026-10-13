@@ -2,6 +2,7 @@ import {
   Cat,
   ceilingExtent,
   floorExtent,
+  floorTopPlane,
   layerMaterial,
   wallDirection,
   wallThickness,
@@ -64,6 +65,15 @@ function slabs(doc: Document, el: Element): Slab | null {
       return { n, bounds: cum(c0, -1), materials, functions };
     }
     case Cat.Floor: {
+      if ((el as Floor).params.slope) {
+        // Sloped top z = c + gx·x + gy·y: layer planes tilt with it (thicknesses are vertical).
+        const t = floorTopPlane(doc, el as Floor);
+        const k = Math.hypot(t.gx, t.gy, 1);
+        const ls = layers.map((l) => ({ ...l, thickness: l.thickness / k }));
+        const b = [t.c / k];
+        for (const l of ls) b.push(b.at(-1)! - l.thickness);
+        return { n: [-t.gx / k, -t.gy / k, 1 / k], bounds: b, materials, functions };
+      }
       const { top } = floorExtent(doc, el as Floor);
       return { n: [0, 0, 1], bounds: cum(top, -1), materials, functions };
     }

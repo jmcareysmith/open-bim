@@ -1,3 +1,4 @@
+import { SlopeArrowTool } from "./slopetool.ts";
 import {
   Cat,
   Document,
@@ -404,6 +405,10 @@ const ctx: ModifyToolContext & PanelContext = {
     viewport.setSelection([]);
     refreshAll();
   },
+  drawSlopeArrow(id) {
+    (tools.slopeArrow as SlopeArrowTool).floorId = id;
+    setTool("slopeArrow");
+  },
   editBoundary(id) {
     const el = doc.require<FloorParams | CeilingParams | RoofParams>(id);
     const name = { [Cat.Ceiling]: "ceiling", [Cat.Roof]: "roof", [Cat.FilledRegion]: "region" }[el.category] ?? "floor";
@@ -465,6 +470,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   symbol: new SymbolTool(ctx),
   detailcomponent: new DetailComponentTool(ctx),
   attach: new AttachTool(ctx),
+  slopeArrow: new SlopeArrowTool(ctx),
   elevation: new ElevationTool(ctx),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */

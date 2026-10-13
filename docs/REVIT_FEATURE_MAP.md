@@ -33,7 +33,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Wall joins, cleanup, wall attach top/base | 1 | ✅ (plan cleanup by layer priority; disallow join; crossing walls) |
 | Stacked walls | 6 | ✅ |
 | Curtain walls, grids, mullions, panels | 6 | 🟨 |
-| Floors (sketch-based, layered, slope arrows) | 1 | 🟨 (Pick Walls for floors/ceilings/roofs; no slope arrows yet) |
+| Floors (sketch-based, layered, slope arrows) | 1 | ✅ (Pick Walls for floors/ceilings/roofs; slope arrows with tail/head heights) |
 | Roofs (footprint, extrusion, slopes, fascia/gutter) | 1 | 🟨 |
 | Ceilings | 1 | 🟨 |
 | Doors & windows (hosted, cut openings) | 1 | 🟨 |

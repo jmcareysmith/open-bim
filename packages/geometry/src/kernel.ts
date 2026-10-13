@@ -5,6 +5,9 @@ import {
   isFormCategory,
   type Values,
   floorExtent,
+  floorSlope,
+  floorThickness,
+  floorTopPlane,
   wallExtent,
   type Document,
   type Ceiling,
@@ -92,8 +95,50 @@ export function buildWall(doc: Document, el: Element): MeshData | null {
 
 export function buildFloor(doc: Document, el: Element): MeshData | null {
   const floor = el as Floor;
+  if (floor.params.slope) {
+    // Sloped (slope arrow): a flat slab sheared onto the top plane, so it keeps its thickness vertically.
+    const plane = floorTopPlane(doc, floor);
+    const thick = floorThickness(doc, floor);
+    const mesh = extrudePolygon(floor.params.boundary, floor.params.holes, -thick, 0);
+    const { positions: pos, normals: nor } = mesh;
+    const k = Math.hypot(plane.gx, plane.gy, 1);
+    for (let i = 0; i < pos.length; i += 3) {
+      pos[i + 2] = pos[i + 2]! + plane.c + plane.gx * pos[i]! + plane.gy * pos[i + 1]!;
+      // Top and bottom faces tilt with the plane; the sides stay vertical.
+      const nz = nor[i + 2]!;
+      if (Math.abs(nz) > 0.5) {
+        const sg = Math.sign(nz);
+        nor[i] = (-plane.gx / k) * sg;
+        nor[i + 1] = (-plane.gy / k) * sg;
+        nor[i + 2] = (1 / k) * sg;
+      }
+    }
+    return mesh;
+  }
   const { bottom, top } = floorExtent(doc, floor);
   return extrudePolygon(floor.params.boundary, floor.params.holes, bottom, top);
+}
+
+/** Plan symbol for a sloped floor: its slope arrow, tail to head, with the fall as 1:n. */
+export function buildFloorLines(doc: Document, el: Element): LineData | null {
+  const floor = el as Floor;
+  const s = floor.params.slope;
+  if (!s) return null;
+  const dx = s.head.x - s.tail.x;
+  const dy = s.head.y - s.tail.y;
+  const len = Math.hypot(dx, dy);
+  if (len < 1) return null;
+  const d = { x: dx / len, y: dy / len };
+  const n = { x: -d.y, y: d.x };
+  const h = Math.min(300, len / 4);
+  const b = s.head;
+  const seg = [s.tail.x, s.tail.y, 0, b.x, b.y, 0];
+  seg.push(b.x, b.y, 0, b.x - d.x * h + n.x * h * 0.5, b.y - d.y * h + n.y * h * 0.5, 0);
+  seg.push(b.x, b.y, 0, b.x - d.x * h - n.x * h * 0.5, b.y - d.y * h - n.y * h * 0.5, 0);
+  const slope = floorSlope(floor);
+  const mid = { x: (s.tail.x + b.x) / 2 + n.x * 200, y: (s.tail.y + b.y) / 2 + n.y * 200 };
+  const labels: LineData["labels"] = slope > 0 ? [{ text: `1:${Math.round(1 / slope)}`, position: [mid.x, mid.y, 0], size: 200 }] : [];
+  return { segments: new Float32Array(seg), labels, planOnly: true };
 }
 
 export function buildCeiling(doc: Document, el: Element): MeshData | null {
@@ -155,6 +200,7 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.Railing, buildRailingLines],
     [Cat.Ramp, buildRampLines],
     [Cat.Toposolid, buildToposolidLines],
+    [Cat.Floor, buildFloorLines],
   ]);
 
   register(category: string, builder: Builder): void {

@@ -192,10 +192,14 @@ function transformed(c: Ctx, el: Element): Record<string, unknown> | null {
     case Cat.Floor:
     case Cat.Ceiling:
     case Cat.FilledRegion:
-    case Cat.RevisionCloud:
+    case Cat.RevisionCloud: {
       loop("boundary");
       holes();
+      // A floor's slope arrow moves with it.
+      const s = p.slope as { tail: Vec2; head: Vec2 } | null | undefined;
+      if (s) p.slope = { ...s, tail: applyAffine(t, s.tail), head: applyAffine(t, s.head) };
       return p;
+    }
     case Cat.Roof: {
       const b = (p.boundary as Vec2[]).map((q) => applyAffine(t, q));
       Object.assign(p, normaliseFootprint(b, p.slopes as (number | null)[]));

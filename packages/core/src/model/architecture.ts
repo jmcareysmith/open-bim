@@ -246,8 +246,46 @@ export type FloorParams = {
   boundary: Vec2[];
   /** Optional holes (shafts, stair voids). */
   holes: Vec2[][];
+  /** Slope arrow (Revit): the top tilts as a plane from the tail to the head. */
+  slope?: SlopeArrow | null;
 };
 export type Floor = Element<FloorParams>;
+
+/**
+ * A slope arrow: heights at its tail and head, as offsets from the floor's top (mm). The top is
+ * the plane through both that is level across the arrow.
+ */
+export type SlopeArrow = { tail: Vec2; head: Vec2; tailOffset: number; headOffset: number };
+
+/** The top surface as z = c + gx·x + gy·y, offsets included (flat floors: gx = gy = 0). */
+export function floorTopPlane(doc: Document, floor: Floor): { c: number; gx: number; gy: number } {
+  const level = doc.require<LevelParams>(floor.params.levelId).params.elevation;
+  const base = level + floor.params.offset;
+  const s = floor.params.slope;
+  if (!s) return { c: base, gx: 0, gy: 0 };
+  const dx = s.head.x - s.tail.x;
+  const dy = s.head.y - s.tail.y;
+  const len2 = dx * dx + dy * dy;
+  if (len2 < 1) return { c: base + s.tailOffset, gx: 0, gy: 0 };
+  const k = (s.headOffset - s.tailOffset) / len2;
+  const gx = dx * k;
+  const gy = dy * k;
+  return { c: base + s.tailOffset - gx * s.tail.x - gy * s.tail.y, gx, gy };
+}
+
+/** Height of the floor's top at plan point `p`, mm. */
+export function floorTopAt(doc: Document, floor: Floor, p: Vec2): number {
+  const t = floorTopPlane(doc, floor);
+  return t.c + t.gx * p.x + t.gy * p.y;
+}
+
+/** Slope as rise over run (e.g. 0.02 = 1:50), from the arrow; 0 when flat. */
+export function floorSlope(floor: Floor): number {
+  const s = floor.params.slope;
+  if (!s) return 0;
+  const len = Math.hypot(s.head.x - s.tail.x, s.head.y - s.tail.y);
+  return len < 1 ? 0 : Math.abs(s.headOffset - s.tailOffset) / len;
+}
 
 export function floorThickness(doc: Document, floor: Floor): number {
   if (!floor.typeId) throw new Error("Floor has no type");
@@ -256,6 +294,11 @@ export function floorThickness(doc: Document, floor: Floor): number {
 
 /** Absolute Z of floor top and bottom, mm. */
 export function floorExtent(doc: Document, floor: Floor): { bottom: number; top: number } {
+  if (floor.params.slope) {
+    // Sloped: the highest and lowest points of the top over the boundary.
+    const zs = floor.params.boundary.map((p) => floorTopAt(doc, floor, p));
+    return { top: Math.max(...zs), bottom: Math.min(...zs) - floorThickness(doc, floor) };
+  }
   const level = doc.require<LevelParams>(floor.params.levelId).params.elevation;
   const top = level + floor.params.offset;
   return { top, bottom: top - floorThickness(doc, floor) };

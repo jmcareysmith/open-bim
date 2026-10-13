@@ -4,6 +4,8 @@ import {
   Cat,
   ceilingExtent,
   floorExtent,
+  floorThickness,
+  floorTopAt,
   setWallAttachHook,
   wallExtentRaw,
   wallLength,
@@ -35,7 +37,7 @@ export function attachedTopAt(doc: Document, wall: Wall, p: Vec2): number | null
   const t = target(doc, wall.params.topAttachId);
   if (!t) return null;
   if (t.category === Cat.Roof) return roofBaseElevation(doc, t as Roof) + roofHeightAt(planesOf(t as Roof), p);
-  if (t.category === Cat.Floor) return floorExtent(doc, t as Floor).bottom;
+  if (t.category === Cat.Floor) return floorTopAt(doc, t as Floor, p) - floorThickness(doc, t as Floor);
   if (t.category === Cat.Ceiling) return ceilingExtent(doc, t as Ceiling).bottom;
   return null;
 }
@@ -49,6 +51,7 @@ export function attachedBase(doc: Document, wall: Wall): number | null {
 /** True when the top follows a sloped roof (so it isn't one height). */
 export function hasSlopedTop(doc: Document, wall: Wall): boolean {
   const t = target(doc, wall.params.topAttachId);
+  if (t?.category === Cat.Floor) return !!(t as Floor).params.slope;
   return t?.category === Cat.Roof && (t as Roof).params.slopes.some((s) => s !== null);
 }
 

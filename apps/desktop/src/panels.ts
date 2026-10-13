@@ -223,6 +223,8 @@ import {
   type Params,
   type Wall,
   type WallParams,
+  floorSlope,
+  type Floor,
 } from "@open-bim/core";
 
 type Child = Node | string | null | undefined | false;
@@ -248,6 +250,8 @@ export interface PanelContext {
   setActiveLevel(id: ElementId): void;
   /** Re-sketch a floor or ceiling boundary. */
   editBoundary(id: ElementId): void;
+  /** Draw a floor's slope arrow (two clicks in the view). */
+  drawSlopeArrow(id: ElementId): void;
   activeViewId(): ElementId | undefined;
   setActiveView(id: ElementId): void;
   status(text: string): void;
@@ -2377,6 +2381,22 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Area", formatArea(regionArea(p), units)),
         editBoundaryButton(ctx, el.id),
       );
+      // Slope arrow: draw it, then set the heights at its tail and head.
+      const draw = h("button", { textContent: p.slope ? "Redraw slope arrow" : "Add slope arrow" });
+      draw.onclick = () => ctx.drawSlopeArrow(el.id);
+      sec.append(h("div", { class: "row" }, h("span", {}), draw));
+      const s = p.slope;
+      if (s) {
+        const fall = floorSlope(el as Floor);
+        const off = h("button", { textContent: "Remove slope" });
+        off.onclick = () => update<FloorParams>("Remove slope arrow", { slope: null });
+        sec.append(
+          row("Height at tail", numberInput(s.tailOffset, (v) => update<FloorParams>("Slope arrow tail", { slope: { ...s, tailOffset: v } }))),
+          row("Height at head", numberInput(s.headOffset, (v) => update<FloorParams>("Slope arrow head", { slope: { ...s, headOffset: v } }))),
+          row("Slope", fall > 0 ? `1:${Math.round(1 / fall)} (${(fall * 100).toFixed(2)}%)` : "Level"),
+          h("div", { class: "row" }, h("span", {}), off),
+        );
+      }
       break;
     }
     case Cat.Ceiling: {

@@ -37,7 +37,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - End each session by updating the "Current state" section below and pushing to GitHub.
 
 ## Current state (update at the end of each session)
-- Phases 0–7 done. Order agreed with Jeremy: Phase 7a (close known gaps), 7b (Revit-style
+- Phases 0–7b done. Order agreed with Jeremy: Phase 7a (close known gaps), 7b (Revit-style
   interface: ribbon, menus, drag and drop), then 8 (MEP & visual programming).
 - Modelling: levels, layered wall/floor/ceiling/roof types with materials, walls (W; auto L/T/X joins,
   Flip), floors/ceilings/roofs from sketches (roofs: per-edge slope or gable), doors (D) and windows (N)
@@ -82,6 +82,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   1750 eye height (eye/target elevation and field of view in Properties).
 - Keyboard Shortcuts (KS, or File menu): edit one/two-letter keys per command (apps/desktop/src/shortcuts.ts;
   local storage). Single letters fire at once; a second letter within 1 s takes over.
+- Tile / Cascade / Tab Views (View → Windows, or WT/WC/TW): every open view in its own live pane
+  (apps/desktop/src/panes.ts, a Viewport each, up to 9); the active pane holds the interactive
+  viewport; click another pane to work in it.
 - Status bar: ⧩ selection count at the right; click to filter the selection by category.
 - Drag from the Project Browser: views/legends/schedules onto the open sheet (placed where dropped);
   families into a view start placing them (detail items via the detail component tool).
@@ -157,5 +160,4 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   NZ Checks → NZS 3604 bracing (enter tabulated demand there). Demand is a provisional estimate.
 - AI render: Render pane → AI render… (self-hosted SD WebUI API, or Gemini with the user's key).
   Tested against a mock server only, not a real model.
-- Next: Phase 7a done. Phase 7b leftovers (recent files, drag and drop from the browser, tile/cascade +
-  selection filter, shortcut editor), then Phase 8 (MEP & visual programming).
+- Next: Phases 7a and 7b done. Phase 8 (MEP & visual programming).

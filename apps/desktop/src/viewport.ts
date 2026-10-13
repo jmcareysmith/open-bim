@@ -254,7 +254,8 @@ export class Viewport {
     this.grid.rotation.x = Math.PI / 2; // GridHelper is XZ; rotate into XY
     this.scene.add(this.grid);
 
-    new ResizeObserver(() => this.resize()).observe(container);
+    this.resizer = new ResizeObserver(() => this.resize());
+    this.resizer.observe(container);
     this.resize();
 
     this.unsubscribe = doc.on((c) => this.sync(c));
@@ -1021,7 +1022,20 @@ export class Viewport {
     this.needsRender = true;
   }
 
+  private resizer: ResizeObserver;
+  private disposed = false;
+
+  /** Stop drawing and free the GPU (tiled panes that close). */
+  dispose(): void {
+    this.disposed = true;
+    this.unsubscribe();
+    this.resizer.disconnect();
+    this.renderer.dispose();
+    this.renderer.domElement.remove();
+  }
+
   private loop = (): void => {
+    if (this.disposed) return;
     requestAnimationFrame(this.loop);
     this.controls.update();
     if (this.drawingDirty) {

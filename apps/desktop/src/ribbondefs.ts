@@ -310,6 +310,9 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
           title: "Windows",
           items: [
             { label: "Zoom to Fit", icon: "fit", cmd: "fit", title: "Zoom to fit (F)" },
+            { label: "Tile", icon: "tile", cmd: "tileViews", title: "Tile the open views (WT)" },
+            { label: "Cascade", icon: "cascade", cmd: "cascadeViews", title: "Cascade the open views (WC)" },
+            { label: "Tab Views", icon: "tabs", cmd: "tabViews", title: "One view at a time, with tabs (TW)" },
             { label: "Reset Panels", icon: "layout", cmd: "resetLayout", title: "Put the Project Browser and Properties back" },
           ],
         },

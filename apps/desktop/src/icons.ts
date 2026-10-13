@@ -2,6 +2,9 @@
 
 const P: Record<string, string> = {
   select: "M5 3l13 8-6 1.5L9 19z",
+  tile: "M3 4h8v7H3zM13 4h8v7h-8zM3 13h8v7H3zM13 13h8v7h-8z",
+  cascade: "M3 3h12v9H3zM7 7h12v9H7zM11 11h10v10H11z",
+  tabs: "M3 6h6v3H3zM10 6h6v3h-6zM3 9h18v11H3z",
   move: "M12 3v18M3 12h18M12 3l-3 3M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3",
   copy: "M8 8h11v11H8zM5 16V5h11",
   rotate: "M19 12a7 7 0 1 1-2.05-4.95M19 4v4h-4",

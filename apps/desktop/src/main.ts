@@ -1,3 +1,4 @@
+import { Panes, type PaneLayout } from "./panes.ts";
 import { openShortcutEditor, shortcutTable } from "./shortcuts.ts";
 import { BROWSER_DRAG } from "./panels.ts";
 import { addRecentFile, fileName, recentFiles, removeRecentFile } from "./recent.ts";
@@ -488,6 +489,19 @@ const DRAWING_TOOLS = new Set(["select", "symbol", "detailcomponent", "placegrou
 let tool: Tool = tools.select!;
 /** Grips and temporary dimensions for the selection (Select tool only). */
 let grips: GripLayer | undefined = new GripLayer(ctx, $("#viewport"));
+// Tile / Cascade / Tab Views: every open view in its own live pane; click one to work in it.
+let panes: Panes | undefined = new Panes($("#panes"), {
+  get doc() {
+    return doc;
+  },
+  mainHost: $("#viewport"),
+  activeViewId: () => activeViewId,
+  openViews: () => viewBar?.openViews() ?? [],
+  activate: (id) => id !== activeViewId && ctx.setActiveView(id),
+  makeViewport: (container) => new Viewport(container, doc, viewport.geometryKernel),
+  configure: (vp, target) => configureViewport(vp, target, false),
+  renderSchedule: (container, s) => renderSchedulePane(container, ctx, s as Schedule),
+});
 $("#sel-filter").onclick = () => openSelectionFilter();
 // Drag from the Project Browser: views, legends and schedules onto the open sheet (placed where
 // dropped); families into a view (starts placing them, as Revit does).
@@ -984,6 +998,9 @@ const commands: Record<string, () => void | Promise<void>> = {
     ctx.setSelection([]);
   },
   camera: () => setTool("camera"),
+  tileViews: () => setPaneLayout("tile"),
+  cascadeViews: () => setPaneLayout("cascade"),
+  tabViews: () => setPaneLayout("tab"),
   keyboardShortcuts: () => openShortcutEditor(() => (shortcuts = shortcutTable())),
   view3d() {
     const v = views(doc).find((x) => x.params.kind === "3d");
@@ -1158,46 +1175,61 @@ function applyView(): void {
     if (tool.name !== "select") setTool("select");
     return;
   }
-  // Sheets open like views.
-  const sheet = active;
-  if (sheet?.category === Cat.Sheet) {
-    viewport.setSheet(sheet as Sheet);
-    viewport.setGraphicsResolver(() => defaultGraphics());
-    viewport.setAnnotationView(sheet.id);
-    viewport.setPlanLevel(undefined);
+  if (!active || (active.category !== Cat.Sheet && active.category !== Cat.View)) {
+    activeViewId = views(doc).find((v) => v.params.kind === "3d")?.id ?? views(doc)[0]?.id;
+  }
+  const target = activeViewId ? doc.get(activeViewId) : undefined;
+  if (!target) return viewport.setViewMode("3d");
+  configureViewport(viewport, target, true);
+  if (target.category === Cat.Sheet) {
     if (!DRAWING_TOOLS.has(tool.name)) setTool("select");
     return;
   }
-  if (!activeView()) activeViewId = views(doc).find((v) => v.params.kind === "3d")?.id ?? views(doc)[0]?.id;
-  const v = activeView();
-  if (!v) return viewport.setViewMode("3d");
+  if (viewport.viewMode === "drawing" && !DRAWING_TOOLS.has(tool.name)) setTool("select");
+}
+
+/**
+ * Set a viewport up to show a view or sheet: mode, plan range or drawing, visual style, sun,
+ * V/G and detail level. `primary` is the interactive pane (it restores saved 3D cameras once per
+ * view); tiled panes always take the view's saved camera.
+ */
+function configureViewport(vp: Viewport, target: ModelElement, primary: boolean): void {
+  if (target.category === Cat.Sheet) {
+    vp.setSheet(target as Sheet);
+    vp.setGraphicsResolver(() => defaultGraphics());
+    vp.setAnnotationView(target.id);
+    vp.setPlanLevel(undefined);
+    return;
+  }
+  const v = target as View;
   // Visual style: 3D views default to Shaded, plans to Hidden Line (line work only).
   const planLike = v.params.kind === "floorPlan" || v.params.kind === "callout" || v.params.kind === "areaPlan";
-  viewport.setVisualStyle(v.params.kind === "3d" ? (v.params.visualStyle ?? "shaded") : planLike ? (v.params.visualStyle ?? "hiddenLine") : "hiddenLine");
+  vp.setVisualStyle(v.params.kind === "3d" ? (v.params.visualStyle ?? "shaded") : planLike ? (v.params.visualStyle ?? "hiddenLine") : "hiddenLine");
   // Sun and shadows (3D views): the true sun for the site, at the view's date and time.
-  if (v.params.kind === "3d") viewport.setSun(viewSun(doc, v.params), !!v.params.shadows, v.params.lighting ?? {});
-  else viewport.setSun(null, false);
+  if (v.params.kind === "3d") vp.setSun(viewSun(doc, v.params), !!v.params.shadows, v.params.lighting ?? {});
+  else vp.setSun(null, false);
   if (isPlanView(v)) {
-    viewport.setPlanRange(viewRange(doc, v));
-    viewport.setViewMode("plan");
-    viewport.setPlanCrop(v.params.kind === "callout" ? (v.params.crop ?? null) : null);
+    vp.setPlanRange(viewRange(doc, v));
+    vp.setViewMode("plan");
+    vp.setPlanCrop(v.params.kind === "callout" ? (v.params.crop ?? null) : null);
   } else if (is2DView(v)) {
-    viewport.setDrawingView(v);
+    vp.setDrawingView(v);
   } else {
-    viewport.setViewMode("3d");
+    vp.setViewMode("3d");
     // Each 3D view keeps its own camera: restore it on opening (or when its saved camera changes).
-    const json = JSON.stringify(v.params.camera ?? null);
-    if (v.params.camera && (appliedCamera?.viewId !== v.id || appliedCamera.json !== json)) viewport.setCamera3d(v.params.camera);
-    appliedCamera = { viewId: v.id, json };
+    if (primary) {
+      const json = JSON.stringify(v.params.camera ?? null);
+      if (v.params.camera && (appliedCamera?.viewId !== v.id || appliedCamera.json !== json)) vp.setCamera3d(v.params.camera);
+      appliedCamera = { viewId: v.id, json };
+    }
   }
   // Visibility/Graphics: the view's own settings, or its template's.
   const g = effectiveGraphics(doc, v);
-  viewport.setGraphicsResolver((el) => elementGraphics(doc, g, el));
-  viewport.setAnnotationView(v.id);
+  vp.setGraphicsResolver((el) => elementGraphics(doc, g, el));
+  vp.setAnnotationView(v.id);
   // Rooms show in floor plans and callouts of their level (area plans show areas instead).
-  viewport.setPlanLevel(viewport.viewMode === "plan" && v.params.kind !== "areaPlan" ? (v.params.levelId ?? undefined) : undefined);
-  viewport.setViewGraphics({ detailLevel: g.detailLevel, scale: g.scale });
-  if (viewport.viewMode === "drawing" && !DRAWING_TOOLS.has(tool.name)) setTool("select");
+  vp.setPlanLevel(vp.viewMode === "plan" && v.params.kind !== "areaPlan" ? (v.params.levelId ?? undefined) : undefined);
+  vp.setViewGraphics({ detailLevel: g.detailLevel, scale: g.scale });
 }
 
 window.addEventListener("keydown", (ev) => {
@@ -1228,6 +1260,8 @@ window.addEventListener("keydown", (ev) => {
   const two = pair ? shortcuts.get(pair) : undefined;
   if (two) {
     lastKey = null;
+    // A command (e.g. WT) shouldn't leave the first letter's tool (W = wall) running.
+    if (two.startsWith("cmd:") && tool.name !== "select") setTool("select");
     return runShortcut(two);
   }
   if (tool.key?.(ev)) return ev.preventDefault();
@@ -1645,10 +1679,17 @@ function refreshPanels(): void {
   if (active?.category === Cat.Schedule) renderSchedulePane($("#schedule-pane"), ctx, active as Schedule);
 }
 
+function setPaneLayout(layout: PaneLayout): void {
+  if (!panes) return;
+  if (layout !== "tab" && (viewBar?.openViews().length ?? 0) < 2) status("Open two or more views (they show as tabs below the view), then tile them.");
+  panes.setLayout(layout);
+}
+
 function refreshAll(): void {
   if (!doc.has(activeLevelId)) activeLevelId = levels(doc)[0]?.id ?? "";
   refreshToolbar();
   refreshPanels();
+  panes?.refresh();
   updateTitle();
 }
 

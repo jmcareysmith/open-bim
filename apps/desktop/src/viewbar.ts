@@ -56,6 +56,11 @@ export class ViewBar {
     private bar: HTMLElement,
   ) {}
 
+  /** Open views and sheets in tab order (for tiling). */
+  openViews(): ElementId[] {
+    return [...this.open];
+  }
+
   /** Forget the open tabs (new or opened project). */
   reset(): void {
     this.open = [];

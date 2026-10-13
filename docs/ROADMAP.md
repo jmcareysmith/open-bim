@@ -72,7 +72,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] NZ H1 compliance — schedule method: construction R-values on types, climate zones, glazing limit (provisional minimums, editable per project)
 - [x] NZS 3604 bracing module — panels on walls, automatic bracing lines per storey/direction, wind + EQ demand (provisional estimate or tabulated override), line minimum and spacing checks
 
-## Phase 7a — Close known gaps (current)
+## Phase 7a — Close known gaps (done)
 - [x] Modify tools: Move, Copy, Rotate, Mirror, Array (MV, CO, RO, MM, AR) — hosted elements follow their hosts; moved walls drag joined walls (Disjoin to stop); typed distance/angle; mirror by drawn axis (no pick-axis yet); linear arrays in the UI (radial in the API)
 - [x] Align, Offset, Trim/Extend, Split (walls, lines, beams, grids) — align to wall faces/centrelines, grids, planes, polygon edges; trim to corner or to a boundary (multiple); doors kept in place or refused if cut; plans/3D only
 - [x] Drag to edit: grips on wall/line/datum ends, drag to move, temporary dimensions (click to type) — also sketch vertices, stair run ends, door slide, point elements; plans and sections/sheets (annotations); joined wall corners follow
@@ -90,15 +90,15 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Find/Replace and Check Spelling for text notes (Annotate → Text)
 - [x] Fold the interactive viewport onto `viewDrawing` (one drawing path for screen and sheet/PDF) — cut/projection line work shared (`lineworkDrawing`); datums/annotations on screen still from `buildLines`
 
-## Phase 7b — Revit-style interface
+## Phase 7b — Revit-style interface (done)
 - [x] Ribbon: tabs and labelled panels, split-button dropdowns, contextual Modify tab, options bar — Architecture/Structure/Insert/Annotate/Massing & Site/Analyse/Collaborate/View/Manage/Modify (+ Create in the family editor); own line icons; "Modify | <category>" label
 - [x] File menu (New, Open, Save, Export ▸, Import ▸, recent files) and Quick Access Toolbar
 - [x] Drag and drop from the Project Browser: views/schedules/legends onto sheets, families into views
 - [x] Dockable panels (Properties, Project Browser): dock, tab, float, collapse; layout remembered — drag titles/tabs; dock widths resizable; light theme (Jeremy: no dark chrome)
-- [ ] View tabs (tile/cascade), status bar with selection filter, view control bar (scale, detail level, visual style, hide/isolate) — done: open-view tabs along the bottom (close, close others), view control bar (scale, detail level, Wireframe/Hidden Line/Shaded/Consistent Colours/Realistic/Rendered, temporary hide/isolate, reveal hidden); collapsible browser groups; status-bar selection filter (⧩ count → category filter). Still to do: tile/cascade
+- [x] View tabs (tile/cascade), status bar with selection filter, view control bar (scale, detail level, visual style, hide/isolate) — done: open-view tabs along the bottom (close, close others), view control bar (scale, detail level, Wireframe/Hidden Line/Shaded/Consistent Colours/Realistic/Rendered, temporary hide/isolate, reveal hidden); collapsible browser groups; status-bar selection filter (⧩ count → category filter); Tile/Cascade/Tab Views (WT/WC/TW; live pane per open view)
 - [x] Right-click menus (Select All Instances, Edit Type, Hide in View…), two-letter shortcuts, shortcut editor — menus done (element: modify tools, Flip, Edit Type, Select All Instances, hide/isolate, V/G, Group, Delete; empty space: V/G dialog, Zoom to Fit, Reset); two-letter shortcuts; Keyboard Shortcuts editor (KS or File menu; saved per machine)
 
-## Phase 8 — MEP & visual programming
+## Phase 8 — MEP & visual programming (current)
 - [ ] Connectors and MEP systems (supply/return air, cold/hot water, sanitary, power); system browser
 - [ ] Ducts with auto fittings (elbows, tees, transitions), round/rectangular types, sizing from airflow
 - [ ] Pipes with auto fittings, falls on waste pipes, pipe materials

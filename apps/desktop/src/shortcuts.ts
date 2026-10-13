@@ -63,6 +63,9 @@ export const COMMANDS: Command[] = [
   { action: "cmd:resetVisibility", label: "Reset Temporary Hide/Isolate", keys: "U" },
   { action: "cmd:view3d", label: "Default 3D View", keys: "" },
   { action: "cmd:render", label: "Render", keys: "" },
+  { action: "cmd:tileViews", label: "Tile Views", keys: "WT" },
+  { action: "cmd:cascadeViews", label: "Cascade Views", keys: "WC" },
+  { action: "cmd:tabViews", label: "Tab Views", keys: "TW" },
   { action: "cmd:keyboardShortcuts", label: "Keyboard Shortcuts", keys: "KS" },
 ];
 

@@ -49,6 +49,7 @@ import { buildSymbolLines } from "./symbols.ts";
 import { buildDetailComponentLines } from "./detailcomponents.ts";
 import { buildAreaBoundaryLines, buildAreaLines, buildRoomLines, buildRoomSeparatorLines } from "./rooms.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
+import { wallProfileMesh, wallSweepSolids } from "./sweeps.ts";
 
 /**
  * Converts elements into renderable geometry.
@@ -94,8 +95,15 @@ export function buildWall(doc: Document, el: Element): MeshData | null {
   const segments = stackSegments(doc, wall);
   if (segments.length) return buildStackedWall(doc, wall, segments);
   // Attached under a sloped roof: the top follows it.
-  if (hasSlopedTop(doc, wall)) return slopedTopWallMesh(doc, wall);
-  return extrudePolygon(joinedWallFootprint(doc, wall), [], bottom, top);
+  const body = wallProfileMesh(doc, wall) ?? (hasSlopedTop(doc, wall) ? slopedTopWallMesh(doc, wall) : extrudePolygon(joinedWallFootprint(doc, wall), [], bottom, top));
+  return withSweeps(doc, wall, body);
+}
+
+/** A wall's body with its sweeps added (reveals need booleans: the OCCT kernel cuts them). */
+export function withSweeps(doc: Document, wall: Wall, body: MeshData | null): MeshData | null {
+  const { sweeps } = wallSweepSolids(doc, wall);
+  if (!sweeps.length || !body) return body;
+  return mergeMeshes([body, ...sweeps]);
 }
 
 export function buildFloor(doc: Document, el: Element): MeshData | null {

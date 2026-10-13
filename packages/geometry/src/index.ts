@@ -39,3 +39,4 @@ export * from "./wallcleanup.ts";
 export * from "./ducts.ts";
 export * from "./massfloors.ts";
 export * from "./faces.ts";
+export * from "./sweeps.ts";

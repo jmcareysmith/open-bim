@@ -4,6 +4,7 @@ import type { Element, ElementId, Vec2 } from "../element.ts";
 import { relatedWalls } from "./joins.ts";
 import { validateRegion } from "./sketch.ts";
 import type { PatternName } from "./materials.ts";
+import type { WallSweep } from "./sweeps.ts";
 
 // ---- categories ----------------------------------------------------------
 
@@ -133,6 +134,8 @@ export type LayeredTypeParams = {
    * draw hollow (outline only), as Revit's types do by default.
    */
   coarseFill?: CoarseFill | null;
+  /** Wall types only: sweeps and reveals on every wall of the type (Edit Assembly). */
+  sweeps?: WallSweep[] | null;
 };
 
 /** A type's fill for its cuts at Coarse: a pattern (or solid) and an optional colour. */
@@ -227,6 +230,10 @@ export type WallParams = {
   baseAttachId?: ElementId | null;
   /** Disallow Join (Revit): these ends stay square and don't join other walls. */
   disallowJoin?: { start?: boolean; end?: boolean } | null;
+  /** This wall's own sweeps and reveals (the type's come first; see model/sweeps.ts). */
+  sweeps?: WallSweep[] | null;
+  /** Edit Profile: the wall's elevation outline (x along from its start, y up from its base, mm); a rectangle when unset. */
+  profile?: Vec2[] | null;
 };
 export type Wall = Element<WallParams>;
 

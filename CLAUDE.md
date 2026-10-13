@@ -228,4 +228,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Properties → Graphics; `coarseFill`). Graphic Display Options (view bar ▾ next to Shadows): style, show
   edges, view transparency, silhouettes (pen; screen-space depth pass in viewport.ts), shadows, lighting,
   depth cueing — view `display` param.
+- Wall sweeps/reveals (core/model/sweeps.ts, geometry/src/sweeps.ts): wall type or wall Properties →
+  Sweeps and reveals (built-in profiles: skirting, chair rail, cornice, plinth, band; reveals cut by OCCT);
+  sweeps run the joined face and stop at openings. Edit Profile: wall Properties → Profile (Gable, Step,
+  Points; `profile` in wall coords) — no elevation sketch mode yet.
 - Next (Jeremy, 2026-10-14): Phase 8b — Revit look & architectural parity, before the rest of 8.

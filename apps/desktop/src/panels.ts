@@ -176,6 +176,14 @@ import {
   materials as materialElements,
   layerMaterial,
   PATTERNS,
+  setWallSweeps,
+  wallExtent,
+  type Vec2,
+  setWallProfile,
+  gableProfile,
+  stepProfile,
+  sweepProfileNames,
+  type WallSweep,
   type MaterialParams,
   type PatternName,
   type DetailLineParams,
@@ -383,6 +391,91 @@ function rValueInput(value: number | null | undefined, onCommit: (v: number | nu
     else input.value = value ? String(value) : "";
   };
   return input;
+}
+
+/** Edit Profile: the wall's elevation outline — presets and its points (along, up from base). */
+function profileRows(ctx: PanelContext, w: Wall): HTMLElement[] {
+  const { doc } = ctx;
+  const len = wallLength(w);
+  const { bottom, top } = wallExtent(doc, w);
+  const height = top - bottom;
+  const prof = w.params.profile ?? null;
+  const save = (next: Vec2[] | null, name = "Edit wall profile") => edit(ctx, name, (tx) => setWallProfile(tx, doc, w.id, next));
+  const out: HTMLElement[] = [h("div", { class: "subhead" }, "Profile")];
+  const btn = (label: string, title: string, fn: () => void) => {
+    const b = h("button", { textContent: label, title });
+    b.onclick = fn;
+    return b;
+  };
+  const rect = (): Vec2[] => [
+    { x: 0, y: 0 },
+    { x: len, y: 0 },
+    { x: len, y: height },
+    { x: 0, y: height },
+  ];
+  out.push(
+    row(
+      "Edit profile",
+      h(
+        "div",
+        { class: "buttons wrap" },
+        btn("Gable", "Gable end: the wall's height at the ends, peaking 1500 higher in the middle", () => save(gableProfile(len, height, height + 1500), "Gable profile")),
+        btn("Step", "Step down to half height over the first half", () => save(stepProfile(len, len / 2, height / 2, height), "Stepped profile")),
+        ...(prof ? [btn("Reset profile", "Back to a rectangle", () => save(null, "Reset wall profile"))] : [btn("Points", "Edit the outline point by point", () => save(rect()))]),
+      ),
+    ),
+  );
+  if (prof) {
+    prof.forEach((q, i) => {
+      const put = (patch: Partial<Vec2>) => save(prof.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+      const rm = h("button", { textContent: "\u00d7", class: "mini", title: "Remove point" });
+      rm.onclick = () => save(prof.filter((_, j) => j !== i));
+      out.push(row(`Point ${i + 1}`, h("div", { class: "buttons wrap" }, numberInput(q.x, (v) => put({ x: v })), numberInput(q.y, (v) => put({ y: v })), rm)));
+    });
+    out.push(
+      row(
+        "",
+        btn("Add point", "Insert a point halfway along the last edge", () => {
+          const a = prof[prof.length - 1]!;
+          const b = prof[0]!;
+          save([...prof, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }]);
+        }),
+      ),
+    );
+  }
+  return out;
+}
+
+/** Sweeps and reveals of a wall or wall type (Revit: Wall Sweep / Reveal; type: Edit Assembly). */
+function sweepRows(ctx: PanelContext, el: Element): HTMLElement[] {
+  const { doc } = ctx;
+  const isType = el.category === Cat.WallType;
+  const list = ((el.params as { sweeps?: WallSweep[] | null }).sweeps ?? []) as WallSweep[];
+  const save = (next: WallSweep[]) => edit(ctx, "Edit sweeps", (tx) => setWallSweeps(tx, doc, el.id, next));
+  const out: HTMLElement[] = [h("div", { class: "subhead" }, isType ? "Sweeps and reveals (every wall of this type)" : "Sweeps and reveals")];
+  if (!isType && el.typeId) {
+    const n = (doc.get<LayeredTypeParams>(el.typeId)?.params.sweeps ?? []).length;
+    if (n) out.push(row("From type", `${n} (edit in the type)`));
+  }
+  list.forEach((s, i) => {
+    const put = (patch: Partial<WallSweep>) => save(list.map((x, j) => (j === i ? { ...x, ...patch } : x)));
+    const rm = h("button", { textContent: "\u00d7", class: "mini", title: "Remove" });
+    rm.onclick = () => save(list.filter((_, j) => j !== i));
+    const profiles = sweepProfileNames(s.kind).map((n) => ({ value: n, label: n }));
+    out.push(
+      row(`${s.kind === "sweep" ? "Sweep" : "Reveal"} ${i + 1}`, h("div", { class: "buttons wrap" }, select(profiles, s.profile, (v) => put({ profile: v })), rm)),
+      row("  face", select([{ value: "exterior", label: "Exterior" }, { value: "interior", label: "Interior" }], s.side, (v) => put({ side: v as WallSweep["side"] }))),
+      row("  distance", h("div", { class: "buttons wrap" }, numberInput(s.height, (v) => put({ height: v })), select([{ value: "base", label: "from base" }, { value: "top", label: "from top" }], s.fromTop ? "top" : "base", (v) => put({ fromTop: v === "top" })))),
+      row("  offset from face", numberInput(s.offset ?? 0, (v) => put({ offset: v }))),
+    );
+  });
+  const add = (kind: WallSweep["kind"]) => {
+    const b = h("button", { textContent: kind === "sweep" ? "Add sweep" : "Add reveal" });
+    b.onclick = () => save([...list, { kind, profile: sweepProfileNames(kind)[0]!, side: kind === "sweep" ? "interior" : "exterior", height: kind === "sweep" ? 0 : 1200 }]);
+    return b;
+  };
+  out.push(row("", h("div", { class: "buttons wrap" }, add("sweep"), add("reveal"))));
+  return out;
 }
 
 /** NZS 3604 bracing panels on a wall. */
@@ -2278,6 +2371,8 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Thickness", len(wallThickness(doc, w))),
         row("Room bounding", checkbox(p.roomBounding !== false, (v) => update<WallParams>("Change room bounding", { roomBounding: v }))),
       );
+      sec.append(...profileRows(ctx, w));
+      sec.append(...sweepRows(ctx, w));
       sec.append(...bracingRows(ctx, w));
       break;
     }
@@ -3331,6 +3426,7 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename type", (tx) => tx.setName(el.id, v || undefined)))),
         row("Total", len(totalThickness(t))),
         ...coarseFillRows(ctx, t),
+        ...(el.category === Cat.WallType && !t.params.stack && !t.params.curtain ? sweepRows(ctx, el) : []),
         ...thermalRows(ctx, el),
       );
       const matOpts = materialElements(doc).map((m) => ({ value: m.id, label: m.name ?? m.id }));

@@ -22,7 +22,8 @@ import { formMesh } from "./forms.ts";
 import { buildFamilyInstance, nestedMeshes } from "./components.ts";
 import type { LineData } from "./datums.ts";
 import { joinedWallFootprint } from "./joins.ts";
-import { SimpleKernel, type GeometryKernel } from "./kernel.ts";
+import { SimpleKernel, withSweeps, type GeometryKernel } from "./kernel.ts";
+import { wallProfileMesh, wallSweepSolids } from "./sweeps.ts";
 import { buildLink } from "./links.ts";
 import type { MeshData } from "./mesh.ts";
 
@@ -56,7 +57,8 @@ export class OcctKernel implements GeometryKernel {
       const wall = el as Wall;
       const cuts = wallCuts(doc, wall);
       // Curtain walls aren't cut: panels and mullions are built on their own grid.
-      if (cuts.length && !curtainOf(doc, wall)) return this.buildWallWithCuts(doc, wall, cuts);
+      const reveals = wallSweepSolids(doc, wall).reveals;
+      if ((cuts.length || reveals.length) && !curtainOf(doc, wall)) return this.buildWallWithCuts(doc, wall, cuts, reveals);
     }
     if (el.category === Cat.FamilyInstance) return buildFamilyInstance(doc, el, this.mesher);
     if (el.category === Cat.Link) return buildLink(doc, el, this);
@@ -148,7 +150,7 @@ export class OcctKernel implements GeometryKernel {
     return this.simple.buildLines(doc, el, scale, detail);
   }
 
-  private buildWallWithCuts(doc: Document, wall: Wall, cuts: WallCut[]): MeshData | null {
+  private buildWallWithCuts(doc: Document, wall: Wall, cuts: WallCut[], reveals: MeshData[] = []): MeshData | null {
     const { bottom, top } = wallExtent(doc, wall);
     if (top <= bottom) return null;
     const oc = this.oc;
@@ -159,7 +161,7 @@ export class OcctKernel implements GeometryKernel {
     };
     try {
       // Under a sloped roof: the sliced, roof-following wall sewn into a solid.
-      const sloped = hasSlopedTop(doc, wall) ? slopedTopWallMesh(doc, wall) : null;
+      const sloped = wallProfileMesh(doc, wall) ?? (hasSlopedTop(doc, wall) ? slopedTopWallMesh(doc, wall) : null);
       // Wall solid: the joined plan footprint extruded from bottom to top.
       const fp = joinedWallFootprint(doc, wall);
       const wire = keep(new oc.BRepBuilderAPI_MakeWire());
@@ -182,7 +184,9 @@ export class OcctKernel implements GeometryKernel {
         const box = keep(keep(new oc.BRepPrimAPI_MakeBox(axes, c.u1 - c.u0, half * 2, c.z1 - c.z0)).Shape());
         solid = keep(keep(new oc.BRepAlgoAPI_Cut(solid, box)).Shape());
       }
-      return this.mesh(solid, keep);
+      // Reveals: grooves cut along the faces.
+      for (const r of reveals) solid = keep(keep(new oc.BRepAlgoAPI_Cut(solid, this.meshToSolid(r, keep))).Shape());
+      return withSweeps(doc, wall, this.mesh(solid, keep));
     } finally {
       for (const o of gc.reverse()) o.delete();
     }

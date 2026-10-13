@@ -1,3 +1,4 @@
+import { openShortcutEditor, shortcutTable } from "./shortcuts.ts";
 import { BROWSER_DRAG } from "./panels.ts";
 import { addRecentFile, fileName, recentFiles, removeRecentFile } from "./recent.ts";
 import { CameraTool } from "./cameratool.ts";
@@ -584,6 +585,8 @@ let ribbon: Ribbon | undefined = new Ribbon(
       { label: "IFC\u2026", action: () => void commands.importIfc?.() },
       { label: "DXF/DWG into this view\u2026", action: () => void commands.importDxf?.() },
       { label: "Link project\u2026", action: () => void commands.linkProject?.() },
+      "-",
+      { label: "Keyboard Shortcuts\u2026", hint: "KS", action: () => void commands.keyboardShortcuts?.() },
     ],
   },
   [
@@ -981,6 +984,7 @@ const commands: Record<string, () => void | Promise<void>> = {
     ctx.setSelection([]);
   },
   camera: () => setTool("camera"),
+  keyboardShortcuts: () => openShortcutEditor(() => (shortcuts = shortcutTable())),
   view3d() {
     const v = views(doc).find((x) => x.params.kind === "3d");
     if (v) ctx.setActiveView(v.id);
@@ -1213,35 +1217,26 @@ window.addEventListener("keydown", (ev) => {
     ev.preventDefault();
     return nudge(ev.key, ev.shiftKey);
   }
-  // Revit's two-letter shortcuts (MV, CO, RO, MM, AR, AL, OF, TR, SL) take over from the first letter's tool.
-  const pair = lastKey && ev.timeStamp - lastKey.at < 1000 ? lastKey.key + ev.key.toLowerCase() : "";
-  lastKey = { key: ev.key.toLowerCase(), at: ev.timeStamp };
-  const two = TWO_LETTER[pair];
+  // Keyboard shortcuts (editable: KS). Two-letter ones (MV, CO…) take over from the first letter's tool.
+  const k = ev.key.length === 1 ? ev.key.toUpperCase() : "";
+  const pair = k && lastKey && ev.timeStamp - lastKey.at < 1000 ? lastKey.key + k : "";
+  lastKey = k ? { key: k, at: ev.timeStamp } : null;
+  const runShortcut = (a: string) => {
+    ev.preventDefault();
+    return a.startsWith("cmd:") ? void commands[a.slice(4)]?.() : setTool(a.slice(5));
+  };
+  const two = pair ? shortcuts.get(pair) : undefined;
   if (two) {
     lastKey = null;
-    ev.preventDefault();
-    return two.startsWith("cmd:") ? void commands[two.slice(4)]?.() : setTool(two);
+    return runShortcut(two);
   }
   if (tool.key?.(ev)) return ev.preventDefault();
   if (ev.key === "Escape") return setTool("select");
-  if (ev.key.toLowerCase() === "w") return setTool("wall");
-  if (ev.key.toLowerCase() === "g") return setTool("grid");
-  if (ev.key.toLowerCase() === "r") return setTool("refplane");
-  if (ev.key.toLowerCase() === "d") return setTool("door");
-  if (ev.key.toLowerCase() === "n") return setTool("window");
-  if (ev.key.toLowerCase() === "s") return setTool("section");
-  if (ev.key.toLowerCase() === "l") return setTool("detailline");
-  if (ev.key.toLowerCase() === "t") return setTool("text");
-  if (ev.key.toLowerCase() === "m") return setTool("dimension");
-  if (ev.key.toLowerCase() === "c") return setTool("component");
-  if (ev.key.toLowerCase() === "f") return run(ev, "fit");
-  if (ev.key.toLowerCase() === "h") return run(ev, ev.shiftKey ? "hideCategory" : "hide");
-  if (ev.key.toLowerCase() === "i") return run(ev, ev.shiftKey ? "isolateCategory" : "isolate");
-  if (ev.key.toLowerCase() === "u") return run(ev, "resetVisibility");
+  const one = k ? shortcuts.get(ev.shiftKey ? `Shift+${k}` : k) : undefined;
+  if (one) return runShortcut(one);
 });
 
-/** The tool a single-letter shortcut started may hand its selection on to a two-letter one. */
-const TWO_LETTER: Record<string, string> = { vv: "cmd:visibilityGraphics", vg: "cmd:visibilityGraphics", mv: "move", co: "copy", cc: "copy", ro: "rotate", mm: "mirror", dm: "mirror", ar: "array", al: "align", of: "offset", tr: "trim", sl: "split" };
+let shortcuts = shortcutTable();
 let lastKey: { key: string; at: number } | null = null;
 
 /** Options strip for the active tool (Copy, Disjoin, Number…), over the top of the view. */

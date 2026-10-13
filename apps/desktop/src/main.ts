@@ -487,6 +487,7 @@ const DRAWING_TOOLS = new Set(["select", "symbol", "detailcomponent", "placegrou
 let tool: Tool = tools.select!;
 /** Grips and temporary dimensions for the selection (Select tool only). */
 let grips: GripLayer | undefined = new GripLayer(ctx, $("#viewport"));
+$("#sel-filter").onclick = () => openSelectionFilter();
 // Drag from the Project Browser: views, legends and schedules onto the open sheet (placed where
 // dropped); families into a view (starts placing them, as Revit does).
 {
@@ -1592,7 +1593,50 @@ function refreshTypeSelector(): void {
   };
 }
 
+/** Status bar selection count (Revit's funnel): click to filter the selection by category. */
+function refreshSelectionFilter(): void {
+  const b = $<HTMLButtonElement>("#sel-filter");
+  b.hidden = selection.length === 0;
+  b.textContent = `⧩ ${selection.length}`;
+}
+
+function openSelectionFilter(): void {
+  const byCat = new Map<string, ElementId[]>();
+  for (const id of selection) {
+    const el = doc.get(id);
+    if (el) byCat.set(el.category, [...(byCat.get(el.category) ?? []), id]);
+  }
+  const keep = new Set(byCat.keys());
+  const render = () => {
+    const box = document.createElement("div");
+    const list = document.createElement("div");
+    list.className = "sel-filter-list";
+    for (const [cat, ids] of [...byCat].sort((a, b) => a[0].localeCompare(b[0]))) {
+      const cb = Object.assign(document.createElement("input"), { type: "checkbox", checked: keep.has(cat) });
+      cb.onchange = () => (cb.checked ? keep.add(cat) : keep.delete(cat));
+      list.append(cb, Object.assign(document.createElement("span"), { textContent: cat }), Object.assign(document.createElement("span"), { className: "muted", textContent: String(ids.length) }));
+    }
+    const all = Object.assign(document.createElement("button"), { textContent: "Check all" });
+    all.onclick = () => (byCat.forEach((_, c) => keep.add(c)), dlg.refresh());
+    const none = Object.assign(document.createElement("button"), { textContent: "Check none" });
+    none.onclick = () => (keep.clear(), dlg.refresh());
+    const ok = Object.assign(document.createElement("button"), { textContent: "OK", className: "primary" });
+    ok.onclick = () => {
+      ctx.setSelection([...byCat].filter(([c]) => keep.has(c)).flatMap(([, ids]) => ids));
+      dlg.close();
+    };
+    const buttons = document.createElement("div");
+    buttons.className = "buttons";
+    buttons.style.marginTop = "10px";
+    buttons.append(all, none, ok);
+    box.append(list, buttons);
+    return box;
+  };
+  const dlg = openDialog("Filter", render);
+}
+
 function refreshPanels(): void {
+  refreshSelectionFilter();
   grips?.refresh();
   ribbon?.setContext(contextLabel());
   vgDialog?.refresh();

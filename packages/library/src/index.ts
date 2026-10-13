@@ -773,6 +773,56 @@ export const hotWaterCylinder: LibraryFamily = {
     ),
 };
 
+
+// ---- Electrical (Systems → Electrical Fixture / Lighting / Switchboard) -----
+// Loads are design figures for circuit totals (provisional: 150 W a double outlet, the lamp
+// wattage for lights).
+
+export const doubleOutlet: LibraryFamily = {
+  name: "Power Outlet - Double",
+  category: "ElectricalFixture",
+  description: "Double switched socket outlet, 300 above the floor on the wall face (150 W design load).",
+  build: () =>
+    family("ElectricalFixture", "Power Outlet - Double", [["Load", 150], ["Mounting Height", 300]], [["10 A double", { Load: 150, "Mounting Height": 300 }]], (tx) => {
+      createExtrusion(tx, rect(-60, 0, 60, 12), { start: "Mounting Height - 37", end: "Mounting Height + 37" });
+      createConnector(tx, { classification: "power", y: 0, z: "Mounting Height", facing: "-y", load: "Load" });
+    }),
+};
+
+export const downlight: LibraryFamily = {
+  name: "Light - LED Downlight",
+  category: "LightingFixture",
+  description: "Recessed LED downlight in the ceiling (lamp watts as its load).",
+  build: () =>
+    family("LightingFixture", "Light - LED Downlight", [["Diameter", 90], ["Load", 10]], [["10 W", { Diameter: 90, Load: 10 }], ["15 W", { Diameter: 110, Load: 15 }]], (tx) => {
+      createRevolution(tx, rect(0, -10, "Diameter/2", 0), { axis: 0 });
+      createRevolution(tx, rect(0, 0, "Diameter/2 - 10", 60), { axis: 0 });
+      createConnector(tx, { classification: "lighting", z: 60, facing: "+z", load: "Load" });
+    }),
+};
+
+export const lightSwitch: LibraryFamily = {
+  name: "Switch - Light",
+  category: "ElectricalFixture",
+  description: "Light switch at 1100 on the wall face (no load of its own).",
+  build: () =>
+    family("ElectricalFixture", "Switch - Light", [["Mounting Height", 1100]], [["Single gang", { "Mounting Height": 1100 }]], (tx) => {
+      createExtrusion(tx, rect(-37, 0, 37, 10), { start: "Mounting Height - 60", end: "Mounting Height + 60" });
+    }),
+};
+
+export const switchboard: LibraryFamily = {
+  name: "Switchboard - Residential",
+  category: "ElectricalEquipment",
+  description: "Surface switchboard (feeds circuits: select fixtures, right-click, Create circuit).",
+  build: () =>
+    family("ElectricalEquipment", "Switchboard - Residential", [["Mounting Height", 1400]], [["12 way", { Width: 400, Height: 500, Depth: 150 }], ["24 way", { Width: 500, Height: 700, Depth: 150 }]], (tx) => {
+      createExtrusion(tx, rect("-Width/2", 0, "Width/2", "Depth"), { start: "Mounting Height", end: "Mounting Height + Height" });
+      createConnector(tx, { classification: "power", y: "Depth", z: "Mounting Height + Height/2", facing: "+y", flowDirection: "out" });
+      createConnector(tx, { classification: "lighting", y: "Depth", z: "Mounting Height + Height/2 + 50", facing: "+y", flowDirection: "out" });
+    }),
+};
+
 export const LIBRARY: LibraryFamily[] = [
   singleDoor,
   casementWindow,
@@ -803,5 +853,9 @@ export const LIBRARY: LibraryFamily[] = [
   kitchenSink,
   laundryTub,
   hotWaterCylinder,
+  doubleOutlet,
+  downlight,
+  lightSwitch,
+  switchboard,
   ...VIEW_MARKERS,
 ];

@@ -205,4 +205,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   discharge units + outlet DN; DN15 hot/cold), hot water cylinder. Systems → Plumbing Fixture.
   NZ Checks → G13 drainage (core/model/drainage.ts): units per drain from its outlet, capacity by
   DN and fall, outlet size, no reducing downstream, falls. Capacities provisional.
-- Next: Phase 8 — electrical (fixtures/devices, circuits, switchboard schedules with load totals).
+- Electrical (core/model/electrical.ts): library Power Outlet - Double (150 W provisional), Switch,
+  LED Downlight, Switchboard - Residential; Systems → Switchboard / Device / Lighting Fixture.
+  Select fixtures → right-click → Create power/lighting circuit on <board> (numbered, breaker 20/10 A);
+  board Properties → Switchboard schedule (load W, current at 230 V, breaker check, connected load).
+- Next: Phase 8 — cable tray and conduit.

@@ -276,6 +276,10 @@ import {
   type PropertyLine,
   type PropertyLineParams,
   drainageCheck,
+  isPanel,
+  panelSchedule,
+  SUPPLY_VOLTAGE,
+  type CircuitParams,
 } from "@open-bim/core";
 
 type Child = Node | string | null | undefined | false;
@@ -2919,6 +2923,14 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       sec.append(
         row("Name", textInput(el.name ?? "", (v) => v.trim() && edit(ctx, "Rename system", (tx) => tx.setName(el.id, v.trim())))),
         row("System", info.label),
+        ...(((sys.params as CircuitParams).panelId)
+          ? [
+              row("Switchboard", doc.get((sys.params as CircuitParams).panelId!)?.name ?? doc.get((doc.get((sys.params as CircuitParams).panelId!)?.params as { familyId?: string } | undefined)?.familyId ?? "")?.name ?? ""),
+              row("Circuit number", numberInput((sys.params as CircuitParams).circuitNumber ?? 0, (v) => edit(ctx, "Circuit number", (tx) => tx.update<CircuitParams>(sys.id, { circuitNumber: Math.max(1, Math.round(v)) })))),
+              row("Breaker (A)", numberInput((sys.params as CircuitParams).breaker ?? 16, (v) => edit(ctx, "Breaker rating", (tx) => tx.update<CircuitParams>(sys.id, { breaker: Math.max(1, v) })))),
+              row("Current", `${(t.load / SUPPLY_VOLTAGE).toFixed(1)} A`),
+            ]
+          : []),
         row("Members", String(t.members)),
         ...(info.domain === "electrical" ? [row("Connected load", `${(t.load / 1000).toFixed(2)} kW`)] : [row("Flow", `${t.flow.toFixed(1)} L/s`)]),
         ...(info.domain === "pipe" && t.units ? [row("Units", String(t.units))] : []),
@@ -2955,6 +2967,23 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
     }
     case Cat.FamilyInstance: {
       sec.append(...instanceRows(ctx, el as FamilyInstance));
+      if (isPanel(doc, el)) {
+        // Switchboard schedule (Revit: panel schedule).
+        const sch = panelSchedule(doc, el.id);
+        sec.append(h("h3", {}, "Switchboard schedule"));
+        if (!sch.rows.length) sec.append(h("div", { class: "muted" }, "No circuits yet: select fixtures, right-click \u2192 Create power/lighting circuit."));
+        for (const r of sch.rows) {
+          const div = h(
+            "div",
+            { class: "list-item", title: `${r.fixtures} fixture(s) \u00b7 ${r.current.toFixed(1)} A of ${r.breaker} A` },
+            h("span", {}, `${r.number}  ${classificationInfo(r.classification).label}`),
+            h("span", { class: r.ok ? "muted" : "fail" }, `${r.load.toFixed(0)} W \u00b7 ${r.current.toFixed(1)}/${r.breaker} A${r.ok ? "" : " \u26a0"}`),
+          );
+          div.onclick = () => ctx.setSelection([r.circuitId]);
+          sec.append(div);
+        }
+        sec.append(row("Connected load", `${(sch.load / 1000).toFixed(2)} kW (${sch.current.toFixed(1)} A at ${SUPPLY_VOLTAGE} V)`));
+      }
       if (isMass(doc, el)) {
         // Mass Floors (Revit: Modify | Mass → Mass Floors): tick the levels to slice it at.
         const floors = massFloors(doc, el.id);

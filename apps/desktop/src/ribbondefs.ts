@@ -152,6 +152,14 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
           ],
         },
         {
+          title: "Electrical",
+          items: [
+            { label: "Switchboard", icon: "component", cmd: "placeSwitchboard", title: "Place a switchboard (circuits are fed from it)" },
+            { label: "Device", icon: "component", cmd: "placeElectricalFixture", title: "Place power outlets and switches" },
+            { label: "Lighting Fixture", icon: "component", cmd: "placeLightingFixture", title: "Place light fittings (at ceiling height)" },
+          ],
+        },
+        {
           title: "Plumbing & Piping",
           items: [
             { label: "Pipe", icon: "pipe", tool: "pipe", large: true, title: "Pipe: route runs; bends, junctions and reducers are automatic; drainage falls (PI)" },

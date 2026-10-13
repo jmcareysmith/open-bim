@@ -109,6 +109,8 @@ import {
   recordExistingGround,
   createPropertyLine,
   pointsFromLegs,
+  createCircuit,
+  panels,
 } from "@open-bim/core";
 import { OcctKernel, SimpleKernel, findClashes, exportGlb, exportObj, exportParts, areaLoopsFromWalls, drawingDxf, parseDxf, viewDrawing, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
@@ -1114,6 +1116,12 @@ const commands: Record<string, () => void | Promise<void>> = {
   },
   siteComponent: () => placeFromCategory("Site", "Tree - Deciduous"),
   placeAirTerminal: () => placeFromCategory("AirTerminal", "Supply Diffuser - Square"),
+  placeElectricalFixture() {
+    if (!familyDefs(doc).some((f) => f.params.category === "ElectricalFixture")) for (const n of ["Power Outlet - Double", "Switch - Light"]) ctx.loadLibraryFamily(n);
+    placeFromCategory("ElectricalFixture", "Power Outlet - Double");
+  },
+  placeLightingFixture: () => placeFromCategory("LightingFixture", "Light - LED Downlight"),
+  placeSwitchboard: () => placeFromCategory("ElectricalEquipment", "Switchboard - Residential"),
   placePlumbingFixture() {
     if (!familyDefs(doc).some((f) => f.params.category === "PlumbingFixture")) {
       for (const n of ["WC - Close Coupled", "Basin - Wall Hung", "Shower - Tray", "Bath - Built In", "Sink - Kitchen", "Tub - Laundry", "Hot Water Cylinder"]) ctx.loadLibraryFamily(n);
@@ -1483,7 +1491,22 @@ function openCanvasMenu(ev: MouseEvent): void {
     // MEP: put the selection in a system (Revit: Create Duct/Piping/Power System), or an existing one.
     const conns = selection.map((s) => doc.get(s)).filter((e): e is ModelElement => !!e).map((e) => connectableClassifications(doc, e));
     const common = conns.length && conns.every((c) => c.length) ? SYSTEM_CLASSIFICATIONS.filter((c) => conns.every((list) => list.includes(c.value))) : [];
+    const boards = panels(doc);
     for (const c of common) {
+      if (c.domain === "electrical" && boards.length && !selection.some((id) => boards.some((b) => b.id === id))) {
+        for (const b of boards) {
+          const bname = b.name ?? doc.get((b.params as { familyId?: ElementId }).familyId ?? "")?.name ?? "switchboard";
+          items.push({
+            label: `Create ${c.label.toLowerCase()} circuit on ${bname}`,
+            action: () => {
+              let id: ElementId | undefined;
+              edit(`Create ${c.label.toLowerCase()} circuit`, (tx) => (id = createCircuit(tx, doc, b.id, selection, c.value).id));
+              if (id) ctx.setSelection([id]);
+            },
+          });
+        }
+        continue;
+      }
       items.push({
         label: `Create ${c.label.toLowerCase()} system`,
         action: () => {

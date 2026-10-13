@@ -19,6 +19,9 @@ import {
   graphicsCategory,
   createDuct,
   createPipe,
+  createCircuit,
+  panelSchedule,
+  type CircuitParams,
   drainageCheck,
   ensurePipeTypes,
   pipeTypeFor,
@@ -34,7 +37,7 @@ import {
   type MEPSystem,
 } from "@open-bim/core";
 import { OcctKernel, SimpleKernel, boundingBox, buildDetailComponentLines, buildViewMarker, meshVolume } from "@open-bim/geometry";
-import { LIBRARY, baseCabinet, casementWindow, ductedIndoorUnit, massGable, roundTable, shower, supplyDiffuser, wc } from "../src/index.ts";
+import { LIBRARY, baseCabinet, casementWindow, ductedIndoorUnit, massGable, roundTable, shower, supplyDiffuser, wc, doubleOutlet, downlight, switchboard } from "../src/index.ts";
 
 let occt: OcctKernel;
 beforeAll(async () => {
@@ -195,5 +198,27 @@ describe("family library", () => {
     doc.transact("Shrink", (tx) => tx.update<PipeParams>(branch.id, { diameter: 40 }));
     expect(drainageCheck(doc).issues.some((i) => /DN50 into DN40|gets smaller/.test(i.message))).toBe(true);
     void s;
+  });
+
+  it("circuits on a switchboard: numbered, loads add up, overloads show", () => {
+    const { doc, ids } = project();
+    const defs = [switchboard, doubleOutlet, downlight].map((f) => doc.transact("Load", (tx) => loadFamily(tx, doc, f.build(), f.name)));
+    const place = (i: number, x: number, type: string) => doc.transact("P", (tx) => placeFamilyInstance(tx, doc, defs[i]!.id, type, { levelId: ids.levels.ground, position: { x, y: 0 } }));
+    const board = place(0, 0, "12 way");
+    const outlets = [1000, 2000, 3000].map((x) => place(1, x, "10 A double"));
+    const lights = [1000, 2000].map((x) => place(2, x, "10 W"));
+    const power = doc.transact("C", (tx) => createCircuit(tx, doc, board.id, outlets.map((o) => o.id), "power"));
+    const light = doc.transact("C", (tx) => createCircuit(tx, doc, board.id, lights.map((o) => o.id), "lighting"));
+    expect([power.params.circuitNumber, light.params.circuitNumber]).toEqual([1, 2]);
+    const s = panelSchedule(doc, board.id);
+    expect(s.rows.map((r) => [r.number, r.load, r.breaker, r.ok])).toEqual([
+      [1, 450, 20, true],
+      [2, 20, 10, true],
+    ]);
+    expect(s.load).toBe(470);
+    // 450 W is about 2 A at 230 V: a 1 A breaker can't take it.
+    doc.transact("Breaker", (tx) => tx.update<CircuitParams>(power.id, { breaker: 1 }));
+    expect(panelSchedule(doc, board.id).rows[0]!.ok).toBe(false);
+    expect(() => doc.transact("Bad", (tx) => createCircuit(tx, doc, outlets[0]!.id, [lights[0]!.id]))).toThrow(/switchboard/);
   });
 });

@@ -5,9 +5,9 @@ import * as THREE from "three";
 // to look at it square on (FRONT = from the south, RIGHT = from the east…), near an edge or corner
 // for that view, or the house for the home view. Right-click for Orthographic / Perspective.
 
-const PX = 128;
-/** The cube's half size inside the compass ring (outer radius about 2.2). */
-const CUBE = 0.68;
+const PX = 152;
+/** The cube's half size inside the compass ring (outer radius about 2.6). */
+const CUBE = 0.85;
 
 type V = [number, number, number];
 
@@ -107,7 +107,7 @@ export class ViewCube {
   readonly el: HTMLDivElement;
   private renderer: THREE.WebGLRenderer;
   private scene = new THREE.Scene();
-  private camera = new THREE.OrthographicCamera(-2.4, 2.4, 2.4, -2.4, 0.1, 50);
+  private camera = new THREE.OrthographicCamera(-2.85, 2.85, 2.85, -2.85, 0.1, 50);
   private faces: THREE.Mesh[] = [];
   private cube = new THREE.Group();
   private raycaster = new THREE.Raycaster();
@@ -167,7 +167,7 @@ export class ViewCube {
     shadow.position.set(0.1, 0.1, -CUBE - 0.01);
     shadow.renderOrder = -1;
     this.scene.add(shadow);
-    const ring = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 4.6), new THREE.MeshBasicMaterial({ map: ringTexture(), transparent: true, depthWrite: false }));
+    const ring = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 5.6), new THREE.MeshBasicMaterial({ map: ringTexture(), transparent: true, depthWrite: false }));
     ring.position.z = -CUBE - 0.02;
     ring.renderOrder = -1;
     this.scene.add(ring);

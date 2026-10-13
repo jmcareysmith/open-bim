@@ -374,7 +374,7 @@ body.pane-dragging canvas { pointer-events: none; }
 .os { max-height: 70vh; overflow: auto; }
 
 /* ViewCube */
-.viewcube { position: absolute; top: 6px; right: 10px; z-index: 6; width: 128px; height: 128px; user-select: none; }
+.viewcube { position: absolute; top: 6px; right: 10px; z-index: 6; width: 152px; height: 152px; user-select: none; }
 .viewcube canvas { display: block; }
 .viewcube-home { position: absolute; top: 0; left: -2px; padding: 0 4px; font-size: 15px; line-height: 16px; background: none; border: none; cursor: pointer; color: #4a5560; }
 .viewcube-home:hover { color: #2f6fd6; }

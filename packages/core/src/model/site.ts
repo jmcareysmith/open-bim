@@ -20,6 +20,11 @@ export type ToposolidParams = {
   /** Contour spacing in plans, mm (0 = none). */
   contourInterval: number;
   materialId?: ElementId | null;
+  /**
+   * Graded region (Revit): the ground as it was before grading, kept so cut and fill can be
+   * measured. Unset, the existing ground is the spot heights without building pads.
+   */
+  existingPoints?: SitePoint[] | null;
 };
 export type Toposolid = Element<ToposolidParams>;
 
@@ -29,9 +34,90 @@ registerCategory({
     const p = el.params as ToposolidParams;
     return [p.levelId, ...(p.materialId ? [p.materialId] : [])];
   },
+  // Pads and subregions sit on the toposolid's surface.
+  related: (doc, el) => [...buildingPads(doc, el.id), ...subregions(doc, el.id)].map((x) => x.id),
   cascadeDelete: true,
   isType: false,
 });
+
+/**
+ * Building pad (Revit: Massing & Site → Building Pad): a slab whose underside the toposolid is
+ * graded to within its boundary, the ground battering up or down to it at the edges.
+ */
+export type BuildingPadParams = {
+  toposolidId: ElementId;
+  levelId: ElementId;
+  boundary: Vec2[];
+  /** Top of the pad above the level, mm. */
+  offset: number;
+  thickness: number;
+  materialId?: ElementId | null;
+};
+export type BuildingPad = Element<BuildingPadParams>;
+
+/** Subregion (Revit: Toposolid → Subregion): an area of the toposolid in another material (paths, lawn, paving). */
+export type SubregionParams = { toposolidId: ElementId; boundary: Vec2[]; materialId?: ElementId | null };
+export type Subregion = Element<SubregionParams>;
+
+registerCategory({
+  name: Cat.BuildingPad,
+  dependencies: (el) => {
+    const p = el.params as BuildingPadParams;
+    return [p.toposolidId, p.levelId, ...(p.materialId ? [p.materialId] : [])];
+  },
+  // The toposolid re-grades round its pads.
+  related: (_doc, el) => [(el.params as BuildingPadParams).toposolidId],
+  cascadeDelete: true,
+  isType: false,
+});
+registerCategory({
+  name: Cat.SiteSubregion,
+  dependencies: (el) => {
+    const p = el.params as SubregionParams;
+    return [p.toposolidId, ...(p.materialId ? [p.materialId] : [])];
+  },
+  cascadeDelete: true,
+  isType: false,
+});
+
+export function buildingPads(doc: Document, toposolidId?: ElementId): BuildingPad[] {
+  const all = doc.byCategory<BuildingPadParams>(Cat.BuildingPad) as BuildingPad[];
+  return toposolidId ? all.filter((p) => p.params.toposolidId === toposolidId) : all;
+}
+
+export function subregions(doc: Document, toposolidId?: ElementId): Subregion[] {
+  const all = doc.byCategory<SubregionParams>(Cat.SiteSubregion) as Subregion[];
+  return toposolidId ? all.filter((p) => p.params.toposolidId === toposolidId) : all;
+}
+
+/** The toposolid a sketched boundary sits on: the first whose boundary holds its centre. */
+export function toposolidUnder(doc: Document, boundary: Vec2[]): Toposolid | undefined {
+  const c = { x: boundary.reduce((s, p) => s + p.x, 0) / boundary.length, y: boundary.reduce((s, p) => s + p.y, 0) / boundary.length };
+  return (doc.byCategory<ToposolidParams>(Cat.Toposolid) as Toposolid[]).find((t) => insidePolygon(c, t.params.boundary));
+}
+
+export function createBuildingPad(tx: Transaction, doc: Document, boundary: Vec2[], opts: { toposolidId?: ElementId; levelId?: ElementId; offset?: number; thickness?: number } = {}): BuildingPad {
+  if (boundary.length < 3) throw new Error("A building pad needs at least three points");
+  const topo = opts.toposolidId ? (doc.get(opts.toposolidId) as Toposolid | undefined) : toposolidUnder(doc, boundary);
+  if (!topo || topo.category !== Cat.Toposolid) throw new Error("Sketch the pad inside a toposolid");
+  return tx.create<BuildingPadParams>(
+    Cat.BuildingPad,
+    { toposolidId: topo.id, levelId: opts.levelId ?? topo.params.levelId, boundary: boundary.map((p) => ({ ...p })), offset: opts.offset ?? 0, thickness: opts.thickness ?? 300 },
+    { name: "Building Pad" },
+  ) as BuildingPad;
+}
+
+export function createSubregion(tx: Transaction, doc: Document, boundary: Vec2[], opts: { toposolidId?: ElementId; materialId?: ElementId | null } = {}): Subregion {
+  if (boundary.length < 3) throw new Error("A subregion needs at least three points");
+  const topo = opts.toposolidId ? (doc.get(opts.toposolidId) as Toposolid | undefined) : toposolidUnder(doc, boundary);
+  if (!topo || topo.category !== Cat.Toposolid) throw new Error("Sketch the subregion inside a toposolid");
+  return tx.create<SubregionParams>(Cat.SiteSubregion, { toposolidId: topo.id, boundary: boundary.map((p) => ({ ...p })), materialId: opts.materialId ?? null }, { name: "Subregion" }) as Subregion;
+}
+
+/** Absolute height of a pad's underside, mm (the ground is graded to it). */
+export function padBottom(doc: Document, pad: BuildingPad): number {
+  return (doc.get<LevelParams>(pad.params.levelId)?.params.elevation ?? 0) + pad.params.offset - pad.params.thickness;
+}
 
 export function createToposolid(tx: Transaction, doc: Document, levelId: ElementId, boundary: Vec2[], points: SitePoint[] = [], opts: { thickness?: number; contourInterval?: number } = {}): Toposolid {
   if (doc.get(levelId)?.category !== Cat.Level) throw new Error("Toposolids sit on a level");
@@ -147,14 +233,107 @@ export function insidePolygon(p: Vec2, poly: Vec2[]): boolean {
 }
 
 /** The toposolid's top surface: vertices (absolute z) and triangles, clipped to the boundary. */
-export function toposolidSurface(doc: Document, t: Toposolid): { vertices: SitePoint[]; triangles: [number, number, number][] } {
-  const p = t.params;
-  const base = doc.get<LevelParams>(p.levelId)?.params.elevation ?? 0;
+/** How far outside a pad the ground returns to its existing level (and the edge step), mm. */
+const PAD_EDGE = 300;
+
+/**
+ * The toposolid's top: proposed (graded to its building pads) by default, or `existing` (before
+ * grading: the recorded existing ground, else the spot heights without pads).
+ */
+export function toposolidSurface(doc: Document, t: Toposolid, opts: { existing?: boolean } = {}): { vertices: SitePoint[]; triangles: [number, number, number][] } {
+  const p0 = t.params;
+  const base = doc.get<LevelParams>(p0.levelId)?.params.elevation ?? 0;
+  let points = opts.existing ? (p0.existingPoints ?? p0.points) : p0.points;
+  if (!opts.existing) {
+    // Pads: drop spot heights under them and add their corners at the pad's underside.
+    // A ring just outside each pad keeps the existing ground there, so only the ground under the
+    // pad changes (Revit grades the pad's footprint, with a near-vertical cut at its edge).
+    const pads = buildingPads(doc, t.id);
+    const ground = toposolidSurface(doc, t, { existing: true });
+    // Pad edges in short steps (so the triangulation keeps to them), each with a matching point
+    // just outside at the existing ground.
+    const edge = (pad: BuildingPad) => {
+      const b = pad.params.boundary;
+      const area = b.reduce((s2, q, i) => s2 + q.x * b[(i + 1) % b.length]!.y - b[(i + 1) % b.length]!.x * q.y, 0);
+      const out = area > 0 ? 1 : -1; // outward normal side for this winding
+      const pts: { on: Vec2; off: Vec2 }[] = [];
+      b.forEach((q, i) => {
+        const r = b[(i + 1) % b.length]!;
+        const L = Math.hypot(r.x - q.x, r.y - q.y);
+        const n = { x: (out * (r.y - q.y)) / L, y: (out * -(r.x - q.x)) / L };
+        const steps = Math.max(1, Math.ceil(L / PAD_EDGE));
+        for (let k = 0; k < steps; k++) {
+          const on = { x: q.x + ((r.x - q.x) * k) / steps, y: q.y + ((r.y - q.y) * k) / steps };
+          pts.push({ on, off: { x: on.x + n.x * PAD_EDGE, y: on.y + n.y * PAD_EDGE } });
+        }
+      });
+      const zPad = padBottom(doc, pad) - base;
+      return pts.flatMap(({ on, off }) => [
+        { ...on, z: zPad },
+        { ...off, z: (surfaceHeightAt(ground, off) ?? siteHeight(points, off) + base) - base },
+      ]);
+    };
+    points = [
+      ...points.filter((q) => !pads.some((pad) => insidePolygon(q, pad.params.boundary))),
+      ...pads.flatMap((pad) => edge(pad)),
+    ];
+  }
+  const p = { ...p0, points };
   const inside = p.points.filter((q) => insidePolygon(q, p.boundary));
-  const verts: SitePoint[] = [...p.boundary.map((b) => ({ x: b.x, y: b.y, z: siteHeight(p.points, b) })), ...inside];
+  // Boundary heights come from the survey, not the pads (their many points would drag the edges).
+  const verts: SitePoint[] = [...p.boundary.map((b) => ({ x: b.x, y: b.y, z: siteHeight(opts.existing ? points : p0.points, b) })), ...inside];
   const tris = delaunay(verts).filter(([a, b, c]) => {
     const g = { x: (verts[a]!.x + verts[b]!.x + verts[c]!.x) / 3, y: (verts[a]!.y + verts[b]!.y + verts[c]!.y) / 3 };
     return insidePolygon(g, p.boundary);
   });
   return { vertices: verts.map((v) => ({ x: v.x, y: v.y, z: v.z + base })), triangles: tris };
+}
+
+/** Height of a triangulated surface at a plan point (barycentric), or null outside it. */
+export function surfaceHeightAt(surface: { vertices: SitePoint[]; triangles: [number, number, number][] }, p: Vec2): number | null {
+  for (const [a, b, c] of surface.triangles) {
+    const A = surface.vertices[a]!;
+    const B = surface.vertices[b]!;
+    const C = surface.vertices[c]!;
+    const det = (B.y - C.y) * (A.x - C.x) + (C.x - B.x) * (A.y - C.y);
+    if (Math.abs(det) < 1e-9) continue;
+    const l1 = ((B.y - C.y) * (p.x - C.x) + (C.x - B.x) * (p.y - C.y)) / det;
+    const l2 = ((C.y - A.y) * (p.x - C.x) + (A.x - C.x) * (p.y - C.y)) / det;
+    const l3 = 1 - l1 - l2;
+    if (l1 >= -1e-9 && l2 >= -1e-9 && l3 >= -1e-9) return l1 * A.z + l2 * B.z + l3 * C.z;
+  }
+  return null;
+}
+
+/**
+ * Cut and fill (Revit: Graded Region / Building Pad properties): the earthworks between the
+ * existing ground and the graded surface, m³, sampled on a grid of `cell` mm squares.
+ */
+export function cutFill(doc: Document, t: Toposolid, cell = 250): { cut: number; fill: number } {
+  const before = toposolidSurface(doc, t, { existing: true });
+  const after = toposolidSurface(doc, t);
+  const b = t.params.boundary;
+  const xs = b.map((q) => q.x);
+  const ys = b.map((q) => q.y);
+  let cut = 0;
+  let fill = 0;
+  for (let x = Math.min(...xs) + cell / 2; x < Math.max(...xs); x += cell) {
+    for (let y = Math.min(...ys) + cell / 2; y < Math.max(...ys); y += cell) {
+      const q = { x, y };
+      if (!insidePolygon(q, b)) continue;
+      const e = surfaceHeightAt(before, q);
+      const n = surfaceHeightAt(after, q);
+      if (e === null || n === null) continue;
+      if (e > n) cut += (e - n) * cell * cell;
+      else fill += (n - e) * cell * cell;
+    }
+  }
+  return { cut: cut / 1e9, fill: fill / 1e9 };
+}
+
+/** Graded Region: record the ground as it is now as the existing ground (for cut and fill). */
+export function recordExistingGround(tx: Transaction, doc: Document, toposolidId: ElementId): void {
+  const t = doc.require<ToposolidParams>(toposolidId);
+  if (t.category !== Cat.Toposolid) throw new Error("Not a toposolid");
+  tx.update<ToposolidParams>(toposolidId, { existingPoints: t.params.points.map((p) => ({ ...p })) });
 }

@@ -61,6 +61,8 @@ const MASS_COLOR = 0x7fa7d9;
 const COLORS: Record<string, number> = {
   [Cat.Wall]: 0xd9d4c7,
   [Cat.Duct]: 0xb9c3cc,
+  [Cat.BuildingPad]: 0xb5b2aa,
+  [Cat.SiteSubregion]: 0x9cc28a,
   [Cat.MassFloor]: 0x3f6fb5,
   [Cat.Pipe]: 0x4f8fbf,
   [Cat.PipeFitting]: 0x3f7faf,

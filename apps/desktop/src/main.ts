@@ -106,6 +106,7 @@ import {
   enableDuctFittings,
   placeFamilyInstance,
   type FamilyInstanceParams,
+  recordExistingGround,
 } from "@open-bim/core";
 import { OcctKernel, SimpleKernel, findClashes, exportGlb, exportObj, exportParts, areaLoopsFromWalls, drawingDxf, parseDxf, viewDrawing, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
@@ -435,7 +436,7 @@ const ctx: ModifyToolContext & PanelContext = {
   },
   editBoundary(id) {
     const el = doc.require<FloorParams | CeilingParams | RoofParams>(id);
-    const name = { [Cat.Ceiling]: "ceiling", [Cat.Roof]: "roof", [Cat.FilledRegion]: "region" }[el.category] ?? "floor";
+    const name = { [Cat.Ceiling]: "ceiling", [Cat.Roof]: "roof", [Cat.FilledRegion]: "region", [Cat.BuildingPad]: "pad", [Cat.SiteSubregion]: "subregion" }[el.category] ?? "floor";
     // Filled regions belong to a view, not a level.
     if (el.params.levelId) activeLevelId = el.params.levelId;
     setTool(name);
@@ -466,6 +467,8 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   region: new SketchTool(ctx, "region"),
   cloud: new SketchTool(ctx, "cloud"),
   toposolid: new SketchTool(ctx, "toposolid"),
+  pad: new SketchTool(ctx, "pad"),
+  subregion: new SketchTool(ctx, "subregion"),
   text: new TextTool(ctx),
   dimension: new DimensionTool(ctx),
   room: new RoomTool(ctx),
@@ -1092,6 +1095,12 @@ const commands: Record<string, () => void | Promise<void>> = {
     activeComponentKey = `${def.id}|${familyTypeNames(def)[0] ?? ""}`;
     setTool("component");
     refreshAll();
+  },
+  gradedRegion() {
+    const t = selection.map((id) => doc.get(id)).find((e) => e?.category === Cat.Toposolid);
+    if (!t) return status("Graded Region: select a toposolid first.");
+    edit("Graded region", (tx) => recordExistingGround(tx, doc, t.id));
+    status("Graded Region: the ground as it is now is the existing ground. Edit spot heights or add pads; cut and fill show in Properties.");
   },
   manageLevels: () => openManage("levels"),
   manageMaterials: () => openMaterialBrowser(doc, status),

@@ -82,6 +82,8 @@ export const Cat = {
   Pipe: "Pipe",
   PipeFitting: "PipeFitting",
   MassFloor: "MassFloor",
+  BuildingPad: "BuildingPad",
+  SiteSubregion: "SiteSubregion",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

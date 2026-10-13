@@ -44,7 +44,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Model in-place | 3 | ⬜ |
 | Rooms, room separation, room bounding | 4 | ✅ |
 | Areas & area plans (GFA, NLA) | 4 | ✅ |
-| Toposolid / topography, building pads, site components | 6 | 🟨 |
+| Toposolid / topography, building pads, site components | 6 | 🟨 (toposolid, pads, subregions, graded region cut/fill; site components next) |
 | Conceptual masses (in-place, loadable, Show Mass) | 8a | ✅ |
 | Mass floors, Model by Face | 8a | ✅ (walls/curtain walls on vertical faces, roofs, floors) |
 

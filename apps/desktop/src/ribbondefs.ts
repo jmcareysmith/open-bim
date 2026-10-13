@@ -289,7 +289,20 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
             { label: "Floor", icon: "floor", tool: "face-floor", title: "Floor by Face: click a mass floor (or a mass for all its floors)" },
           ],
         },
-        { title: "Model Site", items: [{ label: "Toposolid", icon: "toposolid", tool: "toposolid", large: true, title: "Sketch the site boundary, then import survey points" }] },
+        {
+          title: "Model Site",
+          items: [
+            { label: "Toposolid", icon: "toposolid", tool: "toposolid", large: true, title: "Sketch the site boundary, then import survey points" },
+            { label: "Building Pad", icon: "floor", tool: "pad", title: "Sketch a pad inside a toposolid: the ground is graded to its underside" },
+          ],
+        },
+        {
+          title: "Modify Site",
+          items: [
+            { label: "Subregion", icon: "region", tool: "subregion", title: "Sketch an area of the toposolid in another material (paths, lawn, paving)" },
+            { label: "Graded Region", icon: "toposolid", cmd: "gradedRegion", title: "Record the selected toposolid's ground as existing, then regrade it; cut and fill show in Properties" },
+          ],
+        },
       ],
     },
     {

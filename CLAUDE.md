@@ -191,4 +191,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Model by Face (Massing & Site): Wall / Curtain Wall (vertical face; exterior on the face; height
   of the face, rectangular), Roof (top face: pitched from its low edge, or flat), Floor (mass floor,
   or a mass for all its floors) — apps/desktop/src/facetool.ts, geometry/src/faces.ts.
-- Next: Phase 8a — building pads, subregions, graded regions; property lines; then Phase 8.
+- Site: Building Pad (sketch inside a toposolid; ground graded to its underside, 300 mm edge
+  batter), Subregion (draped material area; plan fill), Graded Region (record existing ground);
+  cut/fill (m³) in toposolid and pad Properties — core/model/site.ts `cutFill`.
+- Next: Phase 8a — property lines, site components, contour labels; then Phase 8.

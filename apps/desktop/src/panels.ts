@@ -260,6 +260,13 @@ import {
   massFloors,
   setMassFloors,
   type MassFloor,
+  cutFill,
+  polygonArea,
+  type BuildingPad,
+  type BuildingPadParams,
+  type SubregionParams,
+  type Toposolid,
+  recordExistingGround,
 } from "@open-bim/core";
 
 type Child = Node | string | null | undefined | false;
@@ -2395,6 +2402,30 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       );
       break;
     }
+    case Cat.BuildingPad: {
+      const pad = el as BuildingPad;
+      const p = pad.params;
+      const topo = doc.get(p.toposolidId) as Toposolid | undefined;
+      const cf = topo ? cutFill(doc, topo) : { cut: 0, fill: 0 };
+      sec.append(
+        row("Level", select(levelOpts, p.levelId, (v) => update<BuildingPadParams>("Pad level", { levelId: v }))),
+        row("Height offset (top)", numberInput(p.offset, (v) => update<BuildingPadParams>("Pad height", { offset: v }))),
+        row("Thickness", numberInput(p.thickness, (v) => update<BuildingPadParams>("Pad thickness", { thickness: Math.max(10, v) }))),
+        row("Area", formatArea(Math.abs(polygonArea(p.boundary)), units)),
+        row("Site cut / fill", `${cf.cut.toFixed(1)} / ${cf.fill.toFixed(1)} m\u00b3`),
+        editBoundaryButton(ctx, el.id),
+      );
+      break;
+    }
+    case Cat.SiteSubregion: {
+      const sub = el.params as SubregionParams;
+      sec.append(
+        row("Material", select([{ value: "", label: "(lawn green)" }, ...materialElements(doc).map((m2) => ({ value: m2.id, label: m2.name ?? m2.id }))], sub.materialId ?? "", (v) => update<SubregionParams>("Subregion material", { materialId: v || null }))),
+        row("Area", formatArea(Math.abs(polygonArea(sub.boundary)), units)),
+        editBoundaryButton(ctx, el.id),
+      );
+      break;
+    }
     case Cat.Toposolid: {
       const p = el.params as ToposolidParams;
       const imp = h("button", { textContent: "Import survey CSV\u2026" });
@@ -2410,6 +2441,15 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Contour interval", numberInput(p.contourInterval, (v) => update<ToposolidParams>("Change contour interval", { contourInterval: Math.max(0, v) }))),
         row("Material", select(matOpts, p.materialId ?? "", (v) => update<ToposolidParams>("Change toposolid material", { materialId: v || null }))),
         row("", h("div", { class: "buttons wrap" }, imp, clear)),
+      );
+      // Earthworks: against the recorded existing ground (Graded Region), else the survey.
+      const cf = cutFill(doc, el as Toposolid);
+      const rec = h("button", { textContent: p.existingPoints ? "Re-record existing ground" : "Record existing ground (graded region)" });
+      rec.onclick = () => edit(ctx, "Graded region", (tx) => recordExistingGround(tx, doc, el.id));
+      sec.append(
+        row("Cut / fill", `${cf.cut.toFixed(1)} / ${cf.fill.toFixed(1)} m³ (net ${(cf.fill - cf.cut).toFixed(1)})`),
+        row("Existing ground", p.existingPoints ? "recorded" : "survey (pads excluded)"),
+        row("", rec),
       );
       break;
     }

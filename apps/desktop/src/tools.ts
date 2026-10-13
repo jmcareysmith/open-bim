@@ -94,6 +94,8 @@ import {
   TAGGABLE,
   type TagKind,
   type ViewParams,
+  createBuildingPad,
+  createSubregion,
 } from "@open-bim/core";
 import { areaBoundary, buildGridLines, buildReferencePlaneLines, buildRoomLines, extrudePolygon, roomBoundary, wallFootprint, type LineData } from "@open-bim/geometry";
 import type { Viewport } from "./viewport.ts";
@@ -572,7 +574,7 @@ export class ReferencePlaneTool extends DatumLineTool {
 
 // ---- Sketch (floors, ceilings) --------------------------------------------
 
-type SketchKind = "floor" | "ceiling" | "roof" | "region" | "cloud" | "toposolid" | "extrusion" | "blend" | "revolution";
+type SketchKind = "floor" | "ceiling" | "roof" | "region" | "cloud" | "toposolid" | "pad" | "subregion" | "extrusion" | "blend" | "revolution";
 
 const SKETCH: Record<SketchKind, { category: string; typeCategory: string; label: string }> = {
   floor: { category: Cat.Floor, typeCategory: Cat.FloorType, label: "Floor" },
@@ -581,6 +583,8 @@ const SKETCH: Record<SketchKind, { category: string; typeCategory: string; label
   region: { category: Cat.FilledRegion, typeCategory: "", label: "Filled region" },
   cloud: { category: Cat.RevisionCloud, typeCategory: "", label: "Revision cloud" },
   toposolid: { category: Cat.Toposolid, typeCategory: "", label: "Toposolid" },
+  pad: { category: Cat.BuildingPad, typeCategory: "", label: "Building pad" },
+  subregion: { category: Cat.SiteSubregion, typeCategory: "", label: "Subregion" },
   extrusion: { category: Cat.Extrusion, typeCategory: "", label: "Extrusion" },
   blend: { category: Cat.Blend, typeCategory: "", label: "Blend (bottom loop, then top loop)" },
   revolution: { category: Cat.Revolution, typeCategory: "", label: "Revolve (profile right of the centre line)" },
@@ -811,6 +815,18 @@ export class SketchTool implements Tool {
         doc.transact(`Edit ${this.def.label.toLowerCase()} boundary`, (tx) => tx.update(editing, patch));
         id = editing;
       } else {
+        if (this.name === "pad" || this.name === "subregion") {
+          // Pads and subregions go on the toposolid they're sketched in.
+          const made =
+            this.name === "pad"
+              ? doc.transact("Create building pad", (tx) => createBuildingPad(tx, doc, region.boundary))
+              : doc.transact("Create subregion", (tx) => createSubregion(tx, doc, region.boundary));
+          this.reset();
+          this.redraw();
+          this.ctx.setSelection([made.id]);
+          this.ctx.status(this.name === "pad" ? "Building pad made: the ground is graded to its underside. Set its height and see the cut and fill in Properties." : "Subregion made. Pick its material in Properties.");
+          return;
+        }
         if (this.name === "toposolid") {
           const levelId = this.ctx.activeLevelId();
           const t = doc.transact("Create toposolid", (tx) => createToposolid(tx, doc, levelId, region.boundary));

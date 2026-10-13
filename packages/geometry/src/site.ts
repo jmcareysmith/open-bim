@@ -1,7 +1,19 @@
 import earcut from "earcut";
-import { toposolidSurface, type Document, type Element, type Toposolid } from "@open-bim/core";
+import {
+  delaunay,
+  insidePolygon,
+  padBottom,
+  surfaceHeightAt,
+  toposolidSurface,
+  type BuildingPad,
+  type Document,
+  type Element,
+  type MaterialParams,
+  type Subregion,
+  type Toposolid,
+} from "@open-bim/core";
 import type { LineData } from "./datums.ts";
-import type { MeshData } from "./mesh.ts";
+import { extrudePolygon, type MeshData } from "./mesh.ts";
 
 // Toposolid geometry: the triangulated top, vertical sides down the boundary, and a flat bottom
 // `thickness` below the lowest point. Plan symbol: contours at the interval (every fifth heavier
@@ -107,4 +119,53 @@ export function buildToposolidLines(doc: Document, el: Element): LineData | null
     }
   }
   return { segments: new Float32Array(seg), labels, planOnly: true };
+}
+
+/** A building pad: a slab of its thickness under its top. */
+export function buildBuildingPad(doc: Document, el: Element): MeshData | null {
+  const pad = el as BuildingPad;
+  const bottom = padBottom(doc, pad);
+  return extrudePolygon(pad.params.boundary, [], bottom, bottom + pad.params.thickness);
+}
+
+/** Subregion: its outline draped on the toposolid's (graded) surface, just above it. */
+export function buildSubregion(doc: Document, el: Element): MeshData | null {
+  const sub = el as Subregion;
+  const topo = doc.get(sub.params.toposolidId) as Toposolid | undefined;
+  if (!topo) return null;
+  const surface = toposolidSurface(doc, topo);
+  const b = sub.params.boundary;
+  // Sample the surface on a grid inside the outline so the patch follows the ground.
+  const xs = b.map((q) => q.x);
+  const ys = b.map((q) => q.y);
+  const step = Math.max(500, Math.max(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys)) / 30);
+  const pts: { x: number; y: number }[] = [...b];
+  for (let x = Math.min(...xs) + step / 2; x < Math.max(...xs); x += step) for (let y = Math.min(...ys) + step / 2; y < Math.max(...ys); y += step) if (insidePolygon({ x, y }, b)) pts.push({ x, y });
+  const z = (p: { x: number; y: number }) => (surfaceHeightAt(surface, p) ?? 0) + 15;
+  const tris = delaunay(pts).filter(([i, j, k]) => insidePolygon({ x: (pts[i]!.x + pts[j]!.x + pts[k]!.x) / 3, y: (pts[i]!.y + pts[j]!.y + pts[k]!.y) / 3 }, b));
+  if (!tris.length) return null;
+  const pos: number[] = [];
+  const nor: number[] = [];
+  const idx: number[] = [];
+  for (const [i, j, k] of tris) {
+    let [A, B, C] = [pts[i]!, pts[j]!, pts[k]!];
+    if ((B.x - A.x) * (C.y - A.y) - (B.y - A.y) * (C.x - A.x) < 0) [B, C] = [C, B];
+    const base = pos.length / 3;
+    for (const p of [A, B, C]) {
+      pos.push(p.x, p.y, z(p));
+      nor.push(0, 0, 1);
+    }
+    idx.push(base, base + 1, base + 2);
+  }
+  return { positions: new Float32Array(pos), normals: new Float32Array(nor), indices: new Uint32Array(idx) };
+}
+
+/** Subregions in plan: their outline, filled with the material's colour. */
+export function buildSubregionLines(doc: Document, el: Element): LineData | null {
+  const sub = el as Subregion;
+  const b = sub.params.boundary;
+  const seg: number[] = [];
+  b.forEach((p, i) => seg.push(p.x, p.y, 0, b[(i + 1) % b.length]!.x, b[(i + 1) % b.length]!.y, 0));
+  const m = sub.params.materialId ? doc.get<MaterialParams>(sub.params.materialId) : undefined;
+  return { segments: new Float32Array(seg), labels: [], planOnly: true, fill: { loops: [b], color: m?.params.color ?? 0x9cc28a } };
 }

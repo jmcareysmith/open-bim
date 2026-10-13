@@ -79,6 +79,7 @@ const P: Record<string, string> = {
   tree: "M12 22v-7M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12z",
   parking: "M5 3h14v18H5zM10 17V7h3a3 3 0 0 1 0 6h-3",
   property: "M3 6l6-3 12 4-2 13-14 1zM3 6l2 15",
+  thinlines: "M3 6h18M3 12h18M3 18h18",
   info: "M12 3a9 9 0 1 0 .01 0M12 11v6M12 7.5v.5",
   options: "M4 6h16M4 12h16M4 18h16M8 4v4M16 10v4M10 16v4",
   console: "M3 4h18v16H3zM6 9l3 3-3 3M11 15h6",

@@ -367,3 +367,8 @@ body.pane-dragging canvas { pointer-events: none; }
 .list-item.indent2 { padding-left: 30px; }
 .list-item.muted-head { cursor: default; font-weight: 600; }
 .manage-dialog { min-width: 360px; max-height: 70vh; overflow: auto; }
+
+/* Object Styles dialog */
+.os-table { border-collapse: collapse; font-size: 12px; }
+.os-table th, .os-table td { padding: 3px 8px; border-bottom: 1px solid var(--line); text-align: left; }
+.os { max-height: 70vh; overflow: auto; }

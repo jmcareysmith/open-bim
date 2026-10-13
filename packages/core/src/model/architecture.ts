@@ -91,6 +91,7 @@ export const Cat = {
   ConduitType: "ConduitType",
   Conduit: "Conduit",
   ConduitFitting: "ConduitFitting",
+  ObjectStyles: "ObjectStyles",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

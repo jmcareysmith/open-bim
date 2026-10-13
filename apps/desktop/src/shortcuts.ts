@@ -59,6 +59,7 @@ export const COMMANDS: Command[] = [
   { action: "tool:split", label: "Split", keys: "SL" },
   { action: "tool:demolish", label: "Demolish", keys: "" },
   { action: "cmd:visibilityGraphics", label: "Visibility/Graphics", keys: "VV VG" },
+  { action: "cmd:thinLines", label: "Thin Lines", keys: "TL" },
   { action: "cmd:fit", label: "Zoom to Fit", keys: "F ZF" },
   { action: "cmd:hide", label: "Temporary Hide Element", keys: "H" },
   { action: "cmd:hideCategory", label: "Temporary Hide Category", keys: "Shift+H" },

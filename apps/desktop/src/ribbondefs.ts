@@ -349,7 +349,13 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
       label: "View",
       mode: "both",
       panels: [
-        { title: "Graphics", items: [{ label: "Visibility/ Graphics", icon: "vg", cmd: "visibilityGraphics", large: true, title: "Visibility/Graphics (VV)" }] },
+        {
+          title: "Graphics",
+          items: [
+            { label: "Visibility/ Graphics", icon: "vg", cmd: "visibilityGraphics", large: true, title: "Visibility/Graphics (VV)" },
+            { label: "Thin Lines", icon: "thinlines", cmd: "thinLines", title: "Thin Lines (TL): every line 1 px, or line weights" },
+          ],
+        },
         { title: "Presentation", items: [{ label: "Render", icon: "render", cmd: "render", large: true, title: "Path-traced render of the 3D view" }] },
         {
           title: "Create",
@@ -401,6 +407,7 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
           title: "Settings",
           items: [
             { label: "Project Information", icon: "info", cmd: "projectInfo", large: true, title: "Project information, units, location, phases, H1, bracing" },
+            { label: "Object Styles", icon: "vg", cmd: "objectStyles", title: "Line weights, colours and patterns per category" },
             { label: "Materials", icon: "material", cmd: "manageMaterials", title: "Material Browser" },
             { label: "Project Parameters", icon: "parameters", cmd: "manageParameters", title: "Project, shared and global parameters" },
             { label: "Levels", icon: "level", cmd: "manageLevels", title: "Levels in the project" },

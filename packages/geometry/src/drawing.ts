@@ -24,6 +24,7 @@ import {
   type ResolvedLine,
   graphicsCategory,
   MASS_CATEGORY,
+  penWidth,
 } from "@open-bim/core";
 import { GRID_BUBBLE_RADIUS, type LineData } from "./datums.ts";
 import { planLinework, type PlanLinework } from "./hlr.ts";
@@ -49,6 +50,8 @@ export interface Stroke {
   dashed?: boolean;
   /** Override Graphics: pen weight (1-16) and line pattern. */
   weight?: number;
+  /** Paper width, mm (the pen at the view's scale, from Object Styles / overrides). */
+  width?: number;
   pattern?: LinePattern;
   /** Element this came from, for picking. */
   id?: ElementId;
@@ -146,7 +149,7 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
     const ductLevel = ductPlanLevel(doc, el);
     if (ductLevel && (view.params as ViewParams).levelId !== ductLevel) continue;
     const r = elementGraphics(doc, g, el);
-    addLineData(out, lines, owner ? "annotation" : el.category === Cat.Grid || el.category === Cat.ReferencePlane ? "datum" : "symbol", lineStyle(r, r.projection, el.id));
+    addLineData(out, lines, owner ? "annotation" : el.category === Cat.Grid || el.category === Cat.ReferencePlane ? "datum" : "symbol", lineStyle(r, r.projection, el.id, g.scale));
   }
   if (section) addLineData(out, sectionAnnotations(doc, view), "datum", {});
 
@@ -185,8 +188,10 @@ export function lineworkDrawing(
     if (!el) continue;
     const cc = cuts.get(lw.id) ?? { loops: lw.cutLoops, lines: loopSegments(lw.cutLoops), regions: null };
     const r = graphics(el);
-    const proj = lineStyle(r, r.projection, lw.id);
-    const cut = lineStyle(r, r.cut, lw.id);
+    const proj = lineStyle(r, r.projection, lw.id, g.scale);
+    const cut = lineStyle(r, r.cut, lw.id, g.scale);
+    // Layer boundaries inside a cut are fine lines (Revit's common edges), not the heavy cut pen.
+    const layerLine = { ...cut, weight: proj.weight, width: proj.width };
     const fg = r.cutFill.foreground;
     const bg = r.cutFill.background;
     // Cut patterns: the background (a solid fill when set), then the foreground pattern.
@@ -199,20 +204,20 @@ export function lineworkDrawing(
         return;
       }
       const fam = pattern ? patternFamilies(pattern as PatternName, g.scale) : null;
-      if (fam) out.strokes.push({ kind: "hatch", segments: hatch(loops, fam), ...proj, ...(fg.color !== null ? { color: fg.color } : {}) });
+      if (fam) out.strokes.push({ kind: "hatch", segments: hatch(loops, fam), ...proj, width: penWidth(1, g.scale), ...(fg.color !== null ? { color: fg.color } : {}) });
     };
     if (detailed) {
       for (const reg of cc.regions ?? []) {
         const m = reg.materialId ? doc.get<MaterialParams>(reg.materialId) : undefined;
         cutFill([reg.loop], m?.params.cutPattern ?? "diagonal", "solid");
-        if (reg.lines.length) out.strokes.push({ kind: "beyond", segments: reg.lines, ...cut });
+        if (reg.lines.length) out.strokes.push({ kind: "beyond", segments: reg.lines, ...layerLine });
       }
     } else if (cc.loops.length) {
       cutFill(cc.loops, null, "poche");
     }
     if (lw.projection.length) out.strokes.push({ kind: "beyond", segments: lw.projection, ...proj });
     const sf = r.surface.foreground;
-    if (lw.surface.length && sf.visible) out.strokes.push({ kind: "surface", segments: lw.surface, ...proj, ...(sf.color !== null ? { color: sf.color } : {}) });
+    if (lw.surface.length && sf.visible) out.strokes.push({ kind: "surface", segments: lw.surface, ...proj, width: penWidth(1, g.scale), ...(sf.color !== null ? { color: sf.color } : {}) });
     if (cc.lines.length) out.strokes.push({ kind: "cut", segments: cc.lines, ...cut });
   }
 
@@ -313,8 +318,9 @@ export function transformDrawing(d: Drawing, a: number, bx: number, by: number):
 }
 
 /** Stroke style from resolved graphics and one of its line overrides (projection or cut). */
-function lineStyle(r: ResolvedGraphics, l: ResolvedLine, id: ElementId): Omit<Stroke, "kind" | "segments"> {
+function lineStyle(r: ResolvedGraphics, l: ResolvedLine, id: ElementId, scale = 100): Omit<Stroke, "kind" | "segments"> {
   return {
+    ...(l.weight !== null ? { width: penWidth(l.weight, scale) } : {}),
     halftone: r.halftone,
     id,
     ...(l.color !== null ? { color: l.color } : r.color !== null ? { color: r.color } : {}),

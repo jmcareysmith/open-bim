@@ -105,7 +105,21 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Building pads (cut the toposolid), subregions (material areas), graded regions with cut/fill
 - [x] Property lines (bearings and distances, area), site and parking components, contour labels
 
-## Phase 8 — MEP & visual programming (current)
+## Phase 8b — Revit look & architectural parity (current; Jeremy's priority, 2026-10-14)
+- [x] Object Styles and line weights: pens per category, paper widths by scale, on screen and PDF; Thin Lines (TL)
+- [ ] 3D view look: white background, no work-plane grid, ViewCube and navigation, orthographic 3D
+- [ ] Section box for 3D views (grips to drag its faces)
+- [ ] Coarse fill patterns per type (Revit's default hollow walls at Coarse); Graphic Display Options (edges, silhouettes, smooth lines)
+- [ ] Wall sweeps and reveals; edit wall profile
+- [ ] Stairs: L- and U-shaped runs with landings, winders
+- [ ] Curtain walls: add/remove grid lines, mullion types, panel swaps (doors, solid panels)
+- [ ] Roofs by extrusion; fascias, gutters and soffits
+- [ ] Dimensions in sections/elevations, temporary dimensions while placing, spot elevations
+- [ ] Room colour schemes with colour fill legends
+- [ ] Floor shape editing (points, falls to drains), slab edges
+- [ ] Curved walls and grids (arcs)
+
+## Phase 8 — MEP & visual programming (rest paused for 8b)
 - [x] Connectors and MEP systems (supply/return air, cold/hot water, sanitary, power); system browser
 - [x] Ducts with auto fittings (elbows, tees, transitions), round/rectangular types, sizing from airflow
 - [x] Pipes with auto fittings, falls on waste pipes, pipe materials

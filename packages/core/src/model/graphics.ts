@@ -4,6 +4,7 @@ import { PHASED, phaseGraphics, phaseStatus, viewPhase, type PhaseFilter } from 
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, ParamValue } from "../element.ts";
 import { Cat } from "./architecture.ts";
+import { objectStyle, styleCategory } from "./objectstyles.ts";
 import type { DetailLevel, ViewParams } from "./viewdefs.ts";
 import { customValue } from "./parameters.ts";
 
@@ -268,6 +269,11 @@ export const MASS_CATEGORY = "Mass";
 
 export function elementGraphics(doc: Document, g: ViewGraphicsParams, el: Element): ResolvedGraphics {
   const r = defaultGraphics();
+  // Object Styles first: the category's pens (and any colour or pattern), then the view's overrides.
+  const os = objectStyle(doc, styleCategory(doc, el));
+  r.projection = { color: os.projection.color ?? null, weight: os.projection.weight, pattern: os.projection.pattern ?? null };
+  const cutStyle = os.cut ?? os.projection;
+  r.cut = { color: cutStyle.color ?? null, weight: cutStyle.weight, pattern: cutStyle.pattern ?? null };
   const category = graphicsCategory(doc, el);
   r.visible = !g.hiddenCategories.includes(category);
   const cat = g.categoryOverrides?.[category];

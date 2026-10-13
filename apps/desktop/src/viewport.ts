@@ -1,5 +1,8 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
+import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
+import { LineSegmentsGeometry } from "three/examples/jsm/lines/LineSegmentsGeometry.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
@@ -564,6 +567,24 @@ export class Viewport {
     return g.halftone ? blend(c, HALFTONE_TOWARD, 0.6) : c;
   }
 
+  /** Thin Lines (Revit's TL): every line 1 px, ignoring line weights. */
+  thinLines = false;
+  private fatMaterials = new Set<LineMaterial>();
+
+  setThinLines(on: boolean): void {
+    this.thinLines = on;
+    this.drawingDirty = true;
+    this.needsRender = true;
+  }
+
+  /** Wide-line materials need the canvas size to draw at the right width. */
+  private trackFat(m: LineMaterial): void {
+    const size = this.renderer.getSize(new THREE.Vector2());
+    m.resolution.set(size.x, size.y);
+    this.fatMaterials.add(m);
+    m.addEventListener("dispose", () => this.fatMaterials.delete(m));
+  }
+
   /** Show Mass (Revit's session toggle): conceptual masses only show while it's on. */
   showMass = false;
 
@@ -984,7 +1005,7 @@ export class Viewport {
     for (const st of d.strokes) if (st.id) strokes.set(st.id, [...(strokes.get(st.id) ?? []), st]);
     for (const f of d.fills) if (f.id) fills.set(f.id, [...(fills.get(f.id) ?? []), f]);
     for (const lw of linework) {
-      const g = makeElementDrawing(strokes.get(lw.id) ?? [], fills.get(lw.id) ?? [], z);
+      const g = makeElementDrawing(strokes.get(lw.id) ?? [], fills.get(lw.id) ?? [], z, this.thinLines ? undefined : (m) => this.trackFat(m));
       g.userData.elementId = lw.id;
       this.drawing.set(lw.id, g);
       target.add(g);
@@ -1094,6 +1115,7 @@ export class Viewport {
   private resize(): void {
     const w = Math.max(1, this.container.clientWidth);
     const h = Math.max(1, this.container.clientHeight);
+    for (const m of this.fatMaterials) m.resolution.set(w, h);
     this.renderer.setSize(w, h, false);
     this.camera3d.aspect = w / h;
     this.camera3d.updateProjectionMatrix();
@@ -1400,7 +1422,17 @@ const STROKE_ROLE: Partial<Record<Stroke["kind"], { role: string; color: number;
 };
 
 /** One element's cut/projection drawing (from `lineworkDrawing`) as a flat group at height z. */
-function makeElementDrawing(strokes: Stroke[], fills: Fill[], z: number): THREE.Group {
+/** Screen pixels per paper mm for line weights (96 dpi, like Revit's on-screen weights). */
+const PX_PER_MM = 96 / 25.4;
+
+/** Line weight on screen, CSS px: a stroke's paper width, or null for a plain 1 px line. */
+function strokePixels(st: Stroke): number | null {
+  if (!st.width) return null;
+  const px = st.width * PX_PER_MM;
+  return px >= 1.3 ? px : null;
+}
+
+function makeElementDrawing(strokes: Stroke[], fills: Fill[], z: number, fat?: (m: LineMaterial) => void): THREE.Group {
   const g = new THREE.Group();
   const flat = (o: THREE.Object3D, color: number, role: string, order: number) => {
     o.userData.baseColor = color;
@@ -1424,6 +1456,18 @@ function makeElementDrawing(strokes: Stroke[], fills: Fill[], z: number): THREE.
   for (const st of strokes) {
     const r = STROKE_ROLE[st.kind];
     if (!r || !st.segments.length) continue;
+    // Line weights (Object Styles): wide lines at the pen's width, unless Thin Lines is on.
+    const px = fat ? strokePixels(st) : null;
+    if (px !== null && fat) {
+      const pos: number[] = [];
+      for (let i = 0; i < st.segments.length; i += 4) pos.push(st.segments[i]!, st.segments[i + 1]!, z, st.segments[i + 2]!, st.segments[i + 3]!, z);
+      const geom = new LineSegmentsGeometry();
+      geom.setPositions(pos);
+      const m = new LineMaterial({ color: r.color, linewidth: px, worldUnits: false });
+      fat(m);
+      flat(new LineSegments2(geom, mat(m)), r.color, r.role, r.order);
+      continue;
+    }
     flat(new THREE.LineSegments(segmentsGeom(st.segments, z), mat(new THREE.LineBasicMaterial({ color: r.color }))), r.color, r.role, r.order);
   }
   return g;

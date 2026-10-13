@@ -214,5 +214,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - MEP display: Coarse plans draw runs single-line (no fittings); ceiling/wall MEP items get plan
   symbols on their level (geometry/mepsymbols.ts); line builders take the detail level.
   MEP categories in schedules (system/size/length) and clash checks.
-- Next (Jeremy, 2026-10-14): prioritise architectural tools and visual styles matching Revit over
-  the rest of Phase 8 (visual programming waits).
+- Object Styles (Manage → Object Styles; core/model/objectstyles.ts): pens per category for
+  projection/cut (+ colour, pattern); Revit-like line weights table by scale (`penWidth`); views
+  start from them, V/G overrides on top. Plans/sections draw wide lines on screen (LineSegments2)
+  and in PDF (`Stroke.width`); Thin Lines (TL, QAT, View tab) shows 1 px.
+- Next (Jeremy, 2026-10-14): Phase 8b — Revit look & architectural parity, before the rest of 8.

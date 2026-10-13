@@ -58,6 +58,7 @@ export * from "./model/pipes.ts";
 export * from "./model/drainage.ts";
 export * from "./model/electrical.ts";
 export * from "./model/containment.ts";
+export * from "./model/objectstyles.ts";
 export * from "./model/massfloors.ts";
 export * from "./model/property.ts";
 export * from "./model/markers.ts";

@@ -60,7 +60,7 @@ function pageContent(p: PdfPage): string {
   for (const s of p.drawing.strokes) {
     if (!s.segments.length) continue;
     const colour = s.halftone ? "0.6 0.6 0.6" : s.color !== undefined ? rgb(s.color) : "0 0 0";
-    const width = s.weight ? (PEN[Math.max(1, Math.min(16, Math.round(s.weight)))] ?? WEIGHT[s.kind]) : WEIGHT[s.kind];
+    const width = s.width ?? (s.weight ? (PEN[Math.max(1, Math.min(16, Math.round(s.weight)))] ?? WEIGHT[s.kind]) : WEIGHT[s.kind]);
     const dash = s.pattern ? (DASH[s.pattern] ?? "[] 0 d") : s.dashed ? DASH.dash! : "[] 0 d";
     ops.push(`${f(width * PT)} w ${colour} RG ${dash}`);
     for (let i = 0; i < s.segments.length; i += 4) {

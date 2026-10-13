@@ -1,3 +1,4 @@
+import { openObjectStyles } from "./objectstyles.ts";
 import { ContainmentTool } from "./containtool.ts";
 import { FaceTool } from "./facetool.ts";
 import { MANAGE_SECTIONS, projectSection } from "./panels.ts";
@@ -645,6 +646,7 @@ let ribbon: Ribbon | undefined = new Ribbon(
     { label: "Undo", icon: "undo", cmd: "undo", title: "Undo (Ctrl+Z)" },
     { label: "Redo", icon: "redo", cmd: "redo", title: "Redo (Ctrl+Y)" },
     { label: "3D", icon: "view3d", cmd: "view3d", title: "Default 3D view" },
+    { label: "Thin Lines", icon: "thinlines", cmd: "thinLines", title: "Thin Lines (TL): every line 1 px, or line weights" },
     { label: "Measure: Aligned Dimension", icon: "dimension", tool: "dimension", title: "Aligned dimension" },
   ],
 );
@@ -1140,6 +1142,11 @@ const commands: Record<string, () => void | Promise<void>> = {
     edit("Graded region", (tx) => recordExistingGround(tx, doc, t.id));
     status("Graded Region: the ground as it is now is the existing ground. Edit spot heights or add pads; cut and fill show in Properties.");
   },
+  thinLines() {
+    viewport.setThinLines(!viewport.thinLines);
+    status(viewport.thinLines ? "Thin Lines on: every line at 1 px." : "Thin Lines off: lines show their weights (Manage → Object Styles).");
+  },
+  objectStyles: () => openObjectStyles(doc, status),
   manageLevels: () => openManage("levels"),
   manageMaterials: () => openMaterialBrowser(doc, status),
   manageParameters: () => openManage("parameters"),

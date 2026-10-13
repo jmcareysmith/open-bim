@@ -85,3 +85,20 @@ describe("visibility/graphics", () => {
     expect(() => doc.transact("T", (tx) => createViewTemplate(tx, doc, "T1", doc.require<ViewParams>(plan.id)))).toThrow(/already exists/);
   });
 });
+
+describe("object styles", () => {
+  it("give each category its pens, which views start from and overrides beat", async () => {
+    const { Document, applyResidentialTemplate, createWall, elementGraphics, objectStyle, penWidth, setObjectStyle } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const w = doc.transact("W", (tx) => createWall(tx, ids.wallTypes.exterior, { x: 0, y: 0 }, { x: 1000, y: 0 }, ids.levels.ground));
+    const view = { hiddenCategories: [], scale: 100, detailLevel: "medium" } as never;
+    expect(elementGraphics(doc, view, w).cut.weight).toBe(5);
+    expect(penWidth(5, 100)).toBe(0.5);
+    expect(penWidth(5, 50)).toBe(0.7);
+    doc.transact("Style", (tx) => setObjectStyle(tx, doc, "Wall", { cut: { weight: 7 } }));
+    expect(objectStyle(doc, "Wall").cut!.weight).toBe(7);
+    expect(objectStyle(doc, "Wall").projection.weight).toBe(2);
+    expect(elementGraphics(doc, { ...(view as object), categoryOverrides: { Wall: { cutLines: { weight: 9 } } } } as never, w).cut.weight).toBe(9);
+  });
+});

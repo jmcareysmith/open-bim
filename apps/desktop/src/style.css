@@ -337,15 +337,30 @@ input.invalid { outline: 1px solid var(--danger); }
 .ks-row input { text-transform: uppercase; }
 .ks-row input.invalid { border-color: #c0392b; color: #c0392b; }
 
-/* Tiled / cascaded views */
+/* View windows (tile / cascade / free) */
 #panes { flex: 1; min-height: 0; min-width: 0; position: relative; display: flex; }
-#panes.tile { display: grid; gap: 3px; background: var(--line); }
-.pane-slot { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; background: var(--bg, #fff); }
-#panes.cascade .pane-slot { position: absolute; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25); border: 1px solid var(--line); }
-.pane-slot > #viewport, .pane-body { flex: 1; min-width: 0; min-height: 0; position: relative; }
+#panes.windows { display: block; background: #c9cdd2; overflow: hidden; }
+.pane-slot { position: relative; display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; background: var(--bg, #fff); }
+#panes.windows .pane-slot { position: absolute; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25); border: 1px solid #9aa0a6; box-sizing: border-box; }
+#panes.windows .pane-slot.active { border-color: var(--accent); box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3); }
+.pane-bar { display: none; }
+#panes.windows .pane-bar { display: flex; align-items: center; gap: 4px; height: 22px; flex: none; padding: 0 2px 0 8px; background: var(--panel); border-bottom: 1px solid var(--line); cursor: move; user-select: none; font-size: 12px; }
+#panes.windows .pane-slot.active .pane-bar { background: color-mix(in srgb, var(--accent) 18%, var(--panel)); }
+.pane-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pane-btn { border: none; background: none; padding: 0 6px; font-size: 13px; line-height: 20px; cursor: pointer; }
+.pane-btn:hover { background: rgba(0, 0, 0, 0.08); }
+.pane-body { flex: 1; min-width: 0; min-height: 0; position: relative; display: flex; overflow: auto; }
+.pane-body > #viewport { flex: 1; min-width: 0; min-height: 0; }
 .pane-body canvas { display: block; width: 100%; height: 100%; }
-.pane-slot.tiled.active { outline: 2px solid var(--accent); outline-offset: -2px; z-index: 1; }
-.pane-slot.tiled:not(.active) { cursor: pointer; }
-.pane-title { position: absolute; top: 4px; left: 8px; z-index: 4; font-size: 11px; padding: 0 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.85); color: #333; pointer-events: none; }
-.pane-body .schedule-table, .pane-body table { font-size: 11px; }
-.pane-body { overflow: auto; }
+.pane-edge { display: none; position: absolute; z-index: 5; }
+#panes.windows .pane-edge { display: block; }
+.e-l, .e-r { top: 0; bottom: 0; width: 6px; cursor: ew-resize; }
+.e-l { left: -3px; } .e-r { right: -3px; }
+.e-t, .e-b { left: 0; right: 0; height: 6px; cursor: ns-resize; }
+.e-t { top: -3px; } .e-b { bottom: -3px; }
+.e-tl, .e-tr, .e-bl, .e-br { width: 12px; height: 12px; z-index: 6; }
+.e-tl { left: -4px; top: -4px; cursor: nwse-resize; } .e-br { right: -4px; bottom: -4px; cursor: nwse-resize; }
+.e-tr { right: -4px; top: -4px; cursor: nesw-resize; } .e-bl { left: -4px; bottom: -4px; cursor: nesw-resize; }
+body.pane-dragging, body.pane-dragging * { user-select: none; }
+body.pane-dragging canvas { pointer-events: none; }
+.tab-arrange { margin-left: 4px; padding: 0 8px; font-size: 12px; }

@@ -1142,7 +1142,7 @@ export class Viewport {
     (this.ground.material as THREE.ShadowMaterial).opacity = 0.28 * shadowLevel;
     const on = shadows && (!dir || dir.z > 0.02);
     this.renderer.shadowMap.enabled = on;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.sun.castShadow = on;
     if (on) {
       const cam = this.sun.shadow.camera;

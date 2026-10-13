@@ -82,9 +82,11 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   1750 eye height (eye/target elevation and field of view in Properties).
 - Keyboard Shortcuts (KS, or File menu): edit one/two-letter keys per command (apps/desktop/src/shortcuts.ts;
   local storage). Single letters fire at once; a second letter within 1 s takes over.
-- Tile / Cascade / Tab Views (View → Windows, or WT/WC/TW): every open view in its own live pane
-  (apps/desktop/src/panes.ts, a Viewport each, up to 9); the active pane holds the interactive
-  viewport; click another pane to work in it.
+- View windows (apps/desktop/src/panes.ts): Tile / Cascade / Tab Views (View → Windows, WT/WC/TW,
+  or the ▦ ▾ at the end of the view tabs: Tile all / 2 / 3 / 4 most recent, Cascade, Tab Views).
+  Each open view is a live window (a Viewport each, up to 9): drag the title bar, resize by the
+  edges (snap to the area and each other), double-click to maximise, × closes. The active window
+  holds the interactive viewport; click another to work in it.
 - Status bar: ⧩ selection count at the right; click to filter the selection by category.
 - Drag from the Project Browser: views/legends/schedules onto the open sheet (placed where dropped);
   families into a view start placing them (detail items via the detail component tool).

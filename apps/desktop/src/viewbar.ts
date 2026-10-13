@@ -75,7 +75,7 @@ export class ViewBar {
     this.renderBar(active);
   }
 
-  private close(id: ElementId): void {
+  close(id: ElementId): void {
     if (this.open.length < 2) return this.host.status("The last open view stays open.");
     const i = this.open.indexOf(id);
     this.open.splice(i, 1);
@@ -116,6 +116,21 @@ export class ViewBar {
         return tab;
       }),
     );
+    // Window arrangements (Revit's Tile / Cascade / Tab Views), at the end of the tabs.
+    const n = this.open.length;
+    const arrange = el("button", { className: "tab-arrange", title: "Arrange view windows: tile all, 2, 3 or 4, cascade, or back to tabs", textContent: "\u25a6 \u25be" });
+    arrange.onclick = () => {
+      const r = arrange.getBoundingClientRect();
+      const tiles = [2, 3, 4].filter((k) => k < n).map((k) => ({ label: `Tile ${k} (most recent)`, action: () => this.host.run(`tile${k}`) }));
+      showContextMenu(r.left, r.top - 4, [
+        { heading: n > 1 ? `${n} open views` : "Open another view to tile" },
+        { label: "Tile all", hint: "WT", action: () => this.host.run("tileViews") },
+        ...tiles,
+        { label: "Cascade", hint: "WC", action: () => this.host.run("cascadeViews") },
+        { label: "Tab Views", hint: "TW", action: () => this.host.run("tabViews") },
+      ]);
+    };
+    this.tabs.append(arrange);
   }
 
   private renderBar(active: ElementId | undefined): void {

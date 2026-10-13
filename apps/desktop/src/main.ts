@@ -498,6 +498,7 @@ let panes: Panes | undefined = new Panes($("#panes"), {
   activeViewId: () => activeViewId,
   openViews: () => viewBar?.openViews() ?? [],
   activate: (id) => id !== activeViewId && ctx.setActiveView(id),
+  closeView: (id) => viewBar?.close(id),
   makeViewport: (container) => new Viewport(container, doc, viewport.geometryKernel),
   configure: (vp, target) => configureViewport(vp, target, false),
   renderSchedule: (container, s) => renderSchedulePane(container, ctx, s as Schedule),
@@ -999,6 +1000,9 @@ const commands: Record<string, () => void | Promise<void>> = {
   },
   camera: () => setTool("camera"),
   tileViews: () => setPaneLayout("tile"),
+  tile2: () => setPaneLayout("tile", 2),
+  tile3: () => setPaneLayout("tile", 3),
+  tile4: () => setPaneLayout("tile", 4),
   cascadeViews: () => setPaneLayout("cascade"),
   tabViews: () => setPaneLayout("tab"),
   keyboardShortcuts: () => openShortcutEditor(() => (shortcuts = shortcutTable())),
@@ -1679,10 +1683,10 @@ function refreshPanels(): void {
   if (active?.category === Cat.Schedule) renderSchedulePane($("#schedule-pane"), ctx, active as Schedule);
 }
 
-function setPaneLayout(layout: PaneLayout): void {
+function setPaneLayout(layout: PaneLayout, count?: number): void {
   if (!panes) return;
   if (layout !== "tab" && (viewBar?.openViews().length ?? 0) < 2) status("Open two or more views (they show as tabs below the view), then tile them.");
-  panes.setLayout(layout);
+  panes.setLayout(layout, count);
 }
 
 function refreshAll(): void {

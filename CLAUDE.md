@@ -185,4 +185,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Massing (Phase 8a): Mass family category; Massing & Site → Show Mass (session toggle; masses
   translucent blue, not on sheets/PDF), In-Place Mass (family editor; Load into Project places it
   at the origin), Place Mass (library Mass - Box/Cylinder/Gable). V/G category "Mass".
-- Next: Phase 8a — mass floors; then the rest of 8a, then Phase 8 (mechanical equipment, …).
+- Mass floors: select a mass → Properties → Mass Floors (tick levels); area/perimeter from the
+  mass's plan cut at the level (geometry/massfloors.ts); gross floor area and volume; schedule
+  category Mass Floors.
+- Next: Phase 8a — Model by Face; then site items, then Phase 8 (mechanical equipment, …).

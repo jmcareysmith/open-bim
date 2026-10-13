@@ -81,6 +81,7 @@ export const Cat = {
   PipeType: "PipeType",
   Pipe: "Pipe",
   PipeFitting: "PipeFitting",
+  MassFloor: "MassFloor",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

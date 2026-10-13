@@ -1,3 +1,4 @@
+import { buildMassFloorLines } from "./massfloors.ts";
 import { buildDuct, buildDuctFitting, buildDuctFittingLines, buildDuctLines } from "./ducts.ts";
 import { slopedTopWallMesh } from "./wallattach.ts";
 import {
@@ -213,6 +214,7 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.Pipe, buildDuctLines],
     [Cat.PipeFitting, buildDuctFittingLines],
     [Cat.Connector, buildConnectorLines],
+    [Cat.MassFloor, buildMassFloorLines],
   ]);
 
   register(category: string, builder: Builder): void {

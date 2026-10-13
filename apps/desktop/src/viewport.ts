@@ -61,6 +61,7 @@ const MASS_COLOR = 0x7fa7d9;
 const COLORS: Record<string, number> = {
   [Cat.Wall]: 0xd9d4c7,
   [Cat.Duct]: 0xb9c3cc,
+  [Cat.MassFloor]: 0x3f6fb5,
   [Cat.Pipe]: 0x4f8fbf,
   [Cat.PipeFitting]: 0x3f7faf,
   [Cat.DuctFitting]: 0xa9b4be,
@@ -328,7 +329,7 @@ export class Viewport {
         // Masses: translucent blue, as Revit draws them.
         const mass = graphicsCategory(this.doc, el) === MASS_CATEGORY;
         group = isVoid ? makeGroup(mesh, VOID_COLOR, 0.35) : mass ? makeGroup(mesh, MASS_COLOR, 0.45) : makeGroup(mesh, material?.params.color ?? (el.params as { color?: number }).color ?? COLORS[el.category] ?? 0xcccccc);
-        group.userData.baseColor = material?.params.color;
+        group.userData.baseColor = mass ? MASS_COLOR : material?.params.color;
         group.userData.solid = true;
         // Symbols drawn with a solid (door swings) ride along in the same group.
         if (lines) group.add(makeLineGroup(lines, SYMBOL));

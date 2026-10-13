@@ -37,10 +37,12 @@ import {
   type ViewParams,
   type Wall,
   type WallParams,
+  type MassFloor,
 } from "@open-bim/core";
 import { SimpleKernel } from "./kernel.ts";
 import { meshVolume, type MeshData } from "./mesh.ts";
 import { areaBoundary, roomBoundary } from "./rooms.ts";
+import { massFloorArea } from "./massfloors.ts";
 
 // Schedule evaluation: a field registry per category, then filter → sort → group/collapse → totals.
 // Values are kept in model units (mm, mm², mm³) until display, so totals are exact.
@@ -202,6 +204,11 @@ const SKETCHED: FieldDef[] = [
 ];
 
 const BY_CATEGORY: Record<string, FieldDef[]> = {
+  [Cat.MassFloor]: [
+    { key: "mass", label: "Mass", kind: "text", get: (d, e) => { const m = d.get((e.params as { massId: ElementId }).massId); return m ? familyName(d, m) : "" } },
+    { key: "area", label: "Floor Area", kind: "area", get: (d, e) => massFloorArea(d, e as MassFloor).area },
+    { key: "perimeter", label: "Floor Perimeter", kind: "length", get: (d, e) => massFloorArea(d, e as MassFloor).perimeter },
+  ],
   [Cat.Wall]: [
     { key: "length", label: "Length", kind: "length", get: (_d, e) => wallLength(e as Wall) },
     { key: "height", label: "Height", kind: "length", get: (d, e) => wallExtent(d, e as Wall).top - wallExtent(d, e as Wall).bottom },

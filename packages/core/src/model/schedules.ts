@@ -57,6 +57,7 @@ export const SCHEDULE_CATEGORIES: [string, string][] = [
   ["Furniture", "Furniture"],
   ["Casework", "Casework"],
   ["GenericModel", "Generic Models"],
+  [Cat.MassFloor, "Mass Floors"],
 ];
 
 /** Material takeoffs work on layered elements. */
@@ -106,6 +107,8 @@ export function defaultFields(category: string, kind: ScheduleKind = "schedule")
       return ["mark", "type", "width", "height", "level"];
     case Cat.Room:
       return ["number", "name", "level", "area"];
+    case Cat.MassFloor:
+      return ["mass", "level", "area", "perimeter"];
     case Cat.Area:
       return ["name", "scheme", "level", "area"];
     case Cat.Floor:

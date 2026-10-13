@@ -100,7 +100,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 
 ## Phase 8a — Massing & Site (asked for by Jeremy; next)
 - [x] Conceptual masses: in-place and loadable mass families (extrusion/blend/revolve/sweep), Show Mass
-- [ ] Mass floors (per level) with areas and a mass floor schedule (GFA)
+- [x] Mass floors (per level) with areas and a mass floor schedule (GFA)
 - [ ] Model by Face: walls, floors, roofs and curtain systems from mass faces
 - [ ] Building pads (cut the toposolid), subregions (material areas), graded regions with cut/fill
 - [ ] Property lines (bearings and distances, area), site and parking components, contour labels

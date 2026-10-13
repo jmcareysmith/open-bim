@@ -1,4 +1,4 @@
-import { areaBoundary, areaLoopsFromWalls, roomBoundary, scheduleFields, scheduleTable } from "@open-bim/geometry";
+import { areaBoundary, areaLoopsFromWalls, massFloorArea, massTotals, roomBoundary, scheduleFields, scheduleTable } from "@open-bim/geometry";
 import {
   Cat,
   levels,
@@ -256,6 +256,10 @@ import {
   type Pipe,
   type PipeParams,
   type PipeTypeParams,
+  isMass,
+  massFloors,
+  setMassFloors,
+  type MassFloor,
 } from "@open-bim/core";
 
 type Child = Node | string | null | undefined | false;
@@ -2858,6 +2862,36 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
     }
     case Cat.FamilyInstance: {
       sec.append(...instanceRows(ctx, el as FamilyInstance));
+      if (isMass(doc, el)) {
+        // Mass Floors (Revit: Modify | Mass → Mass Floors): tick the levels to slice it at.
+        const floors = massFloors(doc, el.id);
+        const on = new Set(floors.map((f) => f.params.levelId));
+        const t = massTotals(doc, el.id);
+        sec.append(h("h3", {}, "Mass Floors"));
+        for (const l of levels(doc)) {
+          const cb = checkbox(on.has(l.id), (v) => {
+            const next = v ? [...on, l.id] : [...on].filter((x) => x !== l.id);
+            edit(ctx, v ? "Add mass floor" : "Remove mass floor", (tx) => setMassFloors(tx, doc, el.id, next));
+          });
+          sec.append(h("label", { class: "check" }, cb, `${l.name ?? l.id}  (${len(l.params.elevation)})`));
+        }
+        sec.append(
+          row("Gross floor area", formatArea(t.floorArea, units)),
+          row("Gross volume", `${(t.volume / 1e9).toFixed(1)} m\u00b3`),
+          row("Mass floors", String(t.floors)),
+        );
+      }
+      break;
+    }
+    case Cat.MassFloor: {
+      const mf = el as MassFloor;
+      const a = massFloorArea(doc, mf);
+      sec.append(
+        row("Level", doc.get(mf.params.levelId)?.name ?? ""),
+        row("Floor area", formatArea(a.area, units)),
+        row("Floor perimeter", len(a.perimeter)),
+        h("div", { class: "muted" }, "Mass floors follow their mass. Tick levels in the mass's Properties."),
+      );
       break;
     }
     case Cat.Viewport: {

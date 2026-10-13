@@ -80,7 +80,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Wall joins: per-layer cleanup, disallow join, clean crossing (X) walls
 - [x] Floors: pick walls (with offset), slope arrows
 - [x] 3D views save their camera; perspective camera views
-- [ ] Schedules on sheets; calculated fields
+- [x] Schedules on sheets; calculated fields
 - [ ] Beam plan symbols (dashed centre lines at Coarse/Medium)
 - [x] Annotation symbols — north arrow (up or true north), graphic scale bar, break line; views and sheets; paper-sized
 - [x] Detail components — "Detail Item" families (detail lines + filled regions in one plan view), placed per view with rotation/mirror; library: timber sections, concrete block, steel angle. Not parametric yet (fixed size per family)

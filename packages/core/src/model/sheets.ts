@@ -92,10 +92,17 @@ export function sheetOfView(doc: Document, viewId: ElementId): Sheet | undefined
   return vp ? doc.get<SheetParams>(vp.params.sheetId) : undefined;
 }
 
-/** Place a view on a sheet. Like Revit, a view can be on one sheet only (3D views included). */
+/**
+ * Place a view on a sheet. Like Revit, a view can be on one sheet only (3D views included); a
+ * schedule can go on any number of sheets (each placement is a schedule instance).
+ */
 export function placeView(tx: Transaction, doc: Document, sheetId: ElementId, viewId: ElementId, centre?: Vec2): Viewport {
   const sheet = doc.require<SheetParams>(sheetId);
   if (sheet.category !== Cat.Sheet) throw new Error("Viewports go on sheets");
+  const paper0 = PAPER_SIZES[sheet.params.size];
+  if (doc.require(viewId).category === Cat.Schedule) {
+    return tx.create<ViewportParams>(Cat.Viewport, { sheetId, viewId, centre: centre ?? { x: paper0.width / 2 - 40, y: paper0.height * 0.7 } });
+  }
   const view = doc.require<ViewParams>(viewId);
   if (view.category !== Cat.View) throw new Error("Only views can be placed on sheets");
   if (view.params.kind === "3d") throw new Error("3D views can't be placed on sheets yet");

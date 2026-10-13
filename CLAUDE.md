@@ -119,7 +119,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Tags (Tag / Keynote tools; Mark property), keynote table (browser → Project → Load keynotes),
   legends (Views → New legend; add components / keynote legend in its properties).
 - Schedules/Quantities and material takeoffs (browser → Schedules; fields, filter, sort/group,
-  totals; Export CSV / Excel). Not yet placeable on sheets; no calculated fields.
+  totals; Export CSV / Excel). Calculated values (formula over fields by name; m, m², m³; numbers
+  total) and schedules on sheets (sheet Properties → Place view; any number of sheets; drawn as a table).
 - Revisions (browser → Revisions; Cloud tool; sheet revision schedule) and model groups (Group /
   Ctrl+G; Place copy; Apply to other instances; Ungroup) and detail groups (view drafting).
 - Plugins + scripting console (toolbar Console or `; docs/PLUGINS.md, examples/plugins).

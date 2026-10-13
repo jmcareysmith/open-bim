@@ -13,7 +13,9 @@ import {
   type View,
   type ViewParams,
   type Viewport,
+  type Schedule,
 } from "@open-bim/core";
+import { scheduleTable } from "./schedules.ts";
 import { addLineData, contentBounds, emptyDrawing, loopSegments, transformDrawing, viewDrawing, type Drawing } from "./drawing.ts";
 import type { GeometryKernel } from "./kernel.ts";
 
@@ -61,7 +63,7 @@ export function sheetDrawing(doc: Document, kernel: GeometryKernel, sheet: Sheet
     ...new Set(
       viewportsOn(doc, sheet.id).flatMap((vp) => {
         const v = doc.get<ViewParams>(vp.params.viewId) as View | undefined;
-        return v ? [`1:${effectiveGraphics(doc, v).scale}`] : [];
+        return v?.category === Cat.View ? [`1:${effectiveGraphics(doc, v).scale}`] : [];
       }),
     ),
   ];
@@ -114,9 +116,20 @@ export function sheetDrawing(doc: Document, kernel: GeometryKernel, sheet: Sheet
   }
 
   // Viewports, each with a title: number circle, view name, scale.
-  viewportsOn(doc, sheet.id).forEach((vp, i) => {
-    const view = doc.get<ViewParams>(vp.params.viewId) as View | undefined;
-    if (!view) return;
+  let n = 0;
+  viewportsOn(doc, sheet.id).forEach((vp) => {
+    const target = doc.get(vp.params.viewId);
+    if (target?.category === Cat.Schedule) {
+      // Schedules sit on the sheet as their table (no view title).
+      const d = scheduleOnSheet(doc, target as Schedule, vp.params.centre);
+      out.strokes.push(...d.strokes.map((s) => ({ ...s, id: vp.id })));
+      out.texts.push(...d.texts);
+      out.viewports.push({ id: vp.id, min: d.bounds.min, max: d.bounds.max });
+      return;
+    }
+    const view = target as View | undefined;
+    if (!view || view.category !== Cat.View) return;
+    const i = n++;
     const d = viewportDrawing(doc, kernel, vp);
     out.strokes.push(...d.strokes.map((s) => ({ ...s, id: vp.id })));
     out.fills.push(...d.fills.map((f) => ({ ...f, id: vp.id })));
@@ -133,6 +146,62 @@ export function sheetDrawing(doc: Document, kernel: GeometryKernel, sheet: Sheet
 
   out.bounds = { min: { x: 0, y: 0 }, max: { x: width, y: height } };
   return out;
+}
+
+/** Schedule table text and row heights on paper, mm. */
+const TABLE = { title: 3.5, text: 2.5, row: 5, titleRow: 8, pad: 1.5, charWidth: 0.6 };
+
+/**
+ * A schedule drawn as a table on a sheet (paper mm), centred on `centre`: title row, headings,
+ * then the rows (group headers, subtotals and totals as the schedule computes them).
+ */
+export function scheduleOnSheet(doc: Document, schedule: Schedule, centre: { x: number; y: number }): Drawing {
+  const t = scheduleTable(doc, schedule);
+  const cols = Math.max(1, t.headings.length);
+  const width = (s: string, size: number) => s.length * size * TABLE.charWidth + 2 * TABLE.pad;
+  const colW = Array.from({ length: cols }, (_, c) =>
+    Math.max(15, width(t.headings[c] ?? "", TABLE.text), ...t.rows.map((r) => width(r.cells[c] ?? "", TABLE.text))),
+  );
+  const totalW = Math.max(colW.reduce((a, b) => a + b, 0), width(t.title, TABLE.title));
+  // Stretch the last column if the title is wider than the columns.
+  colW[cols - 1]! += totalW - colW.reduce((a, b) => a + b, 0);
+  const rows = 1 + t.rows.length; // headings + body
+  const totalH = TABLE.titleRow + rows * TABLE.row;
+  const x0 = centre.x - totalW / 2;
+  const y1 = centre.y + totalH / 2;
+  const x1 = x0 + totalW;
+  const y0 = y1 - totalH;
+  const d = emptyDrawing();
+  const outline = [x0, y0, x1, y0, x1, y0, x1, y1, x1, y1, x0, y1, x0, y1, x0, y0];
+  d.strokes.push({ kind: "cut", segments: outline });
+  const grid: number[] = [];
+  let y = y1 - TABLE.titleRow;
+  grid.push(x0, y, x1, y);
+  d.texts.push({ text: t.title.toUpperCase(), x: centre.x, y: y1 - TABLE.titleRow / 2, size: TABLE.title, align: "center" });
+  const rowText = (cells: string[], top: number) => {
+    let x = x0;
+    cells.forEach((c, i) => {
+      if (c) d.texts.push({ text: c, x: x + TABLE.pad, y: top - TABLE.row / 2, size: TABLE.text, align: "left" });
+      x += colW[i] ?? 0;
+    });
+  };
+  rowText(t.headings, y);
+  y -= TABLE.row;
+  grid.push(x0, y, x1, y);
+  for (const r of t.rows) {
+    rowText(r.cells, y);
+    y -= TABLE.row;
+    // Rule under group footers and totals; light rows otherwise.
+    if (r.kind !== "row" || y > y0 + 0.01) grid.push(x0, y, x1, y);
+  }
+  let x = x0;
+  for (let c = 0; c < cols - 1; c++) {
+    x += colW[c]!;
+    grid.push(x, y0, x, y1 - TABLE.titleRow);
+  }
+  d.strokes.push({ kind: "annotation", segments: grid });
+  d.bounds = { min: { x: x0, y: y0 }, max: { x: x1, y: y1 } };
+  return d;
 }
 
 function circle(cx: number, cy: number, r: number): number[] {

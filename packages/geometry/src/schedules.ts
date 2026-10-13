@@ -2,6 +2,8 @@ import {
   AREA_SCHEMES,
   Cat,
   customValue,
+  evaluate,
+  formulaRefs,
   elementKeynote,
   elementMark,
   familyDefs,
@@ -43,7 +45,8 @@ import { areaBoundary, roomBoundary } from "./rooms.ts";
 // Schedule evaluation: a field registry per category, then filter → sort → group/collapse → totals.
 // Values are kept in model units (mm, mm², mm³) until display, so totals are exact.
 
-export type FieldKind = "text" | "count" | "length" | "area" | "volume" | "number";
+/** "total": a number that sums in totals (calculated numbers such as costs). */
+export type FieldKind = "text" | "count" | "length" | "area" | "volume" | "number" | "total";
 
 export interface FieldDef {
   key: string;
@@ -58,7 +61,7 @@ export interface TakeoffLayer {
   thickness: number;
 }
 
-const ADDITIVE = new Set<FieldKind>(["count", "length", "area", "volume"]);
+const ADDITIVE = new Set<FieldKind>(["count", "length", "area", "volume", "total"]);
 
 const nameOf = (doc: Document, id: ElementId | null | undefined) => (id ? (doc.get(id)?.name ?? "") : "");
 
@@ -244,7 +247,40 @@ const TAKEOFF: FieldDef[] = [
 ];
 
 /** Fields available to a schedule: common, the category's own, takeoff fields, and project parameters. */
-export function scheduleFields(doc: Document, s: Pick<Schedule["params"], "category" | "kind">): FieldDef[] {
+/** Model units per SI unit, for calculated fields (mm per m, mm² per m², mm³ per m³). */
+const SI: Partial<Record<FieldKind, number>> = { length: 1e3, area: 1e6, volume: 1e9 };
+
+/** Calculated fields: each formula over the other fields (and earlier calculated ones) by label. */
+function calculatedFields(s: Pick<Schedule["params"], "calculated">, base: FieldDef[]): FieldDef[] {
+  const out: FieldDef[] = [];
+  for (const c of s.calculated ?? []) {
+    const known = [...base, ...out];
+    out.push({
+      key: `calc:${c.name}`,
+      label: c.name,
+      kind: c.type === "number" ? "total" : c.type,
+      get: (doc, el, layer) => {
+        const values: Record<string, number> = {};
+        for (const name of formulaRefs(c.formula, known.map((f) => f.label))) {
+          const f = known.find((x) => x.label === name)!;
+          const v = f.get(doc, el, layer);
+          if (typeof v !== "number") return undefined;
+          values[name] = v / (SI[f.kind] ?? 1);
+        }
+        const r = evaluate(c.formula, values);
+        return Number.isFinite(r) ? r * (SI[c.type] ?? 1) : undefined;
+      },
+    });
+  }
+  return out;
+}
+
+export function scheduleFields(doc: Document, s: Pick<Schedule["params"], "category" | "kind"> & Partial<Pick<Schedule["params"], "calculated">>): FieldDef[] {
+  const base = scheduleBaseFields(doc, s);
+  return [...base, ...calculatedFields(s, base)];
+}
+
+function scheduleBaseFields(doc: Document, s: Pick<Schedule["params"], "category" | "kind">): FieldDef[] {
   const elCat = elementCategory(s.category);
   const own = BY_CATEGORY[elCat] ?? [];
   const common = COMMON.filter((f) => !(f.key === "type" && elCat === Cat.Room) && !(elCat === Cat.Area && ["family", "type", "familyAndType"].includes(f.key)));
@@ -405,6 +441,10 @@ function format(kind: FieldKind, v: CellValue | undefined, units: UnitsSettings)
       return { text: formatArea(v, units), value: units.area.unit === "m2" ? v / 1e6 : v };
     case "volume":
       return { text: `${(v / 1e9).toFixed(2)} m³`, value: Math.round((v / 1e9) * 1000) / 1000 };
+    case "total": {
+      const r = Math.round(v * 100) / 100;
+      return { text: r.toLocaleString("en-NZ", { maximumFractionDigits: 2 }), value: r };
+    }
     default:
       return { text: String(v), value: v };
   }

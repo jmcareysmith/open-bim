@@ -5,6 +5,9 @@ import {
   createDoor,
   createRoom,
   createSchedule,
+  createSheet,
+  placeView,
+  type Sheet,
   createWall,
   tableCsv,
   tableXlsx,
@@ -13,7 +16,7 @@ import {
   type Schedule,
   type Vec2,
 } from "@open-bim/core";
-import { scheduleFields, scheduleTable } from "../src/index.ts";
+import { SimpleKernel, scheduleFields, scheduleTable, sheetDrawing } from "../src/index.ts";
 
 function house() {
   const doc = new Document();
@@ -117,5 +120,57 @@ describe("schedules", () => {
     const { doc } = house();
     doc.transact("P", (tx) => createProjectParameter(tx, doc, "Finish", { categories: ["Room"] }));
     expect(scheduleFields(doc, { category: "Room", kind: "schedule" }).some((f) => f.key === "param:Finish")).toBe(true);
+  });
+});
+
+describe("calculated fields", () => {
+  it("evaluate formulas over other fields in metres and m², and total", () => {
+    const { doc } = house();
+    let s = doc.transact("S", (tx) => createSchedule(tx, doc, "Room", { fields: ["name", "area"] }));
+    s = update(doc, s, {
+      calculated: [
+        { name: "Cost", type: "number", formula: "Area * 2500" },
+        { name: "Area plus 10%", type: "area", formula: "Area * 1.1" },
+        { name: "Cost with GST", type: "number", formula: "Cost * 1.15" },
+      ],
+      fields: ["name", "area", "calc:Cost", "calc:Area plus 10%", "calc:Cost with GST"],
+      grandTotals: true,
+    });
+    const t = scheduleTable(doc, s);
+    expect(t.headings).toEqual(["Name", "Area", "Cost", "Area plus 10%", "Cost with GST"]);
+    const r = t.rows[0]!;
+    const m2 = r.values[1] as number;
+    expect(r.values[2]).toBeCloseTo(m2 * 2500, 1);
+    expect(r.values[3]).toBeCloseTo(m2 * 1.1, 2);
+    expect(r.values[4]).toBeCloseTo(m2 * 2500 * 1.15, 1);
+    const total = t.rows.at(-1)!;
+    expect(total.values[2]).toBeCloseTo((t.rows[0]!.values[2] as number) + (t.rows[1]!.values[2] as number), 1);
+  });
+
+  it("leave a cell blank when the formula can't be worked out", () => {
+    const { doc } = house();
+    let s = doc.transact("S", (tx) => createSchedule(tx, doc, "Room", { fields: ["name"] }));
+    s = update(doc, s, { calculated: [{ name: "Bad", type: "number", formula: "Name * 2" }], fields: ["name", "calc:Bad"] });
+    expect(scheduleTable(doc, s).rows[0]!.cells[1]).toBe("");
+    expect(scheduleFields(doc, s.params).some((f) => f.key === "calc:Bad")).toBe(true);
+  });
+});
+
+describe("schedules on sheets", () => {
+  it("place on several sheets and draw as a table", () => {
+    const { doc } = house();
+    const s = doc.transact("S", (tx) => createSchedule(tx, doc, "Room"));
+    const [a, b] = doc.transact("Sheets", (tx) => [createSheet(tx, doc, { number: "A101" }), createSheet(tx, doc, { number: "A102" })]);
+    doc.transact("Place", (tx) => {
+      placeView(tx, doc, a!.id, s.id, { x: 200, y: 200 });
+      placeView(tx, doc, b!.id, s.id, { x: 200, y: 200 });
+    });
+    const d = sheetDrawing(doc, new SimpleKernel(), doc.require(b!.id) as Sheet);
+    expect(d.texts.some((t) => t.text === "LIVING" || t.text === "Living")).toBe(true);
+    expect(d.texts.some((t) => t.text === (s.name ?? "").toUpperCase())).toBe(true);
+    expect(d.viewports).toHaveLength(1);
+    const box = d.viewports[0]!;
+    expect((box.min.x + box.max.x) / 2).toBeCloseTo(200);
+    expect(box.max.y - box.min.y).toBeCloseTo(8 + 5 * (1 + scheduleTable(doc, s).rows.length));
   });
 });

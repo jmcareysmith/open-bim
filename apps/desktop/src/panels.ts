@@ -225,6 +225,7 @@ import {
   type WallParams,
   floorSlope,
   type Floor,
+  type CalculatedField,
 } from "@open-bim/core";
 
 type Child = Node | string | null | undefined | false;
@@ -697,6 +698,41 @@ function scheduleSections(ctx: PanelContext, s: Schedule): HTMLElement[] {
     );
   }
 
+  // Calculated values: a formula over the other fields by name (lengths in m, areas m², volumes m³).
+  const calc = p.calculated ?? [];
+  const calcSec = h("div", { class: "section" }, h("h3", {}, "Calculated values"));
+  const CALC_TYPES = [
+    { value: "number", label: "Number" },
+    { value: "length", label: "Length (m)" },
+    { value: "area", label: "Area (m²)" },
+    { value: "volume", label: "Volume (m³)" },
+  ];
+  calc.forEach((c, i) => {
+    const key = `calc:${c.name}`;
+    const patch = (q: Partial<CalculatedField>) => {
+      const next = calc.map((x, j) => (j === i ? { ...x, ...q } : x));
+      // Renaming keeps the field in the schedule.
+      const fieldsNext = q.name ? p.fields.map((f) => (f === key ? `calc:${q.name}` : f)) : p.fields;
+      set("Edit calculated value", { calculated: next, fields: fieldsNext });
+    };
+    const rm = h("button", { textContent: "×", title: "Remove" });
+    rm.onclick = () => set("Remove calculated value", { calculated: calc.filter((_, j) => j !== i), fields: p.fields.filter((f) => f !== key) });
+    const formula = textInput(c.formula, (v) => patch({ formula: v }));
+    formula.title = `Formula over fields by name, e.g. ${all.find((f) => f.kind === "area")?.label ?? "Area"} * 2500. Lengths in m, areas m².`;
+    calcSec.append(
+      h("div", { class: "buttons wrap" }, textInput(c.name, (v) => v.trim() && !calc.some((x, j) => j !== i && x.name === v.trim()) && patch({ name: v.trim() })), select(CALC_TYPES, c.type, (v) => patch({ type: v as CalculatedField["type"] })), rm),
+      row("Formula", formula),
+    );
+  });
+  const addCalc = h("button", { textContent: "Add calculated value" });
+  addCalc.onclick = () => {
+    let name = "Calculated";
+    for (let i = 2; calc.some((c) => c.name === name) || all.some((f) => f.label === name); i++) name = `Calculated ${i}`;
+    const first = all.find((f) => f.kind === "area" || f.kind === "length" || f.kind === "count");
+    set("Add calculated value", { calculated: [...calc, { name, type: "number", formula: first ? `${first.label} * 1` : "1" }], fields: [...p.fields, `calc:${name}`] });
+  };
+  calcSec.append(row("", addCalc));
+
   const filters = h("div", { class: "section" }, h("h3", {}, "Filter"));
   p.filters.forEach((f, i) => {
     const patch = (q: Partial<typeof f>) => set("Change filter", { filters: p.filters.map((x, j) => (j === i ? { ...x, ...q } : x)) });
@@ -736,7 +772,7 @@ function scheduleSections(ctx: PanelContext, s: Schedule): HTMLElement[] {
   const addSort = h("button", { textContent: "Add sort level" });
   addSort.onclick = () => set("Add sort", { sort: [...p.sort, { field: p.fields[0] ?? all[0]!.key, descending: false, header: false, footer: false }] });
   sorting.append(row("", addSort));
-  return [general, fields, filters, sorting, h("div", { class: "section" }, del)];
+  return [general, fields, calcSec, filters, sorting, h("div", { class: "section" }, del)];
 }
 
 /** The schedule's table, filling the viewport area (click a row to select its elements). */
@@ -1124,8 +1160,11 @@ function sheetSection(ctx: PanelContext, sheet: Element<SheetParams>): HTMLEleme
       sec.append(h("label", { class: "check", title: clouded ? "Clouded on this sheet" : "" }, cb, `${revisionNumber(doc, r)}  ${r.params.description}`));
     }
   }
-  // Views not yet on a sheet can be placed.
-  const placeable = viewElements(doc).filter((v) => v.params.kind !== "3d" && !sheetOfView(doc, v.id));
+  // Views not yet on a sheet can be placed; schedules can go on any number of sheets.
+  const placeable: { id: ElementId; name?: string }[] = [
+    ...viewElements(doc).filter((v) => v.params.kind !== "3d" && !sheetOfView(doc, v.id)),
+    ...doc.byCategory(Cat.Schedule).map((x) => ({ id: x.id, name: `${x.name ?? "Schedule"} (schedule)` })),
+  ];
   if (placeable.length) {
     sec.append(
       row(

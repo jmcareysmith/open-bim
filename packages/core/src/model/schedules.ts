@@ -30,8 +30,17 @@ export type ScheduleParams = {
   /** Every element on its own row; when false, rows with equal sort keys collapse into one. */
   itemize: boolean;
   grandTotals: boolean;
+  /** Calculated fields (Revit's Calculated Value): add `calc:<name>` to `fields` to show one. */
+  calculated?: CalculatedField[] | null;
 };
 export type Schedule = Element<ScheduleParams>;
+
+/**
+ * A calculated field: a formula over the schedule's other fields by name (e.g. "Area * 45").
+ * Lengths go in as metres, areas as m² and volumes as m³; the result is read the same way for
+ * its type (a "length" result is metres), and a "number" result is shown as is.
+ */
+export type CalculatedField = { name: string; type: "number" | "length" | "area" | "volume"; formula: string };
 
 registerCategory({ name: Cat.Schedule, dependencies: () => [], cascadeDelete: false, isType: false });
 

@@ -14,7 +14,7 @@ import {
   type Wall,
   type WallParams,
 } from "./architecture.ts";
-import { roofBaseElevation, roofHeightAt, roofPlanes, type Roof, type RoofPlane } from "./roofs.ts";
+import { extrusionHeightAt, roofBaseElevation, roofHeightAt, roofPlanes, type Roof, type RoofPlane } from "./roofs.ts";
 
 // Wall attach (Revit: Attach Top/Base). A wall's top can attach to a roof (following the roof's
 // underside, slopes and all), a floor or a ceiling above (their underside); its base can attach to
@@ -36,7 +36,14 @@ const target = (doc: Document, id: ElementId | null | undefined): Element | unde
 export function attachedTopAt(doc: Document, wall: Wall, p: Vec2): number | null {
   const t = target(doc, wall.params.topAttachId);
   if (!t) return null;
-  if (t.category === Cat.Roof) return roofBaseElevation(doc, t as Roof) + roofHeightAt(planesOf(t as Roof), p);
+  if (t.category === Cat.Roof) {
+    const e = (t as Roof).params.extrusion;
+    if (e) {
+      const h = extrusionHeightAt(e, p);
+      return h === null ? null : roofBaseElevation(doc, t as Roof) + h;
+    }
+    return roofBaseElevation(doc, t as Roof) + roofHeightAt(planesOf(t as Roof), p);
+  }
   if (t.category === Cat.Floor) return floorTopAt(doc, t as Floor, p) - floorThickness(doc, t as Floor);
   if (t.category === Cat.Ceiling) return ceilingExtent(doc, t as Ceiling).bottom;
   return null;

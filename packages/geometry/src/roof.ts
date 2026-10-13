@@ -1,6 +1,8 @@
 import earcut from "earcut";
 import {
   planeHeight,
+  ROOF_TRIM_PROFILES,
+  roofEaves,
   roofBaseElevation,
   roofPlaneAt,
   roofPlanes,
@@ -13,6 +15,8 @@ import {
   type Vec2,
 } from "@open-bim/core";
 import { signedArea, type MeshData } from "./mesh.ts";
+import { mergeMeshes } from "./doors.ts";
+import { profilePrism } from "./sweeps.ts";
 
 /** A convex piece of the footprint lying on a single roof plane (null = flat). */
 export interface RoofCell {
@@ -119,6 +123,49 @@ export function buildRoof(doc: Document, el: Element): MeshData | null {
   const t = totalThickness(doc.require<LayeredTypeParams>(roof.typeId));
   if (t <= 0) return null;
   const base = roofBaseElevation(doc, roof);
+  const e = roof.params.extrusion;
+  // Roof by Extrusion: the profile (underside) and the same line `t` higher, swept square to it.
+  const body = e ? profilePrism([...e.profile, ...[...e.profile].reverse().map((q) => ({ x: q.x, y: q.y + t }))], e.origin, { x: -e.dir.y, y: e.dir.x }, e.dir, base, e.start, e.end) : footprintRoofBody(roof, base, t);
+  const trims = roofTrimMeshes(roof, base, t);
+  return trims.length ? mergeMeshes([body, ...trims]) : body;
+}
+
+/** Fascia, gutter and soffit along each eave, merged with the roof. */
+export function roofTrimMeshes(roof: Roof, base: number, t: number): MeshData[] {
+  const tr = roof.params.trims;
+  if (!tr || (!tr.fascia && !tr.gutter && !tr.soffit)) return [];
+  const fascia = tr.fascia ? ROOF_TRIM_PROFILES[tr.fascia]?.points : undefined;
+  const gutter = tr.gutter ? ROOF_TRIM_PROFILES[tr.gutter]?.points : undefined;
+  const fT = fascia ? Math.max(...fascia.map((q) => q.x)) : 0;
+  const fD = fascia ? -Math.min(...fascia.map((q) => q.y)) : t;
+  const out: MeshData[] = [];
+  for (const eave of roofEaves(roof)) {
+    const len = Math.hypot(eave.b.x - eave.a.x, eave.b.y - eave.a.y);
+    if (len < 1) continue;
+    const d = { x: (eave.b.x - eave.a.x) / len, y: (eave.b.y - eave.a.y) / len };
+    const top = base + eave.z + t;
+    // Each runs a little past the corner so neighbouring eaves meet.
+    if (fascia) out.push(profilePrism(fascia, eave.a, d, eave.out, top, -fT, len + fT));
+    if (gutter) {
+      const g = gutter.map((q) => ({ x: q.x + fT, y: q.y }));
+      const gx = Math.max(...g.map((q) => q.x));
+      out.push(profilePrism(g, eave.a, d, eave.out, top, -gx, len + gx));
+    }
+    if (tr.soffit && tr.soffit > 0) {
+      const s = [
+        { x: -tr.soffit, y: -fD },
+        { x: 0, y: -fD },
+        { x: 0, y: -fD + 10 },
+        { x: -tr.soffit, y: -fD + 10 },
+      ];
+      out.push(profilePrism(s, eave.a, d, eave.out, top, 0, len));
+    }
+  }
+  return out;
+}
+
+/** A footprint roof's solid: its sloped surface lifted by the thickness, closed round the edge. */
+function footprintRoofBody(roof: Roof, base: number, t: number): MeshData {
   const { boundary, slopes } = roof.params;
   const cells = roofCells(boundary, roofPlanes(boundary, slopes));
 

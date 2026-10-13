@@ -113,7 +113,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Wall sweeps and reveals; edit wall profile
 - [x] Stairs: L- and U-shaped runs with landings, winders
 - [x] Curtain walls: add/remove grid lines, mullion types, panel swaps (doors, solid panels)
-- [ ] Roofs by extrusion; fascias, gutters and soffits
+- [x] Roofs by extrusion; fascias, gutters and soffits
 - [ ] Dimensions in sections/elevations, temporary dimensions while placing, spot elevations
 - [ ] Room colour schemes with colour fill legends
 - [ ] Floor shape editing (points, falls to drains), slab edges

@@ -138,6 +138,7 @@ import {
   StairTool,
   ColumnTool,
   BeamTool,
+  ExtrusionRoofTool,
   FootingTool,
   DemolishTool,
   RailingTool,
@@ -228,6 +229,7 @@ const TOOL_TYPES: Record<string, string> = {
   floor: Cat.FloorType,
   ceiling: Cat.CeilingType,
   roof: Cat.RoofType,
+  roofextrusion: Cat.RoofType,
   door: Cat.DoorType,
   window: Cat.WindowType,
   stair: Cat.StairType,
@@ -509,6 +511,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   "face-wall": new FaceTool(ctx, "wall"),
   "face-curtain": new FaceTool(ctx, "curtain"),
   "face-roof": new FaceTool(ctx, "roof"),
+  roofextrusion: new ExtrusionRoofTool(ctx),
   "face-floor": new FaceTool(ctx, "floor"),
   duct: new RunTool(ctx, "duct"),
   pipe: new RunTool(ctx, "pipe"),
@@ -622,6 +625,7 @@ let ribbon: Ribbon | undefined = new Ribbon(
         (tools.symbol as SymbolTool).kind = kind;
         setTool("symbol");
       },
+      tool: (name) => setTool(name),
     },
     voidToggle,
   ),

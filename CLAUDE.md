@@ -235,4 +235,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Sweeps and reveals (built-in profiles: skirting, chair rail, cornice, plinth, band; reveals cut by OCCT);
   sweeps run the joined face and stop at openings. Edit Profile: wall Properties → Profile (Gable, Step,
   Points; `profile` in wall coords) — no elevation sketch mode yet.
+- Roof ▾ → Roof by Extrusion (two corners in plan; profile across the shorter side; Properties: Gable/Mono/
+  Curved or points, extrusion start/end; walls attach to it). Roof Properties → Eaves: fascia, gutter (quad/
+  half round), soffit depth (`trims`; core `roofEaves`, geometry `roofTrimMeshes`, `profilePrism`).
 - Next (Jeremy, 2026-10-14): Phase 8b — Revit look & architectural parity, before the rest of 8.

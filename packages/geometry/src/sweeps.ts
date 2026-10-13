@@ -117,3 +117,36 @@ export function wallProfileMesh(doc: Document, wall: Wall): MeshData | null {
   }
   return m;
 }
+
+/**
+ * A profile drawn in (x, y) extruded along a plan line: world = origin + along·u + across·x,
+ * z = z0 + y, for u from u0 to u1. Used for roof trims and extrusion roofs.
+ */
+export function profilePrism(profile: Vec2[], origin: Vec2, along: Vec2, across: Vec2, z0: number, u0: number, u1: number): MeshData {
+  const m = extrudePolygon(profile, [], u0, u1);
+  const P = m.positions;
+  const N = m.normals;
+  for (let i = 0; i < P.length; i += 3) {
+    const x = P[i]!;
+    const y = P[i + 1]!;
+    const u = P[i + 2]!;
+    P[i] = origin.x + across.x * x + along.x * u;
+    P[i + 1] = origin.y + across.y * x + along.y * u;
+    P[i + 2] = z0 + y;
+    const nx = N[i]!;
+    const ny = N[i + 1]!;
+    const nu = N[i + 2]!;
+    N[i] = across.x * nx + along.x * nu;
+    N[i + 1] = across.y * nx + along.y * nu;
+    N[i + 2] = ny;
+  }
+  // (x, y, u) → (across, up, along) mirrors when across · (up × along) < 0: swap the winding back.
+  const det = across.x * -along.y + across.y * along.x;
+  if (det < 0)
+    for (let t = 0; t < m.indices.length; t += 3) {
+      const k = m.indices[t + 1]!;
+      m.indices[t + 1] = m.indices[t + 2]!;
+      m.indices[t + 2] = k;
+    }
+  return m;
+}

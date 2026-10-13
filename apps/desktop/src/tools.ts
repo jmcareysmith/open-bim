@@ -74,6 +74,7 @@ import {
   ensureStructuralTypes,
   createToposolid,
   createStair,
+  createExtrusionRoof,
   ensureStairType,
   createRamp,
   ensureRampType,
@@ -1229,6 +1230,66 @@ export class BeamTool implements Tool {
       this.start = p;
     } catch (err) {
       this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
+  }
+
+  key(ev: KeyboardEvent): boolean {
+    if (ev.key === "Escape" && this.start) {
+      this.start = null;
+      this.ctx.viewport.setPreviewLines(null);
+      return true;
+    }
+    return false;
+  }
+}
+
+/** Roof by Extrusion: click two opposite corners of the roof's plan rectangle (a gable across the shorter side). */
+export class ExtrusionRoofTool implements Tool {
+  readonly name = "roofextrusion";
+  private start: Vec2 | null = null;
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.start = null;
+    this.ctx.status("Roof by Extrusion: click two opposite corners. The profile (25° gable) runs across the shorter side; change it in Properties.");
+  }
+
+  deactivate(): void {
+    this.start = null;
+    this.ctx.viewport.setPreviewLines(null);
+  }
+
+  pointerMove(ev: PointerEvent): void {
+    const p = viewPoint(this.ctx, ev, null);
+    const a = this.start;
+    if (!p || !a) return this.ctx.viewport.setPreviewLines(null);
+    const q = [a, { x: p.x, y: a.y }, p, { x: a.x, y: p.y }];
+    const seg: number[] = [];
+    q.forEach((c, i) => {
+      const d = q[(i + 1) % 4]!;
+      seg.push(c.x, c.y, 0, d.x, d.y, 0);
+    });
+    this.ctx.viewport.setPreviewLines({ segments: new Float32Array(seg), labels: [] });
+  }
+
+  click(ev: PointerEvent): void {
+    const p = viewPoint(this.ctx, ev, null);
+    if (!p) return;
+    if (!this.start) {
+      this.start = p;
+      return;
+    }
+    const { doc } = this.ctx;
+    const a = this.start;
+    try {
+      const typeId = this.ctx.activeTypeId(Cat.RoofType);
+      if (!typeId) throw new Error("No roof types in this project");
+      const r = doc.transact("Create extrusion roof", (tx) => createExtrusionRoof(tx, typeId, this.ctx.activeLevelId(), a, p));
+      this.start = null;
+      this.ctx.viewport.setPreviewLines(null);
+      this.ctx.setSelection([r.id]);
+    } catch (err) {
+      this.ctx.status(`⚠ ${(err as Error).message}`);
     }
   }
 

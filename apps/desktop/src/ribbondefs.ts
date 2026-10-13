@@ -10,6 +10,7 @@ export interface RibbonMenus {
   newSchedule(category: string, kind: "schedule" | "takeoff"): void;
   cmd(name: string): void;
   placeSymbol(kind: SymbolKind): void;
+  tool(name: string): void;
   detailFamilies(): { id: string; name: string }[];
   libraryDetailItems(): string[];
   placeDetail(familyId: string): void;
@@ -89,7 +90,16 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
             { label: "Door", icon: "door", tool: "door", large: true, title: "Door (D)" },
             { label: "Window", icon: "window", tool: "window", large: true, title: "Window (N)" },
             { label: "Component", icon: "component", tool: "component", large: true, title: "Place a loaded family (C)", menu: libraryMenu },
-            { label: "Roof", icon: "roof", tool: "roof", title: "Roof by footprint" },
+            {
+              label: "Roof",
+              icon: "roof",
+              tool: "roof",
+              title: "Roof by Footprint (▾: Roof by Extrusion)",
+              menu: () => [
+                { label: "Roof by Footprint", action: () => m.tool("roof") },
+                { label: "Roof by Extrusion", action: () => m.tool("roofextrusion") },
+              ],
+            },
             { label: "Ceiling", icon: "ceiling", tool: "ceiling" },
             { label: "Floor", icon: "floor", tool: "floor" },
             { label: "Column", icon: "column", tool: "column", title: "Column" },

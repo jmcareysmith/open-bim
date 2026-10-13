@@ -177,6 +177,12 @@ import {
   layerMaterial,
   PATTERNS,
   setWallSweeps,
+  setRoofExtrusion,
+  extrusionProfile,
+  trimProfileNames,
+  DEFAULT_ROOF_SLOPE,
+  type RoofExtrusion,
+  type RoofTrims,
   setCurtainEdits,
   curtainOf,
   type CurtainEdits,
@@ -505,6 +511,69 @@ function curtainRows(ctx: PanelContext, w: Wall): HTMLElement[] {
     reset.onclick = () => save(null, "Reset curtain wall");
     out.push(row("", reset));
   }
+  return out;
+}
+
+/** Fascia, gutter and soffit along a roof's eaves. */
+function roofTrimRows(ctx: PanelContext, r: Roof): HTMLElement[] {
+  const tr = r.params.trims ?? {};
+  const set = (patch: Partial<RoofTrims>, name: string) => edit(ctx, name, (tx) => tx.update<RoofParams>(r.id, { trims: { ...tr, ...patch } }));
+  const opts = (kind: "fascia" | "gutter") => [{ value: "", label: "<None>" }, ...trimProfileNames(kind).map((n) => ({ value: n, label: n }))];
+  return [
+    h("div", { class: "subhead" }, "Eaves"),
+    row("Fascia", select(opts("fascia"), tr.fascia ?? "", (v) => set({ fascia: v || null }, "Roof fascia"))),
+    row("Gutter", select(opts("gutter"), tr.gutter ?? "", (v) => set({ gutter: v || null }, "Roof gutter"))),
+    row("Soffit depth (0 = none)", numberInput(tr.soffit ?? 0, (v) => set({ soffit: v > 0 ? v : null }, "Roof soffit"))),
+  ];
+}
+
+/** Roof by Extrusion: profile presets, its points (along the profile line, up from the base) and its extent. */
+function extrusionRoofRows(ctx: PanelContext, r: Roof): HTMLElement[] {
+  const { doc } = ctx;
+  const e = r.params.extrusion!;
+  const save = (next: RoofExtrusion, name = "Edit extrusion roof") => edit(ctx, name, (tx) => setRoofExtrusion(tx, doc, r.id, next));
+  const x0 = e.profile[0]!.x;
+  const width = e.profile[e.profile.length - 1]!.x - x0;
+  const shift = (pts: { x: number; y: number }[]) => pts.map((q) => ({ x: q.x + x0, y: q.y }));
+  const btn = (label: string, title: string, fn: () => void) => {
+    const b = h("button", { textContent: label, title });
+    b.onclick = fn;
+    return b;
+  };
+  const out: HTMLElement[] = [
+    h("div", { class: "subhead" }, "Extrusion profile"),
+    row(
+      "Shape",
+      h(
+        "div",
+        { class: "buttons wrap" },
+        btn("Gable 25\u00b0", "Gable across the profile's width at 25\u00b0", () => save({ ...e, profile: shift(extrusionProfile("gable", width, DEFAULT_ROOF_SLOPE)) }, "Gable profile")),
+        btn("Mono 10\u00b0", "Mono-pitch at 10\u00b0", () => save({ ...e, profile: shift(extrusionProfile("mono", width, (10 * Math.PI) / 180)) }, "Mono-pitch profile")),
+        btn("Curved", "Curved, rising a sixth of the width", () => save({ ...e, profile: shift(extrusionProfile("curved", width, width / 6)) }, "Curved profile")),
+      ),
+    ),
+  ];
+  // Points: along the profile line and up from the base. Curves have many; show them all.
+  e.profile.forEach((q, i) => {
+    const put = (patch: Partial<Vec2>) => save({ ...e, profile: e.profile.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+    const rm = h("button", { textContent: "\u00d7", class: "mini", title: "Remove point" });
+    rm.onclick = () => save({ ...e, profile: e.profile.filter((_, j) => j !== i) });
+    out.push(row(`Point ${i + 1}`, h("div", { class: "buttons wrap" }, numberInput(q.x, (v) => put({ x: v })), numberInput(q.y, (v) => put({ y: v })), ...(e.profile.length > 2 ? [rm] : []))));
+  });
+  out.push(
+    row(
+      "",
+      btn("Add point", "Insert a point halfway along the longest segment", () => {
+        let k = 0;
+        for (let i = 1; i + 1 < e.profile.length; i++) if (e.profile[i + 1]!.x - e.profile[i]!.x > e.profile[k + 1]!.x - e.profile[k]!.x) k = i;
+        const a = e.profile[k]!;
+        const b = e.profile[k + 1]!;
+        save({ ...e, profile: [...e.profile.slice(0, k + 1), { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, ...e.profile.slice(k + 1)] });
+      }),
+    ),
+    row("Extrusion start", numberInput(e.start, (v) => save({ ...e, start: v }, "Extrusion start"))),
+    row("Extrusion end", numberInput(e.end, (v) => save({ ...e, end: v }, "Extrusion end"))),
+  );
   return out;
 }
 
@@ -3046,6 +3115,13 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Base level", select(levelOpts, p.levelId, (v) => update<RoofParams>("Change roof level", { levelId: v }))),
         row("Base offset", numberInput(p.baseOffset, (v) => update<RoofParams>("Change roof offset", { baseOffset: v }))),
         row("Base elevation", len(roofBaseElevation(doc, r))),
+      );
+      sec.append(...roofTrimRows(ctx, r));
+      if (p.extrusion) {
+        sec.append(...extrusionRoofRows(ctx, r));
+        break;
+      }
+      sec.append(
         row(
           `Slope, all sloped edges (${units.angle.unit === "deg" ? "°" : "rad"})`,
           slopeInput(sloped.length ? sloped[0]! : null, (v) => v !== null && setSlopes(p.slopes.map((s) => (s === null ? null : v)))),

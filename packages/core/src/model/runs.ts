@@ -217,7 +217,7 @@ export function fittingTrim(doc: Document, f: Fitting, runId: ElementId): number
     case "elbow":
       return own; // centreline radius ≈ the size
     case "transition":
-      return Math.max(kind?.category === Cat.Pipe ? 25 : 75, Math.abs(sizes[0]! - sizes[1]!)); // ~30° taper each side
+      return Math.max(kind?.category === Cat.Pipe || kind?.category === Cat.Conduit ? 25 : 75, Math.abs(sizes[0]! - sizes[1]!)); // ~30° taper each side
     case "tee":
     case "cross":
       return i < 2 || f.params.kind === "cross" ? max / 2 + Math.min(50, max / 2) : max / 2 + Math.min(25, max / 4);

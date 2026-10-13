@@ -157,6 +157,8 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
             { label: "Switchboard", icon: "component", cmd: "placeSwitchboard", title: "Place a switchboard (circuits are fed from it)" },
             { label: "Device", icon: "component", cmd: "placeElectricalFixture", title: "Place power outlets and switches" },
             { label: "Lighting Fixture", icon: "component", cmd: "placeLightingFixture", title: "Place light fittings (at ceiling height)" },
+            { label: "Cable Tray", icon: "duct", tool: "tray", title: "Cable Tray: route runs; bends and tees are automatic (CT)" },
+            { label: "Conduit", icon: "pipe", tool: "conduit", title: "Conduit: route runs; bends and tees are automatic (CN)" },
           ],
         },
         {

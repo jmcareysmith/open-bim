@@ -19,6 +19,10 @@ import { MeshBuilder, type MeshData } from "./mesh.ts";
 // it; elbows and transitions sweep a section along a curve through the joint (blending size and
 // shape), tees and crosses are stubs from the joint to each duct.
 
+/** Run categories (ducts, pipes, cable trays, conduit) and their fittings. */
+const RUN_CATEGORIES = new Set<string>([Cat.Duct, Cat.Pipe, Cat.CableTray, Cat.Conduit]);
+const FITTING_CATEGORIES = new Set<string>([Cat.DuctFitting, Cat.PipeFitting, Cat.CableTrayFitting, Cat.ConduitFitting]);
+
 /** Points round a section (round or rectangular), the same count either way so they can blend. */
 const RING = 24;
 
@@ -102,7 +106,8 @@ function tube(m: MeshBuilder, rings: P3[][]): void {
 
 function section(doc: Document, d: Duct): Section {
   // Pipes are round at their nominal size.
-  if (d.category === Cat.Pipe) return { shape: "round", d: d.params.diameter, w: 0, h: 0 };
+  if (d.category === Cat.Pipe || d.category === Cat.Conduit) return { shape: "round", d: d.params.diameter, w: 0, h: 0 };
+  if (d.category === Cat.CableTray) return { shape: "rectangular", d: 0, w: d.params.width, h: d.params.height };
   return { shape: ductShape(doc, d), d: d.params.diameter, w: d.params.width, h: d.params.height };
 }
 
@@ -145,7 +150,7 @@ function fittingTubes(doc: Document, f: DuctFitting): P3[][][] | null {
   const J = f.params.point;
   const ends = f.params.ends.flatMap((e) => {
     const d = doc.get(e.ductId) as Duct | undefined;
-    if (!d || (d.category !== Cat.Duct && d.category !== Cat.Pipe)) return [];
+    if (!d || !RUN_CATEGORIES.has(d.category)) return [];
     const inward = ductInward(doc, d, e.end);
     return [{ s: section(doc, d), inward, p: add(J, mul(inward, fittingTrim(doc, f, d.id))) }];
   });
@@ -232,7 +237,7 @@ export function buildDuctFittingLines(doc: Document, el: Element): LineData | nu
 
 /** The level whose plans show a duct's, pipe's or fitting's outline. */
 export function ductPlanLevel(doc: Document, el: Element): string | undefined {
-  if (el.category === Cat.Duct || el.category === Cat.Pipe) return (el as Duct).params.levelId;
-  if (el.category === Cat.DuctFitting || el.category === Cat.PipeFitting) return (doc.get((el as DuctFitting).params.ends[0]?.ductId ?? "") as Duct | undefined)?.params.levelId;
+  if (RUN_CATEGORIES.has(el.category)) return (el as Duct).params.levelId;
+  if (FITTING_CATEGORIES.has(el.category)) return (doc.get((el as DuctFitting).params.ends[0]?.ductId ?? "") as Duct | undefined)?.params.levelId;
   return undefined;
 }

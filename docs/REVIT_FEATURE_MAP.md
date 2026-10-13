@@ -62,7 +62,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 |---|---|---|
 | Ducts, pipes, fittings, routing | 8 | 🟨 (ducts: round/rect, auto elbows/tees/transitions/crosses, risers, sizing by velocity; pipes: DN sizes, materials, drainage falls, auto fittings) |
 | Systems (supply, return, sanitary…) | 8 | ✅ (connectors in families; systems with flow/load totals; system browser) |
-| Electrical circuits, panels, cable trays, conduit | 8 | 🟨 (circuits on switchboards, schedules with loads; tray/conduit next) |
+| Electrical circuits, panels, cable trays, conduit | 8 | ✅ (circuits on switchboards, schedules with loads; cable tray and conduit with fittings) |
 | Fixtures & equipment | 8 | 🟨 (MEP family categories with connectors; HVAC library: diffusers, grilles, exhaust fan, heat pump units) |
 | Sizing & pressure-loss calcs | 9 | ⬜ |
 

@@ -280,6 +280,10 @@ import {
   panelSchedule,
   SUPPLY_VOLTAGE,
   type CircuitParams,
+  CONDUIT_SIZES,
+  containmentLength,
+  type CableTray,
+  type Conduit,
 } from "@open-bim/core";
 
 type Child = Node | string | null | undefined | false;
@@ -2887,6 +2891,24 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       );
       break;
     }
+    case Cat.CableTray:
+    case Cat.Conduit: {
+      const r = el as CableTray & Conduit;
+      const p = r.params;
+      const tray = el.category === Cat.CableTray;
+      const set = (name: string, patch: Record<string, unknown>) => update(name, patch as never);
+      sec.append(
+        ...(tray
+          ? [row("Width", numberInput(p.width, (v) => set("Tray width", { width: Math.max(25, v) }))), row("Depth", numberInput(p.height, (v) => set("Tray depth", { height: Math.max(25, v) })))]
+          : [row("Size", select(CONDUIT_SIZES.map((d) => ({ value: String(d), label: `${d} mm` })), String(p.diameter), (v) => set("Conduit size", { diameter: Number(v) })))]),
+        row("Start elevation", numberInput(p.start.z, (v) => set("Start elevation", { start: { ...p.start, z: v } }))),
+        row("End elevation", numberInput(p.end.z, (v) => set("End elevation", { end: { ...p.end, z: v } }))),
+        row("Length", len(containmentLength(r))),
+      );
+      break;
+    }
+    case Cat.CableTrayFitting:
+    case Cat.ConduitFitting:
     case Cat.PipeFitting:
     case Cat.DuctFitting: {
       const f = el.params as DuctFittingParams;

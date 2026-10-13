@@ -112,7 +112,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Mechanical equipment and air terminals (library families with connectors)
 - [x] Plumbing fixtures and drainage; G13/AS1 discharge units, pipe size and fall checks
 - [x] Electrical: fixtures and devices, circuits, switchboard schedules with load totals
-- [ ] Cable tray and conduit
+- [x] Cable tray and conduit
 - [ ] MEP display (single-line at Coarse, plan symbols), MEP in schedules and clash checks
 - [ ] Visual programming engine: node graphs with incremental re-run, saved in the project
 - [ ] Node editor and node library (selection, parameters, geometry, maths/lists, element creation)

@@ -85,6 +85,12 @@ export const Cat = {
   BuildingPad: "BuildingPad",
   SiteSubregion: "SiteSubregion",
   PropertyLine: "PropertyLine",
+  CableTrayType: "CableTrayType",
+  CableTray: "CableTray",
+  CableTrayFitting: "CableTrayFitting",
+  ConduitType: "ConduitType",
+  Conduit: "Conduit",
+  ConduitFitting: "ConduitFitting",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

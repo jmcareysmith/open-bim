@@ -209,4 +209,6 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   LED Downlight, Switchboard - Residential; Systems → Switchboard / Device / Lighting Fixture.
   Select fixtures → right-click → Create power/lighting circuit on <board> (numbered, breaker 20/10 A);
   board Properties → Switchboard schedule (load W, current at 230 V, breaker check, connected load).
-- Next: Phase 8 — cable tray and conduit.
+- Cable tray (CT) and conduit (CN): Systems → Electrical; runs with automatic fittings like ducts
+  (core/model/containment.ts; ContainmentTool). Width/depth or size + middle elevation.
+- Next: Phase 8 — MEP display (single-line at Coarse, plan symbols), MEP in schedules and clashes.

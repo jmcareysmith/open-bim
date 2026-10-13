@@ -1,3 +1,4 @@
+import { ContainmentTool } from "./containtool.ts";
 import { FaceTool } from "./facetool.ts";
 import { MANAGE_SECTIONS, projectSection } from "./panels.ts";
 import { openMaterialBrowser } from "./materialbrowser.ts";
@@ -509,6 +510,8 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   "face-floor": new FaceTool(ctx, "floor"),
   duct: new RunTool(ctx, "duct"),
   pipe: new RunTool(ctx, "pipe"),
+  tray: new ContainmentTool(ctx, "tray"),
+  conduit: new ContainmentTool(ctx, "conduit"),
   camera: new CameraTool(ctx, (id) => {
     setTool("select");
     ctx.setActiveView(id);

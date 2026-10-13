@@ -167,6 +167,8 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
     const lines = kernel.buildLines(doc, el, g.scale);
     if (!lines) continue;
     if (lines.planOnly && section) continue;
+    // Beam symbols belong to plans of the beam's level.
+    if (el.category === Cat.Beam && (view.params as ViewParams).levelId !== (el.params as { levelId?: string }).levelId) continue;
     const r = elementGraphics(doc, g, el);
     addLineData(out, lines, owner ? "annotation" : el.category === Cat.Grid || el.category === Cat.ReferencePlane ? "datum" : "symbol", lineStyle(r, r.projection, el.id));
   }

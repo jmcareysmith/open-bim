@@ -22,6 +22,19 @@ function setup() {
 }
 
 describe("structure", () => {
+  it("beams show as a dashed centreline in plans of their level only", () => {
+    const { doc, ids, byName } = setup();
+    const b = doc.transact("B", (tx) => createBeam(tx, doc, byName("Steel 200UB25"), ids.levels.first, { x: 0, y: 0 }, { x: 0, y: 5000 }));
+    const k = new SimpleKernel();
+    const lines = k.buildLines(doc, b)!;
+    expect(lines.dashed).toBe(true);
+    expect(lines.segments[2]).toBeCloseTo(2701);
+    const first = viewDrawing(doc, k, floorPlanFor(doc, ids.levels.first)!).strokes.filter((s) => s.id === b.id && s.dashed);
+    expect(first).toHaveLength(1);
+    expect(first[0]!.segments).toEqual([0, 0, 0, 5000]);
+    expect(viewDrawing(doc, k, floorPlanFor(doc, ids.levels.ground)!).strokes.some((s) => s.id === b.id && s.dashed)).toBe(false);
+  });
+
   it("columns extrude their section between levels and cut in plan", () => {
     const { doc, ids, byName } = setup();
     const c = doc.transact("C", (tx) => createColumn(tx, doc, byName("Steel SHS 100x100x4"), ids.levels.ground, ids.levels.first, { x: 1000, y: 1000 }));

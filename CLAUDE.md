@@ -137,7 +137,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Stacked walls: browser Types → New stacked wall type (segments in its properties).
 - Toposolids: Toposolid tool (sketch boundary) + Import survey CSV (E,N,RL m) in Properties; contours.
 - Structure: Column / Beam / Footing tools; sections (NZ timber/steel/concrete) as Structural types.
-  Beams only show in plans where the view range cuts them (no dashed beam symbols yet).
+  Beams show a dashed centreline in plans of their level (plus their cut where the view range cuts them).
 - Phasing (view Phase / Phase filter; element Phase created/demolished; Demolish tool), design options
   (browser → Design Options; element Design option; per-view option), Clashes panel (OCCT volumes).
 - Multi-user editing (Phase 7): toolbar Collaborate → Share this project / Join, via the sync server

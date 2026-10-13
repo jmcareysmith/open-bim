@@ -1,3 +1,4 @@
+import type { LineData } from "./datums.ts";
 import {
   columnExtent,
   sectionProfile,
@@ -70,6 +71,17 @@ export function buildBeam(doc: Document, el: Element): MeshData | null {
   // Section hangs below the top: shift so its top edge is at 0.
   const shift = (q: Vec2) => ({ x: q.x, y: q.y - s.d / 2 });
   return extrudeAlong(outer.map(shift), holes.map((h) => h.map(shift)), p.start, dir, len, zTop);
+}
+
+/**
+ * Beam plan symbol: a dashed centreline at its level (Revit's structural framing in plan at
+ * Coarse/Medium), drawn just above the level so plans of that level show it below their cut.
+ */
+export function buildBeamLines(doc: Document, el: Element): LineData | null {
+  const p = el.params as BeamParams;
+  if (Math.hypot(p.end.x - p.start.x, p.end.y - p.start.y) < 1) return null;
+  const z = (doc.get<LevelParams>(p.levelId)?.params.elevation ?? 0) + 1;
+  return { segments: new Float32Array([p.start.x, p.start.y, z, p.end.x, p.end.y, z]), labels: [], dashed: true, planOnly: true, placement: "model" };
 }
 
 export function buildPadFooting(doc: Document, el: Element): MeshData | null {

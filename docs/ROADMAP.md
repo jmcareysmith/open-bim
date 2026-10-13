@@ -81,7 +81,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Floors: pick walls (with offset), slope arrows
 - [x] 3D views save their camera; perspective camera views
 - [x] Schedules on sheets; calculated fields
-- [ ] Beam plan symbols (dashed centre lines at Coarse/Medium)
+- [x] Beam plan symbols (dashed centre lines at Coarse/Medium)
 - [x] Annotation symbols — north arrow (up or true north), graphic scale bar, break line; views and sheets; paper-sized
 - [x] Detail components — "Detail Item" families (detail lines + filled regions in one plan view), placed per view with rotation/mirror; library: timber sections, concrete block, steel angle. Not parametric yet (fixed size per family)
 - [x] View marker families — "View Marker" family category (elevation mark, section head/tail, callout head; paper size, {n}/{name}/{sheet} text); picked per view in Properties; library styles

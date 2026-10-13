@@ -172,11 +172,14 @@ export class ViewBar {
     this.bar.append(detail);
 
     const planLike = p.kind === "floorPlan" || p.kind === "callout" || p.kind === "areaPlan";
-    if (p.kind === "3d" || planLike) {
+    // Every model view (plans, callouts, sections, elevations, details, 3D) has visual styles,
+    // sun, shadows and lighting; legends draw no model.
+    const modelView = p.kind !== "legend";
+    if (modelView) {
       const style = selectEl("Visual style", false);
-      const current = p.visualStyle ?? (planLike ? "hiddenLine" : "shaded");
-      // Plans: the path-traced Rendered style is a 3D view thing.
-      for (const s of VISUAL_STYLES.filter((x) => !planLike || x.value !== "rendered")) style.append(new Option(s.label, s.value, false, s.value === current));
+      const current = p.visualStyle ?? (p.kind === "3d" ? "shaded" : "hiddenLine");
+      // The path-traced Rendered style is a 3D view thing.
+      for (const s of VISUAL_STYLES.filter((x) => p.kind === "3d" || x.value !== "rendered")) style.append(new Option(s.label, s.value, false, s.value === current));
       style.onchange = () => {
         const value = style.value as VisualStyle;
         set("Visual style", { visualStyle: value });
@@ -186,7 +189,7 @@ export class ViewBar {
       this.bar.append(style);
     }
 
-    if (p.kind === "3d") {
+    if (modelView) {
       // Sun Settings and Shadows (Revit's view control bar).
       const sunBtn = el("button", { textContent: "\u2600 Sun", title: "Sun Settings: solar study (still, single-day, multi-day) or set sun angles; sun brightness" });
       sunBtn.onclick = () => openSunSettings(this.host, view);

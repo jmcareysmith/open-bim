@@ -815,11 +815,58 @@ export class Viewport {
     // In plan, solids give way to the 2D drawing (their meshes stay pickable while hidden); shaded
     // plan styles show the coloured model under the line work.
     if (g.userData.solid) {
-      const shadedPlan = this.mode === "plan" && SHADED_STYLES.has(this.visualStyle);
-      g.children[0]!.visible = this.mode === "3d" || shadedPlan;
-      g.children[0]!.renderOrder = shadedPlan ? -10 : 0;
+      const shaded = this.modelShaded();
+      g.children[0]!.visible = this.mode === "3d" || shaded;
+      g.children[0]!.renderOrder = shaded ? -10 : 0;
       g.children[1]!.visible = this.mode === "3d";
     }
+  }
+
+  /** Plans, sections and elevations in a shaded style: the coloured model shows under the line work. */
+  private modelShaded(): boolean {
+    if (!SHADED_STYLES.has(this.visualStyle)) return false;
+    if (this.mode === "plan") return true;
+    return this.mode === "drawing" && !this.sheet && !!this.drawingView && isDrawingView(this.drawingView);
+  }
+
+  private sectionCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.5, 1_000_000);
+
+  /**
+   * The model camera behind a section/elevation drawing: looking along the view direction from
+   * the cut plane, framed like the drawing camera (drawing x = along the view, y = height).
+   */
+  private syncSectionCam(): THREE.OrthographicCamera {
+    const v = this.drawingView!;
+    const f = viewFrame(v);
+    const d = this.cameraDraw;
+    const cam = this.sectionCam;
+    const o = new THREE.Vector3(...f.origin);
+    const right = new THREE.Vector3(...f.right);
+    const up = new THREE.Vector3(...f.up);
+    const dir = new THREE.Vector3(...f.dir);
+    cam.up.copy(up);
+    cam.position.copy(o).addScaledVector(right, d.position.x).addScaledVector(up, d.position.y);
+    cam.lookAt(cam.position.clone().add(dir));
+    Object.assign(cam, { left: d.left, right: d.right, top: d.top, bottom: d.bottom, zoom: d.zoom, near: 0.5, far: Math.max(1000, v.params.farClip ?? 1_000_000) });
+    cam.updateProjectionMatrix();
+    cam.updateMatrixWorld();
+    return cam;
+  }
+
+  /** Clip the shaded model to a section/elevation's crop (along the view and in height). */
+  private sectionClipping(): THREE.Plane[] {
+    const v = this.drawingView!;
+    const f = viewFrame(v);
+    const c = viewCrop(v);
+    const right = new THREE.Vector3(...f.right);
+    const o = new THREE.Vector3(...f.origin);
+    const along = right.dot(o);
+    return [
+      new THREE.Plane(right.clone(), -(along + c.min.x)),
+      new THREE.Plane(right.clone().negate(), along + c.max.x),
+      new THREE.Plane(new THREE.Vector3(0, 0, 1), -c.min.y),
+      new THREE.Plane(new THREE.Vector3(0, 0, -1), c.max.y),
+    ];
   }
 
   /** Recompute the plan drawing (cut + hidden-line projection) for visible solids. */
@@ -1044,9 +1091,31 @@ export class Viewport {
     }
     if (this.needsRender) {
       const in3d = this.mode === "3d";
-      this.scene.fog = in3d && this.depthCue ? this.cueFog() : null;
-      if (in3d && this.ambientShadows) this.composer().render();
-      else this.renderer.render(this.mode === "drawing" ? this.drawScene : this.scene, this.camera);
+      const shaded = this.modelShaded();
+      if (this.mode === "drawing" && shaded) {
+        // Shaded section/elevation: the model through the section camera (with its sun, shadows,
+        // ambient shadows and depth cueing), then the drawing's line work over it.
+        const cam = this.syncSectionCam();
+        const clip = this.renderer.clippingPlanes;
+        this.renderer.clippingPlanes = this.sectionClipping();
+        this.scene.fog = this.depthCue ? this.cueFog(cam) : null;
+        const gridShown = this.grid.visible;
+        this.grid.visible = false;
+        if (this.ambientShadows) this.composer(cam).render();
+        else this.renderer.render(this.scene, cam);
+        this.grid.visible = gridShown;
+        this.renderer.clippingPlanes = clip;
+        this.renderer.autoClear = false;
+        this.renderer.clearDepth();
+        this.renderer.render(this.drawScene, this.camera);
+        this.renderer.autoClear = true;
+      } else if (this.mode === "drawing") {
+        this.renderer.render(this.drawScene, this.camera);
+      } else {
+        this.scene.fog = (in3d || shaded) && this.depthCue ? this.cueFog(this.camera) : null;
+        if ((in3d || shaded) && this.ambientShadows) this.composer(this.camera).render();
+        else this.renderer.render(this.scene, this.camera);
+      }
       this.needsRender = false;
       for (const fn of this.frameListeners) fn();
     }
@@ -1062,13 +1131,13 @@ export class Viewport {
   private fx: { composer: EffectComposer; render: RenderPass; ao: GTAOPass; w: number; h: number } | null = null;
 
   /** Ambient shadows: the scene through a GTAO (ambient occlusion) pass. */
-  private composer(): EffectComposer {
+  private composer(cam: THREE.Camera): EffectComposer {
     const size = this.renderer.getSize(new THREE.Vector2());
     const pr = this.renderer.getPixelRatio();
     if (!this.fx) {
       const composer = new EffectComposer(this.renderer);
-      const render = new RenderPass(this.scene, this.camera);
-      const ao = new GTAOPass(this.scene, this.camera, size.x, size.y);
+      const render = new RenderPass(this.scene, cam);
+      const ao = new GTAOPass(this.scene, cam, size.x, size.y);
       ao.blendIntensity = 1;
       // Only model solids occlude: bubbles, labels, previews and the ground catcher stay out.
       const gtao = ao as unknown as { _overrideVisibility(): void; _visibilityCache: THREE.Object3D[] };
@@ -1094,17 +1163,18 @@ export class Viewport {
       fx.w = size.x;
       fx.h = size.y;
     }
-    fx.render.camera = this.camera;
-    fx.ao.camera = this.camera;
+    fx.render.camera = cam;
+    fx.ao.camera = cam;
     return fx.composer;
   }
 
   /** Depth cueing as fog: clear up to `start` % of the model's depth, fading to `fade` % at `end`. */
-  private cueFog(): THREE.Fog {
+  private cueFog(cam: THREE.Camera): THREE.Fog {
     const c = this.depthCue!;
     const box = this.modelBox.isEmpty() ? new THREE.Box3(new THREE.Vector3(-10000, -10000, 0), new THREE.Vector3(10000, 10000, 6000)) : this.modelBox;
     const sphere = box.getBoundingSphere(new THREE.Sphere());
-    const d = this.camera.position.distanceTo(sphere.center);
+    // Orthographic cameras (plans, sections) measure fog from the camera too, so this holds.
+    const d = cam.position.distanceTo(sphere.center);
     const front = Math.max(0, d - sphere.radius);
     const depth = 2 * sphere.radius;
     const near = front + (depth * c.start) / 100;
@@ -1158,7 +1228,7 @@ export class Viewport {
     const bottom = box.isEmpty() ? 0 : box.min.z;
     this.ground.position.set(centre.x, centre.y, bottom + 1);
     this.ground.scale.set(size * 4, size * 4, 1);
-    this.ground.visible = on && this.mode === "3d";
+    this.ground.visible = on;
     // Materials need recompiling when shadows switch.
     for (const g of this.objects.values()) g.traverse((o) => o instanceof THREE.Mesh && ((o.material as THREE.Material).needsUpdate = true));
     this.needsRender = true;

@@ -1208,9 +1208,9 @@ function configureViewport(vp: Viewport, target: ModelElement, primary: boolean)
   const v = target as View;
   // Visual style: 3D views default to Shaded, plans to Hidden Line (line work only).
   const planLike = v.params.kind === "floorPlan" || v.params.kind === "callout" || v.params.kind === "areaPlan";
-  vp.setVisualStyle(v.params.kind === "3d" ? (v.params.visualStyle ?? "shaded") : planLike ? (v.params.visualStyle ?? "hiddenLine") : "hiddenLine");
-  // Sun and shadows (3D views): the true sun for the site, at the view's date and time.
-  if (v.params.kind === "3d") vp.setSun(viewSun(doc, v.params), !!v.params.shadows, v.params.lighting ?? {});
+  vp.setVisualStyle(v.params.kind === "3d" ? (v.params.visualStyle ?? "shaded") : v.params.kind === "legend" ? "hiddenLine" : (v.params.visualStyle ?? "hiddenLine"));
+  // Sun, shadows and lighting (any model view): the true sun for the site, at the view's date and time.
+  if (v.params.kind !== "legend") vp.setSun(viewSun(doc, v.params), !!v.params.shadows, v.params.lighting ?? {});
   else vp.setSun(null, false);
   if (isPlanView(v)) {
     vp.setPlanRange(viewRange(doc, v));

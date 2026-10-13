@@ -102,8 +102,10 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - View control bar also has (3D) Sun Settings (solar study: Still / Single-Day / Multi-Day with a
   Play preview, or Lighting by azimuth/altitude; sun brightness) and Shadows on/off with a ▾
   Shadows & Lighting dialog (shadow intensity, ambient light, ambient shadows = GTAO, depth cueing
-  = fog) — view `sun` / `lighting` params, and Materials (Material Browser dialog). Plans have
-  visual styles too: Shaded/Consistent/Realistic show the coloured model under the line work.
+  = fog) — view `sun` / `lighting` params, and Materials (Material Browser dialog). Every model view (plans,
+  callouts, sections, elevations, 3D) has visual styles, sun, shadows, ambient shadows and depth
+  cueing: shaded plans/sections show the coloured model under the line work (sections render the
+  model through a camera on the cut plane, clipped to the crop, then the drawing over it).
 - Under the view: open-view tabs (bottom, Revit-style per Jeremy) and the view control bar (scale,
   detail level, visual style for 3D, temporary hide/isolate, reveal hidden in magenta).
 - Wall join cleanup in plans (`geometry/src/wallcleanup.ts`): layers give way by priority (structure

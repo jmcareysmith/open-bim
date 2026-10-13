@@ -83,14 +83,24 @@ export function railingPath(doc: Document, r: Railing): { x: number; y: number; 
     const width = (host.typeId ? doc.get<StairTypeParams>(host.typeId)?.params.width : undefined) ?? DEFAULT_STAIR_TYPE.width;
     const off = (width / 2 - EDGE_INSET) * (p.side === "left" ? 1 : -1);
     const out: { x: number; y: number; z: number }[] = [];
-    for (const run of L.runs) {
+    L.runs.forEach((run, i) => {
       const n = { x: -run.dir.y, y: run.dir.x };
       const at = (u: number) => ({ x: run.start.x + run.dir.x * u + n.x * off, y: run.start.y + run.dir.y * u + n.y * off });
       // Along the nosing line: tread j's nose is at u = j·G, height z0 + (j+1)·R.
       const a = at(0);
       const b = at(run.length);
+      // Turning into this run: round the corner where the two edges meet (landing or winders).
+      const prev = L.runs[i - 1];
+      const last = out[out.length - 1];
+      if (prev && last) {
+        const cross = prev.dir.x * run.dir.y - prev.dir.y * run.dir.x;
+        if (Math.abs(cross) > 0.1) {
+          const t = ((a.x - last.x) * run.dir.y - (a.y - last.y) * run.dir.x) / cross;
+          out.push({ x: last.x + prev.dir.x * t, y: last.y + prev.dir.y * t, z: (last.z + run.z0 + L.riser) / 2 });
+        }
+      }
       out.push({ ...a, z: run.z0 + L.riser }, { ...b, z: run.z0 + run.risers * L.riser });
-    }
+    });
     return out;
   }
   const z = (doc.get<LevelParams>(p.levelId)?.params.elevation ?? 0) + p.baseOffset;

@@ -56,6 +56,8 @@ export function buildStair(doc: Document, el: Element): MeshData | null {
     parts.push(sweepProfile(dedupe(prof), r.start, r.dir, L.width));
   }
   for (const l of L.landings) parts.push(extrudePolygon(l.boundary, [], l.z - t.landingThickness, l.z));
+  // Winders: each tread a block down to the one below it (the first down to the landing's soffit).
+  L.winders.forEach((w, j) => parts.push(extrudePolygon(w.boundary, [], j === 0 ? w.z - t.landingThickness : w.z - L.riser - t.waist, w.z)));
   return parts.length ? mergeMeshes(parts) : null;
 }
 

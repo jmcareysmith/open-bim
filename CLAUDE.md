@@ -153,7 +153,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Link project…; by shared coordinates or origin; Reload). Links draw in one colour, aren't scheduled.
 - glTF (.glb) and OBJ (+MTL, zipped) export.
 - Stairs (Stair tool: run ends, Enter; D1/AS1 checks), ramps (1:12 check), railings (sketched or
-  on stairs/ramps, F4/AS1 gap). Straight runs only (no winders/curved runs).
+  on stairs/ramps, F4/AS1 gap). Runs are straight; L/U by drawing runs; stair Properties → Turns: landings or 2–4 winders per square turn
+  (provisional walking-line going check); railings round the corners. No curved runs.
 - Curtain walls: wall type "Curtain Wall - Aluminium 1200 x 1500" (grid in type properties).
 - Stacked walls: browser Types → New stacked wall type (segments in its properties).
 - Toposolids: Toposolid tool (sketch boundary) + Import survey CSV (E,N,RL m) in Properties; contours.

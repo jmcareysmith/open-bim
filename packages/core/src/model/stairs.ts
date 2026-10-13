@@ -27,6 +27,8 @@ export type StairParams = {
   baseOffset: number;
   topOffset: number;
   runs: StairRun[];
+  /** Square (90°) turns between runs: winder treads, this many per turn (2–4); landings when unset. */
+  winders?: number | null;
 };
 export type Stair = Element<StairParams>;
 
@@ -84,6 +86,8 @@ export interface StairLayout {
   width: number;
   runs: RunLayout[];
   landings: { boundary: Vec2[]; z: number }[];
+  /** Winder treads at square turns (each a riser above the one before), with their tread heights. */
+  winders: { boundary: Vec2[]; z: number }[];
   /** NZBC D1/AS1 private stairway checks. */
   checks: { label: string; ok: boolean }[];
 }
@@ -98,9 +102,18 @@ export function stairLayout(doc: Document, stair: Stair): StairLayout {
   const riser = height / risers;
   const going = t.going;
 
+  // Square turns take winders when the stair asks for them: k treads, k − 1 risers more than a landing.
+  const k = p.winders ? Math.max(2, Math.min(4, Math.round(p.winders))) : 0;
+  const dirs = p.runs.map((r) => {
+    const l = Math.hypot(r.end.x - r.start.x, r.end.y - r.start.y) || 1;
+    return { x: (r.end.x - r.start.x) / l, y: (r.end.y - r.start.y) / l };
+  });
+  const winderAt = p.runs.slice(0, -1).map((_, i) => k > 0 && Math.abs(dirs[i]!.x * dirs[i + 1]!.x + dirs[i]!.y * dirs[i + 1]!.y) < 0.05);
+  const extra = winderAt.filter(Boolean).length * (k - 1);
+
   // Risers per run from its drawn length; the last run takes what's left (at least one).
   const counts: number[] = [];
-  let left = risers;
+  let left = Math.max(p.runs.length, risers - extra);
   p.runs.forEach((r, i) => {
     const len = Math.hypot(r.end.x - r.start.x, r.end.y - r.start.y);
     const runsAfter = p.runs.length - 1 - i;
@@ -117,12 +130,19 @@ export function stairLayout(doc: Document, stair: Stair): StairLayout {
     const n = counts[i]!;
     runs.push({ start: { ...r.start }, dir, treads: n - 1, risers: n, z0: z, length: (n - 1) * going });
     z += n * riser;
+    if (winderAt[i]) z += (k - 1) * riser;
   });
 
-  const landings = landingsBetween(
-    runs.map((r) => ({ start: r.start, dir: r.dir, length: r.length, zEnd: r.z0 + r.risers * riser })),
-    t.width,
-  );
+  // Landings between runs, or winders in their place at square turns.
+  const plan = runs.map((r) => ({ start: r.start, dir: r.dir, length: r.length, zEnd: r.z0 + r.risers * riser }));
+  const landings: StairLayout["landings"] = [];
+  const winders: StairLayout["winders"] = [];
+  for (let i = 0; i + 1 < plan.length; i++) {
+    const land = landingsBetween([plan[i]!, plan[i + 1]!], t.width)[0];
+    if (!land) continue;
+    if (winderAt[i]) winders.push(...winderTreads(plan[i]!, plan[i + 1]!, land, k, riser));
+    else landings.push(land);
+  }
 
   const twoRG = 2 * riser + going;
   const checks = [
@@ -130,7 +150,52 @@ export function stairLayout(doc: Document, stair: Stair): StairLayout {
     { label: `Going ${going.toFixed(0)} mm ≥ 280`, ok: going >= 280 - 1e-6 },
     { label: `2R + G ${twoRG.toFixed(0)} mm in 550–700`, ok: twoRG >= 550 && twoRG <= 700 },
   ];
-  return { bottom, top, height, risers, riser, going, width: t.width, runs, landings, checks };
+  if (winders.length) {
+    // Provisional: winder going on the walking line (the stair's centreline) against the type's going.
+    const wg = ((Math.PI / 2) * (t.width / 2)) / k;
+    checks.push({ label: `Winder going ${wg.toFixed(0)} mm at the walking line ≥ ${going.toFixed(0)} (provisional)`, ok: wg >= going - 1e-6 });
+  }
+  return { bottom, top, height, risers, riser, going, width: t.width, runs, landings, winders, checks };
+}
+
+/**
+ * Winder treads filling a square turn's landing: k treads fanning from the turn's inner corner,
+ * from the arriving run's edge round to the leaving run's. Tread j sits j risers above the landing.
+ */
+export function winderTreads(a: PlanRun, b: PlanRun, land: { boundary: Vec2[]; z: number }, k: number, riser: number): { boundary: Vec2[]; z: number }[] {
+  const nrm = { x: -a.dir.y, y: a.dir.x };
+  const o = land.boundary[0]!; // (u 0, v0)
+  const loc = land.boundary.map((q) => ({ u: (q.x - o.x) * a.dir.x + (q.y - o.y) * a.dir.y, v: (q.x - o.x) * nrm.x + (q.y - o.y) * nrm.y }));
+  const u1 = Math.max(...loc.map((q) => q.u));
+  const v0 = Math.min(...loc.map((q) => q.v));
+  const v1 = Math.max(...loc.map((q) => q.v));
+  const left = a.dir.x * b.dir.y - a.dir.y * b.dir.x > 0;
+  // Inner corner, and the angles of the arriving edge (along u = 0) and the leaving edge (along the inner side).
+  const I = { u: 0, v: left ? v1 : v0 };
+  const thA = left ? -Math.PI / 2 : Math.PI / 2;
+  const thD = 0;
+  const hit = (th: number) => {
+    const du = Math.cos(th);
+    const dv = Math.sin(th);
+    let t = Infinity;
+    if (du > 1e-9) t = Math.min(t, (u1 - I.u) / du);
+    if (dv > 1e-9) t = Math.min(t, (v1 - I.v) / dv);
+    if (dv < -1e-9) t = Math.min(t, (v0 - I.v) / dv);
+    return { u: I.u + du * t, v: I.v + dv * t };
+  };
+  const far = { u: u1, v: left ? v0 : v1 };
+  const thF = Math.atan2(far.v - I.v, far.u - I.u);
+  const at = (q: { u: number; v: number }) => ({ x: o.x + a.dir.x * q.u + nrm.x * q.v, y: o.y + a.dir.y * q.u + nrm.y * q.v });
+  const out: { boundary: Vec2[]; z: number }[] = [];
+  for (let j = 0; j < k; j++) {
+    const t0 = thA + ((thD - thA) * j) / k;
+    const t1 = thA + ((thD - thA) * (j + 1)) / k;
+    const pts = [I, hit(t0)];
+    if ((thF - t0) * (thF - t1) < -1e-9) pts.push(far);
+    pts.push(hit(t1));
+    out.push({ boundary: pts.map(at), z: land.z + j * riser });
+  }
+  return out;
 }
 
 /** A straight run in plan, for landing layout: start, unit direction, length and height at its end. */

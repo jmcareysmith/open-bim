@@ -111,7 +111,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Section box for 3D views (grips to drag its faces)
 - [x] Coarse fill patterns per type (Revit's default hollow walls at Coarse); Graphic Display Options (edges, silhouettes, smooth lines)
 - [x] Wall sweeps and reveals; edit wall profile
-- [ ] Stairs: L- and U-shaped runs with landings, winders
+- [x] Stairs: L- and U-shaped runs with landings, winders
 - [ ] Curtain walls: add/remove grid lines, mullion types, panel swaps (doors, solid panels)
 - [ ] Roofs by extrusion; fascias, gutters and soffits
 - [ ] Dimensions in sections/elevations, temporary dimensions while placing, spot elevations

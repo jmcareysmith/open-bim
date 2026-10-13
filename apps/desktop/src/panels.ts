@@ -2471,6 +2471,19 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Risers", `${L.risers} \u00d7 ${L.riser.toFixed(1)} mm`),
         row("Going", len(L.going)),
         row("Runs", L.runs.map((r) => r.risers).join(" + ")),
+        row(
+          "Turns",
+          select(
+            [
+              { value: "", label: "Landings" },
+              { value: "2", label: "2 winders" },
+              { value: "3", label: "3 winders" },
+              { value: "4", label: "4 winders" },
+            ],
+            p.winders ? String(p.winders) : "",
+            (v) => update<StairParams>(v ? "Winders at turns" : "Landings at turns", { winders: v ? Number(v) : null }),
+          ),
+        ),
         h("h3", {}, "NZBC D1/AS1 (private stairway)"),
       );
       for (const c of L.checks) sec.append(row(c.ok ? "\u2713" : "\u2717", h("span", { class: c.ok ? "" : "warn" }, c.label)));

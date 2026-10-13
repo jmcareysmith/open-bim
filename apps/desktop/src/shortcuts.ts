@@ -42,6 +42,7 @@ export const COMMANDS: Command[] = [
   { action: "tool:elevation", label: "Elevation", keys: "" },
   { action: "tool:camera", label: "Camera", keys: "" },
   { action: "tool:dimension", label: "Aligned Dimension", keys: "M DI" },
+  { action: "tool:spot", label: "Spot Elevation", keys: "EL" },
   { action: "tool:detailline", label: "Detail Line", keys: "L DL" },
   { action: "tool:region", label: "Filled Region", keys: "" },
   { action: "tool:text", label: "Text", keys: "T TX" },

@@ -101,7 +101,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 8. Annotation & documentation
 | Feature | Phase | Status |
 |---|---|---|
-| Dimensions (aligned, linear, angular, radial, spot) | 2 | 🟨 |
+| Dimensions (aligned, linear, angular, radial, spot) | 2 | 🟨 (aligned in plans, sections, elevations — live to walls, grids, levels; spot elevations; no angular/radial yet) |
 | Text, leaders | 2 | 🟨 |
 | Tags (by category, multi-category, material) | 4 | 🟨 |
 | Keynotes | 4 | ✅ |
@@ -171,7 +171,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 |---|---|---|
 | Move, copy, rotate, mirror, array | 7a | ✅ (mirror by drawn axis; radial array via API only) |
 | Align, offset, trim/extend, split | 7a | ✅ (plans/3D) |
-| Grips, drag editing, temporary dimensions | 7a | ✅ (temp dims: line length only) |
+| Grips, drag editing, temporary dimensions | 7a | ✅ (temp dims while drawing walls, detail lines, beams: length and angle) |
 | Ribbon, contextual tabs, options bar | 7b | ✅ |
 | File menu, Quick Access Toolbar | 7b | 🟨 (no recent files) |
 | Drag and drop from the Project Browser | 7b | ⬜ |

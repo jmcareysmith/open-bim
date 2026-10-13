@@ -75,6 +75,10 @@ import {
   createToposolid,
   createStair,
   createExtrusionRoof,
+  resolveRef,
+  createSpotElevation,
+  SPOT_HOSTS,
+  refPoint,
   ensureStairType,
   createRamp,
   ensureRampType,
@@ -389,6 +393,7 @@ export class WallTool implements Tool {
   deactivate(): void {
     this.start = null;
     this.ctx.viewport.setPreview(null);
+    this.ctx.viewport.setPreviewLines(null);
   }
 
   private levelElevation(): number {
@@ -414,11 +419,13 @@ export class WallTool implements Tool {
     const p = this.point(ev);
     if (!p || !this.start) {
       this.ctx.viewport.setPreview(null);
+    this.ctx.viewport.setPreviewLines(null);
       return;
     }
     const len = Math.hypot(p.x - this.start.x, p.y - this.start.y);
     if (len < 1) {
       this.ctx.viewport.setPreview(null);
+    this.ctx.viewport.setPreviewLines(null);
       return;
     }
     const typeId = this.ctx.activeTypeId(Cat.WallType);
@@ -428,6 +435,7 @@ export class WallTool implements Tool {
     const top = this.topLevelId();
     const z1 = top ? this.ctx.doc.require<LevelParams>(top).params.elevation : z0 + 2400;
     this.ctx.viewport.setPreview(extrudePolygon(wallFootprint(this.start, p, totalThickness(type)), [], z0, z1));
+    this.ctx.viewport.setPreviewLines(tempDimension(this.ctx, this.start, p));
     this.ctx.status(`Wall length: ${formatLength(len, projectUnits(this.ctx.doc))}${SNAP_LABEL[this.snapped!.kind]}`);
   }
 
@@ -456,6 +464,7 @@ export class WallTool implements Tool {
     if (ev.key === "Escape" && this.start) {
       this.start = null;
       this.ctx.viewport.setPreview(null);
+    this.ctx.viewport.setPreviewLines(null);
       this.ctx.status("Wall: click start point.");
       return true;
     }
@@ -990,6 +999,41 @@ const linePreview = (start: Vec2, end: Vec2): LineData => ({
   labels: [],
 });
 
+/**
+ * Temporary dimension (Revit's, while drawing): witness lines, a dimension line with ticks beside
+ * the line being drawn, its length, and its angle when it isn't square to the axes. Paper sizes
+ * scale with the open view.
+ */
+function tempDimension(ctx: ToolContext, a: Vec2, b: Vec2, base: LineData | null = null): LineData {
+  const len = Math.hypot(b.x - a.x, b.y - a.y);
+  const seg: number[] = base ? [...base.segments] : [];
+  const labels: LineData["labels"] = base ? [...base.labels] : [];
+  if (len >= 1) {
+    const viewId = ctx.activeViewId();
+    const k = (viewId ? ctx.doc.get<ViewParams>(viewId)?.params.scale : undefined) ?? 100;
+    const d = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
+    const n = { x: -d.y, y: d.x };
+    const off = 8 * k;
+    const at = (q: Vec2, o: number) => ({ x: q.x + n.x * o, y: q.y + n.y * o });
+    const ln = (q: Vec2, r: Vec2) => seg.push(q.x, q.y, 0, r.x, r.y, 0);
+    for (const q of [a, b]) {
+      ln(at(q, 1.5 * k), at(q, off + 2 * k));
+      const c = at(q, off);
+      const t = 1.4 * k;
+      ln({ x: c.x - (d.x + n.x) * t, y: c.y - (d.y + n.y) * t }, { x: c.x + (d.x + n.x) * t, y: c.y + (d.y + n.y) * t });
+    }
+    ln(at(a, off), at(b, off));
+    const mid = at({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, off + 2 * k);
+    labels.push({ text: formatLength(len, projectUnits(ctx.doc)), position: [mid.x, mid.y, 0], size: 2.5 * k });
+    const deg = (((Math.atan2(d.y, d.x) * 180) / Math.PI) % 360 + 360) % 360;
+    if (Math.abs(deg - Math.round(deg / 90) * 90) > 0.05) {
+      const q = { x: a.x - n.x * 4 * k + d.x * 4 * k, y: a.y - n.y * 4 * k + d.y * 4 * k };
+      labels.push({ text: `${deg.toFixed(1)}\u00b0`, position: [q.x, q.y, 0], size: 2.2 * k });
+    }
+  }
+  return { segments: new Float32Array(seg), labels };
+}
+
 /** Section: click the head end, then the tail. The view looks to the left of the line you draw. */
 export class SectionTool extends DatumLineTool {
   constructor(ctx: ToolContext) {
@@ -1212,7 +1256,7 @@ export class BeamTool implements Tool {
 
   pointerMove(ev: PointerEvent): void {
     const p = viewPoint(this.ctx, ev, this.start);
-    this.ctx.viewport.setPreviewLines(p && this.start ? linePreview(this.start, p) : null);
+    this.ctx.viewport.setPreviewLines(p && this.start ? tempDimension(this.ctx, this.start, p, linePreview(this.start, p)) : null);
   }
 
   click(ev: PointerEvent): void {
@@ -1236,6 +1280,67 @@ export class BeamTool implements Tool {
   key(ev: KeyboardEvent): boolean {
     if (ev.key === "Escape" && this.start) {
       this.start = null;
+      this.ctx.viewport.setPreviewLines(null);
+      return true;
+    }
+    return false;
+  }
+}
+
+/** Spot Elevation: click the point (a floor, roof or toposolid reads its top), then the leader's end. */
+export class SpotElevationTool implements Tool {
+  readonly name = "spot";
+  private first: { point: Vec2; hostId: ElementId | null } | null = null;
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.first = null;
+    this.ctx.status("Spot Elevation: click a point (on a floor, roof or ground for its top), then where the text goes.");
+  }
+
+  deactivate(): void {
+    this.first = null;
+    this.ctx.viewport.setPreviewLines(null);
+  }
+
+  private pointAt(ev: PointerEvent): Vec2 | null {
+    return this.ctx.viewport.viewMode === "drawing" ? this.ctx.viewport.pickDrawing(ev) : viewPoint(this.ctx, ev, null);
+  }
+
+  pointerMove(ev: PointerEvent): void {
+    const p = this.pointAt(ev);
+    this.ctx.viewport.setPreviewLines(p && this.first ? linePreview(this.first.point, p) : null);
+  }
+
+  click(ev: PointerEvent): void {
+    const viewId = requireAnnotView(this.ctx);
+    if (!viewId) return;
+    const { doc, viewport } = this.ctx;
+    if (!this.first) {
+      const hit = viewport.pickHit(ev, (id) => SPOT_HOSTS.has(doc.get(id)?.category ?? ""));
+      const p = viewport.viewMode === "drawing" ? viewport.pickDrawing(ev) : (hit?.point ?? viewPoint(this.ctx, ev, null));
+      if (!p) return;
+      this.first = { point: p, hostId: hit?.id ?? null };
+      this.ctx.status("Spot Elevation: click where the text goes.");
+      return;
+    }
+    const leader = this.pointAt(ev);
+    if (!leader) return;
+    const f = this.first;
+    try {
+      const s = doc.transact("Create spot elevation", (tx) => createSpotElevation(tx, doc, viewId, f.point, leader, { hostId: f.hostId }));
+      this.ctx.setSelection([s.id]);
+      this.activate();
+      this.ctx.viewport.setPreviewLines(null);
+    } catch (err) {
+      this.first = null;
+      this.ctx.status(`⚠ ${(err as Error).message}`);
+    }
+  }
+
+  key(ev: KeyboardEvent): boolean {
+    if (ev.key === "Escape" && this.first) {
+      this.activate();
       this.ctx.viewport.setPreviewLines(null);
       return true;
     }
@@ -1641,7 +1746,7 @@ export class DetailLineTool implements Tool {
   pointerMove(ev: PointerEvent): void {
     const p = viewPoint(this.ctx, ev, this.start);
     if (!p || !this.start) return this.ctx.viewport.setPreviewLines(null);
-    this.ctx.viewport.setPreviewLines(linePreview(this.start, p));
+    this.ctx.viewport.setPreviewLines(tempDimension(this.ctx, this.start, p, linePreview(this.start, p)));
   }
 
   click(ev: PointerEvent): void {
@@ -1713,7 +1818,7 @@ export class DimensionTool implements Tool {
     const viewId = requireAnnotView(this.ctx);
     if (!viewId) return;
     const { doc, viewport } = this.ctx;
-    if (viewport.viewMode === "drawing") return this.ctx.status("Dimensions in sections are coming; use plans for now.");
+    if (viewport.viewMode === "drawing") return this.clickDrawing(ev, viewId);
     const pickable = new Set<string>([Cat.Wall, Cat.Grid, Cat.ReferencePlane]);
     const hit = viewport.pickHit(ev, (id) => pickable.has(doc.get(id)?.category ?? ""));
     if (hit) {
@@ -1741,6 +1846,82 @@ export class DimensionTool implements Tool {
     this.refs = [];
     try {
       const dim = doc.transact("Create dimension", (tx) => createDimension(tx, doc, viewId, refs, at));
+      this.ctx.setSelection([dim.id]);
+      this.activate();
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
+  }
+
+  /**
+   * Sections and elevations: levels (horizontal), grids and walls where the view crosses them
+   * (vertical) stay live; anything else is a fixed point on the drawing.
+   */
+  private clickDrawing(ev: PointerEvent, viewId: ElementId): void {
+    const { doc, viewport } = this.ctx;
+    const p = viewport.pickDrawing(ev);
+    if (!p) return;
+    const tol = viewport.mmPerPixel() * 8;
+    const view = doc.get<ViewParams>(viewId);
+    const line = view?.params.line;
+    const say = () => this.ctx.status(`Dimension: ${this.refs.length} reference(s). Click more, or click empty space (Enter) to place.`);
+    // A level line?
+    const lvl = doc.byCategory<LevelParams>(Cat.Level).find((l) => Math.abs(l.params.elevation - p.y) < tol);
+    if (lvl) {
+      this.refs.push({ kind: "level", id: lvl.id, pick: p });
+      return say();
+    }
+    // A grid or a wall face crossing the view?
+    const crossingRef = (ref: DimRef): number | null => {
+      try {
+        return resolveRef(doc, ref, viewId).point.x;
+      } catch {
+        return null;
+      }
+    };
+    if (line) {
+      for (const g of doc.byCategory(Cat.Grid)) {
+        const ref: DimRef = { kind: "datum", id: g.id, pick: p };
+        const x = crossingRef(ref);
+        if (x !== null && Math.abs(x - p.x) < tol) {
+          this.refs.push(ref);
+          return say();
+        }
+      }
+      const hit = viewport.pickHit(ev, (id) => doc.get(id)?.category === Cat.Wall);
+      if (hit) {
+        const sides = (["left", "centre", "right"] as const)
+          .map((side) => ({ side, x: crossingRef({ kind: "wallFace", id: hit.id, side, pick: p }) }))
+          .filter((s): s is { side: "left" | "centre" | "right"; x: number } => s.x !== null)
+          .sort((a, b) => Math.abs(a.x - p.x) - Math.abs(b.x - p.x));
+        if (sides[0] && Math.abs(sides[0].x - p.x) < tol * 3) {
+          this.refs.push({ kind: "wallFace", id: hit.id, side: sides[0].side, pick: p });
+          return say();
+        }
+      }
+    }
+    // Two or more references and a click away from them: place the dimension there.
+    if (this.refs.length >= 2) return this.place(viewId, p);
+    // Otherwise a fixed point (snapped to the drawing's increments).
+    const q = viewPoint(this.ctx, ev, null) ?? p;
+    this.refs.push({ kind: "point", at: q });
+    say();
+  }
+
+  private place(viewId: ElementId, at: Vec2): void {
+    const { doc } = this.ctx;
+    const refs = this.refs;
+    this.refs = [];
+    try {
+      // Points only: measure the way they're furthest apart.
+      const lineRef = refs.some((r) => r.kind !== "point");
+      let dir: Vec2 | undefined;
+      if (!lineRef) {
+        const a = refPoint(doc, refs[0]!, viewId);
+        const b = refPoint(doc, refs[refs.length - 1]!, viewId);
+        dir = Math.abs(b.x - a.x) >= Math.abs(b.y - a.y) ? { x: 1, y: 0 } : { x: 0, y: 1 };
+      }
+      const dim = doc.transact("Create dimension", (tx) => createDimension(tx, doc, viewId, refs, at, dir ? { dir } : {}));
       this.ctx.setSelection([dim.id]);
       this.activate();
     } catch (err) {

@@ -122,7 +122,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Known gaps: join cleanup is plan-only (3D solids overlap at crossings); grids straight only;
   floors: Pick Walls (sketch options strip: face/core/centre line + offset) and slope arrows (floor
   Properties → Add slope arrow; tail/head heights; plane top, sheared slab, 1:n arrow in plan); roofs exact for convex/L/T/U only; doors/windows parametric;
-  dimensions only in plans via the tool.
+  no angular/radial dimensions.
   Screen and sheet/PDF share `lineworkDrawing` for cut/projection line work.
 - Families (Phase 3 started): family editor (Browser → Families → New family / Edit family) with
   Extrusion/Blend/Revolve/Sweep (+ Void), parameters with formulas, family types; Load into Project;
@@ -238,4 +238,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Roof ▾ → Roof by Extrusion (two corners in plan; profile across the shorter side; Properties: Gable/Mono/
   Curved or points, extrusion start/end; walls attach to it). Roof Properties → Eaves: fascia, gutter (quad/
   half round), soffit depth (`trims`; core `roofEaves`, geometry `roofTrimMeshes`, `profilePrism`).
+- Dimensions in sections/elevations (Aligned tool: levels, grids and walls crossing the view stay live —
+  `resolveRef(doc, ref, viewId)`; other clicks are fixed points). Spot Elevation (EL; Annotate → Dimension;
+  core/model/spots.ts): floor/roof/toposolid top live, else the section point or plan level; +2.700 m text.
+  Temporary dimensions (length + off-axis angle) while drawing walls, detail lines and beams.
 - Next (Jeremy, 2026-10-14): Phase 8b — Revit look & architectural parity, before the rest of 8.

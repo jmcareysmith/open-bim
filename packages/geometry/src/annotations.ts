@@ -10,6 +10,11 @@ import {
   type Element,
   type FilledRegionParams,
   type TextNoteParams,
+  type SpotElevationParams,
+  type SpotElevation,
+  type ViewParams,
+  formatSpotElevation,
+  spotElevationValue,
   type Vec2,
   anchorInView,
   tagPosition,
@@ -47,6 +52,39 @@ export function buildAnnotationLines(doc: Document, el: Element): LineData | nul
         });
       }
       return { segments: new Float32Array(seg), labels: [], fill: { loops: [p.boundary, ...p.holes], color: p.color } };
+    }
+    case Cat.SpotElevation: {
+      // A target (plans) or a triangle standing on the point (sections), a leader, and the height.
+      const p = el.params as SpotElevationParams;
+      const k = modelTextSize(doc, p.viewId, 1);
+      const inSection = !!doc.get<ViewParams>(p.viewId)?.params.line;
+      const z = spotElevationValue(doc, el as SpotElevation);
+      const pt = inSection ? { x: p.point.x, y: z } : p.point;
+      const seg: number[] = [];
+      const ln = (a: Vec2, b: Vec2) => seg.push(a.x, a.y, 0, b.x, b.y, 0);
+      if (inSection) {
+        const t = 2 * k;
+        ln(pt, { x: pt.x - t * 0.6, y: pt.y + t });
+        ln(pt, { x: pt.x + t * 0.6, y: pt.y + t });
+        ln({ x: pt.x - t * 0.6, y: pt.y + t }, { x: pt.x + t * 0.6, y: pt.y + t });
+        const lead = { x: p.leader.x, y: pt.y + t };
+        ln({ x: pt.x, y: pt.y + t }, lead);
+        const right = lead.x >= pt.x;
+        ln(lead, { x: lead.x + (right ? 1 : -1) * 12 * k, y: lead.y });
+        return { segments: new Float32Array(seg), labels: [{ text: formatSpotElevation(z), position: [(right ? lead.x : lead.x - 12 * k) + 0.5 * k, lead.y + 0.6 * k, 0], size: p.size * k, align: "left" }] };
+      }
+      const r = 1.2 * k;
+      for (let i = 0; i < 24; i++) {
+        const a0 = (i / 24) * 2 * Math.PI;
+        const a1 = ((i + 1) / 24) * 2 * Math.PI;
+        ln({ x: pt.x + r * Math.cos(a0), y: pt.y + r * Math.sin(a0) }, { x: pt.x + r * Math.cos(a1), y: pt.y + r * Math.sin(a1) });
+      }
+      ln({ x: pt.x - r * 1.5, y: pt.y }, { x: pt.x + r * 1.5, y: pt.y });
+      ln({ x: pt.x, y: pt.y - r * 1.5 }, { x: pt.x, y: pt.y + r * 1.5 });
+      ln(pt, p.leader);
+      const right = p.leader.x >= pt.x;
+      ln(p.leader, { x: p.leader.x + (right ? 1 : -1) * 12 * k, y: p.leader.y });
+      return { segments: new Float32Array(seg), labels: [{ text: formatSpotElevation(z), position: [(right ? p.leader.x : p.leader.x - 12 * k) + 0.5 * k, p.leader.y + 0.6 * k, 0], size: p.size * k, align: "left" }] };
     }
     case Cat.TextNote: {
       const p = el.params as TextNoteParams;

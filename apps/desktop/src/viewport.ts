@@ -98,6 +98,7 @@ const COLORS: Record<string, number> = {
   [Cat.Symbol]: 0x1f2328,
   [Cat.Dimension]: 0x1f2328,
   [Cat.TextNote]: 0x1f2328,
+  [Cat.SpotElevation]: 0x1f2328,
   [Cat.FilledRegion]: 0x1f2328,
   [Cat.Room]: 0x7a8fa6,
   [Cat.RoomSeparator]: 0x1f2328,

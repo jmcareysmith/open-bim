@@ -127,3 +127,32 @@ describe("dimensions", () => {
     expect(dimensionLayout(doc, dim).values).toEqual([2700]);
   });
 });
+
+describe("dimensions in sections and elevations", () => {
+  it("wall faces and grids where the section crosses them, and levels, stay live", () => {
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    // A wall running north at x = 3000 (interior type, 110 thick), a grid at x = 0, a section along y = 1000.
+    const w = doc.transact("W", (tx) => createWall(tx, ids.wallTypes.interior, p(3000, 0), p(3000, 5000), ids.levels.ground, { height: 2400 }));
+    const g = doc.transact("G", (tx) => createGrid(tx, doc, p(0, -1000), p(0, 6000), "A"));
+    const s = doc.transact("S", (tx) => createSection(tx, doc, p(-1000, 1000), p(6000, 1000)));
+    const dim = doc.transact("D", (tx) =>
+      createDimension(tx, doc, s.id, [{ kind: "datum", id: g.id, pick: p(1000, 500) }, { kind: "wallFace", id: w.id, side: "centre", pick: p(4000, 500) }], p(2000, -500)),
+    );
+    expect(dimensionLayout(doc, dim).values[0]).toBeCloseTo(3000);
+    expect(dim.params.dir.x).toBeCloseTo(1);
+    expect(dim.params.dir.y).toBeCloseTo(0);
+    doc.transact("Move", (tx) => tx.update<WallParams>(w.id, { start: p(3500, 0), end: p(3500, 5000) }));
+    expect(dimensionLayout(doc, doc.require(dim.id) as Dimension).values[0]).toBeCloseTo(3500);
+    // Levels measure up the drawing.
+    const lv = doc.transact("L", (tx) =>
+      createDimension(tx, doc, s.id, [{ kind: "level", id: ids.levels.ground, pick: p(0, 0) }, { kind: "level", id: ids.levels.first, pick: p(0, 2700) }], p(-500, 0)),
+    );
+    expect(lv.params.dir.x).toBeCloseTo(0);
+    expect(lv.params.dir.y).toBeCloseTo(1);
+    expect(dimensionLayout(doc, lv).values[0]).toBeCloseTo(2700);
+    // A wall running along the section doesn't cross it.
+    const along = doc.transact("W2", (tx) => createWall(tx, ids.wallTypes.interior, p(0, 3000), p(5000, 3000), ids.levels.ground, { height: 2400 }));
+    expect(() => doc.transact("Bad", (tx) => createDimension(tx, doc, s.id, [{ kind: "datum", id: g.id, pick: p(0, 0) }, { kind: "wallFace", id: along.id, side: "centre", pick: p(1, 1) }], p(0, 0)))).toThrow(/doesn't cross/);
+  });
+});

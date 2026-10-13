@@ -207,6 +207,7 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.DetailLine, buildAnnotationLines],
     [Cat.FilledRegion, buildAnnotationLines],
     [Cat.TextNote, buildAnnotationLines],
+    [Cat.SpotElevation, buildAnnotationLines],
     [Cat.Dimension, buildAnnotationLines],
     [Cat.Room, buildRoomLines],
     [Cat.RoomSeparator, buildRoomSeparatorLines],

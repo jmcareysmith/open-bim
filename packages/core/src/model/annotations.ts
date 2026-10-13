@@ -62,7 +62,7 @@ export type Dimension = Element<DimensionParams>;
 /** Revit default annotation text height, mm on paper. */
 export const DEFAULT_TEXT_SIZE = 2.5;
 
-export const ANNOTATION_CATEGORIES = [Cat.DetailLine, Cat.FilledRegion, Cat.TextNote, Cat.Dimension, Cat.Area, Cat.AreaBoundary, Cat.Tag, Cat.LegendComponent, Cat.KeynoteLegend, Cat.RevisionCloud, Cat.CadImport, Cat.Symbol, Cat.DetailComponent] as const;
+export const ANNOTATION_CATEGORIES = [Cat.DetailLine, Cat.FilledRegion, Cat.TextNote, Cat.Dimension, Cat.Area, Cat.AreaBoundary, Cat.Tag, Cat.LegendComponent, Cat.KeynoteLegend, Cat.RevisionCloud, Cat.CadImport, Cat.Symbol, Cat.DetailComponent, Cat.SpotElevation] as const;
 
 const refIds = (r: DimRef): ElementId[] => (r.kind === "point" ? [] : [r.id]);
 
@@ -137,8 +137,24 @@ const unit = (v: Vec2): Vec2 => {
   return { x: v.x / l, y: v.y / l };
 };
 
-/** Where a reference is now, in its view's 2D space. Throws if a referenced element is gone. */
-export function resolveRef(doc: Document, ref: DimRef): ResolvedRef {
+/**
+ * Where a reference is now, in its view's 2D space. Throws if a referenced element is gone. In a
+ * section or elevation (`viewId`), wall faces and grids are vertical lines where the view's line
+ * crosses them; levels are horizontal lines at their elevation.
+ */
+export function resolveRef(doc: Document, ref: DimRef, viewId?: ElementId): ResolvedRef {
+  const line = viewId ? doc.get<ViewParams>(viewId)?.params.line : undefined;
+  if (line && (ref.kind === "wallFace" || ref.kind === "datum")) {
+    const plan = resolveRef(doc, ref);
+    const l = Math.hypot(line.end.x - line.start.x, line.end.y - line.start.y) || 1;
+    const R = { x: (line.end.x - line.start.x) / l, y: (line.end.y - line.start.y) / l };
+    const D = plan.dir!;
+    // line.start + R·s = plan.point + D·t
+    const den = R.x * D.y - R.y * D.x;
+    if (Math.abs(den) < 1e-6) throw new Error("That reference runs along the view, so it doesn't cross it");
+    const s = ((plan.point.x - line.start.x) * D.y - (plan.point.y - line.start.y) * D.x) / den;
+    return { point: { x: s, y: 0 }, dir: { x: 0, y: 1 } };
+  }
   switch (ref.kind) {
     case "point":
       return { point: ref.at, dir: null };
@@ -161,8 +177,8 @@ export function resolveRef(doc: Document, ref: DimRef): ResolvedRef {
 }
 
 /** The measured point of a reference: its pick projected onto where the reference is now. */
-export function refPoint(doc: Document, ref: DimRef): Vec2 {
-  const r = resolveRef(doc, ref);
+export function refPoint(doc: Document, ref: DimRef, viewId?: ElementId): Vec2 {
+  const r = resolveRef(doc, ref, viewId);
   if (!r.dir || ref.kind === "point") return r.point;
   const t = (ref.pick.x - r.point.x) * r.dir.x + (ref.pick.y - r.point.y) * r.dir.y;
   return { x: r.point.x + r.dir.x * t, y: r.point.y + r.dir.y * t };
@@ -180,7 +196,7 @@ export interface DimensionLayout {
 /** Live geometry and values of a dimension. */
 export function dimensionLayout(doc: Document, dim: Dimension): DimensionLayout {
   const { refs, dir, at } = dim.params;
-  const points = refs.map((r) => refPoint(doc, r));
+  const points = refs.map((r) => refPoint(doc, r, dim.params.viewId));
   const along = (p: Vec2) => p.x * dir.x + p.y * dir.y;
   const base = along(at);
   const ticks = points
@@ -205,12 +221,12 @@ export function createDimension(
 ): Dimension {
   requireView(doc, viewId);
   if (refs.length < 2) throw new Error("A dimension needs at least two references");
-  const lines = refs.map((r) => resolveRef(doc, r));
+  const lines = refs.map((r) => resolveRef(doc, r, viewId));
   const first = lines.find((l) => l.dir);
   let dir = opts.dir ? unit(opts.dir) : first?.dir ? { x: -first.dir.y, y: first.dir.x } : null;
   if (!dir) throw new Error("Give a direction when dimensioning between points");
   // Point the dimension from the first reference towards the last, so values read in pick order.
-  const pts = refs.map((r) => refPoint(doc, r));
+  const pts = refs.map((r) => refPoint(doc, r, viewId));
   const span = (pts.at(-1)!.x - pts[0]!.x) * dir.x + (pts.at(-1)!.y - pts[0]!.y) * dir.y;
   if (span < 0) dir = { x: -dir.x, y: -dir.y };
   for (const l of lines) {

@@ -31,6 +31,7 @@ export const Cat = {
   FilledRegion: "FilledRegion",
   TextNote: "TextNote",
   Dimension: "Dimension",
+  SpotElevation: "SpotElevation",
   Material: "Material",
   ViewFilter: "ViewFilter",
   ViewTemplate: "ViewTemplate",

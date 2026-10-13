@@ -63,3 +63,4 @@ export * from "./model/massfloors.ts";
 export * from "./model/property.ts";
 export * from "./model/markers.ts";
 export * from "./model/sweeps.ts";
+export * from "./model/spots.ts";

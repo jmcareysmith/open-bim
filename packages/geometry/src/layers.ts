@@ -11,6 +11,7 @@ import {
   type ElementId,
   type Floor,
   type LayeredTypeParams,
+  type LayerFunction,
   type Vec2,
   type ViewFrame,
   type Wall,
@@ -23,6 +24,8 @@ import {
 export interface LayerRegion {
   loop: Vec2[];
   materialId: ElementId | undefined;
+  /** The layer's function (sets which layer wins where joined walls overlap). */
+  function?: LayerFunction;
 }
 
 /** Plan view frame: drawing = model XY, cut at height `cut`. */
@@ -36,6 +39,7 @@ interface Slab {
   /** Boundary positions along n, from the first layer's outer face inwards. */
   bounds: number[];
   materials: (ElementId | undefined)[];
+  functions: LayerFunction[];
 }
 
 function slabs(doc: Document, el: Element): Slab | null {
@@ -44,6 +48,7 @@ function slabs(doc: Document, el: Element): Slab | null {
   const layers = type?.params.layers;
   if (!layers?.length) return null;
   const materials = layers.map((l) => layerMaterial(doc, l)?.id);
+  const functions = layers.map((l) => l.function);
   const cum = (start: number, sign: number) => {
     const b = [start];
     for (const l of layers) b.push(b.at(-1)! + sign * l.thickness);
@@ -56,16 +61,16 @@ function slabs(doc: Document, el: Element): Slab | null {
       const d = wallDirection(w);
       const n: [number, number, number] = [-d.y, d.x, 0];
       const c0 = n[0] * w.params.start.x + n[1] * w.params.start.y + wallThickness(doc, w) / 2;
-      return { n, bounds: cum(c0, -1), materials };
+      return { n, bounds: cum(c0, -1), materials, functions };
     }
     case Cat.Floor: {
       const { top } = floorExtent(doc, el as Floor);
-      return { n: [0, 0, 1], bounds: cum(top, -1), materials };
+      return { n: [0, 0, 1], bounds: cum(top, -1), materials, functions };
     }
     case Cat.Ceiling: {
       // Ceiling layers build upwards from the underside.
       const { bottom } = ceilingExtent(doc, el as Ceiling);
-      return { n: [0, 0, 1], bounds: cum(bottom, 1), materials };
+      return { n: [0, 0, 1], bounds: cum(bottom, 1), materials, functions };
     }
     default:
       return null;
@@ -99,7 +104,7 @@ export function layerRegions(doc: Document, el: Element, loops: Vec2[][], frame:
       const lo = Math.min(s.bounds[i]!, s.bounds[i + 1]!);
       let poly = clipHalf(loop, (p) => hi - value(p));
       poly = clipHalf(poly, (p) => value(p) - lo);
-      if (poly.length >= 3 && Math.abs(area(poly)) > 1e-3) out.push({ loop: poly, materialId: s.materials[i] });
+      if (poly.length >= 3 && Math.abs(area(poly)) > 1e-3) out.push({ loop: poly, materialId: s.materials[i], function: s.functions[i] });
     }
   }
   return out;

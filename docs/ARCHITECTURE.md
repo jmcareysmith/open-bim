@@ -59,6 +59,12 @@ more = T/X junction) or *tee* (end lies within another wall's thickness, clear o
 Walls only join if they overlap vertically. `joinedWallFootprint()` in geometry mitres L
 corners, stops tee stems at the through wall's face, and splits multi-wall junctions into
 wedges; neighbours compute identical cut points so footprints tile with no overlap.
+`disallowJoin` (per end) keeps an end square and out of joins. Plan drawings then clean the cut
+per layer (`cleanCuts()` in `wallcleanup.ts`, shared by the viewport and sheets/PDF): overlapping
+layer regions of joined or crossing walls give way by layer priority (structure, substrate,
+thermal, membrane, finishes; ties to the through wall, then the thicker), tee stems' cores extend
+through the through wall's finish to its core, and boundary lines shared with a joined wall of
+the same material are dropped. The 3D solids are unchanged.
 
 **Sketches** — floor/ceiling (later roof) boundaries are closed loops. `regionFromLoops()` takes the
 largest loop as the boundary and the rest as holes; `validateRegion()` rejects self-crossing loops,

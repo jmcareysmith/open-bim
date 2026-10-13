@@ -62,11 +62,18 @@ export function relatedWalls(doc: Document, wall: Wall): ElementId[] {
 
 // ---- internals -------------------------------------------------------------
 
+/** True if this end of the wall has Disallow Join set. */
+export function joinDisallowed(wall: Wall, end: WallEnd): boolean {
+  return !!wall.params.disallowJoin?.[end];
+}
+
 function joinAt(doc: Document, wall: Wall, end: WallEnd, others: Wall[]): WallJoin | null {
+  if (joinDisallowed(wall, end)) return null;
   const p = wallEndPoint(wall, end);
   const meeting: { wallId: ElementId; end: WallEnd }[] = [];
   for (const o of others) {
     for (const e of WALL_ENDS) {
+      if (joinDisallowed(o, e)) continue;
       const q = wallEndPoint(o, e);
       if (Math.hypot(q.x - p.x, q.y - p.y) <= JOIN_TOLERANCE) meeting.push({ wallId: o.id, end: e });
     }

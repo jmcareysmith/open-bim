@@ -129,7 +129,8 @@ export function flipWall(tx: Transaction, doc: Document, wallId: ElementId): voi
   const wall = doc.require<WallParams>(wallId) as Wall;
   if (wall.category !== Cat.Wall) throw new Error("Only walls can be flipped");
   const len = wallLength(wall);
-  tx.update<WallParams>(wallId, { start: wall.params.end, end: wall.params.start });
+  const dj = wall.params.disallowJoin;
+  tx.update<WallParams>(wallId, { start: wall.params.end, end: wall.params.start, ...(dj ? { disallowJoin: { start: !!dj.end, end: !!dj.start } } : {}) });
   for (const e of doc.all()) {
     if (!cutters.has(e.category)) continue;
     const p = e.params as { hostId?: ElementId; position: number; facingFlipped?: boolean; handFlipped?: boolean };

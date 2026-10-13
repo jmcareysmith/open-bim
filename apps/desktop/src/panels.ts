@@ -1930,6 +1930,13 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       const flip = h("button", { textContent: "Flip (swap exterior side)" });
       flip.onclick = () => edit(ctx, "Flip wall", (tx) => flipWall(tx, doc, w.id));
       sec.append(row("Orientation", flip));
+      // Disallow Join per end (Revit: right-click a wall end → Disallow Join).
+      for (const end of ["start", "end"] as const) {
+        const cb = h("input", { type: "checkbox" }) as HTMLInputElement;
+        cb.checked = !!p.disallowJoin?.[end];
+        cb.onchange = () => update<WallParams>(cb.checked ? "Disallow join" : "Allow join", { disallowJoin: { ...p.disallowJoin, [end]: cb.checked } });
+        sec.append(row(end === "start" ? "Disallow join at start" : "Disallow join at end", cb));
+      }
       // Attach Top/Base (Modify tab or right-click to attach; detach here).
       for (const end of ["top", "base"] as const) {
         const id = end === "top" ? p.topAttachId : p.baseAttachId;

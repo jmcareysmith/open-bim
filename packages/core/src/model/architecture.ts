@@ -197,6 +197,8 @@ export type WallParams = {
   topAttachId?: ElementId | null;
   /** Attach Base: a floor the base sits on (its top). */
   baseAttachId?: ElementId | null;
+  /** Disallow Join (Revit): these ends stay square and don't join other walls. */
+  disallowJoin?: { start?: boolean; end?: boolean } | null;
 };
 export type Wall = Element<WallParams>;
 

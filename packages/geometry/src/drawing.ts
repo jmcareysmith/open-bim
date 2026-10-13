@@ -25,7 +25,8 @@ import {
 import { GRID_BUBBLE_RADIUS, type LineData } from "./datums.ts";
 import { planLinework, type PlanLinework } from "./hlr.ts";
 import type { GeometryKernel } from "./kernel.ts";
-import { layerRegions, planFrame } from "./layers.ts";
+import { planFrame } from "./layers.ts";
+import { cleanCuts } from "./wallcleanup.ts";
 import { hatch, patternFamilies } from "./patterns.ts";
 import { sectionAnnotations, sectionLinework, type Rect } from "./sections.ts";
 
@@ -121,8 +122,11 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
   const linework: PlanLinework[] = section ? sectionLinework(items, view) : planLinework(items, range!);
   const frame = section ? viewFrame(view) : planFrame(range!.cut);
   const detailed = g.detailLevel !== "coarse";
+  // Cuts with wall joins cleaned up (plans): layers run through by priority, joint lines drop.
+  const cuts = cleanCuts(doc, linework, frame, detailed, !section);
   for (const lw of linework) {
     const el = doc.require(lw.id);
+    const cc = cuts.get(lw.id) ?? { loops: lw.cutLoops, lines: loopSegments(lw.cutLoops), regions: null };
     const r = elementGraphics(doc, g, el);
     const proj = lineStyle(r, r.projection, lw.id);
     const cut = lineStyle(r, r.cut, lw.id);
@@ -141,18 +145,18 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
       if (fam) out.strokes.push({ kind: "hatch", segments: hatch(loops, fam), ...proj, ...(fg.color !== null ? { color: fg.color } : {}) });
     };
     if (detailed) {
-      for (const reg of layerRegions(doc, el, lw.cutLoops, frame)) {
+      for (const reg of cc.regions ?? []) {
         const m = reg.materialId ? doc.get<MaterialParams>(reg.materialId) : undefined;
         cutFill([reg.loop], m?.params.cutPattern ?? "diagonal", "solid");
-        out.strokes.push({ kind: "beyond", segments: loopSegments([reg.loop]), ...cut });
+        if (reg.lines.length) out.strokes.push({ kind: "beyond", segments: reg.lines, ...cut });
       }
-    } else if (lw.cutLoops.length) {
-      cutFill(lw.cutLoops, null, "poche");
+    } else if (cc.loops.length) {
+      cutFill(cc.loops, null, "poche");
     }
     if (lw.projection.length) out.strokes.push({ kind: "beyond", segments: lw.projection, ...proj });
     const sf = r.surface.foreground;
     if (lw.surface.length && sf.visible) out.strokes.push({ kind: "surface", segments: lw.surface, ...proj, ...(sf.color !== null ? { color: sf.color } : {}) });
-    if (lw.cutLoops.length) out.strokes.push({ kind: "cut", segments: loopSegments(lw.cutLoops), ...cut });
+    if (cc.lines.length) out.strokes.push({ kind: "cut", segments: cc.lines, ...cut });
   }
 
   // Line work: datums, plan symbols, view markers, annotations.

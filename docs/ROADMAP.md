@@ -77,7 +77,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Align, Offset, Trim/Extend, Split (walls, lines, beams, grids) — align to wall faces/centrelines, grids, planes, polygon edges; trim to corner or to a boundary (multiple); doors kept in place or refused if cut; plans/3D only
 - [x] Drag to edit: grips on wall/line/datum ends, drag to move, temporary dimensions (click to type) — also sketch vertices, stair run ends, door slide, point elements; plans and sections/sheets (annotations); joined wall corners follow
 - [x] Walls attach top/base to floors, ceilings and roofs — tops follow sloped roof undersides (kinks at ridges/hips), floor/ceiling undersides; bases to a floor's top; detach restores own height
-- [ ] Wall joins: per-layer cleanup, disallow join, clean crossing (X) walls
+- [x] Wall joins: per-layer cleanup, disallow join, clean crossing (X) walls
 - [ ] Floors: pick walls (with offset), slope arrows
 - [ ] 3D views save their camera; perspective camera views
 - [ ] Schedules on sheets; calculated fields

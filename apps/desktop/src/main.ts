@@ -87,6 +87,7 @@ import {
   defaultGraphics,
   sunDirection,
   viewSunDate,
+  type WallParams,
 } from "@open-bim/core";
 import { OcctKernel, SimpleKernel, findClashes, exportGlb, exportObj, exportParts, areaLoopsFromWalls, drawingDxf, parseDxf, viewDrawing, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
@@ -1218,6 +1219,7 @@ function openCanvasMenu(ev: MouseEvent): void {
     const type = el.typeId ? doc.get(el.typeId) : undefined;
     const many = selection.length > 1;
     const walls = selection.map((s) => doc.get(s)).filter((e): e is ModelElement => e?.category === Cat.Wall);
+    const menuPoint = viewport.viewMode === "drawing" ? null : viewport.pickPlane(ev, 0);
     items.push(
       { heading: many ? `${selection.length} elements` : `${el.category}${type?.name ? `: ${type.name}` : el.name ? `: ${el.name}` : ""}` },
       { label: "Move", hint: "MV", action: () => setTool("move") },
@@ -1236,6 +1238,16 @@ function openCanvasMenu(ev: MouseEvent): void {
         items.push({
           label: "Detach Top/Base",
           action: () => edit("Detach", (tx) => attached.forEach((w) => (detachWall(tx, doc, w.id, "top"), detachWall(tx, doc, w.id, "base")))),
+        });
+      }
+      // Disallow/Allow Join at the wall end nearest where the menu was opened.
+      if (walls.length === 1 && menuPoint) {
+        const w = walls[0]!.params as WallParams;
+        const end = Math.hypot(w.start.x - menuPoint.x, w.start.y - menuPoint.y) <= Math.hypot(w.end.x - menuPoint.x, w.end.y - menuPoint.y) ? "start" : "end";
+        const off = !!w.disallowJoin?.[end];
+        items.push({
+          label: off ? "Allow Join (this end)" : "Disallow Join (this end)",
+          action: () => edit(off ? "Allow join" : "Disallow join", (tx) => tx.update<WallParams>(walls[0]!.id, { disallowJoin: { ...w.disallowJoin, [end]: !off } })),
         });
       }
       items.push({

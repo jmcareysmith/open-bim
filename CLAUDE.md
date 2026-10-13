@@ -90,7 +90,10 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   visual styles too: Shaded/Consistent/Realistic show the coloured model under the line work.
 - Under the view: open-view tabs (bottom, Revit-style per Jeremy) and the view control bar (scale,
   detail level, visual style for 3D, temporary hide/isolate, reveal hidden in magenta).
-- Known gaps: joins whole-wall (no per-layer cleanup), no disallow-join, crossing walls overlap; grids straight only;
+- Wall join cleanup in plans (`geometry/src/wallcleanup.ts`): layers give way by priority (structure
+  first), tee stems' cores run to the through wall's core, crossing walls clean (thicker wins), no
+  lines between joined walls of the same material. Disallow Join per end (Properties / right-click).
+- Known gaps: join cleanup is plan-only (3D solids overlap at crossings); grids straight only;
   floors lack pick-walls/slope arrows; roofs exact for convex/L/T/U only; doors/windows parametric;
   dimensions only in plans via the tool; no 3D view camera saved per view; viewport (interactive)
   and sheet/PDF drawing paths are separate (fold the viewport onto `viewDrawing` later).

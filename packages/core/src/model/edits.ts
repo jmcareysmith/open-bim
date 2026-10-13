@@ -175,6 +175,12 @@ export function splitElement(tx: Transaction, doc: Document, id: ElementId, poin
   const p = { ...structuredClone(el.params), start: cut, end: { ...end } } as Params;
   const second = tx.create(el.category, p, { ...(el.name !== undefined ? { name: el.name } : {}), ...(el.typeId ? { typeId: el.typeId } : {}) });
   tx.update(id, { end: cut } as Params);
+  // The two pieces join each other at the cut, whatever their outer ends do.
+  const dj = (el.params as { disallowJoin?: { start?: boolean; end?: boolean } | null }).disallowJoin;
+  if (dj) {
+    tx.update(id, { disallowJoin: { start: !!dj.start, end: false } } as Params);
+    tx.update(second.id, { disallowJoin: { start: false, end: !!dj.end } } as Params);
+  }
   for (const h of hosted) {
     const k = alongKey(h);
     const pos = (h.params as Record<string, number>)[k]!;

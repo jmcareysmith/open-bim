@@ -1,4 +1,4 @@
-import { areaBoundary, areaLoopsFromWalls, massFloorArea, massTotals, roomBoundary, scheduleFields, scheduleTable } from "@open-bim/geometry";
+import { areaBoundary, curtainGridLines, areaLoopsFromWalls, massFloorArea, massTotals, roomBoundary, scheduleFields, scheduleTable } from "@open-bim/geometry";
 import {
   Cat,
   levels,
@@ -177,6 +177,10 @@ import {
   layerMaterial,
   PATTERNS,
   setWallSweeps,
+  setCurtainEdits,
+  curtainOf,
+  type CurtainEdits,
+  type CurtainPanelKind,
   wallExtent,
   type Vec2,
   setWallProfile,
@@ -391,6 +395,117 @@ function rValueInput(value: number | null | undefined, onCommit: (v: number | nu
     else input.value = value ? String(value) : "";
   };
   return input;
+}
+
+const PANEL_CYCLE: CurtainPanelKind[] = ["glass", "solid", "empty", "door"];
+const PANEL_FILL: Record<CurtainPanelKind, string> = { glass: "#bcdcec", solid: "#c9ccd0", empty: "#ffffff", door: "#8fb8cf" };
+
+/**
+ * A curtain wall's own grid (Revit: add/remove grid line segments, swap panels): an elevation of the
+ * wall seen from its interior side, start on the left. Click a panel to swap it (glass → solid → empty → door), click an
+ * interior grid line segment to remove or restore its mullion. Line positions are typed below.
+ */
+function curtainRows(ctx: PanelContext, w: Wall): HTMLElement[] {
+  const { doc } = ctx;
+  const grid = curtainOf(doc, w)!;
+  const len = wallLength(w);
+  const { bottom, top } = wallExtent(doc, w);
+  const ed: CurtainEdits = w.params.curtainEdits ?? {};
+  const { u: us, z: zs } = curtainGridLines(len, bottom, top, grid, ed);
+  const save = (next: CurtainEdits | null, name = "Edit curtain wall") => edit(ctx, name, (tx) => setCurtainEdits(tx, doc, w.id, next));
+  const out: HTMLElement[] = [h("div", { class: "subhead" }, "Curtain grid and panels")];
+  const W = 260;
+  const k = W / len;
+  const H = (top - bottom) * k;
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("width", String(W + 8));
+  svg.setAttribute("height", String(H + 8));
+  svg.classList.add("cw-editor");
+  const g = document.createElementNS(NS, "g");
+  g.setAttribute("transform", "translate(4,4)");
+  svg.append(g);
+  const X = (u: number) => u * k;
+  const Y = (z: number) => H - (z - bottom) * k;
+  const removed = new Set(ed.removed ?? []);
+  for (let i = 0; i + 1 < us.length; i++)
+    for (let j = 0; j + 1 < zs.length; j++) {
+      const kind = ed.panels?.[`${i},${j}`] ?? "glass";
+      const r = document.createElementNS(NS, "rect");
+      r.setAttribute("x", String(X(us[i]!)));
+      r.setAttribute("y", String(Y(zs[j + 1]!)));
+      r.setAttribute("width", String(X(us[i + 1]!) - X(us[i]!)));
+      r.setAttribute("height", String(Y(zs[j]!) - Y(zs[j + 1]!)));
+      r.setAttribute("fill", PANEL_FILL[kind]);
+      r.classList.add("cw-panel");
+      const t = document.createElementNS(NS, "title");
+      t.textContent = `Panel ${i + 1},${j + 1}: ${kind} (click to swap)`;
+      r.append(t);
+      r.addEventListener("click", () => {
+        const next = PANEL_CYCLE[(PANEL_CYCLE.indexOf(kind) + 1) % PANEL_CYCLE.length]!;
+        const panels = { ...(ed.panels ?? {}), [`${i},${j}`]: next };
+        if (next === "glass") delete panels[`${i},${j}`];
+        save({ ...ed, panels }, "Swap curtain panel");
+      });
+      g.append(r);
+      if (kind === "door") {
+        const d = document.createElementNS(NS, "text");
+        d.setAttribute("x", String((X(us[i]!) + X(us[i + 1]!)) / 2));
+        d.setAttribute("y", String((Y(zs[j]!) + Y(zs[j + 1]!)) / 2 + 4));
+        d.setAttribute("text-anchor", "middle");
+        d.classList.add("cw-label");
+        d.textContent = "Door";
+        g.append(d);
+      }
+    }
+  // Grid line segments: interior ones toggle; edges are the type's border mullions.
+  const seg = (key: string | null, x1: number, y1: number, x2: number, y2: number) => {
+    const gone = key !== null && removed.has(key);
+    const l = document.createElementNS(NS, "line");
+    for (const [a, v] of [["x1", x1], ["y1", y1], ["x2", x2], ["y2", y2]] as const) l.setAttribute(a, String(v));
+    l.classList.add("cw-line");
+    if (gone) l.classList.add("removed");
+    if (key) {
+      l.classList.add("cw-hit");
+      const t = document.createElementNS(NS, "title");
+      t.textContent = gone ? "Removed mullion (click to restore)" : "Mullion (click to remove this segment)";
+      l.append(t);
+      l.addEventListener("click", () => {
+        const next = new Set(removed);
+        if (gone) next.delete(key);
+        else next.add(key);
+        save({ ...ed, removed: [...next] }, gone ? "Add mullion segment" : "Remove mullion segment");
+      });
+    }
+    g.append(l);
+  };
+  for (let a = 0; a < us.length; a++)
+    for (let j = 0; j + 1 < zs.length; j++) seg(a === 0 || a === us.length - 1 ? null : `v:${a}:${j}`, X(us[a]!), Y(zs[j]!), X(us[a]!), Y(zs[j + 1]!));
+  for (let b = 0; b < zs.length; b++)
+    for (let i = 0; i + 1 < us.length; i++) seg(b === 0 || b === zs.length - 1 ? null : `h:${b}:${i}`, X(us[i]!), Y(zs[b]!), X(us[i + 1]!), Y(zs[b]!));
+  out.push(h("div", { class: "cw-wrap" }, svg as unknown as HTMLElement, h("div", { class: "muted" }, "Seen from inside, start on the left. Click a panel to swap it; click a grid line to remove or restore its mullion.")));
+  // Grid line positions: a list in mm; changing the lines resets panel swaps and removed segments.
+  const list = (vals: number[], onCommit: (v: number[] | null) => void) => {
+    const input = h("input", { type: "text", value: vals.map((v) => String(Math.round(v))).join(", "), title: "Positions in mm, separated by commas; blank = the type's spacing" }) as HTMLInputElement;
+    input.onchange = () => {
+      const txt = input.value.trim();
+      if (!txt) return onCommit(null);
+      const xs = txt.split(/[,\s]+/).map(Number);
+      if (xs.some((x) => !Number.isFinite(x))) return ctx.status("\u26a0 Grid lines are numbers in mm, separated by commas");
+      onCommit(xs);
+    };
+    return input;
+  };
+  out.push(
+    row("Vertical lines (from start)", list(us.slice(1, -1), (v) => save({ uLines: v, zLines: ed.zLines ?? null }, "Curtain grid lines"))),
+    row("Horizontal lines (above base)", list(zs.slice(1, -1).map((z) => z - bottom), (v) => save({ uLines: ed.uLines ?? null, zLines: v }, "Curtain grid lines"))),
+  );
+  if (w.params.curtainEdits) {
+    const reset = h("button", { textContent: "Reset to type" });
+    reset.onclick = () => save(null, "Reset curtain wall");
+    out.push(row("", reset));
+  }
+  return out;
 }
 
 /** Edit Profile: the wall's elevation outline — presets and its points (along, up from base). */
@@ -2371,6 +2486,10 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Thickness", len(wallThickness(doc, w))),
         row("Room bounding", checkbox(p.roomBounding !== false, (v) => update<WallParams>("Change room bounding", { roomBounding: v }))),
       );
+      if (curtainOf(doc, w)) {
+        sec.append(...curtainRows(ctx, w));
+        break;
+      }
       sec.append(...profileRows(ctx, w));
       sec.append(...sweepRows(ctx, w));
       sec.append(...bracingRows(ctx, w));
@@ -3487,6 +3606,18 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
           num("panelThickness", "Panel thickness"),
           row("Panel material", select(matOpts, grid.panelMaterialId ?? "", (v) => setGrid({ panelMaterialId: v }))),
           row("Mullion material", select(matOpts, grid.mullionMaterialId ?? "", (v) => setGrid({ mullionMaterialId: v }))),
+          row(
+            "Mullion type",
+            select(
+              [
+                { value: "rectangular", label: "Rectangular (width \u00d7 depth)" },
+                { value: "circular", label: "Circular (width = diameter)" },
+              ],
+              grid.mullionShape ?? "rectangular",
+              (v) => setGrid({ mullionShape: v as "rectangular" | "circular" }),
+            ),
+          ),
+          row("Border mullions", checkbox(grid.borderMullions !== false, (v) => setGrid({ borderMullions: v }))),
         );
         break;
       }

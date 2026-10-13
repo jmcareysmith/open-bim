@@ -158,6 +158,28 @@ export type CurtainGrid = {
   panelThickness: number;
   panelMaterialId?: ElementId | null;
   mullionMaterialId?: ElementId | null;
+  /** Mullion type: rectangular (width × depth) or circular (width = diameter). Default rectangular. */
+  mullionShape?: "rectangular" | "circular" | null;
+  /** Mullions round the edge of the wall (default true). */
+  borderMullions?: boolean | null;
+};
+
+/** A curtain panel: glazed (default), solid, empty (no panel) or a glazed door. */
+export type CurtainPanelKind = "glass" | "solid" | "empty" | "door";
+
+/**
+ * One curtain wall's own grid and panels (Revit: add/remove grid line segments, swap panels).
+ * Cells are numbered from the wall's start (i) and its base (j).
+ */
+export type CurtainEdits = {
+  /** Interior vertical grid lines, mm along from the start; the type's equal spacing when unset. */
+  uLines?: number[] | null;
+  /** Interior horizontal grid lines, mm above the wall's base. */
+  zLines?: number[] | null;
+  /** Panel swaps by cell, "i,j". */
+  panels?: Record<string, CurtainPanelKind> | null;
+  /** Removed mullion segments: "v:k:j" (vertical line k in row j) or "h:k:i" (horizontal line k in bay i). */
+  removed?: string[] | null;
 };
 
 /**
@@ -204,6 +226,24 @@ export function curtainOf(doc: Document, wall: Element): CurtainGrid | undefined
   return t?.params.curtain ?? undefined;
 }
 
+/** Set a curtain wall's own grid and panels (validated: lines inside the wall, panels known). */
+export function setCurtainEdits(tx: Transaction, doc: Document, id: ElementId, edits: CurtainEdits | null): void {
+  const wall = doc.require<WallParams>(id) as Wall;
+  if (wall.category !== Cat.Wall || !curtainOf(doc, wall)) throw new Error("Only curtain walls have grid lines and panels");
+  if (edits) {
+    const len = wallLength(wall);
+    const { bottom, top } = wallExtent(doc, wall);
+    const check = (xs: number[] | null | undefined, max: number, what: string) => {
+      for (const x of xs ?? []) if (!(x > 0 && x < max)) throw new Error(`${what} grid lines must be inside the wall`);
+    };
+    check(edits.uLines, len, "Vertical");
+    check(edits.zLines, top - bottom, "Horizontal");
+    for (const k of Object.values(edits.panels ?? {})) if (!["glass", "solid", "empty", "door"].includes(k)) throw new Error(`Unknown panel ${k}`);
+  }
+  const sorted = (xs: number[] | null | undefined) => (xs ? [...new Set(xs.map((x) => Math.round(x * 10) / 10))].sort((a, b) => a - b) : xs);
+  tx.update<WallParams>(id, { curtainEdits: edits ? { ...edits, uLines: sorted(edits.uLines), zLines: sorted(edits.zLines) } : null });
+}
+
 export function totalThickness(t: Element<LayeredTypeParams>): number {
   return t.params.layers.reduce((sum, l) => sum + l.thickness, 0);
 }
@@ -232,6 +272,8 @@ export type WallParams = {
   disallowJoin?: { start?: boolean; end?: boolean } | null;
   /** This wall's own sweeps and reveals (the type's come first; see model/sweeps.ts). */
   sweeps?: WallSweep[] | null;
+  /** Curtain walls: this wall's grid lines, mullion segments and panel swaps. */
+  curtainEdits?: CurtainEdits | null;
   /** Edit Profile: the wall's elevation outline (x along from its start, y up from its base, mm); a rectangle when unset. */
   profile?: Vec2[] | null;
 };

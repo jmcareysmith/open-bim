@@ -155,7 +155,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Stairs (Stair tool: run ends, Enter; D1/AS1 checks), ramps (1:12 check), railings (sketched or
   on stairs/ramps, F4/AS1 gap). Runs are straight; L/U by drawing runs; stair Properties → Turns: landings or 2–4 winders per square turn
   (provisional walking-line going check); railings round the corners. No curved runs.
-- Curtain walls: wall type "Curtain Wall - Aluminium 1200 x 1500" (grid in type properties).
+- Curtain walls: wall type "Curtain Wall - Aluminium 1200 x 1500" (grid, mullion type rectangular/circular, border
+  mullions in type properties). Per wall (Properties → Curtain grid and panels): elevation diagram (click panel
+  = glass → solid → empty → door; click grid line = remove/restore segment), typed line positions; `curtainEdits`.
 - Stacked walls: browser Types → New stacked wall type (segments in its properties).
 - Toposolids: Toposolid tool (sketch boundary) + Import survey CSV (E,N,RL m) in Properties; contours.
 - Structure: Column / Beam / Footing tools; sections (NZ timber/steel/concrete) as Structural types.

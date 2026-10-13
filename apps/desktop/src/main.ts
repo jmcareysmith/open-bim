@@ -440,6 +440,7 @@ const ctx: ModifyToolContext & PanelContext = {
     (tools.slopeArrow as SlopeArrowTool).floorId = id;
     setTool("slopeArrow");
   },
+  modelBounds: () => viewport.modelBounds(),
   editBoundary(id) {
     const el = doc.require<FloorParams | CeilingParams | RoofParams>(id);
     const name = { [Cat.Ceiling]: "ceiling", [Cat.Roof]: "roof", [Cat.FilledRegion]: "region", [Cat.BuildingPad]: "pad", [Cat.SiteSubregion]: "subregion" }[el.category] ?? "floor";
@@ -524,6 +525,11 @@ const DRAWING_TOOLS = new Set(["select", "symbol", "detailcomponent", "placegrou
 let tool: Tool = tools.select!;
 /** Grips and temporary dimensions for the selection (Select tool only). */
 let grips: GripLayer | undefined = new GripLayer(ctx, $("#viewport"));
+// Dragging a section box face saves it in the open 3D view.
+viewport.onSectionBoxChange = (box) => {
+  const v = activeView();
+  if (v?.params.kind === "3d") edit("Section box", (tx) => tx.update<ViewParams>(v.id, { sectionBox: box }));
+};
 // The ViewCube's Orthographic/Perspective switch is the open 3D view's setting.
 viewport.onProjectionChange = (ortho) => {
   const v = activeView();
@@ -1343,6 +1349,7 @@ function configureViewport(vp: Viewport, target: ModelElement, primary: boolean)
   } else {
     vp.setViewMode("3d");
     vp.setOrtho(v.params.projection !== "perspective");
+    vp.setSectionBox(v.params.sectionBox ?? null);
     // Each 3D view keeps its own camera: restore it on opening (or when its saved camera changes).
     if (primary) {
       const json = JSON.stringify(v.params.camera ?? null);

@@ -328,7 +328,7 @@ export class Viewport {
     this.controlsDraw.enabled = false;
     this.controlsDraw.addEventListener("change", () => (this.needsRender = true));
     // Orbit about the selection (Revit): in 3D with something selected, the orbit pivots on it.
-    this.renderer.domElement.addEventListener("pointerdown", (ev) => this.orbitAboutSelection(ev), { capture: true });
+    this.renderer.domElement.addEventListener("pointerdown", (ev) => this.dragBoxHandle(ev) || this.orbitAboutSelection(ev), { capture: true });
 
     this.hemi = new THREE.HemisphereLight(0xffffff, 0x445566, 1.6);
     this.scene.add(this.hemi);
@@ -639,6 +639,115 @@ export class Viewport {
     const g = this.resolveGraphics(el);
     const c = exact ? base : (g.color ?? base);
     return g.halftone ? blend(c, HALFTONE_TOWARD, 0.6) : c;
+  }
+
+  /** Section box (3D): the box, its outline and face handles, drawn over the clipped model. */
+  private sectionBox: THREE.Box3 | null = null;
+  private boxScene = new THREE.Scene();
+  private boxHandles: THREE.Mesh[] = [];
+  /** Called when a section box handle is dragged (to save it in the view). */
+  onSectionBoxChange: ((box: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } }) => void) | null = null;
+
+  /** The visible model's extents (for a new section box). */
+  modelBounds(): { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } } | null {
+    const box = new THREE.Box3();
+    for (const [id, g] of this.objects) if (this.meshes.has(id) && g.visible) box.expandByObject(g);
+    if (box.isEmpty()) return null;
+    box.expandByScalar(500);
+    return { min: { x: box.min.x, y: box.min.y, z: box.min.z }, max: { x: box.max.x, y: box.max.y, z: box.max.z } };
+  }
+
+  setSectionBox(b: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } } | null): void {
+    this.sectionBox = b ? new THREE.Box3(new THREE.Vector3(b.min.x, b.min.y, b.min.z), new THREE.Vector3(b.max.x, b.max.y, b.max.z)) : null;
+    this.buildBoxOverlay();
+    this.applyClipping();
+  }
+
+  private buildBoxOverlay(): void {
+    for (const c of [...this.boxScene.children]) {
+      this.boxScene.remove(c);
+      c.traverse((o) => {
+        if (o instanceof THREE.Mesh || o instanceof THREE.LineSegments) {
+          o.geometry.dispose();
+          (o.material as THREE.Material).dispose();
+        }
+      });
+    }
+    this.boxHandles = [];
+    const b = this.sectionBox;
+    if (!b) return;
+    const size = b.getSize(new THREE.Vector3());
+    const centre = b.getCenter(new THREE.Vector3());
+    const lines = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(size.x, size.y, size.z)), new THREE.LineBasicMaterial({ color: 0x3a7bd5 }));
+    lines.position.copy(centre);
+    this.boxScene.add(lines);
+    // A blue arrow on each face, pointing out, to drag that face.
+    const r = Math.max(150, Math.min(size.x, size.y, size.z) * 0.04);
+    const faces: [THREE.Vector3, "min" | "max", "x" | "y" | "z"][] = [
+      [new THREE.Vector3(1, 0, 0), "max", "x"],
+      [new THREE.Vector3(-1, 0, 0), "min", "x"],
+      [new THREE.Vector3(0, 1, 0), "max", "y"],
+      [new THREE.Vector3(0, -1, 0), "min", "y"],
+      [new THREE.Vector3(0, 0, 1), "max", "z"],
+      [new THREE.Vector3(0, 0, -1), "min", "z"],
+    ];
+    for (const [n, side, axis] of faces) {
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(r, r * 2.4, 16), new THREE.MeshBasicMaterial({ color: 0x2f6fd6, depthTest: false }));
+      const at = centre.clone();
+      at[axis] = b[side][axis];
+      cone.position.copy(at).addScaledVector(n, r * 1.4);
+      cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), n);
+      cone.renderOrder = 10;
+      cone.userData = { side, axis };
+      this.boxScene.add(cone);
+      this.boxHandles.push(cone);
+    }
+  }
+
+  /** Drag a section box face by its arrow (3D, taken before orbiting or selecting). */
+  private dragBoxHandle(ev: PointerEvent): boolean {
+    if (this.mode !== "3d" || !this.sectionBox || ev.button !== 0) return false;
+    this.setRay(ev);
+    const hit = this.raycaster.intersectObjects(this.boxHandles, false)[0];
+    if (!hit) return false;
+    ev.stopImmediatePropagation();
+    ev.preventDefault();
+    const { side, axis } = hit.object.userData as { side: "min" | "max"; axis: "x" | "y" | "z" };
+    const box = this.sectionBox;
+    const dir = new THREE.Vector3(axis === "x" ? 1 : 0, axis === "y" ? 1 : 0, axis === "z" ? 1 : 0);
+    const origin = box.getCenter(new THREE.Vector3());
+    // Where the mouse ray passes closest to the face's axis line.
+    const along = (e: PointerEvent) => {
+      this.setRay(e);
+      const ray = this.raycaster.ray;
+      const w0 = origin.clone().sub(ray.origin);
+      const a = dir.dot(dir);
+      const b2 = dir.dot(ray.direction);
+      const c = ray.direction.dot(ray.direction);
+      const d = dir.dot(w0);
+      const e2 = ray.direction.dot(w0);
+      const den = a * c - b2 * b2;
+      return Math.abs(den) < 1e-9 ? 0 : (b2 * e2 - c * d) / den;
+    };
+    const t0 = along(ev);
+    const start = box[side][axis];
+    const el = this.renderer.domElement;
+    el.setPointerCapture(ev.pointerId);
+    const move = (e: PointerEvent) => {
+      const v = start + (along(e) - t0);
+      const other = side === "max" ? box.min[axis] : box.max[axis];
+      box[side][axis] = side === "max" ? Math.max(other + 100, v) : Math.min(other - 100, v);
+      this.buildBoxOverlay();
+      this.applyClipping();
+    };
+    const up = () => {
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      this.onSectionBoxChange?.({ min: { x: box.min.x, y: box.min.y, z: box.min.z }, max: { x: box.max.x, y: box.max.y, z: box.max.z } });
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+    return true;
   }
 
   /** Thin Lines (Revit's TL): every line 1 px, ignoring line weights. */
@@ -1116,6 +1225,19 @@ export class Viewport {
     // Keep bottom - 1 mm so floor tops sitting exactly at the level stay visible.
     this.drawingDirty = true;
     const crop = this.planCrop;
+    const sb = this.sectionBox;
+    if (this.mode === "3d" && sb) {
+      this.renderer.clippingPlanes = [
+        new THREE.Plane(new THREE.Vector3(1, 0, 0), -sb.min.x),
+        new THREE.Plane(new THREE.Vector3(-1, 0, 0), sb.max.x),
+        new THREE.Plane(new THREE.Vector3(0, 1, 0), -sb.min.y),
+        new THREE.Plane(new THREE.Vector3(0, -1, 0), sb.max.y),
+        new THREE.Plane(new THREE.Vector3(0, 0, 1), -sb.min.z),
+        new THREE.Plane(new THREE.Vector3(0, 0, -1), sb.max.z),
+      ];
+      this.needsRender = true;
+      return;
+    }
     this.renderer.clippingPlanes =
       this.mode === "plan"
         ? [
@@ -1264,6 +1386,15 @@ export class Viewport {
         this.scene.fog = (in3d || shaded) && this.depthCue ? this.cueFog(this.camera) : null;
         if ((in3d || shaded) && this.ambientShadows) this.composer(this.camera).render();
         else this.renderer.render(this.scene, this.camera);
+        if (in3d && this.sectionBox) {
+          // The section box's outline and arrows, unclipped, over the model.
+          const clip = this.renderer.clippingPlanes;
+          this.renderer.clippingPlanes = [];
+          this.renderer.autoClear = false;
+          this.renderer.render(this.boxScene, this.camera);
+          this.renderer.autoClear = true;
+          this.renderer.clippingPlanes = clip;
+        }
       }
       this.needsRender = false;
       for (const fn of this.frameListeners) fn();
@@ -1469,6 +1600,9 @@ function makeGroup(mesh: MeshData, color: number, opacity = 1): THREE.Group {
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 1,
   });
+  mat.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace("#include <dithering_fragment>", "#include <dithering_fragment>\n  if (!gl_FrontFacing) gl_FragColor = vec4(0.42, 0.43, 0.45, gl_FragColor.a);");
+  };
   const edges = new THREE.LineSegments(
     new THREE.EdgesGeometry(geom, 20),
     new THREE.LineBasicMaterial({ color: 0x14171b, transparent: opacity < 1, opacity }),

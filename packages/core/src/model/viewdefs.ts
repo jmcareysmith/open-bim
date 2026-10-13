@@ -81,6 +81,8 @@ export type ViewParams = {
   phase?: string | null;
   /** 3D views: the saved camera (where the view looks from and to). */
   camera?: ViewCamera | null;
+  /** 3D views: Section Box (Revit: Extents → Section Box) — only what's inside it shows. */
+  sectionBox?: { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } } | null;
   /** 3D views: orthographic (the default, as Revit's {3D}) or perspective (camera views). */
   projection?: "orthographic" | "perspective" | null;
   /** 3D views: Sun Settings (solar study or direct lighting angles) and whether shadows show. */

@@ -77,6 +77,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Grid bubbles, view markers and reference plane labels scale with the view scale (paper size ×
   1:n), on screen and on sheets; grids are dash-dot with solid ends; section tails are a bar in the
   view direction.
+- 3D views: white background, shaded three.js ViewCube in an N/E/S/W compass ring (viewcube.ts; click
+  face/edge/corner, right-click Orthographic/Perspective; {3D} orthographic), Section box (view Properties;
+  drag the blue arrows; `sectionBox` param; cut faces drawn grey).
 - 3D views keep their own camera (`camera` param, saved without an undo step on leaving the view
   or saving); View → 3D View ▾ → Camera: eye then target in a plan makes a perspective view at
   1750 eye height (eye/target elevation and field of view in Properties).

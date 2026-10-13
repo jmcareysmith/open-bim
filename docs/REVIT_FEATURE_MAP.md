@@ -82,7 +82,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 7. Views
 | Feature | Phase | Status |
 |---|---|---|
-| 3D view (orbit, pan, zoom, section box) | 0–1 | 🟨 |
+| 3D view (orbit, pan, zoom, section box) | 0–1 | ✅ (ViewCube, orthographic {3D}, section box with face arrows) |
 | Floor plans (cut plane, view range) | 2 | ✅ |
 | Reflected ceiling plans | 2 | ⬜ |
 | Elevations | 2 | ✅ |
@@ -93,7 +93,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Visibility/Graphics overrides, filters | 2 | ✅ (incl. Override Graphics by element; line weights in PDF only) |
 | View templates | 2 | ✅ |
 | Hidden-line, shaded, realistic styles | 2 | ✅ (3D views; plans/sections are 2D drawings) |
-| Camera / perspective views | 2 | ✅ (Camera tool; each 3D view keeps its camera; no orthographic 3D yet) |
+| Camera / perspective views | 2 | ✅ (Camera tool; each 3D view keeps its camera) |
 | Temporary hide/isolate | 1 | ✅ |
 
 ## 8. Annotation & documentation

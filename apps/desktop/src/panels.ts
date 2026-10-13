@@ -309,6 +309,8 @@ export interface PanelContext {
   setActiveLevel(id: ElementId): void;
   /** Re-sketch a floor or ceiling boundary. */
   editBoundary(id: ElementId): void;
+  /** The visible model's extents (a new section box). */
+  modelBounds(): { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } } | null;
   /** Draw a floor's slope arrow (two clicks in the view). */
   drawSlopeArrow(id: ElementId): void;
   activeViewId(): ElementId | undefined;
@@ -574,6 +576,17 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
         createViewTemplate(tx, doc, name, view);
       });
     sec.append(row("", make));
+  }
+  if (p.kind === "3d") {
+    // Section Box (Revit: Extents): drag its arrows in the view to cut the model back.
+    const sb = h("input", { type: "checkbox" }) as HTMLInputElement;
+    sb.checked = !!p.sectionBox;
+    sb.onchange = () => {
+      const box = sb.checked ? ctx.modelBounds() : null;
+      if (sb.checked && !box) return ctx.status("\u26a0 Nothing to put a section box round yet.");
+      set(sb.checked ? "Section box on" : "Section box off", { sectionBox: box });
+    };
+    sec.append(row("Section box", sb));
   }
   if (p.kind === "3d" && p.camera) {
     // Camera: eye and target heights and the field of view (orbiting saves the rest).

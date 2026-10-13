@@ -94,7 +94,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   first), tee stems' cores run to the through wall's core, crossing walls clean (thicker wins), no
   lines between joined walls of the same material. Disallow Join per end (Properties / right-click).
 - Known gaps: join cleanup is plan-only (3D solids overlap at crossings); grids straight only;
-  floors lack pick-walls/slope arrows; roofs exact for convex/L/T/U only; doors/windows parametric;
+  floors lack slope arrows (Pick Walls in the sketch options strip: face/core/centre line + offset); roofs exact for convex/L/T/U only; doors/windows parametric;
   dimensions only in plans via the tool; no 3D view camera saved per view; viewport (interactive)
   and sheet/PDF drawing paths are separate (fold the viewport onto `viewDrawing` later).
 - Families (Phase 3 started): family editor (Browser → Families → New family / Edit family) with

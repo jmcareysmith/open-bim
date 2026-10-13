@@ -1140,6 +1140,13 @@ function renderToolOptions(options: ToolOption[] | null): void {
     ...(options ?? []).map((o) => {
       const label = document.createElement("label");
       const input = document.createElement("input");
+      if (o.kind === "select") {
+        const sel = document.createElement("select");
+        for (const opt of o.options) sel.append(new Option(opt.label, opt.value, false, opt.value === o.value));
+        sel.onchange = () => o.set(sel.value);
+        label.append(`${o.label} `, sel);
+        return label;
+      }
       if (o.kind === "check") {
         input.type = "checkbox";
         input.checked = o.value;
@@ -1147,7 +1154,7 @@ function renderToolOptions(options: ToolOption[] | null): void {
         label.append(input, ` ${o.label}`);
       } else {
         input.type = "number";
-        input.min = String(o.min);
+        if (Number.isFinite(o.min)) input.min = String(o.min);
         input.value = String(o.value);
         input.onchange = () => o.set(Number(input.value));
         label.append(`${o.label} `, input);

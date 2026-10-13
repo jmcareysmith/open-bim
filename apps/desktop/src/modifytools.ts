@@ -27,7 +27,8 @@ export type ModifyMode = "move" | "copy" | "rotate" | "mirror" | "array";
 /** A tool option shown in the options strip (Revit's options bar). */
 export type ToolOption =
   | { kind: "check"; label: string; value: boolean; set(v: boolean): void }
-  | { kind: "number"; label: string; value: number; min: number; set(v: number): void };
+  | { kind: "number"; label: string; value: number; min: number; set(v: number): void }
+  | { kind: "select"; label: string; value: string; options: { value: string; label: string }[]; set(v: string): void };
 
 export interface ModifyToolContext extends ToolContext {
   setToolOptions(options: ToolOption[] | null): void;

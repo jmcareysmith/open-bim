@@ -1,4 +1,8 @@
+import type { ToolOption } from "./modifytools.ts";
 import {
+  boundaryFromWalls,
+  PICK_WALL_LINES,
+  type PickWallLine,
   Cat,
   closestPointOnDatum,
   createGrid,
@@ -109,6 +113,8 @@ export interface ToolContext {
   formIsVoid(): boolean;
   /** Component tool: the family and type to place (from the type selector). */
   activeComponent(): { familyId: ElementId; typeName: string } | undefined;
+  /** The options strip at the top left of the view (Revit's options bar). */
+  setToolOptions?(options: ToolOption[] | null): void;
 }
 
 export interface Tool {
@@ -591,12 +597,50 @@ export class SketchTool implements Tool {
   private current: Vec2[] = [];
   private cursor: Vec2 | null = null;
   private editing: ElementId | null = null;
+  /** Pick Walls (floors, ceilings, roofs): the boundary follows picked walls. */
+  private picking = false;
+  private picked: ElementId[] = [];
+  private pickLine: PickWallLine = "interior";
+  private pickOffset = 0;
 
   constructor(
     private ctx: ToolContext,
     kind: SketchKind,
   ) {
     this.name = kind;
+    if (kind === "roof") {
+      // Roofs by footprint: the exterior face plus an eave overhang.
+      this.pickLine = "exterior";
+      this.pickOffset = 600;
+    }
+  }
+
+  private get canPick(): boolean {
+    return this.name === "floor" || this.name === "ceiling" || this.name === "roof";
+  }
+
+  private showOptions(): void {
+    if (!this.canPick) return;
+    const opts: ToolOption[] = [
+      { kind: "check", label: "Pick Walls", value: this.picking, set: (v) => ((this.picking = v), this.prompt(), this.showOptions(), this.redraw()) },
+    ];
+    if (this.picking) {
+      opts.push(
+        { kind: "select", label: "Line on", value: this.pickLine, options: PICK_WALL_LINES, set: (v) => ((this.pickLine = v as PickWallLine), this.redraw()) },
+        { kind: "number", label: "Offset", value: this.pickOffset, min: -Infinity, set: (v) => ((this.pickOffset = v || 0), this.redraw()) },
+      );
+    }
+    this.ctx.setToolOptions?.(opts);
+  }
+
+  /** The loop from the picked walls, or null (with the reason) if they don't close yet. */
+  private pickedLoop(): { loop: Vec2[] | null; why: string } {
+    if (!this.picked.length) return { loop: null, why: "" };
+    try {
+      return { loop: boundaryFromWalls(this.ctx.doc, this.picked, this.pickLine, this.pickOffset), why: "" };
+    } catch (err) {
+      return { loop: null, why: (err as Error).message };
+    }
   }
 
   private get def() {
@@ -606,11 +650,13 @@ export class SketchTool implements Tool {
   activate(): void {
     this.reset();
     this.prompt();
+    this.showOptions();
   }
 
   deactivate(): void {
     this.reset();
     this.ctx.viewport.setPreviewLines(null);
+    this.ctx.setToolOptions?.(null);
   }
 
   /** Start re-sketching the boundary of an existing floor/ceiling (replaces it on finish). */
@@ -625,9 +671,20 @@ export class SketchTool implements Tool {
     this.current = [];
     this.cursor = null;
     this.editing = null;
+    this.picked = [];
   }
 
   private prompt(): void {
+    if (this.picking) {
+      const n = this.picked.length;
+      const { loop, why } = this.pickedLoop();
+      this.ctx.status(
+        `Pick Walls: click walls round the ${this.def.label.toLowerCase()} (click again to drop one). ` +
+          (loop ? "Loop closed: Enter = finish." : n ? `${n} picked${why ? ` \u2014 ${why}` : ""}.` : "") +
+          " Untick Pick Walls to sketch holes; Esc = cancel",
+      );
+      return;
+    }
     const what = this.editing ? `Edit ${this.def.label.toLowerCase()} boundary` : `${this.def.label} sketch`;
     const n = this.loops.length;
     const loops = n ? ` · ${n} loop${n > 1 ? "s" : ""} closed (extra loops become holes)` : "";
@@ -647,6 +704,8 @@ export class SketchTool implements Tool {
     for (let i = 1; i < this.current.length; i++) add(this.current[i - 1]!, this.current[i]!);
     const last = this.current.at(-1);
     if (last && this.cursor) add(last, this.cursor);
+    const picked = this.pickedLoop().loop;
+    if (picked) picked.forEach((p, i) => add(p, picked[(i + 1) % picked.length]!));
     this.ctx.viewport.setPreviewLines(seg.length ? { segments: new Float32Array(seg), labels: [] } : null);
   }
 
@@ -656,6 +715,15 @@ export class SketchTool implements Tool {
   }
 
   click(ev: PointerEvent): void {
+    if (this.picking) {
+      const id = this.ctx.viewport.pick(ev);
+      if (!id || this.ctx.doc.get(id)?.category !== Cat.Wall) return this.ctx.status("Pick Walls: click a wall.");
+      this.picked = this.picked.includes(id) ? this.picked.filter((x) => x !== id) : [...this.picked, id];
+      this.ctx.setSelection(this.picked);
+      this.redraw();
+      this.prompt();
+      return;
+    }
     const p = this.point(ev);
     if (!p) return;
     const first = this.current[0];
@@ -681,7 +749,7 @@ export class SketchTool implements Tool {
       this.redraw();
       return true;
     }
-    if (ev.key === "Escape" && (this.current.length || this.loops.length || this.editing)) {
+    if (ev.key === "Escape" && (this.current.length || this.loops.length || this.editing || this.picked.length)) {
       this.reset();
       this.redraw();
       this.prompt();
@@ -720,7 +788,13 @@ export class SketchTool implements Tool {
   }
 
   private finish(): void {
-    const loops = this.current.length >= 3 ? [...this.loops, this.current] : this.loops;
+    let loops = this.current.length >= 3 ? [...this.loops, this.current] : this.loops;
+    if (this.picked.length) {
+      const { loop, why } = this.pickedLoop();
+      if (!loop) return this.ctx.status(`\u26a0 ${why}`);
+      // The picked loop is the boundary; sketched loops inside it become holes.
+      loops = [loop, ...loops];
+    }
     const { doc } = this.ctx;
     if (this.name === "extrusion" || this.name === "blend" || this.name === "revolution") return this.finishForm(loops);
     try {

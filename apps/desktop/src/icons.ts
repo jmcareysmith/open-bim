@@ -21,6 +21,7 @@ const P: Record<string, string> = {
   group: "M4 4h7v7H4zM13 13h7v7h-7zM4 13h7v7H4zM13 4h7v7h-7z",
   demolish: "M4 20h16M7 20V10h10v10M5 5l14 10M19 5L5 15",
   wall: "M3 8h18v8H3zM3 12h18",
+  curtain: "M3 4h18v16H3zM9 4v16M15 4v16M3 10h18M3 15h18",
   door: "M6 21V3h10v18M13 12h1M3 21h18",
   window: "M4 5h16v14H4zM12 5v14M4 12h16",
   component: "M5 10h14v4H5zM7 14v6M17 14v6M6 10V6h12v4",

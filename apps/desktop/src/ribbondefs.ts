@@ -280,6 +280,15 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
             { label: "Place Mass", icon: "component", cmd: "placeMass", title: "Place a loaded mass family (loads Mass - Box if there's none)" },
           ],
         },
+        {
+          title: "Model by Face",
+          items: [
+            { label: "Wall", icon: "wall", tool: "face-wall", title: "Wall by Face: click a vertical mass face" },
+            { label: "Curtain Wall", icon: "curtain", tool: "face-curtain", title: "Curtain wall on a vertical mass face" },
+            { label: "Roof", icon: "roof", tool: "face-roof", title: "Roof by Face: click a mass's top face" },
+            { label: "Floor", icon: "floor", tool: "face-floor", title: "Floor by Face: click a mass floor (or a mass for all its floors)" },
+          ],
+        },
         { title: "Model Site", items: [{ label: "Toposolid", icon: "toposolid", tool: "toposolid", large: true, title: "Sketch the site boundary, then import survey points" }] },
       ],
     },

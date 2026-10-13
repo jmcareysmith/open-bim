@@ -1,3 +1,4 @@
+import { FaceTool } from "./facetool.ts";
 import { MANAGE_SECTIONS, projectSection } from "./panels.ts";
 import { openMaterialBrowser } from "./materialbrowser.ts";
 import { RunTool } from "./runtool.ts";
@@ -213,6 +214,9 @@ const activeTypes = new Map<string, ElementId>();
 /** Type category each placing tool creates. */
 const TOOL_TYPES: Record<string, string> = {
   wall: Cat.WallType,
+  "face-wall": Cat.WallType,
+  "face-roof": Cat.RoofType,
+  "face-floor": Cat.FloorType,
   duct: Cat.DuctType,
   floor: Cat.FloorType,
   ceiling: Cat.CeilingType,
@@ -491,6 +495,10 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   detailcomponent: new DetailComponentTool(ctx),
   attach: new AttachTool(ctx),
   slopeArrow: new SlopeArrowTool(ctx),
+  "face-wall": new FaceTool(ctx, "wall"),
+  "face-curtain": new FaceTool(ctx, "curtain"),
+  "face-roof": new FaceTool(ctx, "roof"),
+  "face-floor": new FaceTool(ctx, "floor"),
   duct: new RunTool(ctx, "duct"),
   pipe: new RunTool(ctx, "pipe"),
   camera: new CameraTool(ctx, (id) => {

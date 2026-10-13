@@ -489,6 +489,20 @@ export class Viewport {
   }
 
   /** Element under the cursor and the model point hit, nearest first. */
+  /** The solid under the cursor, with the triangle hit (Model by Face). 3D and plans only. */
+  pickFace(ev: { clientX: number; clientY: number }, filter?: (id: ElementId) => boolean): { id: ElementId; tri: number; mesh: MeshData } | null {
+    if (this.mode === "drawing") return null;
+    this.setRay(ev);
+    const meshes = [...this.objects.entries()].filter(([id, g]) => g.visible && this.meshes.has(id) && (!filter || filter(id))).map(([, g]) => g.children[0]!);
+    for (const hit of this.raycaster.intersectObjects(meshes, false)) {
+      if (this.renderer.clippingPlanes.some((pl) => pl.distanceToPoint(hit.point) < 0)) continue;
+      const id = hit.object.parent?.userData.elementId as ElementId | undefined;
+      const mesh = id ? this.meshes.get(id) : undefined;
+      if (id && mesh && hit.faceIndex !== undefined && hit.faceIndex !== null) return { id, tri: hit.faceIndex, mesh };
+    }
+    return null;
+  }
+
   pickHit(ev: { clientX: number; clientY: number }, filter?: (id: ElementId) => boolean): { id: ElementId; point: Vec2 } | null {
     this.setRay(ev);
     // Line picking tolerance: a few pixels, in mm at the current zoom.

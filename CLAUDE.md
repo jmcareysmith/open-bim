@@ -188,4 +188,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Mass floors: select a mass → Properties → Mass Floors (tick levels); area/perimeter from the
   mass's plan cut at the level (geometry/massfloors.ts); gross floor area and volume; schedule
   category Mass Floors.
-- Next: Phase 8a — Model by Face; then site items, then Phase 8 (mechanical equipment, …).
+- Model by Face (Massing & Site): Wall / Curtain Wall (vertical face; exterior on the face; height
+  of the face, rectangular), Roof (top face: pitched from its low edge, or flat), Floor (mass floor,
+  or a mass for all its floors) — apps/desktop/src/facetool.ts, geometry/src/faces.ts.
+- Next: Phase 8a — building pads, subregions, graded regions; property lines; then Phase 8.

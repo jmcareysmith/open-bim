@@ -46,7 +46,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Areas & area plans (GFA, NLA) | 4 | ✅ |
 | Toposolid / topography, building pads, site components | 6 | 🟨 |
 | Conceptual masses (in-place, loadable, Show Mass) | 8a | ✅ |
-| Mass floors, Model by Face | 8a | ⬜ |
+| Mass floors, Model by Face | 8a | ✅ (walls/curtain walls on vertical faces, roofs, floors) |
 
 ## 4. Structural
 | Feature | Phase | Status |

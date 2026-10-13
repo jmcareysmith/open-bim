@@ -1774,6 +1774,9 @@ export class SweepTool implements Tool {
 }
 
 /** Component: place the selected family type; hosted families go in a wall. Space rotates 90 degrees. */
+/** Family categories placed at ceiling height. */
+const CEILING_FAMILIES = new Set<string>(["AirTerminal", "LightingFixture"]);
+
 export class ComponentTool implements Tool {
   readonly name = "component";
   private rotation = 0;
@@ -1816,7 +1819,8 @@ export class ComponentTool implements Tool {
         if (!p) return;
         const levelId = this.ctx.activeLevelId();
         inst = doc.transact("Place component", (tx) =>
-          placeFamilyInstance(tx, doc, def.id, c.typeName, { levelId, position: p, rotation: this.rotation }),
+          // Air terminals and light fittings go on the ceiling (2400 above the level; change Offset).
+          placeFamilyInstance(tx, doc, def.id, c.typeName, { levelId, position: p, rotation: this.rotation, offset: CEILING_FAMILIES.has(def.params.category) ? 2400 : 0 }),
         );
       }
       this.ctx.setSelection([inst.id]);

@@ -198,4 +198,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   survey-style DMS whole-circle bearings from the project's survey north, distances in m, area;
   legs editable in Properties (core/model/property.ts). Site / Parking Component (library Tree -
   Deciduous, Parking Space). Toposolid contour labels: index / all / none.
-- Next: Phase 8 — mechanical equipment and air terminals (library families with connectors).
+- HVAC library (packages/library): Supply Diffuser - Square, Return Grille, Exhaust Fan - Ceiling,
+  Ducted Heat Pump - Indoor Unit (supply/return/power/condensate), Heat Pump - Outdoor Unit.
+  Systems → Air Terminal / Mechanical Equipment place them (terminals and lights at 2400).
+- Next: Phase 8 — plumbing fixtures and drainage (G13/AS1 discharge units, pipe size and fall checks).

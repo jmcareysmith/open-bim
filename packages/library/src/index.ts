@@ -9,6 +9,7 @@ import {
   type MarkerRole,
   createFamilyParameter,
   createRevolution,
+  createConnector,
   familyInfo,
   type FamilyCategory,
   type FamilyInfoParams,
@@ -540,6 +541,128 @@ export const parkingSpace: LibraryFamily = {
     }),
 };
 
+
+// ---- HVAC: air terminals and mechanical equipment (Systems → Air Terminal / Equipment) ------
+// Air terminals have their origin on the ceiling face (placed at ceiling height); connectors carry
+// the design flow so duct sizing works from them.
+
+/** Round neck on top of a terminal: a short cylinder up from z0. */
+const neck = (tx: Transaction, z0: Num, height: Num) => createRevolution(tx, rect(0, z0, "Neck Diameter/2", `${z0} + ${height}`), { axis: 0 });
+
+export const supplyDiffuser: LibraryFamily = {
+  name: "Supply Diffuser - Square",
+  category: "AirTerminal",
+  description: "Square ceiling diffuser with a round neck; supply air in at the top (Flow, L/s).",
+  build: () =>
+    family(
+      "AirTerminal",
+      "Supply Diffuser - Square",
+      [
+        ["Neck Diameter", 250],
+        ["Flow", 100],
+      ],
+      [
+        ["600 x 600 - 250 neck", { Width: 600, Depth: 600, "Neck Diameter": 250, Flow: 100 }],
+        ["450 x 450 - 200 neck", { Width: 450, Depth: 450, "Neck Diameter": 200, Flow: 60 }],
+      ],
+      (tx) => {
+        createExtrusion(tx, rect("-Width/2", "-Depth/2", "Width/2", "Depth/2"), { start: -40, end: 0 });
+        neck(tx, 0, 150);
+        createConnector(tx, { classification: "supplyAir", z: 150, facing: "+z", diameter: "Neck Diameter", flow: "Flow", flowDirection: "in" });
+      },
+    ),
+};
+
+export const returnGrille: LibraryFamily = {
+  name: "Return Grille - Rectangular",
+  category: "AirTerminal",
+  description: "Ceiling return air grille; air leaves the room into the duct at the top (Flow, L/s).",
+  build: () =>
+    family(
+      "AirTerminal",
+      "Return Grille - Rectangular",
+      [
+        ["Neck Diameter", 300],
+        ["Flow", 200],
+      ],
+      [["600 x 300", { Width: 600, Depth: 300, "Neck Diameter": 300, Flow: 200 }]],
+      (tx) => {
+        createExtrusion(tx, rect("-Width/2", "-Depth/2", "Width/2", "Depth/2"), { start: -30, end: 0 });
+        neck(tx, 0, 150);
+        createConnector(tx, { classification: "returnAir", z: 150, facing: "+z", diameter: "Neck Diameter", flow: "Flow", flowDirection: "out" });
+      },
+    ),
+};
+
+export const exhaustFan: LibraryFamily = {
+  name: "Exhaust Fan - Ceiling",
+  category: "MechanicalEquipment",
+  description: "Bathroom/kitchen ceiling exhaust fan: exhaust air out at the top, and its power.",
+  build: () =>
+    family(
+      "MechanicalEquipment",
+      "Exhaust Fan - Ceiling",
+      [
+        ["Neck Diameter", 150],
+        ["Flow", 50],
+        ["Load", 30],
+      ],
+      [["150 mm - 50 L/s", { Width: 300, Depth: 300, Height: 200, "Neck Diameter": 150, Flow: 50, Load: 30 }]],
+      (tx) => {
+        createExtrusion(tx, rect("-Width/2", "-Depth/2", "Width/2", "Depth/2"), { start: -20, end: 0 });
+        createExtrusion(tx, rect("-Width/2 + 30", "-Depth/2 + 30", "Width/2 - 30", "Depth/2 - 30"), { start: 0, end: "Height - 60" });
+        neck(tx, "Height - 60", 60);
+        createConnector(tx, { classification: "exhaustAir", z: "Height", facing: "+z", diameter: "Neck Diameter", flow: "Flow", flowDirection: "out" });
+        createConnector(tx, { classification: "power", x: "Width/2 - 30", z: 100, facing: "+x", load: "Load" });
+      },
+    ),
+};
+
+export const ductedIndoorUnit: LibraryFamily = {
+  name: "Ducted Heat Pump - Indoor Unit",
+  category: "MechanicalEquipment",
+  description: "Ceiling-space ducted unit: supply air out at one end, return in at the other, power and a condensate drain.",
+  build: () =>
+    family(
+      "MechanicalEquipment",
+      "Ducted Heat Pump - Indoor Unit",
+      [
+        ["Supply Diameter", 350],
+        ["Return Diameter", 400],
+        ["Airflow", 400],
+        ["Load", 2500],
+      ],
+      [
+        ["7 kW", { Width: 1100, Depth: 700, Height: 280, Airflow: 400, Load: 2200 }],
+        ["10 kW", { Width: 1300, Depth: 750, Height: 300, Airflow: 550, Load: 3100 }],
+      ],
+      (tx) => {
+        createExtrusion(tx, rect("-Width/2", "-Depth/2", "Width/2", "Depth/2"), { end: "Height" });
+        createConnector(tx, { classification: "supplyAir", x: "Width/2", z: "Height/2", facing: "+x", diameter: "Supply Diameter", flow: "Airflow", flowDirection: "out" });
+        createConnector(tx, { classification: "returnAir", x: "-Width/2", z: "Height/2", facing: "-x", diameter: "Return Diameter", flow: "Airflow", flowDirection: "in" });
+        createConnector(tx, { classification: "power", y: "-Depth/2", z: "Height/2", facing: "-y", load: "Load" });
+        createConnector(tx, { classification: "sanitary", x: "Width/2 - 100", y: "Depth/2", z: 40, facing: "+y", diameter: 20, flowDirection: "out" });
+      },
+    ),
+};
+
+export const outdoorUnit: LibraryFamily = {
+  name: "Heat Pump - Outdoor Unit",
+  category: "MechanicalEquipment",
+  description: "Outdoor heat pump unit on its pad: power connection.",
+  build: () =>
+    family(
+      "MechanicalEquipment",
+      "Heat Pump - Outdoor Unit",
+      [["Load", 2500]],
+      [["7 kW", { Width: 800, Depth: 300, Height: 600, Load: 2200 }]],
+      (tx) => {
+        createExtrusion(tx, rect("-Width/2", "-Depth/2", "Width/2", "Depth/2"), { end: "Height" });
+        createConnector(tx, { classification: "power", x: "Width/2", z: "Height/2", facing: "+x", load: "Load" });
+      },
+    ),
+};
+
 export const LIBRARY: LibraryFamily[] = [
   singleDoor,
   casementWindow,
@@ -558,5 +681,10 @@ export const LIBRARY: LibraryFamily[] = [
   massGable,
   tree,
   parkingSpace,
+  supplyDiffuser,
+  returnGrille,
+  exhaustFan,
+  ductedIndoorUnit,
+  outdoorUnit,
   ...VIEW_MARKERS,
 ];

@@ -1113,6 +1113,8 @@ const commands: Record<string, () => void | Promise<void>> = {
     status("Property line: type the bearings and distances from the survey plan in Properties.");
   },
   siteComponent: () => placeFromCategory("Site", "Tree - Deciduous"),
+  placeAirTerminal: () => placeFromCategory("AirTerminal", "Supply Diffuser - Square"),
+  placeMechanicalEquipment: () => placeFromCategory("MechanicalEquipment", "Ducted Heat Pump - Indoor Unit"),
   parkingComponent: () => placeFromCategory("Parking", "Parking Space"),
   gradedRegion() {
     const t = selection.map((id) => doc.get(id)).find((e) => e?.category === Cat.Toposolid);

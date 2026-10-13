@@ -17,9 +17,18 @@ import {
   wallCuts,
   type FamilyInstance,
   graphicsCategory,
+  createDuct,
+  createSystem,
+  ductFlows,
+  elementConnectors,
+  enableMepFittings,
+  ensureDuctTypes,
+  sizeDucts,
+  type Duct,
+  type MEPSystem,
 } from "@open-bim/core";
 import { OcctKernel, SimpleKernel, boundingBox, buildDetailComponentLines, buildViewMarker, meshVolume } from "@open-bim/geometry";
-import { LIBRARY, baseCabinet, casementWindow, massGable, roundTable } from "../src/index.ts";
+import { LIBRARY, baseCabinet, casementWindow, ductedIndoorUnit, massGable, roundTable, supplyDiffuser } from "../src/index.ts";
 
 let occt: OcctKernel;
 beforeAll(async () => {
@@ -120,5 +129,36 @@ describe("family library", () => {
     // Walls to the eaves plus the gable triangle, through the depth.
     expect(meshVolume(mesh)).toBeCloseTo((12000 * 2700 + (12000 * 2700) / 2) * 8000, -6);
     expect(graphicsCategory(doc, inst)).toBe("Mass");
+  });
+
+  it("an indoor unit and two diffusers: connectors line up, ducts join them, sizing works", () => {
+    const { doc, ids } = project();
+    enableMepFittings(doc);
+    const unitDef = doc.transact("Load", (tx) => loadFamily(tx, doc, ductedIndoorUnit.build(), "Unit"));
+    const diffDef = doc.transact("Load", (tx) => loadFamily(tx, doc, supplyDiffuser.build(), "Diffuser"));
+    const unit = doc.transact("P", (tx) => placeFamilyInstance(tx, doc, unitDef.id, "7 kW", { levelId: ids.levels.ground, position: { x: 0, y: 0 }, offset: 2500 }));
+    const place = (x: number) => doc.transact("P", (tx) => placeFamilyInstance(tx, doc, diffDef.id, "600 x 600 - 250 neck", { levelId: ids.levels.ground, position: { x, y: 0 }, offset: 2400 }));
+    const d1 = place(3000);
+    const d2 = place(6000);
+    const supply = elementConnectors(doc, unit).find((c) => c.classification === "supplyAir")!;
+    expect(supply.position).toEqual([550, 0, 2640]);
+    expect(elementConnectors(doc, unit)).toHaveLength(4);
+    const neck = elementConnectors(doc, d1)[0]!;
+    expect(neck.position).toEqual([3000, 0, 2550]);
+    expect(neck.flow).toBe(100);
+    // Duct from the unit's supply along to above each diffuser, then drops to their necks.
+    const [round] = doc.transact("Types", (tx) => ensureDuctTypes(tx, doc));
+    const duct = (a: [number, number, number], b: [number, number, number]) =>
+      doc.transact("D", (tx) => createDuct(tx, doc, round!, ids.levels.ground, { x: a[0], y: a[1], z: a[2] }, { x: b[0], y: b[1], z: b[2] }, { diameter: 200 }));
+    const main = duct([550, 0, 2640], [6000, 0, 2640]);
+    duct([3000, 0, 2640], [3000, 0, 2550]);
+    duct([6000, 0, 2640], [6000, 0, 2550]);
+    const sys = doc.transact("S", (tx) => createSystem(tx, doc, "supplyAir", [unit.id, d1.id, d2.id]));
+    const flows = ductFlows(doc, doc.require(sys.id) as MEPSystem);
+    expect(flows.get(main.id)).toBe(200);
+    doc.transact("Size", (tx) => sizeDucts(tx, doc, sys.id, { velocity: 4 }));
+    // 200 L/s at 4 m/s: Ø252 → 300.
+    expect((doc.require(main.id) as Duct).params.diameter).toBe(300);
+    void d2;
   });
 });

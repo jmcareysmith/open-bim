@@ -147,8 +147,8 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
           items: [
             { label: "System Browser", icon: "duct", cmd: "systemBrowser", title: "MEP systems, their members and totals (F9)" },
             { label: "Duct", icon: "duct", tool: "duct", large: true, title: "Duct: route runs; elbows, tees and transitions are automatic (DT)" },
-            { label: "Air Terminal", icon: "component", tool: "component", title: "Place an air terminal family (choose it in the type selector)" },
-            { label: "Mechanical Equipment", icon: "component", tool: "component", title: "Place a mechanical equipment family" },
+            { label: "Air Terminal", icon: "component", cmd: "placeAirTerminal", title: "Place an air terminal at ceiling height (loads Supply Diffuser - Square if there's none; pick others in the type selector)" },
+            { label: "Mechanical Equipment", icon: "component", cmd: "placeMechanicalEquipment", title: "Place mechanical equipment (loads Ducted Heat Pump - Indoor Unit if there's none)" },
           ],
         },
         {

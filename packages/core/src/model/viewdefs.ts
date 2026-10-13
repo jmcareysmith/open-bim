@@ -79,9 +79,11 @@ export type ViewParams = {
   templateId?: ElementId | null;
   /** Phasing: the phase this view shows and its phase filter (default: last phase, Show All). */
   phase?: string | null;
-  /** 3D views: sun date and time (local, "YYYY-MM-DD" / "HH:MM") and whether shadows show. */
-  sun?: { date: string; time: string } | null;
+  /** 3D views: Sun Settings (solar study or direct lighting angles) and whether shadows show. */
+  sun?: SunSettings | null;
   shadows?: boolean;
+  /** 3D views: Graphic Display Options lighting (brightness, ambient shadows, depth cueing). */
+  lighting?: ViewLighting | null;
   /** 3D views: how the model is drawn (default shaded). */
   visualStyle?: VisualStyle | null;
   phaseFilter?: "all" | "complete" | "new" | "previous" | "none" | null;
@@ -307,12 +309,84 @@ export function calloutHeadPosition(p: ViewParams): Vec2 | null {
   return p.headPosition ?? { x: p.crop.max.x + 1300, y: p.crop.max.y + 700 };
 }
 
-/** When a view's sun is: its own date and time, else today at 2 pm (as the Render pane starts). */
+/**
+ * Revit's solar study kinds: Still (one moment), Single-Day (a day from a start to an end time),
+ * Multi-Day (one time of day across a date range), or Lighting (sun angles set directly).
+ */
+export type SunStudy = "still" | "singleDay" | "multiDay" | "lighting";
+
+export type SunSettings = {
+  /** Default still. */
+  study?: SunStudy;
+  /** Still: the moment. Single-Day: the day. Multi-Day: the first day and the time of day. Local, "YYYY-MM-DD" / "HH:MM". */
+  date: string;
+  time: string;
+  /** Single-Day: the time range (default sunrise-ish 06:00 to 18:00). */
+  startTime?: string;
+  endTime?: string;
+  /** Multi-Day: the last day. */
+  endDate?: string;
+  /** Step between frames: minutes (Single-Day, default 60) or days (Multi-Day, default 7). */
+  interval?: number;
+  /** Which frame of a single/multi-day study the view shows (default 0). */
+  frame?: number;
+  /** Lighting: sun bearing from true north and height above the horizon, degrees. */
+  azimuth?: number;
+  altitude?: number;
+};
+
+export type ViewLighting = {
+  /** Sun brightness, 0–100 (default 80). */
+  sun?: number;
+  /** Ambient (sky) light, 0–100 (default 50). */
+  ambient?: number;
+  /** Shadow darkness, 0–100 (default 50). */
+  shadow?: number;
+  /** Ambient shadows (ambient occlusion in corners and creases). */
+  ambientShadows?: boolean;
+  /** Depth cueing: things fade towards the background with distance. Start/end are % of the model's depth from the front; fade is how much the far end fades, %. */
+  depthCue?: { start: number; end: number; fade: number } | null;
+};
+
+export const DEFAULT_LIGHTING = { sun: 80, ambient: 50, shadow: 50 } as const;
+
+function parseDate(date: string, time: string): Date | null {
+  const [y, mo, d] = date.split("-").map(Number);
+  const [h, mi] = time.split(":").map(Number);
+  return [y, mo, d, h, mi].every((n) => Number.isFinite(n)) ? new Date(y!, mo! - 1, d!, h!, mi!) : null;
+}
+
+/** The moments of a view's solar study: one for Still, every interval across the day or dates otherwise. */
+export function sunStudyFrames(sun: SunSettings): Date[] {
+  const study = sun.study ?? "still";
+  if (study === "singleDay") {
+    const a = parseDate(sun.date, sun.startTime ?? "06:00");
+    const b = parseDate(sun.date, sun.endTime ?? "18:00");
+    if (!a || !b || b < a) return a ? [a] : [];
+    const step = Math.max(1, sun.interval ?? 60) * 60_000;
+    const out: Date[] = [];
+    for (let t = a.getTime(); t <= b.getTime() && out.length < 500; t += step) out.push(new Date(t));
+    return out;
+  }
+  if (study === "multiDay") {
+    const a = parseDate(sun.date, sun.time);
+    const b = parseDate(sun.endDate ?? sun.date, sun.time);
+    if (!a || !b || b < a) return a ? [a] : [];
+    const out: Date[] = [];
+    const step = Math.max(1, sun.interval ?? 7);
+    for (const d = new Date(a); d <= b && out.length < 500; d.setDate(d.getDate() + step)) out.push(new Date(d));
+    return out;
+  }
+  const d = parseDate(sun.date, sun.time);
+  return d ? [d] : [];
+}
+
+/** When a view's sun is: its study's current frame, else today at 2 pm (as the Render pane starts). */
 export function viewSunDate(p: ViewParams, today = new Date()): Date {
   if (p.sun) {
-    const [y, mo, d] = p.sun.date.split("-").map(Number);
-    const [h, mi] = p.sun.time.split(":").map(Number);
-    if ([y, mo, d, h, mi].every((n) => Number.isFinite(n))) return new Date(y!, mo! - 1, d!, h!, mi!);
+    const frames = sunStudyFrames(p.sun);
+    const f = frames[Math.min(Math.max(0, p.sun.frame ?? 0), frames.length - 1)];
+    if (f) return f;
   }
   const t = new Date(today);
   t.setHours(14, 0, 0, 0);

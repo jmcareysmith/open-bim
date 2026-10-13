@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Document, ensureProjectSettings, nztmToLatLon, sunDirection, sunPosition, viewSunDate, type ProjectSettingsParams, type ViewParams } from "../src/index.ts";
+import { Document, ensureProjectSettings, nztmToLatLon, projectLocation, sunDirection, sunPosition, sunStudyFrames, viewSun, viewSunDate, type ProjectSettingsParams, type ViewParams } from "../src/index.ts";
 
 describe("solar position", () => {
   it("converts NZTM2000 to latitude/longitude", () => {
@@ -52,5 +52,28 @@ describe("view sun settings", () => {
     expect(viewSunDate(p, today)).toEqual(new Date(2026, 9, 13, 14, 0));
     expect(viewSunDate({ ...p, sun: { date: "2026-12-21", time: "16:45" } }, today)).toEqual(new Date(2026, 11, 21, 16, 45));
     expect(viewSunDate({ ...p, sun: { date: "bad", time: "x" } }, today)).toEqual(new Date(2026, 9, 13, 14, 0));
+  });
+});
+
+describe("solar studies", () => {
+  it("steps a single-day study across the day and a multi-day study across the dates", () => {
+    const single = sunStudyFrames({ study: "singleDay", date: "2026-12-21", time: "12:00", startTime: "06:00", endTime: "18:00", interval: 60 });
+    expect(single).toHaveLength(13);
+    expect(single[0]!.getHours()).toBe(6);
+    expect(single.at(-1)!.getHours()).toBe(18);
+    const multi = sunStudyFrames({ study: "multiDay", date: "2026-06-01", endDate: "2026-06-29", time: "10:00", interval: 7 });
+    expect(multi.map((d) => d.getDate())).toEqual([1, 8, 15, 22, 29]);
+    expect(sunStudyFrames({ date: "2026-06-01", time: "10:00" })).toHaveLength(1);
+  });
+
+  it("shows the study's current frame, or set angles in Lighting mode", () => {
+    const p = { sun: { study: "singleDay" as const, date: "2026-12-21", time: "12:00", interval: 120, frame: 2 } } as unknown as ViewParams;
+    expect(viewSunDate(p).getHours()).toBe(10);
+    const doc = new Document();
+    const north = viewSun(doc, { sun: { study: "lighting", date: "", time: "", azimuth: 0, altitude: 0 } } as unknown as ViewParams);
+    expect(north.y).toBeCloseTo(Math.cos(projectLocation(doc).rotation));
+    expect(north.z).toBeCloseTo(0);
+    const up = viewSun(doc, { sun: { study: "lighting", date: "", time: "", azimuth: 90, altitude: 90 } } as unknown as ViewParams);
+    expect(up.z).toBeCloseTo(1);
   });
 });

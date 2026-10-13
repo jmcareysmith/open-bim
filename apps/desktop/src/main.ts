@@ -85,8 +85,7 @@ import {
   type FamilyCategory,
   type FamilyDef,
   defaultGraphics,
-  sunDirection,
-  viewSunDate,
+  viewSun,
   type WallParams,
 } from "@open-bim/core";
 import { OcctKernel, SimpleKernel, findClashes, exportGlb, exportObj, exportParts, areaLoopsFromWalls, drawingDxf, parseDxf, viewDrawing, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
@@ -1063,7 +1062,7 @@ function applyView(): void {
   const planLike = v.params.kind === "floorPlan" || v.params.kind === "callout" || v.params.kind === "areaPlan";
   viewport.setVisualStyle(v.params.kind === "3d" ? (v.params.visualStyle ?? "shaded") : planLike ? (v.params.visualStyle ?? "hiddenLine") : "hiddenLine");
   // Sun and shadows (3D views): the true sun for the site, at the view's date and time.
-  if (v.params.kind === "3d") viewport.setSun(sunDirection(doc, viewSunDate(v.params)), !!v.params.shadows);
+  if (v.params.kind === "3d") viewport.setSun(viewSun(doc, v.params), !!v.params.shadows, v.params.lighting ?? {});
   else viewport.setSun(null, false);
   if (isPlanView(v)) {
     viewport.setPlanRange(viewRange(doc, v));

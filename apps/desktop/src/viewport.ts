@@ -1,5 +1,9 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import {
   Cat,
   PLAN_CUT_HEIGHT,
@@ -235,7 +239,8 @@ export class Viewport {
     // Orbit about the selection (Revit): in 3D with something selected, the orbit pivots on it.
     this.renderer.domElement.addEventListener("pointerdown", (ev) => this.orbitAboutSelection(ev), { capture: true });
 
-    this.scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.6));
+    this.hemi = new THREE.HemisphereLight(0xffffff, 0x445566, 1.6);
+    this.scene.add(this.hemi);
     const sun = new THREE.DirectionalLight(0xffffff, 1.6);
     sun.position.set(-1, -2, 3);
     this.scene.add(sun, sun.target);
@@ -1014,7 +1019,10 @@ export class Viewport {
       this.needsRender = true;
     }
     if (this.needsRender) {
-      this.renderer.render(this.mode === "drawing" ? this.drawScene : this.scene, this.camera);
+      const in3d = this.mode === "3d";
+      this.scene.fog = in3d && this.depthCue ? this.cueFog() : null;
+      if (in3d && this.ambientShadows) this.composer().render();
+      else this.renderer.render(this.mode === "drawing" ? this.drawScene : this.scene, this.camera);
       this.needsRender = false;
       for (const fn of this.frameListeners) fn();
     }
@@ -1022,15 +1030,82 @@ export class Viewport {
 
   private frameListeners = new Set<() => void>();
   private sun!: THREE.DirectionalLight;
+  private hemi!: THREE.HemisphereLight;
   private ground!: THREE.Mesh;
+  private ambientShadows = false;
+  private depthCue: { start: number; end: number; fade: number } | null = null;
+  private modelBox = new THREE.Box3();
+  private fx: { composer: EffectComposer; render: RenderPass; ao: GTAOPass; w: number; h: number } | null = null;
+
+  /** Ambient shadows: the scene through a GTAO (ambient occlusion) pass. */
+  private composer(): EffectComposer {
+    const size = this.renderer.getSize(new THREE.Vector2());
+    const pr = this.renderer.getPixelRatio();
+    if (!this.fx) {
+      const composer = new EffectComposer(this.renderer);
+      const render = new RenderPass(this.scene, this.camera);
+      const ao = new GTAOPass(this.scene, this.camera, size.x, size.y);
+      ao.blendIntensity = 1;
+      // Only model solids occlude: bubbles, labels, previews and the ground catcher stay out.
+      const gtao = ao as unknown as { _overrideVisibility(): void; _visibilityCache: THREE.Object3D[] };
+      const base = gtao._overrideVisibility.bind(gtao);
+      gtao._overrideVisibility = () => {
+        base();
+        this.scene.traverse((o) => {
+          if ((o instanceof THREE.Mesh || o instanceof THREE.Sprite) && !o.userData.modelSolid && o.visible) {
+            o.visible = false;
+            gtao._visibilityCache.push(o);
+          }
+        });
+      };
+      composer.addPass(render);
+      composer.addPass(ao);
+      composer.addPass(new OutputPass());
+      this.fx = { composer, render, ao, w: 0, h: 0 };
+    }
+    const fx = this.fx;
+    if (fx.w !== size.x || fx.h !== size.y) {
+      fx.composer.setPixelRatio(pr);
+      fx.composer.setSize(size.x, size.y);
+      fx.w = size.x;
+      fx.h = size.y;
+    }
+    fx.render.camera = this.camera;
+    fx.ao.camera = this.camera;
+    return fx.composer;
+  }
+
+  /** Depth cueing as fog: clear up to `start` % of the model's depth, fading to `fade` % at `end`. */
+  private cueFog(): THREE.Fog {
+    const c = this.depthCue!;
+    const box = this.modelBox.isEmpty() ? new THREE.Box3(new THREE.Vector3(-10000, -10000, 0), new THREE.Vector3(10000, 10000, 6000)) : this.modelBox;
+    const sphere = box.getBoundingSphere(new THREE.Sphere());
+    const d = this.camera.position.distanceTo(sphere.center);
+    const front = Math.max(0, d - sphere.radius);
+    const depth = 2 * sphere.radius;
+    const near = front + (depth * c.start) / 100;
+    const end = Math.max(near + 1, front + (depth * c.end) / 100);
+    const far = near + (end - near) / Math.max(0.01, c.fade / 100);
+    return new THREE.Fog(BG_3D, near, far);
+  }
 
   /**
    * Sun for the 3D view (Revit's Sun Settings / Shadows): `dir` points towards the sun (project
    * axes, z up), or null for the default studio light. Shadows fall on the model and the ground.
    */
-  setSun(dir: { x: number; y: number; z: number } | null, shadows: boolean): void {
+  setSun(
+    dir: { x: number; y: number; z: number } | null,
+    shadows: boolean,
+    lighting: { sun?: number; ambient?: number; shadow?: number; ambientShadows?: boolean; depthCue?: { start: number; end: number; fade: number } | null } = {},
+  ): void {
     const box = new THREE.Box3();
     for (const [id, g] of this.objects) if (this.meshes.has(id) && g.visible) box.expandByObject(g);
+    this.modelBox = box;
+    const sunLevel = (lighting.sun ?? 80) / 80;
+    const shadowLevel = (lighting.shadow ?? 50) / 50;
+    this.hemi.intensity = 1.6 * ((lighting.ambient ?? 50) / 50);
+    this.ambientShadows = !!lighting.ambientShadows;
+    this.depthCue = lighting.depthCue ?? null;
     const centre = box.isEmpty() ? new THREE.Vector3() : box.getCenter(new THREE.Vector3());
     const size = box.isEmpty() ? 20000 : box.getSize(new THREE.Vector3()).length();
     const up = dir && dir.z > 0.02 ? new THREE.Vector3(dir.x, dir.y, dir.z).normalize() : new THREE.Vector3(-1, -2, 3).normalize();
@@ -1038,7 +1113,9 @@ export class Viewport {
     this.sun.target.position.copy(centre);
     this.sun.target.updateMatrixWorld();
     // Below the horizon: no direct sun.
-    this.sun.intensity = dir && dir.z <= 0.02 ? 0.15 : 1.6;
+    this.sun.intensity = (dir && dir.z <= 0.02 ? 0.15 : 1.6) * sunLevel;
+    this.sun.shadow.intensity = Math.min(1, shadowLevel);
+    (this.ground.material as THREE.ShadowMaterial).opacity = 0.28 * shadowLevel;
     const on = shadows && (!dir || dir.z > 0.02);
     this.renderer.shadowMap.enabled = on;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -1158,6 +1235,7 @@ function makeGroup(mesh: MeshData, color: number, opacity = 1): THREE.Group {
   const solid = new THREE.Mesh(geom, mat);
   // Shadows cost nothing until the view turns them on.
   solid.castShadow = solid.receiveShadow = opacity >= 1;
+  solid.userData.modelSolid = true;
   g.add(solid, edges);
   return g;
 }

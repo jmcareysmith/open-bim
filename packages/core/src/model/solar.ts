@@ -1,5 +1,6 @@
 import type { Document } from "../document.ts";
 import { projectLocation, type SiteLocation } from "./settings.ts";
+import { viewSunDate, type ViewParams } from "./viewdefs.ts";
 
 // Sun position for renders and shadow studies: NZTM2000 → latitude/longitude, then the NOAA solar
 // position equations (accurate to well under a degree, plenty for daylight). Grid convergence
@@ -91,9 +92,14 @@ export function siteLatLon(loc: SiteLocation): { lat: number; lon: number } {
  * and orientation, plus the raw angles.
  */
 export function sunDirection(doc: Document, date: Date): { x: number; y: number; z: number; azimuth: number; altitude: number } {
-  const loc = projectLocation(doc);
-  const { lat, lon } = siteLatLon(loc);
+  const { lat, lon } = siteLatLon(projectLocation(doc));
   const { azimuth, altitude } = sunPosition(date, lat, lon);
+  return sunFromAngles(doc, azimuth, altitude);
+}
+
+/** Direction towards a sun at `azimuth` (degrees from true north, clockwise) and `altitude` above the horizon, in project axes. */
+export function sunFromAngles(doc: Document, azimuth: number, altitude: number): { x: number; y: number; z: number; azimuth: number; altitude: number } {
+  const loc = projectLocation(doc);
   const alt = altitude * RAD;
   // Grid (east, north) components, then into project axes (project X is `rotation` from east).
   const e = Math.sin(azimuth * RAD) * Math.cos(alt);
@@ -101,4 +107,10 @@ export function sunDirection(doc: Document, date: Date): { x: number; y: number;
   const c = Math.cos(loc.rotation);
   const s = Math.sin(loc.rotation);
   return { x: e * c + n * s, y: -e * s + n * c, z: Math.sin(alt), azimuth, altitude };
+}
+
+/** The sun a 3D view shows: its Lighting angles, or the true sun at its study's current frame. */
+export function viewSun(doc: Document, p: ViewParams): { x: number; y: number; z: number; azimuth: number; altitude: number } {
+  if (p.sun?.study === "lighting") return sunFromAngles(doc, p.sun.azimuth ?? 135, p.sun.altitude ?? 35);
+  return sunDirection(doc, viewSunDate(p));
 }

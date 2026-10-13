@@ -294,12 +294,21 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
           items: [
             { label: "Toposolid", icon: "toposolid", tool: "toposolid", large: true, title: "Sketch the site boundary, then import survey points" },
             { label: "Building Pad", icon: "floor", tool: "pad", title: "Sketch a pad inside a toposolid: the ground is graded to its underside" },
+            { label: "Site Component", icon: "tree", cmd: "siteComponent", title: "Place a site family (trees, letterboxes…)" },
+            { label: "Parking Component", icon: "parking", cmd: "parkingComponent", title: "Place a parking space family" },
           ],
         },
         {
           title: "Modify Site",
           items: [
             { label: "Subregion", icon: "region", tool: "subregion", title: "Sketch an area of the toposolid in another material (paths, lawn, paving)" },
+            {
+              label: "Property Line",
+              icon: "property",
+              tool: "property",
+              title: "Sketch the property boundary (\u25be: create by entering bearings and distances)",
+              menu: () => [{ label: "Create by entering bearings and distances", action: () => m.cmd("propertyFromBearings") }],
+            },
             { label: "Graded Region", icon: "toposolid", cmd: "gradedRegion", title: "Record the selected toposolid's ground as existing, then regrade it; cut and fill show in Properties" },
           ],
         },

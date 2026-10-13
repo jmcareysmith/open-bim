@@ -11,6 +11,10 @@ import {
   type MaterialParams,
   type Subregion,
   type Toposolid,
+  formatBearing,
+  propertyArea,
+  propertyLegs,
+  type PropertyLine,
 } from "@open-bim/core";
 import type { LineData } from "./datums.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
@@ -113,8 +117,9 @@ export function buildToposolidLines(doc: Document, el: Element): LineData | null
   });
   for (const c of contours(vertices, triangles, t.params.contourInterval)) {
     for (let i = 0; i < c.segments.length; i += 4) seg.push(c.segments[i]!, c.segments[i + 1]!, 0, c.segments[i + 2]!, c.segments[i + 3]!, 0);
-    // Label every fifth contour (the index contours) at its first segment.
-    if (Math.round(c.z / t.params.contourInterval) % 5 === 0) {
+    // Label every fifth contour (the index contours) at its first segment, or all of them, or none.
+    const mode = t.params.contourLabels ?? "index";
+    if (mode === "all" || (mode === "index" && Math.round(c.z / t.params.contourInterval) % 5 === 0)) {
       labels.push({ text: `${(c.z / 1000).toFixed(1)}`, position: [c.segments[0]!, c.segments[1]!, 0], size: 180 });
     }
   }
@@ -168,4 +173,34 @@ export function buildSubregionLines(doc: Document, el: Element): LineData | null
   b.forEach((p, i) => seg.push(p.x, p.y, 0, b[(i + 1) % b.length]!.x, b[(i + 1) % b.length]!.y, 0));
   const m = sub.params.materialId ? doc.get<MaterialParams>(sub.params.materialId) : undefined;
   return { segments: new Float32Array(seg), labels: [], planOnly: true, fill: { loops: [b], color: m?.params.color ?? 0x9cc28a } };
+}
+
+/**
+ * Property line in plan: a dashed boundary, each leg labelled with its bearing and distance (as on
+ * a survey plan), and the area at the middle.
+ */
+export function buildPropertyLines(doc: Document, el: Element): LineData | null {
+  const pl = el as PropertyLine;
+  const pts = pl.params.points;
+  if (pts.length < 3) return null;
+  const seg: number[] = [];
+  const labels: LineData["labels"] = [];
+  const legs = propertyLegs(doc, pl);
+  const cx = pts.reduce((s2, p) => s2 + p.x, 0) / pts.length;
+  const cy = pts.reduce((s2, p) => s2 + p.y, 0) / pts.length;
+  pts.forEach((a, i) => {
+    const b = pts[(i + 1) % pts.length]!;
+    seg.push(a.x, a.y, 0, b.x, b.y, 0);
+    // Label outside the boundary, off the leg's middle.
+    const mx = (a.x + b.x) / 2;
+    const my = (a.y + b.y) / 2;
+    const L = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    let nx = -(b.y - a.y) / L;
+    let ny = (b.x - a.x) / L;
+    if ((mx - cx) * nx + (my - cy) * ny < 0) [nx, ny] = [-nx, -ny];
+    const leg = legs[i]!;
+    labels.push({ text: `${formatBearing(leg.bearing)}  ${(leg.distance / 1000).toFixed(3)}`, position: [mx + nx * 600, my + ny * 600, 0], size: 250 });
+  });
+  labels.push({ text: `${(propertyArea(pl) / 1e6).toFixed(1)} m²`, position: [cx, cy, 0], size: 350 });
+  return { segments: new Float32Array(seg), labels, dashed: true, planOnly: true };
 }

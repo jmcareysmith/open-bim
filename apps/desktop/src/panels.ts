@@ -267,6 +267,14 @@ import {
   type SubregionParams,
   type Toposolid,
   recordExistingGround,
+  formatBearing,
+  parseBearing,
+  pointsFromLegs,
+  propertyArea,
+  propertyLegs,
+  type Leg,
+  type PropertyLine,
+  type PropertyLineParams,
 } from "@open-bim/core";
 
 type Child = Node | string | null | undefined | false;
@@ -852,6 +860,8 @@ const FAMILY_CATEGORIES: [FamilyCategory, string][] = [
   ["ElectricalFixture", "Electrical Fixture (MEP)"],
   ["LightingFixture", "Lighting Fixture (MEP)"],
   ["Mass", "Mass (conceptual)"],
+  ["Site", "Site (trees, site furniture)"],
+  ["Parking", "Parking"],
 ];
 
 /** A number or formula: numeric text is stored as a number, anything else as a formula. */
@@ -2402,6 +2412,30 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       );
       break;
     }
+    case Cat.PropertyLine: {
+      const pl = el as PropertyLine;
+      const legs = propertyLegs(doc, pl);
+      const start = pl.params.points[0]!;
+      const setLegs = (next: Leg[]) => update<PropertyLineParams>("Edit property line", { points: pointsFromLegs(doc, start, next) });
+      sec.append(row("Area", formatArea(propertyArea(pl), units)), h("h3", {}, "Bearings and distances"));
+      legs.forEach((l, i) => {
+        const b = textInput(formatBearing(l.bearing), (v) => {
+          const deg = parseBearing(v);
+          if (deg === null) return ctx.status("\u26a0 Bearings as 45\u00b030'00\", 45 30 00 or 45.5");
+          setLegs(legs.map((x, j) => (j === i ? { ...x, bearing: deg } : x)));
+        });
+        b.title = "Whole-circle bearing from north, e.g. 45\u00b030'00\"";
+        const d = numberInput(Math.round(l.distance) / 1000, (v) => setLegs(legs.map((x, j) => (j === i ? { ...x, distance: v * 1000 } : x))));
+        d.title = "Distance, metres";
+        const rm = h("button", { textContent: "\u00d7", title: "Remove this leg", class: "mini", disabled: legs.length <= 3 });
+        rm.onclick = () => setLegs(legs.filter((_, j) => j !== i));
+        sec.append(h("div", { class: "buttons wrap" }, h("span", { class: "muted" }, `${i + 1}`), b, d, h("span", { class: "muted" }, "m"), rm));
+      });
+      const add = h("button", { textContent: "Add leg" });
+      add.onclick = () => setLegs([...legs.slice(0, -1), { bearing: legs.at(-1)!.bearing, distance: 5000 }, legs.at(-1)!]);
+      sec.append(row("", add), h("div", { class: "muted" }, "The last leg closes back to the first corner. Bearings are clockwise from north (the project's survey north)."));
+      break;
+    }
     case Cat.BuildingPad: {
       const pad = el as BuildingPad;
       const p = pad.params;
@@ -2439,6 +2473,18 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Spot heights", String(p.points.length)),
         row("Thickness below lowest", numberInput(p.thickness, (v) => (v > 0 ? update<ToposolidParams>("Change thickness", { thickness: v }) : ctx.status("\u26a0 Must be positive")))),
         row("Contour interval", numberInput(p.contourInterval, (v) => update<ToposolidParams>("Change contour interval", { contourInterval: Math.max(0, v) }))),
+        row(
+          "Contour labels",
+          select(
+            [
+              { value: "index", label: "Every fifth (index)" },
+              { value: "all", label: "Every contour" },
+              { value: "none", label: "None" },
+            ],
+            p.contourLabels ?? "index",
+            (v) => update<ToposolidParams>("Contour labels", { contourLabels: v as ToposolidParams["contourLabels"] }),
+          ),
+        ),
         row("Material", select(matOpts, p.materialId ?? "", (v) => update<ToposolidParams>("Change toposolid material", { materialId: v || null }))),
         row("", h("div", { class: "buttons wrap" }, imp, clear)),
       );

@@ -19,6 +19,8 @@ export type ToposolidParams = {
   thickness: number;
   /** Contour spacing in plans, mm (0 = none). */
   contourInterval: number;
+  /** Contour labels: every fifth (index) contour (default), every contour, or none. */
+  contourLabels?: "index" | "all" | "none";
   materialId?: ElementId | null;
   /**
    * Graded region (Revit): the ground as it was before grading, kept so cut and fill can be

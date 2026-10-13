@@ -489,6 +489,57 @@ export const massGable: LibraryFamily = {
     ),
 };
 
+
+// ---- Site and parking components (Massing & Site → Site / Parking Component) --
+
+export const tree: LibraryFamily = {
+  name: "Tree - Deciduous",
+  category: "Site",
+  description: "Round-headed tree: trunk and canopy (Height, Canopy Diameter).",
+  build: () =>
+    family(
+      "Site",
+      "Tree - Deciduous",
+      [
+        ["Canopy Diameter", 5000],
+        ["Trunk Diameter", 300],
+      ],
+      [
+        ["6 m", { Height: 6000, "Canopy Diameter": 5000 }],
+        ["10 m", { Height: 10000, "Canopy Diameter": 8000 }],
+      ],
+      (tx) => {
+        createRevolution(tx, rect(0, 0, "Trunk Diameter/2", "Height*0.45"), { axis: 0 });
+        // Canopy: a rounded profile revolved about the trunk.
+        const r = "Canopy Diameter/2";
+        createRevolution(
+          tx,
+          [
+            { x: 0, y: "Height*0.35" },
+            { x: `${r}*0.7`, y: "Height*0.4" },
+            { x: r, y: "Height*0.62" },
+            { x: `${r}*0.8`, y: "Height*0.85" },
+            { x: `${r}*0.35`, y: "Height*0.98" },
+            { x: 0, y: "Height" },
+          ],
+          { axis: 0 },
+        );
+      },
+    ),
+};
+
+export const parkingSpace: LibraryFamily = {
+  name: "Parking Space",
+  category: "Parking",
+  description: "Marked car park: painted lines along the sides and across the end (Width, Length).",
+  build: () =>
+    family("Parking", "Parking Space", [["Line Width", 100]], [["2.5 x 5.0 m", { Width: 2500, Length: 5000 }], ["Accessible 3.6 x 5.0 m", { Width: 3600, Length: 5000 }]], (tx) => {
+      createExtrusion(tx, rect("-Width/2", 0, "-Width/2 + Line Width", "Length"), { end: 5 });
+      createExtrusion(tx, rect("Width/2 - Line Width", 0, "Width/2", "Length"), { end: 5 });
+      createExtrusion(tx, rect("-Width/2", "Length - Line Width", "Width/2", "Length"), { end: 5 });
+    }),
+};
+
 export const LIBRARY: LibraryFamily[] = [
   singleDoor,
   casementWindow,
@@ -505,5 +556,7 @@ export const LIBRARY: LibraryFamily[] = [
   massBox,
   massCylinder,
   massGable,
+  tree,
+  parkingSpace,
   ...VIEW_MARKERS,
 ];

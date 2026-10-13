@@ -98,14 +98,14 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] View tabs (tile/cascade), status bar with selection filter, view control bar (scale, detail level, visual style, hide/isolate) — done: open-view tabs along the bottom (close, close others), view control bar (scale, detail level, Wireframe/Hidden Line/Shaded/Consistent Colours/Realistic/Rendered, temporary hide/isolate, reveal hidden); collapsible browser groups; status-bar selection filter (⧩ count → category filter); Tile/Cascade/Tab Views (WT/WC/TW; live pane per open view)
 - [x] Right-click menus (Select All Instances, Edit Type, Hide in View…), two-letter shortcuts, shortcut editor — menus done (element: modify tools, Flip, Edit Type, Select All Instances, hide/isolate, V/G, Group, Delete; empty space: V/G dialog, Zoom to Fit, Reset); two-letter shortcuts; Keyboard Shortcuts editor (KS or File menu; saved per machine)
 
-## Phase 8a — Massing & Site (asked for by Jeremy; next)
+## Phase 8a — Massing & Site (done; asked for by Jeremy)
 - [x] Conceptual masses: in-place and loadable mass families (extrusion/blend/revolve/sweep), Show Mass
 - [x] Mass floors (per level) with areas and a mass floor schedule (GFA)
 - [x] Model by Face: walls, floors, roofs and curtain systems from mass faces — curtain walls on vertical faces (no curtain systems on curved/sloped faces yet)
 - [x] Building pads (cut the toposolid), subregions (material areas), graded regions with cut/fill
-- [ ] Property lines (bearings and distances, area), site and parking components, contour labels
+- [x] Property lines (bearings and distances, area), site and parking components, contour labels
 
-## Phase 8 — MEP & visual programming
+## Phase 8 — MEP & visual programming (current)
 - [x] Connectors and MEP systems (supply/return air, cold/hot water, sanitary, power); system browser
 - [x] Ducts with auto fittings (elbows, tees, transitions), round/rectangular types, sizing from airflow
 - [x] Pipes with auto fittings, falls on waste pipes, pipe materials

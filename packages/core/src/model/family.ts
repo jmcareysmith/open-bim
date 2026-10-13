@@ -29,7 +29,9 @@ export type FamilyCategory =
   | "ElectricalEquipment"
   | "ElectricalFixture"
   | "LightingFixture"
-  | "Mass";
+  | "Mass"
+  | "Site"
+  | "Parking";
 
 /** Family categories that carry MEP connectors. */
 export const MEP_FAMILY_CATEGORIES: FamilyCategory[] = ["MechanicalEquipment", "AirTerminal", "PlumbingFixture", "ElectricalEquipment", "ElectricalFixture", "LightingFixture"];
@@ -315,6 +317,11 @@ const STARTER: Record<FamilyCategory, [string, number][]> = {
     ["Width", 12000],
     ["Depth", 8000],
     ["Height", 6000],
+  ],
+  Site: [["Height", 1000]],
+  Parking: [
+    ["Width", 2500],
+    ["Length", 5000],
   ],
 };
 

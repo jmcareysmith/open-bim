@@ -107,6 +107,8 @@ import {
   placeFamilyInstance,
   type FamilyInstanceParams,
   recordExistingGround,
+  createPropertyLine,
+  pointsFromLegs,
 } from "@open-bim/core";
 import { OcctKernel, SimpleKernel, findClashes, exportGlb, exportObj, exportParts, areaLoopsFromWalls, drawingDxf, parseDxf, viewDrawing, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
@@ -469,6 +471,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   toposolid: new SketchTool(ctx, "toposolid"),
   pad: new SketchTool(ctx, "pad"),
   subregion: new SketchTool(ctx, "subregion"),
+  property: new SketchTool(ctx, "property"),
   text: new TextTool(ctx),
   dimension: new DimensionTool(ctx),
   room: new RoomTool(ctx),
@@ -1096,6 +1099,21 @@ const commands: Record<string, () => void | Promise<void>> = {
     setTool("component");
     refreshAll();
   },
+  propertyFromBearings() {
+    // Revit: Property Line → Create by entering distances and bearings. Start from a 20 × 30 m lot.
+    const legs = [
+      { bearing: 0, distance: 30000 },
+      { bearing: 90, distance: 20000 },
+      { bearing: 180, distance: 30000 },
+      { bearing: 270, distance: 20000 },
+    ];
+    let id: ElementId | undefined;
+    edit("Property line from bearings", (tx) => (id = createPropertyLine(tx, pointsFromLegs(doc, { x: 0, y: 0 }, legs)).id));
+    if (id) ctx.setSelection([id]);
+    status("Property line: type the bearings and distances from the survey plan in Properties.");
+  },
+  siteComponent: () => placeFromCategory("Site", "Tree - Deciduous"),
+  parkingComponent: () => placeFromCategory("Parking", "Parking Space"),
   gradedRegion() {
     const t = selection.map((id) => doc.get(id)).find((e) => e?.category === Cat.Toposolid);
     if (!t) return status("Graded Region: select a toposolid first.");
@@ -1771,6 +1789,19 @@ function refreshPanels(): void {
   makeCollapsible($("#properties-body"), "p:");
   const active = activeViewId ? doc.get(activeViewId) : undefined;
   if (active?.category === Cat.Schedule) renderSchedulePane($("#schedule-pane"), ctx, active as Schedule);
+}
+
+/** Place a family of a category (loading the library one if the project has none). */
+function placeFromCategory(category: string, libraryName: string): void {
+  let def = familyDefs(doc).find((f) => f.params.category === category);
+  if (!def) {
+    ctx.loadLibraryFamily(libraryName);
+    def = familyDefs(doc).find((f) => f.params.category === category);
+  }
+  if (!def) return;
+  activeComponentKey = `${def.id}|${familyTypeNames(def)[0] ?? ""}`;
+  setTool("component");
+  refreshAll();
 }
 
 /** A project settings section (Revit's Manage tab dialogs), live while open. */

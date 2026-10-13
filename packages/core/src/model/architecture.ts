@@ -84,6 +84,7 @@ export const Cat = {
   MassFloor: "MassFloor",
   BuildingPad: "BuildingPad",
   SiteSubregion: "SiteSubregion",
+  PropertyLine: "PropertyLine",
 } as const;
 
 // ---- Level ---------------------------------------------------------------

@@ -96,6 +96,7 @@ import {
   type ViewParams,
   createBuildingPad,
   createSubregion,
+  createPropertyLine,
 } from "@open-bim/core";
 import { areaBoundary, buildGridLines, buildReferencePlaneLines, buildRoomLines, extrudePolygon, roomBoundary, wallFootprint, type LineData } from "@open-bim/geometry";
 import type { Viewport } from "./viewport.ts";
@@ -574,7 +575,7 @@ export class ReferencePlaneTool extends DatumLineTool {
 
 // ---- Sketch (floors, ceilings) --------------------------------------------
 
-type SketchKind = "floor" | "ceiling" | "roof" | "region" | "cloud" | "toposolid" | "pad" | "subregion" | "extrusion" | "blend" | "revolution";
+type SketchKind = "floor" | "ceiling" | "roof" | "region" | "cloud" | "toposolid" | "pad" | "subregion" | "property" | "extrusion" | "blend" | "revolution";
 
 const SKETCH: Record<SketchKind, { category: string; typeCategory: string; label: string }> = {
   floor: { category: Cat.Floor, typeCategory: Cat.FloorType, label: "Floor" },
@@ -585,6 +586,7 @@ const SKETCH: Record<SketchKind, { category: string; typeCategory: string; label
   toposolid: { category: Cat.Toposolid, typeCategory: "", label: "Toposolid" },
   pad: { category: Cat.BuildingPad, typeCategory: "", label: "Building pad" },
   subregion: { category: Cat.SiteSubregion, typeCategory: "", label: "Subregion" },
+  property: { category: Cat.PropertyLine, typeCategory: "", label: "Property line" },
   extrusion: { category: Cat.Extrusion, typeCategory: "", label: "Extrusion" },
   blend: { category: Cat.Blend, typeCategory: "", label: "Blend (bottom loop, then top loop)" },
   revolution: { category: Cat.Revolution, typeCategory: "", label: "Revolve (profile right of the centre line)" },
@@ -815,6 +817,14 @@ export class SketchTool implements Tool {
         doc.transact(`Edit ${this.def.label.toLowerCase()} boundary`, (tx) => tx.update(editing, patch));
         id = editing;
       } else {
+        if (this.name === "property") {
+          const pl = doc.transact("Create property line", (tx) => createPropertyLine(tx, region.boundary));
+          this.reset();
+          this.redraw();
+          this.ctx.setSelection([pl.id]);
+          this.ctx.status("Property line made: its bearings and distances are in Properties (edit them there).");
+          return;
+        }
         if (this.name === "pad" || this.name === "subregion") {
           // Pads and subregions go on the toposolid they're sketched in.
           const made =

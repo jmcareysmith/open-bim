@@ -211,4 +211,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   board Properties → Switchboard schedule (load W, current at 230 V, breaker check, connected load).
 - Cable tray (CT) and conduit (CN): Systems → Electrical; runs with automatic fittings like ducts
   (core/model/containment.ts; ContainmentTool). Width/depth or size + middle elevation.
-- Next: Phase 8 — MEP display (single-line at Coarse, plan symbols), MEP in schedules and clashes.
+- MEP display: Coarse plans draw runs single-line (no fittings); ceiling/wall MEP items get plan
+  symbols on their level (geometry/mepsymbols.ts); line builders take the detail level.
+  MEP categories in schedules (system/size/length) and clash checks.
+- Next (Jeremy, 2026-10-14): prioritise architectural tools and visual styles matching Revit over
+  the rest of Phase 8 (visual programming waits).

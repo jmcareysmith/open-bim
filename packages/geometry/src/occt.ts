@@ -15,6 +15,7 @@ import {
   type WallCut,
   curtainOf,
   hasSlopedTop,
+  type DetailLevel,
 } from "@open-bim/core";
 import { mergeMeshes } from "./doors.ts";
 import { formMesh } from "./forms.ts";
@@ -143,8 +144,8 @@ export class OcctKernel implements GeometryKernel {
     return keep(fix.Solid());
   }
 
-  buildLines(doc: Document, el: Element, scale?: number): LineData | null {
-    return this.simple.buildLines(doc, el, scale);
+  buildLines(doc: Document, el: Element, scale?: number, detail?: DetailLevel): LineData | null {
+    return this.simple.buildLines(doc, el, scale, detail);
   }
 
   private buildWallWithCuts(doc: Document, wall: Wall, cuts: WallCut[]): MeshData | null {

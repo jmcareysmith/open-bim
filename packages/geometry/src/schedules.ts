@@ -38,6 +38,7 @@ import {
   type Wall,
   type WallParams,
   type MassFloor,
+  SYSTEM_CLASSIFICATIONS,
 } from "@open-bim/core";
 import { SimpleKernel } from "./kernel.ts";
 import { meshVolume, type MeshData } from "./mesh.ts";
@@ -203,7 +204,23 @@ const SKETCHED: FieldDef[] = [
   { key: "thickness", label: "Thickness", kind: "length", get: (d, e) => typeThickness(d, e) },
 ];
 
+/** Schedulable categories made of loadable families. */
+const FAMILY_SCHEDULE_CATEGORIES = new Set(["Furniture", "Casework", "GenericModel", "AirTerminal", "MechanicalEquipment", "PlumbingFixture", "ElectricalFixture", "LightingFixture", "ElectricalEquipment"]);
+
+/** MEP run fields: system, size and length. */
+const runFields: FieldDef[] = [
+  { key: "system", label: "System", kind: "text", get: (_d, e) => { const c = (e.params as { classification?: string }).classification; return c ? (SYSTEM_CLASSIFICATIONS.find((x) => x.value === c)?.label ?? c) : ""; } },
+  { key: "size", label: "Size", kind: "text", get: (_d, e) => { const p = e.params as { diameter?: number; width?: number; height?: number }; return e.category === Cat.CableTray || (e.category === Cat.Duct && p.width && !p.diameter) ? `${p.width}×${p.height}` : `Ø${p.diameter}`; } },
+  { key: "length", label: "Length", kind: "length", get: (_d, e) => { const p = e.params as { start: { x: number; y: number; z: number }; end: { x: number; y: number; z: number } }; return Math.hypot(p.end.x - p.start.x, p.end.y - p.start.y, p.end.z - p.start.z); } },
+];
+
 const BY_CATEGORY: Record<string, FieldDef[]> = {
+  [Cat.Duct]: runFields,
+  [Cat.Pipe]: runFields,
+  [Cat.CableTray]: runFields.filter((f) => f.key !== "system"),
+  [Cat.Conduit]: runFields.filter((f) => f.key !== "system"),
+  [Cat.DuctFitting]: [{ key: "kind", label: "Fitting", kind: "text", get: (_d, e) => (e.params as { kind: string }).kind }],
+  [Cat.PipeFitting]: [{ key: "kind", label: "Fitting", kind: "text", get: (_d, e) => (e.params as { kind: string }).kind }],
   [Cat.MassFloor]: [
     { key: "mass", label: "Mass", kind: "text", get: (d, e) => { const m = d.get((e.params as { massId: ElementId }).massId); return m ? familyName(d, m) : "" } },
     { key: "area", label: "Floor Area", kind: "area", get: (d, e) => massFloorArea(d, e as MassFloor).area },
@@ -306,7 +323,7 @@ function scheduleBaseFields(doc: Document, s: Pick<Schedule["params"], "category
 
 /** Family categories schedule family instances; element categories also include families of that category. */
 function elementCategory(category: string): string {
-  return category === "Furniture" || category === "Casework" || category === "GenericModel" ? Cat.FamilyInstance : category;
+  return FAMILY_SCHEDULE_CATEGORIES.has(category) ? Cat.FamilyInstance : category;
 }
 
 export function scheduleElements(doc: Document, category: string): Element[] {
@@ -314,7 +331,7 @@ export function scheduleElements(doc: Document, category: string): Element[] {
     const defs = new Set(familyDefs(doc).filter((d) => d.params.category === c).map((d) => d.id));
     return doc.byCategory<FamilyInstanceParams>(Cat.FamilyInstance).filter((i) => defs.has(i.params.familyId));
   };
-  if (category === "Furniture" || category === "Casework" || category === "GenericModel") return fam(category);
+  if (FAMILY_SCHEDULE_CATEGORIES.has(category)) return fam(category);
   if (category === Cat.Door || category === Cat.Window) return [...doc.byCategory(category), ...fam(category)];
   return doc.byCategory(category);
 }

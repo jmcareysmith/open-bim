@@ -58,6 +58,18 @@ export const SCHEDULE_CATEGORIES: [string, string][] = [
   ["Casework", "Casework"],
   ["GenericModel", "Generic Models"],
   [Cat.MassFloor, "Mass Floors"],
+  [Cat.Duct, "Ducts"],
+  [Cat.DuctFitting, "Duct Fittings"],
+  [Cat.Pipe, "Pipes"],
+  [Cat.PipeFitting, "Pipe Fittings"],
+  [Cat.CableTray, "Cable Trays"],
+  [Cat.Conduit, "Conduits"],
+  ["AirTerminal", "Air Terminals"],
+  ["MechanicalEquipment", "Mechanical Equipment"],
+  ["PlumbingFixture", "Plumbing Fixtures"],
+  ["ElectricalFixture", "Electrical Fixtures"],
+  ["LightingFixture", "Lighting Fixtures"],
+  ["ElectricalEquipment", "Electrical Equipment"],
 ];
 
 /** Material takeoffs work on layered elements. */

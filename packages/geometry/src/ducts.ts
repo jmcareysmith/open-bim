@@ -11,6 +11,7 @@ import {
   type Element,
   type LevelParams,
   type P3,
+  type DetailLevel,
 } from "@open-bim/core";
 import type { LineData } from "./datums.ts";
 import { MeshBuilder, type MeshData } from "./mesh.ts";
@@ -220,20 +221,30 @@ const centre = (r: P3[]): P3 => mul(r.reduce((s, p) => add(s, p), { x: 0, y: 0, 
 
 const levelZ = (doc: Document, d: Duct) => (doc.get<LevelParams>(d.params.levelId)?.params.elevation ?? 0) + 1;
 
-export function buildDuctLines(doc: Document, el: Element): LineData | null {
+export function buildDuctLines(doc: Document, el: Element, _scale = 100, detail: DetailLevel = "medium"): LineData | null {
   const d = el as Duct;
+  if (detail === "coarse") {
+    // Coarse: one line down the middle of the run (Revit's single-line ducts and pipes).
+    const { start, end } = ductEnds(doc, d);
+    const z = levelZ(doc, d);
+    return { segments: new Float32Array([start.x, start.y, z, end.x, end.y, z]), labels: [], planOnly: true, placement: "model" };
+  }
   const rings = ductRings(doc, d);
   if (!rings) return null;
   return { segments: new Float32Array(planOutline([rings], levelZ(doc, d))), labels: [], planOnly: true, placement: "model" };
 }
 
-export function buildDuctFittingLines(doc: Document, el: Element): LineData | null {
+export function buildDuctFittingLines(doc: Document, el: Element, _scale = 100, detail: DetailLevel = "medium"): LineData | null {
+  if (detail === "coarse") return null; // the runs' centrelines meet at the joint
   const f = el as DuctFitting;
   const tubes = fittingTubes(doc, f);
   const first = doc.get(f.params.ends[0]?.ductId ?? "") as Duct | undefined;
   if (!tubes || !first) return null;
   return { segments: new Float32Array(planOutline(tubes, levelZ(doc, first))), labels: [], planOnly: true, placement: "model" };
 }
+
+/** Runs and their fittings (ducts, pipes, trays, conduit): single-line at Coarse. */
+export const isRunCategory = (c: string) => RUN_CATEGORIES.has(c) || FITTING_CATEGORIES.has(c);
 
 /** The level whose plans show a duct's, pipe's or fitting's outline. */
 export function ductPlanLevel(doc: Document, el: Element): string | undefined {

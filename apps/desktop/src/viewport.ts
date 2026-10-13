@@ -50,6 +50,7 @@ import {
   type LineData,
   type MeshData,
   type PlanLinework,
+  isRunCategory,
 } from "@open-bim/geometry";
 
 // Model space is millimetres with Z up (Revit convention).
@@ -326,7 +327,7 @@ export class Viewport {
     let group: THREE.Group;
     try {
       const mesh = this.kernel.build(this.doc, el);
-      const lines = this.kernel.buildLines(this.doc, el, this.graphics.scale);
+      const lines = this.kernel.buildLines(this.doc, el, this.graphics.scale, this.graphics.detailLevel);
       if (mesh) {
         this.meshes.set(id, mesh);
         const material = elementMaterial(this.doc, el);
@@ -816,6 +817,8 @@ export class Viewport {
     this.drawingDirty = true;
     // Grid bubbles and view markers are sized for the view scale: redraw them.
     if (rescale) for (const el of this.doc.all()) if (SCALED_MARKS.has(el.category)) this.rebuild(el.id);
+    // Ducts, pipes, trays and conduit change symbol with detail level (single-line at Coarse).
+    if (!rescale) for (const el of this.doc.all()) if (isRunCategory(el.category) || el.category === Cat.FamilyInstance) this.rebuild(el.id);
   }
 
   /** Callouts crop their plan to a rectangle; null for an uncropped plan. */
@@ -955,6 +958,7 @@ export class Viewport {
       .filter(([id]) => {
         const el = this.doc.get(id);
         if (!el || !this.objects.get(id)?.visible) return false;
+        if (!drawingMode && this.graphics.detailLevel === "coarse" && isRunCategory(el.category)) return false; // single-line at Coarse
         return drawingMode || !SYMBOLIC_IN_PLAN.has(el.category); // plans use door/window symbols
       })
       .map(([id, mesh]) => {

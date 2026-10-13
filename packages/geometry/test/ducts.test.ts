@@ -40,4 +40,14 @@ describe("duct solids", () => {
     const draw = viewDrawing(doc, new SimpleKernel(), floorPlanFor(doc, ids.levels.ground)!);
     expect(draw.strokes.some((s) => s.id === d.id)).toBe(true);
   });
+
+  it("draw single-line at Coarse, with no fittings", () => {
+    const { doc, ids, round } = setup();
+    const k = new SimpleKernel();
+    const a = doc.transact("D", (tx) => createDuct(tx, doc, round, ids.levels.ground, p(0, 0), p(3000, 0)));
+    doc.transact("D", (tx) => createDuct(tx, doc, round, ids.levels.ground, p(3000, 0), p(3000, 2000)));
+    expect(k.buildLines(doc, doc.require(a.id), 100, "coarse")!.segments.length).toBe(6);
+    expect(k.buildLines(doc, doc.byCategory(Cat.DuctFitting)[0]!, 100, "coarse")).toBeNull();
+    expect(k.buildLines(doc, doc.require(a.id), 100, "medium")!.segments.length).toBeGreaterThan(6);
+  });
 });

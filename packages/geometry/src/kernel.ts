@@ -1,3 +1,4 @@
+import { buildMepSymbol, setSymbolSolids } from "./mepsymbols.ts";
 import { buildMassFloorLines } from "./massfloors.ts";
 import { buildDuct, buildDuctFitting, buildDuctFittingLines, buildDuctLines } from "./ducts.ts";
 import { slopedTopWallMesh } from "./wallattach.ts";
@@ -20,6 +21,7 @@ import {
   curtainOf,
   stackSegments,
   hasSlopedTop,
+  type DetailLevel,
 } from "@open-bim/core";
 import { buildConnectorLines, buildGridLines, buildOpeningLines, buildReferencePlaneLines, type LineData } from "./datums.ts";
 import { buildDoor, buildDoorLines, buildWindow, buildWindowLines } from "./doors.ts";
@@ -58,13 +60,13 @@ export interface GeometryKernel {
   build(doc: Document, el: Element): MeshData | null;
   /** Line work: datums (grids…), opening outlines, plan symbols (door swings). May accompany a mesh. */
   /** Plan line work; `scale` (the view's 1:n) sizes annotation-like parts such as grid bubbles. */
-  buildLines(doc: Document, el: Element, scale?: number): LineData | null;
+  buildLines(doc: Document, el: Element, scale?: number, detail?: DetailLevel): LineData | null;
   /** A family document's geometry (solids minus voids where supported) for given parameter values. */
   familyMesh(familyDoc: Document, values: Values): MeshData | null;
 }
 
 type Builder = (doc: Document, el: Element) => MeshData | null;
-type LineBuilder = (doc: Document, el: Element, scale: number) => LineData | null;
+type LineBuilder = (doc: Document, el: Element, scale: number, detail: DetailLevel) => LineData | null;
 
 /** Plan footprint of a straight, unjoined wall: rectangle around its location line. */
 export function wallFootprint(start: Vec2, end: Vec2, thickness: number): Vec2[] {
@@ -213,6 +215,7 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.Railing, buildRailingLines],
     [Cat.Ramp, buildRampLines],
     [Cat.Toposolid, buildToposolidLines],
+    [Cat.FamilyInstance, buildMepSymbol],
     [Cat.SiteSubregion, buildSubregionLines],
     [Cat.PropertyLine, buildPropertyLines],
     [Cat.Floor, buildFloorLines],
@@ -241,8 +244,8 @@ export class SimpleKernel implements GeometryKernel {
     return this.builders.get(el.category)?.(doc, el) ?? null;
   }
 
-  buildLines(doc: Document, el: Element, scale = 100): LineData | null {
-    return this.lineBuilders.get(el.category)?.(doc, el, scale) ?? null;
+  buildLines(doc: Document, el: Element, scale = 100, detail: DetailLevel = "medium"): LineData | null {
+    return this.lineBuilders.get(el.category)?.(doc, el, scale, detail) ?? null;
   }
 
   /** All solid forms of a family document as one mesh. Voids need the OCCT kernel and are skipped. */
@@ -255,3 +258,7 @@ export class SimpleKernel implements GeometryKernel {
     return parts.length ? mergeMeshes(parts) : null;
   }
 }
+
+// MEP plan symbols size themselves from the instance's solid.
+let symbolKernel: SimpleKernel | null = null;
+setSymbolSolids((doc, el) => (symbolKernel ??= new SimpleKernel()).build(doc, el));

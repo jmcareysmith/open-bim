@@ -2123,6 +2123,12 @@ const CLASH_CATEGORIES: [string, string][] = [
   [Cat.Stair, "Stairs"],
   [Cat.Ramp, "Ramps"],
   [Cat.FamilyInstance, "Components"],
+  [Cat.Duct, "Ducts"],
+  [Cat.DuctFitting, "Duct fittings"],
+  [Cat.Pipe, "Pipes"],
+  [Cat.PipeFitting, "Pipe fittings"],
+  [Cat.CableTray, "Cable trays"],
+  [Cat.Conduit, "Conduits"],
   [Cat.DirectShape, "Imported (IFC)"],
   [Cat.Link, "Linked models"],
 ];

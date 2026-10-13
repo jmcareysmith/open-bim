@@ -30,7 +30,7 @@ import { planLinework, type PlanLinework } from "./hlr.ts";
 import type { GeometryKernel } from "./kernel.ts";
 import { planFrame } from "./layers.ts";
 import { cleanCuts } from "./wallcleanup.ts";
-import { ductPlanLevel } from "./ducts.ts";
+import { ductPlanLevel, isRunCategory } from "./ducts.ts";
 import { hatch, patternFamilies } from "./patterns.ts";
 import { sectionAnnotations, sectionLinework, type Rect } from "./sections.ts";
 
@@ -105,7 +105,7 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
   if (view.params.kind === "legend") {
     // Legends hold no model: only their own annotation and legend components.
     for (const el of els.filter((e) => annotationView(e) === view.id)) {
-      const lines = kernel.buildLines(doc, el, g.scale);
+      const lines = kernel.buildLines(doc, el, g.scale, g.detailLevel);
       const r = elementGraphics(doc, g, el);
       if (lines) addLineData(out, lines, "annotation", { color: r.color ?? undefined, halftone: r.halftone, id: el.id });
     }
@@ -117,6 +117,8 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
   // Solids: cut + hidden-line projection, with layers and patterns at medium/fine.
   const items = els
     .filter((el) => section || !SYMBOLIC.has(el.category))
+    // Coarse plans draw ducts, pipes, trays and conduit single-line (their symbols, not their solids).
+    .filter((el) => section || g.detailLevel !== "coarse" || !isRunCategory(el.category))
     .flatMap((el) => {
       const mesh = kernel.build(doc, el);
       if (!mesh) return [];
@@ -135,7 +137,7 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
   for (const el of lineEls) {
     const owner = annotationView(el);
     if (section && !owner) continue; // sections draw their own level/grid annotations below
-    const lines = kernel.buildLines(doc, el, g.scale);
+    const lines = kernel.buildLines(doc, el, g.scale, g.detailLevel);
     if (!lines) continue;
     if (lines.planOnly && section) continue;
     // Beam symbols belong to plans of the beam's level.

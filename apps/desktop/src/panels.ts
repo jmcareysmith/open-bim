@@ -1233,7 +1233,7 @@ function visibilityGraphics(ctx: PanelContext, id: ElementId, p: ViewGraphicsPar
       ),
     );
   }
-  box.append(h("h3", {}, "Filters (top wins)"));
+  box.append(h("h3", { title: "Where filters overlap, the one higher in the list wins" }, "Filters"));
   const applied = p.filters ?? [];
   applied.forEach((af, i) => {
     const f = doc.get(af.filterId);

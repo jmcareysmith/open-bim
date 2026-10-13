@@ -79,6 +79,9 @@ export type ViewParams = {
   templateId?: ElementId | null;
   /** Phasing: the phase this view shows and its phase filter (default: last phase, Show All). */
   phase?: string | null;
+  /** 3D views: sun date and time (local, "YYYY-MM-DD" / "HH:MM") and whether shadows show. */
+  sun?: { date: string; time: string } | null;
+  shadows?: boolean;
   /** 3D views: how the model is drawn (default shaded). */
   visualStyle?: VisualStyle | null;
   phaseFilter?: "all" | "complete" | "new" | "previous" | "none" | null;
@@ -302,6 +305,18 @@ export function createElevationAt(tx: Transaction, doc: Document, at: Vec2, opts
 export function calloutHeadPosition(p: ViewParams): Vec2 | null {
   if (!p.crop) return null;
   return p.headPosition ?? { x: p.crop.max.x + 1300, y: p.crop.max.y + 700 };
+}
+
+/** When a view's sun is: its own date and time, else today at 2 pm (as the Render pane starts). */
+export function viewSunDate(p: ViewParams, today = new Date()): Date {
+  if (p.sun) {
+    const [y, mo, d] = p.sun.date.split("-").map(Number);
+    const [h, mi] = p.sun.time.split(":").map(Number);
+    if ([y, mo, d, h, mi].every((n) => Number.isFinite(n))) return new Date(y!, mo! - 1, d!, h!, mi!);
+  }
+  const t = new Date(today);
+  t.setHours(14, 0, 0, 0);
+  return t;
 }
 
 /** Callout: a cropped plan region of a floor plan, usually at a larger scale. */

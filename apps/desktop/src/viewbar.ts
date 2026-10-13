@@ -8,8 +8,11 @@ import {
   type View,
   type ViewParams,
   type VisualStyle,
+  sunDirection,
+  viewSunDate,
 } from "@open-bim/core";
-import { showContextMenu } from "./dialog.ts";
+import { openDialog, showContextMenu } from "./dialog.ts";
+import { openMaterialBrowser } from "./materialbrowser.ts";
 import type { Viewport } from "./viewport.ts";
 
 // Under the model window, Revit-style: tabs for the open views/sheets/schedules, then the view
@@ -111,6 +114,43 @@ export class ViewBar {
     );
   }
 
+  /** Sun Settings: the date and time this 3D view's sun (and shadows) are for. */
+  private openSun(view: View): void {
+    const { doc } = this.host;
+    const when = viewSunDate(view.params);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const date = Object.assign(document.createElement("input"), { type: "date", value: `${when.getFullYear()}-${pad(when.getMonth() + 1)}-${pad(when.getDate())}` });
+    const time = Object.assign(document.createElement("input"), { type: "time", value: `${pad(when.getHours())}:${pad(when.getMinutes())}` });
+    const info = el("p", { className: "muted" });
+    const show = () => {
+      const [y, mo, d] = date.value.split("-").map(Number);
+      const [h, mi] = time.value.split(":").map(Number);
+      const sun = sunDirection(doc, new Date(y!, mo! - 1, d!, h!, mi!));
+      info.textContent = sun.altitude > 0 ? `Sun ${sun.altitude.toFixed(0)}\u00b0 up, bearing ${sun.azimuth.toFixed(0)}\u00b0 (from the project location).` : "The sun is below the horizon then.";
+    };
+    date.oninput = time.oninput = show;
+    show();
+    const apply = el("button", { textContent: "Apply", className: "primary" });
+    const form = el("div", { className: "dlg-form" });
+    const row = (label: string, c: HTMLElement) => {
+      const l = el("label", { className: "dlg-field" });
+      l.append(el("span", { textContent: label }), c);
+      form.append(l);
+    };
+    row("Date", date);
+    row("Time", time);
+    form.append(info, apply);
+    const dlg = openDialog("Sun Settings", () => form);
+    apply.onclick = () => {
+      try {
+        doc.transact("Sun settings", (tx) => tx.update<ViewParams>(view.id, { sun: { date: date.value, time: time.value } }));
+      } catch (e) {
+        this.host.status(`\u26a0 ${(e as Error).message}`);
+      }
+      dlg.close();
+    };
+  }
+
   private renderBar(active: ElementId | undefined): void {
     const { doc, viewport } = this.host;
     const v = active ? doc.get(active) : undefined;
@@ -149,10 +189,12 @@ export class ViewBar {
     }
     this.bar.append(detail);
 
-    if (p.kind === "3d") {
+    const planLike = p.kind === "floorPlan" || p.kind === "callout" || p.kind === "areaPlan";
+    if (p.kind === "3d" || planLike) {
       const style = selectEl("Visual style", false);
-      const current = p.visualStyle ?? "shaded";
-      for (const s of VISUAL_STYLES) style.append(new Option(s.label, s.value, false, s.value === current));
+      const current = p.visualStyle ?? (planLike ? "hiddenLine" : "shaded");
+      // Plans: the path-traced Rendered style is a 3D view thing.
+      for (const s of VISUAL_STYLES.filter((x) => !planLike || x.value !== "rendered")) style.append(new Option(s.label, s.value, false, s.value === current));
       style.onchange = () => {
         const value = style.value as VisualStyle;
         set("Visual style", { visualStyle: value });
@@ -161,6 +203,19 @@ export class ViewBar {
       };
       this.bar.append(style);
     }
+
+    if (p.kind === "3d") {
+      // Sun Settings and Shadows (Revit's view control bar).
+      const sunBtn = el("button", { textContent: "\u2600 Sun", title: "Sun settings: date and time for this view's sun" });
+      sunBtn.onclick = () => this.openSun(view);
+      const shadows = el("button", { textContent: "\u25d0 Shadows", title: "Shadows on/off" });
+      shadows.classList.toggle("active", !!p.shadows);
+      shadows.onclick = () => set(p.shadows ? "Shadows off" : "Shadows on", { shadows: !p.shadows });
+      this.bar.append(sunBtn, shadows);
+    }
+    const mats = el("button", { textContent: "\u25a6 Materials", title: "Material Browser: colours, patterns and render appearance" });
+    mats.onclick = () => openMaterialBrowser(doc, (t) => this.host.status(t));
+    this.bar.append(mats);
 
     const temp = el("button", { textContent: "🕶 Hide/Isolate", title: "Temporary Hide/Isolate" });
     temp.classList.toggle("active", viewport.visibility.active);

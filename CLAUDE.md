@@ -85,6 +85,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   view `elementOverrides` / category overrides (template if any); line weights only in PDF.
 - Reveal Hidden mode: right-click a magenta element → Unhide Element / Unhide Category. Docking:
   drop on a docked panel's top/bottom half to split it there.
+- View control bar also has (3D) Sun settings (date/time; true sun for the site) and Shadows on/off
+  (real-time shadow map + ground catcher), and Materials (Material Browser dialog). Plans have
+  visual styles too: Shaded/Consistent/Realistic show the coloured model under the line work.
 - Under the view: open-view tabs (bottom, Revit-style per Jeremy) and the view control bar (scale,
   detail level, visual style for 3D, temporary hide/isolate, reveal hidden in magenta).
 - Known gaps: joins whole-wall (no per-layer cleanup), no disallow-join, crossing walls overlap; grids straight only;

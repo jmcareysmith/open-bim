@@ -85,6 +85,8 @@ import {
   type FamilyCategory,
   type FamilyDef,
   defaultGraphics,
+  sunDirection,
+  viewSunDate,
 } from "@open-bim/core";
 import { OcctKernel, SimpleKernel, findClashes, exportGlb, exportObj, exportParts, areaLoopsFromWalls, drawingDxf, parseDxf, viewDrawing, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
@@ -1056,7 +1058,12 @@ function applyView(): void {
   if (!activeView()) activeViewId = views(doc).find((v) => v.params.kind === "3d")?.id ?? views(doc)[0]?.id;
   const v = activeView();
   if (!v) return viewport.setViewMode("3d");
-  viewport.setVisualStyle(v.params.kind === "3d" ? (v.params.visualStyle ?? "shaded") : "shaded");
+  // Visual style: 3D views default to Shaded, plans to Hidden Line (line work only).
+  const planLike = v.params.kind === "floorPlan" || v.params.kind === "callout" || v.params.kind === "areaPlan";
+  viewport.setVisualStyle(v.params.kind === "3d" ? (v.params.visualStyle ?? "shaded") : planLike ? (v.params.visualStyle ?? "hiddenLine") : "hiddenLine");
+  // Sun and shadows (3D views): the true sun for the site, at the view's date and time.
+  if (v.params.kind === "3d") viewport.setSun(sunDirection(doc, viewSunDate(v.params)), !!v.params.shadows);
+  else viewport.setSun(null, false);
   if (isPlanView(v)) {
     viewport.setPlanRange(viewRange(doc, v));
     viewport.setViewMode("plan");

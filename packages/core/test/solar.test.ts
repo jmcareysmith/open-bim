@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Document, ensureProjectSettings, nztmToLatLon, sunDirection, sunPosition, type ProjectSettingsParams } from "../src/index.ts";
+import { Document, ensureProjectSettings, nztmToLatLon, sunDirection, sunPosition, viewSunDate, type ProjectSettingsParams, type ViewParams } from "../src/index.ts";
 
 describe("solar position", () => {
   it("converts NZTM2000 to latitude/longitude", () => {
@@ -42,5 +42,15 @@ describe("solar position", () => {
     });
     // Project X now points north.
     expect(sunDirection(doc, noon).x).toBeGreaterThan(0.85);
+  });
+});
+
+describe("view sun settings", () => {
+  it("a view's own date and time, else today at 2 pm", () => {
+    const p = { kind: "3d", levelId: null, range: null, scale: 100, detailLevel: "medium", hiddenCategories: [] } as unknown as ViewParams;
+    const today = new Date(2026, 9, 13, 9, 30);
+    expect(viewSunDate(p, today)).toEqual(new Date(2026, 9, 13, 14, 0));
+    expect(viewSunDate({ ...p, sun: { date: "2026-12-21", time: "16:45" } }, today)).toEqual(new Date(2026, 11, 21, 16, 45));
+    expect(viewSunDate({ ...p, sun: { date: "bad", time: "x" } }, today)).toEqual(new Date(2026, 9, 13, 14, 0));
   });
 });

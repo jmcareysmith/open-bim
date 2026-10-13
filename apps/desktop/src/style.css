@@ -167,6 +167,13 @@ aside h2 {
 .context-menu button:hover kbd { color: #fff; }
 .context-menu hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
 .context-heading { padding: 4px 12px; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+.mb { display: grid; grid-template-columns: 220px 1fr; gap: 12px; min-height: 340px; }
+.dialog:has(.mb) { width: min(780px, calc(100vw - 32px)); }
+.mb-side { display: flex; flex-direction: column; gap: 6px; border-right: 1px solid var(--line); padding-right: 10px; }
+.mb-list { flex: 1; overflow-y: auto; max-height: 420px; }
+.mb-form { display: flex; flex-direction: column; gap: 2px; }
+.mb-slider { display: flex; gap: 6px; align-items: center; }
+.mb-slider input { flex: 1; }
 .ovr { display: flex; flex-direction: column; gap: 8px; }
 .ovr-group { border: 1px solid var(--line); border-radius: 5px; padding: 6px 10px 8px; margin: 0; }
 .ovr-group legend { padding: 0 4px; font-weight: 600; }

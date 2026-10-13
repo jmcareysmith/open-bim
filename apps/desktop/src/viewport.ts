@@ -87,6 +87,8 @@ const COLORS: Record<string, number> = {
   [Cat.PadFooting]: 0xa7a8a6,
   [Cat.StripFooting]: 0xa7a8a6,
 };
+/** Plan styles that show the coloured model under the line work. */
+const SHADED_STYLES = new Set<string>(["shaded", "consistent", "realistic"]);
 /** Model elements whose plan marks scale with the view (bubbles, heads, labels). */
 const SCALED_MARKS = new Set<string>([Cat.Grid, Cat.ReferencePlane, Cat.View]);
 /** Hidden elements while revealing them (Revit shows them magenta). */
@@ -236,7 +238,13 @@ export class Viewport {
     this.scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 1.6));
     const sun = new THREE.DirectionalLight(0xffffff, 1.6);
     sun.position.set(-1, -2, 3);
-    this.scene.add(sun);
+    this.scene.add(sun, sun.target);
+    this.sun = sun;
+    // Shadow catcher on the ground (only seen when shadows are on).
+    this.ground = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.ShadowMaterial({ opacity: 0.28 }));
+    this.ground.receiveShadow = true;
+    this.ground.visible = false;
+    this.scene.add(this.ground);
 
     this.grid = new THREE.GridHelper(60000, 60, 0xc4c9cf, 0xd6dadf);
     this.grid.rotation.x = Math.PI / 2; // GridHelper is XZ; rotate into XY
@@ -424,6 +432,7 @@ export class Viewport {
     if (s === this.visualStyle) return;
     this.visualStyle = s;
     for (const id of this.objects.keys()) this.applyHighlight(id);
+    for (const g of this.objects.values()) this.applyPlanOnly(g);
     this.needsRender = true;
   }
 
@@ -778,9 +787,12 @@ export class Viewport {
     g.traverse((o) => {
       if (o.userData.planOnly) o.visible = this.mode === "plan";
     });
-    // In plan, solids give way to the 2D drawing (their meshes stay pickable while hidden).
+    // In plan, solids give way to the 2D drawing (their meshes stay pickable while hidden); shaded
+    // plan styles show the coloured model under the line work.
     if (g.userData.solid) {
-      g.children[0]!.visible = this.mode === "3d";
+      const shadedPlan = this.mode === "plan" && SHADED_STYLES.has(this.visualStyle);
+      g.children[0]!.visible = this.mode === "3d" || shadedPlan;
+      g.children[0]!.renderOrder = shadedPlan ? -10 : 0;
       g.children[1]!.visible = this.mode === "3d";
     }
   }
@@ -1006,6 +1018,47 @@ export class Viewport {
   };
 
   private frameListeners = new Set<() => void>();
+  private sun!: THREE.DirectionalLight;
+  private ground!: THREE.Mesh;
+
+  /**
+   * Sun for the 3D view (Revit's Sun Settings / Shadows): `dir` points towards the sun (project
+   * axes, z up), or null for the default studio light. Shadows fall on the model and the ground.
+   */
+  setSun(dir: { x: number; y: number; z: number } | null, shadows: boolean): void {
+    const box = new THREE.Box3();
+    for (const [id, g] of this.objects) if (this.meshes.has(id) && g.visible) box.expandByObject(g);
+    const centre = box.isEmpty() ? new THREE.Vector3() : box.getCenter(new THREE.Vector3());
+    const size = box.isEmpty() ? 20000 : box.getSize(new THREE.Vector3()).length();
+    const up = dir && dir.z > 0.02 ? new THREE.Vector3(dir.x, dir.y, dir.z).normalize() : new THREE.Vector3(-1, -2, 3).normalize();
+    this.sun.position.copy(centre).addScaledVector(up, size * 1.5);
+    this.sun.target.position.copy(centre);
+    this.sun.target.updateMatrixWorld();
+    // Below the horizon: no direct sun.
+    this.sun.intensity = dir && dir.z <= 0.02 ? 0.15 : 1.6;
+    const on = shadows && (!dir || dir.z > 0.02);
+    this.renderer.shadowMap.enabled = on;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.sun.castShadow = on;
+    if (on) {
+      const cam = this.sun.shadow.camera;
+      const r = size * 0.75;
+      Object.assign(cam, { left: -r, right: r, top: r, bottom: -r, near: 1, far: size * 4 });
+      cam.updateProjectionMatrix();
+      this.sun.shadow.mapSize.set(2048, 2048);
+      this.sun.shadow.bias = -0.0005;
+      this.sun.shadow.normalBias = size * 0.0002;
+      this.sun.shadow.map?.dispose();
+      this.sun.shadow.map = null;
+    }
+    const bottom = box.isEmpty() ? 0 : box.min.z;
+    this.ground.position.set(centre.x, centre.y, bottom + 1);
+    this.ground.scale.set(size * 4, size * 4, 1);
+    this.ground.visible = on && this.mode === "3d";
+    // Materials need recompiling when shadows switch.
+    for (const g of this.objects.values()) g.traverse((o) => o instanceof THREE.Mesh && ((o.material as THREE.Material).needsUpdate = true));
+    this.needsRender = true;
+  }
 
   /** Is the element drawn in the current view (after V/G, phase and temporary hide)? */
   isVisible(id: ElementId): boolean {
@@ -1099,7 +1152,10 @@ function makeGroup(mesh: MeshData, color: number, opacity = 1): THREE.Group {
   );
   const g = new THREE.Group();
   g.userData.opacity = opacity;
-  g.add(new THREE.Mesh(geom, mat), edges);
+  const solid = new THREE.Mesh(geom, mat);
+  // Shadows cost nothing until the view turns them on.
+  solid.castShadow = solid.receiveShadow = opacity >= 1;
+  g.add(solid, edges);
   return g;
 }
 

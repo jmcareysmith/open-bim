@@ -79,6 +79,8 @@ export type ViewParams = {
   templateId?: ElementId | null;
   /** Phasing: the phase this view shows and its phase filter (default: last phase, Show All). */
   phase?: string | null;
+  /** 3D views: the saved camera (where the view looks from and to). */
+  camera?: ViewCamera | null;
   /** 3D views: Sun Settings (solar study or direct lighting angles) and whether shadows show. */
   sun?: SunSettings | null;
   shadows?: boolean;
@@ -155,6 +157,41 @@ export function create3DView(tx: Transaction, doc: Document, name = "{3D}"): Vie
     { kind: "3d", levelId: null, range: null, scale: 100, detailLevel: "medium", hiddenCategories: [] },
     { name },
   );
+}
+
+/** A 3D view's camera: eye and target points (model mm) and the vertical field of view, degrees. */
+export type ViewCamera = { eye: [number, number, number]; target: [number, number, number]; fov?: number };
+
+/** Revit's default camera eye height above the level, mm. */
+export const CAMERA_EYE_HEIGHT = 1750;
+
+/**
+ * Camera (Revit: View → 3D View → Camera): a perspective 3D view looking from `eye` to `target`
+ * in plan, both at eye height above the level.
+ */
+export function createCameraView(tx: Transaction, doc: Document, levelId: ElementId, eye: Vec2, target: Vec2, opts: { name?: string; eyeHeight?: number } = {}): View {
+  if (Math.hypot(target.x - eye.x, target.y - eye.y) < 1) throw new Error("Pick a target away from the eye point");
+  const z = doc.require<LevelParams>(levelId).params.elevation + (opts.eyeHeight ?? CAMERA_EYE_HEIGHT);
+  return tx.create<ViewParams>(
+    Cat.View,
+    {
+      kind: "3d",
+      levelId: null,
+      range: null,
+      scale: 100,
+      detailLevel: "medium",
+      hiddenCategories: [],
+      camera: { eye: [eye.x, eye.y, z], target: [target.x, target.y, z], fov: 50 },
+    },
+    { name: opts.name ?? nextNumbered(doc, "3d", "3D View") },
+  );
+}
+
+/** "3D View 1", "3D View 2", … — the first number not taken. */
+function nextNumbered(doc: Document, kind: ViewKind, base: string): string {
+  let i = 1;
+  while (nameInUse(doc, kind, `${base} ${i}`)) i++;
+  return `${base} ${i}`;
 }
 
 export function renameView(tx: Transaction, doc: Document, id: ElementId, name: string): void {

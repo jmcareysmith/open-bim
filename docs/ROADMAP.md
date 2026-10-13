@@ -79,7 +79,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Walls attach top/base to floors, ceilings and roofs — tops follow sloped roof undersides (kinks at ridges/hips), floor/ceiling undersides; bases to a floor's top; detach restores own height
 - [x] Wall joins: per-layer cleanup, disallow join, clean crossing (X) walls
 - [x] Floors: pick walls (with offset), slope arrows
-- [ ] 3D views save their camera; perspective camera views
+- [x] 3D views save their camera; perspective camera views
 - [ ] Schedules on sheets; calculated fields
 - [ ] Beam plan symbols (dashed centre lines at Coarse/Medium)
 - [x] Annotation symbols — north arrow (up or true north), graphic scale bar, break line; views and sheets; paper-sized

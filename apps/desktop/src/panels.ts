@@ -516,6 +516,15 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
       });
     sec.append(row("", make));
   }
+  if (p.kind === "3d" && p.camera) {
+    // Camera: eye and target heights and the field of view (orbiting saves the rest).
+    const c = p.camera;
+    sec.append(
+      row("Eye elevation", numberInput(c.eye[2], (v) => set("Camera eye elevation", { camera: { ...c, eye: [c.eye[0], c.eye[1], v] } }))),
+      row("Target elevation", numberInput(c.target[2], (v) => set("Camera target elevation", { camera: { ...c, target: [c.target[0], c.target[1], v] } }))),
+      row("Field of view (°)", numberInput(c.fov ?? 45, (v) => set("Camera field of view", { camera: { ...c, fov: Math.max(10, Math.min(120, v)) } }))),
+    );
+  }
   if ((p.kind === "section" || p.kind === "elevation") && p.zRange) {
     const z = p.zRange;
     const setZ = (key: "bottom" | "top", v: number) =>

@@ -280,7 +280,17 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
         {
           title: "Create",
           items: [
-            { label: "3D View", icon: "view3d", cmd: "view3d", large: true },
+            {
+              label: "3D View",
+              icon: "view3d",
+              cmd: "view3d",
+              large: true,
+              title: "Default 3D view (▾: Camera — a perspective view from an eye point in plan)",
+              menu: () => [
+                { label: "Default 3D View", action: () => m.cmd("view3d") },
+                { label: "Camera", action: () => m.cmd("camera") },
+              ],
+            },
             { label: "Plan", icon: "plan", cmd: "viewPlan", large: true, title: "Floor plan of the active level" },
             { label: "Section", icon: "section", tool: "section", title: "Section (S)" },
             { label: "Callout", icon: "callout", tool: "callout" },

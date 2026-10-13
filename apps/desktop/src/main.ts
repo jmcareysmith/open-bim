@@ -1,3 +1,4 @@
+import { CameraTool } from "./cameratool.ts";
 import { SlopeArrowTool } from "./slopetool.ts";
 import {
   Cat,
@@ -397,6 +398,7 @@ const ctx: ModifyToolContext & PanelContext = {
   },
   activeViewId: () => activeViewId,
   setActiveView(id) {
+    saveViewCamera();
     activeViewId = id;
     const v = activeView();
     if (v?.params.levelId) activeLevelId = v.params.levelId;
@@ -471,6 +473,10 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   detailcomponent: new DetailComponentTool(ctx),
   attach: new AttachTool(ctx),
   slopeArrow: new SlopeArrowTool(ctx),
+  camera: new CameraTool(ctx, (id) => {
+    setTool("select");
+    ctx.setActiveView(id);
+  }),
   elevation: new ElevationTool(ctx),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
@@ -692,6 +698,7 @@ const commands: Record<string, () => void | Promise<void>> = {
   async save() {
     if (projectSession) return status("You're editing a family: use Load into Project to keep it.");
     try {
+      saveViewCamera();
       const path = await saveProject(doc.toJSON(), filePath);
       if (path) {
         filePath = path;
@@ -923,6 +930,7 @@ const commands: Record<string, () => void | Promise<void>> = {
     edit(`Delete ${ids.length} element(s)`, (tx) => ids.forEach((id) => doc.has(id) && tx.delete(id)));
     ctx.setSelection([]);
   },
+  camera: () => setTool("camera"),
   view3d() {
     const v = views(doc).find((x) => x.params.kind === "3d");
     if (v) ctx.setActiveView(v.id);
@@ -1041,6 +1049,20 @@ function activeView(): View | undefined {
 }
 
 /** Push the active view's settings (mode, range, hidden categories) into the viewport. */
+/** The camera last put on screen for a 3D view (so orbiting isn't undone by redraws). */
+let appliedCamera: { viewId: ElementId; json: string } | null = null;
+
+/** Remember the open 3D view's camera in the view (not an undo step). */
+function saveViewCamera(): void {
+  const v = activeView();
+  if (!v || v.params.kind !== "3d" || viewport.viewMode !== "3d") return;
+  const cam = viewport.getCamera3d();
+  const json = JSON.stringify(cam);
+  if (JSON.stringify(v.params.camera ?? null) === json) return;
+  appliedCamera = { viewId: v.id, json };
+  doc.transact("Save view camera", (tx) => tx.update<ViewParams>(v.id, { camera: cam }), { undoable: false });
+}
+
 function applyView(): void {
   // Schedules open like views, as a table over the viewport.
   const active = activeViewId ? doc.get(activeViewId) : undefined;
@@ -1078,6 +1100,10 @@ function applyView(): void {
     viewport.setDrawingView(v);
   } else {
     viewport.setViewMode("3d");
+    // Each 3D view keeps its own camera: restore it on opening (or when its saved camera changes).
+    const json = JSON.stringify(v.params.camera ?? null);
+    if (v.params.camera && (appliedCamera?.viewId !== v.id || appliedCamera.json !== json)) viewport.setCamera3d(v.params.camera);
+    appliedCamera = { viewId: v.id, json };
   }
   // Visibility/Graphics: the view's own settings, or its template's.
   const g = effectiveGraphics(doc, v);

@@ -91,7 +91,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Visibility/Graphics overrides, filters | 2 | ✅ (incl. Override Graphics by element; line weights in PDF only) |
 | View templates | 2 | ✅ |
 | Hidden-line, shaded, realistic styles | 2 | ✅ (3D views; plans/sections are 2D drawings) |
-| Camera / perspective views | 2 | ⬜ |
+| Camera / perspective views | 2 | ✅ (Camera tool; each 3D view keeps its camera; no orthographic 3D yet) |
 | Temporary hide/isolate | 1 | ✅ |
 
 ## 8. Annotation & documentation

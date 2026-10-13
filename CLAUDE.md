@@ -76,6 +76,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Grid bubbles, view markers and reference plane labels scale with the view scale (paper size ×
   1:n), on screen and on sheets; grids are dash-dot with solid ends; section tails are a bar in the
   view direction.
+- 3D views keep their own camera (`camera` param, saved without an undo step on leaving the view
+  or saving); View → 3D View ▾ → Camera: eye then target in a plan makes a perspective view at
+  1750 eye height (eye/target elevation and field of view in Properties).
 - Double-click: section/elevation/callout marker opens its view; sheet viewport opens its view;
   a component opens its family in the family editor.
 - Wall attach: Modify → Attach Top/Base (or right-click a wall), then click the roof/floor/ceiling;
@@ -98,7 +101,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Known gaps: join cleanup is plan-only (3D solids overlap at crossings); grids straight only;
   floors: Pick Walls (sketch options strip: face/core/centre line + offset) and slope arrows (floor
   Properties → Add slope arrow; tail/head heights; plane top, sheared slab, 1:n arrow in plan); roofs exact for convex/L/T/U only; doors/windows parametric;
-  dimensions only in plans via the tool; no 3D view camera saved per view; viewport (interactive)
+  dimensions only in plans via the tool; 3D views are perspective only (no orthographic 3D); viewport (interactive)
   and sheet/PDF drawing paths are separate (fold the viewport onto `viewDrawing` later).
 - Families (Phase 3 started): family editor (Browser → Families → New family / Edit family) with
   Extrusion/Blend/Revolve/Sweep (+ Void), parameters with formulas, family types; Load into Project;

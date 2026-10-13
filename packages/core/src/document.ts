@@ -123,8 +123,9 @@ export class Document {
 
   /**
    * Run `fn` as one undoable unit. If it throws, every edit is rolled back and the error rethrown.
+   * `undoable: false` records nothing to undo (e.g. a view remembering its camera as you orbit).
    */
-  transact<T>(name: string, fn: (tx: Transaction) => T): T {
+  transact<T>(name: string, fn: (tx: Transaction) => T, opts: { undoable?: boolean } = {}): T {
     if (this.active) throw new Error("Nested transactions are not supported");
     const touched = new Map<ElementId, Element | undefined>();
     this.active = touched;
@@ -147,8 +148,10 @@ export class Document {
       changes.push({ id, before, after: after && clone(after) });
     }
     if (changes.length === 0) return result;
-    this.undoStack.push({ name, changes });
-    this.redoStack = [];
+    if (opts.undoable !== false) {
+      this.undoStack.push({ name, changes });
+      this.redoStack = [];
+    }
     this.emit(name, changes);
     return result;
   }

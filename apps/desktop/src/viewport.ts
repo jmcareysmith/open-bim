@@ -688,6 +688,26 @@ export class Viewport {
 
   // ---- views & camera -----------------------------------------------------
 
+  /** The 3D camera as a view stores it (eye, target, field of view). */
+  getCamera3d(): { eye: [number, number, number]; target: [number, number, number]; fov: number } {
+    const p = this.camera3d.position;
+    const t = this.controls3d.target;
+    const r = (n: number) => Math.round(n);
+    return { eye: [r(p.x), r(p.y), r(p.z)], target: [r(t.x), r(t.y), r(t.z)], fov: this.camera3d.fov };
+  }
+
+  /** Put the 3D camera where a view saved it. */
+  setCamera3d(c: { eye: [number, number, number]; target: [number, number, number]; fov?: number }): void {
+    this.camera3d.position.set(...c.eye);
+    this.controls3d.target.set(...c.target);
+    if (c.fov && c.fov !== this.camera3d.fov) {
+      this.camera3d.fov = c.fov;
+      this.camera3d.updateProjectionMatrix();
+    }
+    this.controls3d.update();
+    this.needsRender = true;
+  }
+
   /** The 3D view's camera (for renders). */
   get perspectiveCamera(): THREE.PerspectiveCamera {
     return this.camera3d;

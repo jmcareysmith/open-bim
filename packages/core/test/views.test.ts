@@ -5,6 +5,9 @@ import {
   TemporaryVisibility,
   typeCategoryOf,
   applyResidentialTemplate,
+  CAMERA_EYE_HEIGHT,
+  createCameraView,
+  type ViewParams,
   planViewRange,
   type LevelParams,
 } from "../src/index.ts";
@@ -73,5 +76,21 @@ describe("type categories", () => {
     expect(typeCategoryOf("Wall")).toBe("WallType");
     expect(typeCategoryOf("Window")).toBe("WindowType");
     expect(typeCategoryOf("Grid")).toBeUndefined();
+  });
+});
+
+describe("camera views", () => {
+  it("makes numbered perspective views at eye height, and saves cameras without undo", () => {
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const a = doc.transact("Camera", (tx) => createCameraView(tx, doc, ids.levels.ground, { x: 0, y: 0 }, { x: 5000, y: 0 }));
+    const b = doc.transact("Camera", (tx) => createCameraView(tx, doc, ids.levels.ground, { x: 0, y: 0 }, { x: 0, y: 5000 }));
+    expect([a.name, b.name]).toEqual(["3D View 1", "3D View 2"]);
+    expect(a.params.camera!.eye[2]).toBe(CAMERA_EYE_HEIGHT);
+    expect(() => doc.transact("Camera", (tx) => createCameraView(tx, doc, ids.levels.ground, { x: 0, y: 0 }, { x: 0, y: 0 }))).toThrow();
+    const undoName = doc.undoName;
+    doc.transact("Save camera", (tx) => tx.update<ViewParams>(a.id, { camera: { eye: [1, 2, 3], target: [4, 5, 6] } }), { undoable: false });
+    expect(doc.require<ViewParams>(a.id).params.camera!.eye).toEqual([1, 2, 3]);
+    expect(doc.undoName).toBe(undoName);
   });
 });

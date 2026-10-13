@@ -101,8 +101,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Known gaps: join cleanup is plan-only (3D solids overlap at crossings); grids straight only;
   floors: Pick Walls (sketch options strip: face/core/centre line + offset) and slope arrows (floor
   Properties → Add slope arrow; tail/head heights; plane top, sheared slab, 1:n arrow in plan); roofs exact for convex/L/T/U only; doors/windows parametric;
-  dimensions only in plans via the tool; 3D views are perspective only (no orthographic 3D); viewport (interactive)
-  and sheet/PDF drawing paths are separate (fold the viewport onto `viewDrawing` later).
+  dimensions only in plans via the tool; 3D views are perspective only (no orthographic 3D).
+  Screen and sheet/PDF share `lineworkDrawing` for cut/projection line work.
 - Families (Phase 3 started): family editor (Browser → Families → New family / Edit family) with
   Extrusion/Blend/Revolve/Sweep (+ Void), parameters with formulas, family types; Load into Project;
   Component tool (C) places them (free-standing, or in walls for Door/Window families).
@@ -151,4 +151,5 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   NZ Checks → NZS 3604 bracing (enter tabulated demand there). Demand is a provisional estimate.
 - AI render: Render pane → AI render… (self-hosted SD WebUI API, or Gemini with the user's key).
   Tested against a mock server only, not a real model.
-- Next: Phase 7a — drag to edit (grips on wall/line/datum ends, drag to move, temporary dimensions).
+- Next: Phase 7a done. Phase 7b leftovers (recent files, drag and drop from the browser, tile/cascade +
+  selection filter, shortcut editor), then Phase 8 (MEP & visual programming).

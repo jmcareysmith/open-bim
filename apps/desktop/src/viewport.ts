@@ -16,7 +16,6 @@ import {
   viewFrame,
   type DetailLevel,
   type Element,
-  type MaterialParams,
   type ResolvedGraphics,
   type Sheet,
   type ViewParams,
@@ -30,14 +29,14 @@ import {
   viewCrop,
   planLevelOf,
   defaultGraphics,
-  type PatternName,
 } from "@open-bim/core";
 import {
   GRID_BUBBLE_RADIUS,
   fillLoops,
-  cleanCuts,
+  lineworkDrawing,
+  type Fill,
+  type Stroke,
   patternFamilies,
-  hatch,
   planFrame,
   planLinework,
   sectionAnnotations,
@@ -885,23 +884,14 @@ export class Viewport {
     const z = drawingMode ? 0 : this.planRange.cut - 0.5;
     const frame = drawingMode ? viewFrame(this.drawingView!) : planFrame(this.planRange.cut);
     const detailed = this.graphics.detailLevel !== "coarse";
-    // Plans clean up wall joins (layers by priority; no lines between joined walls).
-    const cuts = cleanCuts(this.doc, linework, frame, detailed, !drawingMode);
+    // The same line work sheets and PDFs use: wall joins cleaned, layers hatched, overrides applied.
+    const d = lineworkDrawing(this.doc, (el) => this.resolveGraphics(el), linework, frame, { detailed, plan: !drawingMode, scale: this.graphics.scale });
+    const strokes = new Map<ElementId, Stroke[]>();
+    const fills = new Map<ElementId, Fill[]>();
+    for (const st of d.strokes) if (st.id) strokes.set(st.id, [...(strokes.get(st.id) ?? []), st]);
+    for (const f of d.fills) if (f.id) fills.set(f.id, [...(fills.get(f.id) ?? []), f]);
     for (const lw of linework) {
-      const el = this.doc.require(lw.id);
-      const cc = cuts.get(lw.id);
-      // Medium/fine: split cuts into layers, each hatched with its material's cut pattern.
-      const fg = this.resolveGraphics(el).cutFill.foreground;
-      const regions = detailed
-        ? (cc?.regions ?? []).map((r) => {
-            const m = r.materialId ? this.doc.get<MaterialParams>(r.materialId) : undefined;
-            const pattern = (fg.pattern as PatternName | null) ?? m?.params.cutPattern ?? "diagonal";
-            if (!fg.visible) return { loop: r.loop, lines: r.lines, solid: false, hatch: [] };
-            const fam = patternFamilies(pattern, this.graphics.scale);
-            return { loop: r.loop, lines: r.lines, solid: pattern === "solid", hatch: fam ? hatch([r.loop], fam) : [] };
-          })
-        : null;
-      const g = makeDrawingGroup(lw, z, regions, cc);
+      const g = makeElementDrawing(strokes.get(lw.id) ?? [], fills.get(lw.id) ?? [], z);
       g.userData.elementId = lw.id;
       this.drawing.set(lw.id, g);
       target.add(g);
@@ -1264,8 +1254,6 @@ function makeGroup(mesh: MeshData, color: number, opacity = 1): THREE.Group {
  * Plan linework for one element at the cut plane height: poché fill, then projection lines, then
  * cut outlines on top. Drawn without depth testing so draw order decides what's on top.
  */
-type CutRegion = { loop: Vec2[]; lines: number[]; solid: boolean; hatch: number[] };
-
 function segmentsGeom(seg: number[], z: number): THREE.BufferGeometry {
   const pos: number[] = [];
   for (let i = 0; i < seg.length; i += 4) pos.push(seg[i]!, seg[i + 1]!, z, seg[i + 2]!, seg[i + 3]!, z);
@@ -1274,16 +1262,20 @@ function segmentsGeom(seg: number[], z: number): THREE.BufferGeometry {
   return geom;
 }
 
-/**
- * Plan/section linework for one element: poché (coarse) or layer regions with cut patterns
- * (medium/fine), projection and surface-pattern lines, then cut outlines on top.
- */
-function makeDrawingGroup(lw: PlanLinework, z: number, regions: CutRegion[] | null = null, cut?: { loops: Vec2[][]; lines: number[] }): THREE.Group {
-  const cutLoops = cut?.loops ?? lw.cutLoops;
+/** Screen colour and draw order for each kind of line work (overrides recolour by role). */
+const STROKE_ROLE: Partial<Record<Stroke["kind"], { role: string; color: number; order: number }>> = {
+  cut: { role: "cut", color: CUT_LINE, order: -1 },
+  beyond: { role: "projection", color: BEYOND, order: -2 },
+  surface: { role: "surface", color: SURFACE, order: -2.5 },
+  hatch: { role: "hatch", color: HATCH, order: -2 },
+};
+
+/** One element's cut/projection drawing (from `lineworkDrawing`) as a flat group at height z. */
+function makeElementDrawing(strokes: Stroke[], fills: Fill[], z: number): THREE.Group {
   const g = new THREE.Group();
-  const flat = (o: THREE.Object3D, color: number, order: number) => {
+  const flat = (o: THREE.Object3D, color: number, role: string, order: number) => {
     o.userData.baseColor = color;
-    o.userData.role = color === CUT_LINE ? "cut" : color === BEYOND ? "projection" : color === SURFACE ? "surface" : color === HATCH ? "hatch" : "poche";
+    o.userData.role = role;
     o.renderOrder = order;
     g.add(o);
   };
@@ -1292,39 +1284,18 @@ function makeDrawingGroup(lw: PlanLinework, z: number, regions: CutRegion[] | nu
     m.depthWrite = false;
     return m;
   };
-  const tris = regions ? fillLoops(regions.filter((r) => r.solid).map((r) => r.loop)) : fillLoops(cutLoops);
-  if (regions) {
-    for (const r of regions) {
-      if (r.hatch.length) flat(new THREE.LineSegments(segmentsGeom(r.hatch, z), mat(new THREE.LineBasicMaterial({ color: HATCH }))), HATCH, -2);
-      if (r.lines.length) flat(new THREE.LineSegments(segmentsGeom(r.lines, z), mat(new THREE.LineBasicMaterial({ color: BEYOND }))), BEYOND, -2);
-    }
-  }
-  if (lw.surface?.length) {
-    flat(new THREE.LineSegments(segmentsGeom(lw.surface, z), mat(new THREE.LineBasicMaterial({ color: SURFACE }))), SURFACE, -2.5);
-  }
-  if (tris.length) {
-    const pos = new Float32Array(tris.flatMap((t) => t.flatMap((p) => [p.x, p.y, z])));
+  for (const f of fills) {
+    const tris = fillLoops(f.loops);
+    if (!tris.length) continue;
     const geom = new THREE.BufferGeometry();
-    geom.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-    flat(new THREE.Mesh(geom, mat(new THREE.MeshBasicMaterial({ color: POCHE, side: THREE.DoubleSide }))), POCHE, -3);
+    geom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(tris.flatMap((t) => t.flatMap((p) => [p.x, p.y, z]))), 3));
+    const color = f.color ?? POCHE;
+    flat(new THREE.Mesh(geom, mat(new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }))), color, "poche", -3);
   }
-  if (lw.projection.length) {
-    const pos: number[] = [];
-    for (let i = 0; i < lw.projection.length; i += 4) {
-      pos.push(lw.projection[i]!, lw.projection[i + 1]!, z, lw.projection[i + 2]!, lw.projection[i + 3]!, z);
-    }
-    const geom = new THREE.BufferGeometry();
-    geom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(pos), 3));
-    flat(new THREE.LineSegments(geom, mat(new THREE.LineBasicMaterial({ color: BEYOND }))), BEYOND, -2);
-  }
-  if (cut) {
-    if (cut.lines.length) flat(new THREE.LineSegments(segmentsGeom(cut.lines, z), mat(new THREE.LineBasicMaterial({ color: CUT_LINE }))), CUT_LINE, -1);
-  } else {
-    for (const loop of lw.cutLoops) {
-      const geom = new THREE.BufferGeometry();
-      geom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(loop.flatMap((p) => [p.x, p.y, z])), 3));
-      flat(new THREE.LineLoop(geom, mat(new THREE.LineBasicMaterial({ color: CUT_LINE }))), CUT_LINE, -1);
-    }
+  for (const st of strokes) {
+    const r = STROKE_ROLE[st.kind];
+    if (!r || !st.segments.length) continue;
+    flat(new THREE.LineSegments(segmentsGeom(st.segments, z), mat(new THREE.LineBasicMaterial({ color: r.color }))), r.color, r.role, r.order);
   }
   return g;
 }

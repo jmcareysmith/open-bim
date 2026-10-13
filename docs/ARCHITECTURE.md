@@ -111,8 +111,11 @@ paper mm; a view goes on one sheet). `viewDrawing` turns any plan/callout/sectio
 vector primitives (strokes tagged cut/beyond/hatch/surface/annotation/datum/symbol, fills, texts)
 honouring V/G, detail level and patterns; `sheetDrawing` lays out the title block and viewports at
 view scale; `writePdf` is a dependency-free vector PDF writer (Helvetica, WinAnsi). The sheet display
-and the PDF render the same primitives. (The interactive viewport still has its own plan/section
-path; folding it onto `viewDrawing` is a later clean-up.)
+and the PDF render the same primitives. Schedules placed on sheets draw as tables
+(`scheduleOnSheet`). The interactive viewport draws plans and sections from the same
+`lineworkDrawing` (cut/projection line work: join cleanup, layers, patterns, overrides) as
+`viewDrawing`, grouping it per element so selection and override colours apply live; datums,
+symbols and annotations on screen still come straight from `buildLines`.
 
 **Families** — a family is its own `Document` (Revit's family editor): reference level, views,
 centre reference planes, `FamilyInfo` (category, hosting, types with values, current type),

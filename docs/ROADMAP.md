@@ -88,7 +88,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Override Graphics in View — by element/category (right-click; by filter via V/G): visible, halftone, transparency, projection/cut lines (pattern, colour, weight), surface/cut patterns (foreground/background: visible, pattern, colour). Weights show in PDF only (screen lines are 1 px)
 - [x] Detail groups — one view's detail lines, regions, text, symbols, detail components and clouds; place copies in any plan/section/elevation
 - [x] Find/Replace and Check Spelling for text notes (Annotate → Text)
-- [ ] Fold the interactive viewport onto `viewDrawing` (one drawing path for screen and sheet/PDF)
+- [x] Fold the interactive viewport onto `viewDrawing` (one drawing path for screen and sheet/PDF) — cut/projection line work shared (`lineworkDrawing`); datums/annotations on screen still from `buildLines`
 
 ## Phase 7b — Revit-style interface
 - [x] Ribbon: tabs and labelled panels, split-button dropdowns, contextual Modify tab, options bar — Architecture/Structure/Insert/Annotate/Massing & Site/Analyse/Collaborate/View/Manage/Modify (+ Create in the family editor); own line icons; "Modify | <category>" label

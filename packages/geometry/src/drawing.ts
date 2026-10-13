@@ -15,6 +15,7 @@ import {
   type MaterialParams,
   type Vec2,
   type View,
+  type ViewFrame,
   type ViewParams,
   planLevelOf,
   type LinePattern,
@@ -121,13 +122,60 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
   const range = section ? null : viewRange(doc, view);
   const linework: PlanLinework[] = section ? sectionLinework(items, view) : planLinework(items, range!);
   const frame = section ? viewFrame(view) : planFrame(range!.cut);
-  const detailed = g.detailLevel !== "coarse";
-  // Cuts with wall joins cleaned up (plans): layers run through by priority, joint lines drop.
-  const cuts = cleanCuts(doc, linework, frame, detailed, !section);
-  for (const lw of linework) {
-    const el = doc.require(lw.id);
-    const cc = cuts.get(lw.id) ?? { loops: lw.cutLoops, lines: loopSegments(lw.cutLoops), regions: null };
+  const lw = lineworkDrawing(doc, (el) => elementGraphics(doc, g, el), linework, frame, { detailed: g.detailLevel !== "coarse", plan: !section, scale: g.scale });
+  out.strokes.push(...lw.strokes);
+  out.fills.push(...lw.fills);
+
+  // Line work: datums, plan symbols, view markers, annotations.
+  const lineEls = els.filter((el) => !NOT_ON_DRAWINGS.has(el.category));
+  for (const el of lineEls) {
+    const owner = annotationView(el);
+    if (section && !owner) continue; // sections draw their own level/grid annotations below
+    const lines = kernel.buildLines(doc, el, g.scale);
+    if (!lines) continue;
+    if (lines.planOnly && section) continue;
+    // Beam symbols belong to plans of the beam's level.
+    if (el.category === Cat.Beam && (view.params as ViewParams).levelId !== (el.params as { levelId?: string }).levelId) continue;
     const r = elementGraphics(doc, g, el);
+    addLineData(out, lines, owner ? "annotation" : el.category === Cat.Grid || el.category === Cat.ReferencePlane ? "datum" : "symbol", lineStyle(r, r.projection, el.id));
+  }
+  if (section) addLineData(out, sectionAnnotations(doc, view), "datum", {});
+
+  // Bounds: the view's crop when it has one, else everything drawn.
+  const crop = section ? viewCrop(view) : (view.params as ViewParams).crop;
+  out.bounds = crop ? { min: { ...crop.min }, max: { ...crop.max } } : contentBounds(out);
+  if (section) {
+    // Leave room for level heads to the right and grid bubbles above.
+    out.bounds.max.x += 3000;
+    out.bounds.max.y += 1000;
+  }
+  if (crop && !section) clipDrawing(out, crop);
+  return out;
+}
+
+/**
+ * Cut and projection line work as drawing primitives, each tagged with its element: wall joins
+ * cleaned up (plans), cuts split into layers with their materials' cut patterns (medium/fine) or
+ * pochéd (coarse), then projection, surface pattern and heavy cut outlines. Shared by sheets/PDF
+ * (`viewDrawing`) and the interactive viewport, so both draw a view the same way.
+ */
+export function lineworkDrawing(
+  doc: Document,
+  graphics: (el: Element) => ResolvedGraphics,
+  linework: PlanLinework[],
+  frame: ViewFrame,
+  opts: { detailed: boolean; plan: boolean; scale: number },
+): Pick<Drawing, "strokes" | "fills"> {
+  const out: Pick<Drawing, "strokes" | "fills"> = { strokes: [], fills: [] };
+  const g = { scale: opts.scale };
+  const detailed = opts.detailed;
+  // Cuts with wall joins cleaned up (plans): layers run through by priority, joint lines drop.
+  const cuts = cleanCuts(doc, linework, frame, detailed, opts.plan);
+  for (const lw of linework) {
+    const el = doc.get(lw.id);
+    if (!el) continue;
+    const cc = cuts.get(lw.id) ?? { loops: lw.cutLoops, lines: loopSegments(lw.cutLoops), regions: null };
+    const r = graphics(el);
     const proj = lineStyle(r, r.projection, lw.id);
     const cut = lineStyle(r, r.cut, lw.id);
     const fg = r.cutFill.foreground;
@@ -159,30 +207,6 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
     if (cc.lines.length) out.strokes.push({ kind: "cut", segments: cc.lines, ...cut });
   }
 
-  // Line work: datums, plan symbols, view markers, annotations.
-  const lineEls = els.filter((el) => !NOT_ON_DRAWINGS.has(el.category));
-  for (const el of lineEls) {
-    const owner = annotationView(el);
-    if (section && !owner) continue; // sections draw their own level/grid annotations below
-    const lines = kernel.buildLines(doc, el, g.scale);
-    if (!lines) continue;
-    if (lines.planOnly && section) continue;
-    // Beam symbols belong to plans of the beam's level.
-    if (el.category === Cat.Beam && (view.params as ViewParams).levelId !== (el.params as { levelId?: string }).levelId) continue;
-    const r = elementGraphics(doc, g, el);
-    addLineData(out, lines, owner ? "annotation" : el.category === Cat.Grid || el.category === Cat.ReferencePlane ? "datum" : "symbol", lineStyle(r, r.projection, el.id));
-  }
-  if (section) addLineData(out, sectionAnnotations(doc, view), "datum", {});
-
-  // Bounds: the view's crop when it has one, else everything drawn.
-  const crop = section ? viewCrop(view) : (view.params as ViewParams).crop;
-  out.bounds = crop ? { min: { ...crop.min }, max: { ...crop.max } } : contentBounds(out);
-  if (section) {
-    // Leave room for level heads to the right and grid bubbles above.
-    out.bounds.max.x += 3000;
-    out.bounds.max.y += 1000;
-  }
-  if (crop && !section) clipDrawing(out, crop);
   return out;
 }
 

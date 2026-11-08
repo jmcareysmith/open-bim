@@ -72,6 +72,11 @@ describe("family library", () => {
       expect(() => doc.transact("P", (tx) => placeFamilyInstance(tx, doc, def.id, "Default", { levelId: ids.levels.ground }))).toThrow(/view marker/);
       return;
     }
+    if (lib.category === "TitleBlock") {
+      // Picked by sheets (see geometry title block tests); never placed.
+      expect(() => doc.transact("P", (tx) => placeFamilyInstance(tx, doc, def.id, "Default", { levelId: ids.levels.ground }))).toThrow(/title block/);
+      return;
+    }
     if (lib.category === "DetailItem") {
       // 2D: placed in a view as a detail component; it must draw something.
       const plan = views(doc).find((v) => v.params.kind === "floorPlan")!;

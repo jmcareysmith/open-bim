@@ -181,6 +181,7 @@ export function placeFamilyInstance(
   if (def.category !== Cat.FamilyDef) throw new Error("Not a loaded family");
   if (def.params.category === "DetailItem") throw new Error(`${def.name} is a detail item: place it with Annotate → Detail → Component`);
   if (def.params.category === "ViewMarker") throw new Error(`${def.name} is a view marker: pick it in a section's, elevation's or callout's Properties`);
+  if (def.params.category === "TitleBlock") throw new Error(`${def.name} is a title block: pick it in a sheet's Properties`);
   if (!familyTypeNames(def).includes(typeName)) throw new Error(`${def.name} has no type "${typeName}"`);
   let levelId = opts.levelId;
   if (def.params.hosting === "wall") {

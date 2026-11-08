@@ -111,7 +111,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Detail lines, filled regions, detail components, insulation | 2 | 🟨 (detail components fixed-size; batt insulation) |
 | Symbols, north arrow, section/elevation heads | 2 | 🟨 (north arrow, scale bar, break line; view markers drawn) |
 | Revision clouds & revisions | 4 | ✅ |
-| Sheets, title blocks, viewports | 2 | 🟨 |
+| Sheets, title blocks, viewports | 2 | ✅ (built-in strip or Title Block families with {label} text; library A1 title block) |
 | Print / PDF export (vector) | 2 | ✅ |
 
 ## 9. Schedules & data

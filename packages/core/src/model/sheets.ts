@@ -26,6 +26,8 @@ export type SheetParams = {
   issueDate: string;
   /** Revisions added to the sheet by hand (Revit "Revisions on Sheet"); clouds add others. */
   revisionIds?: ElementId[] | null;
+  /** A Title Block family (loaded); the built-in title strip when unset. */
+  titleBlockId?: ElementId | null;
 };
 export type Sheet = Element<SheetParams>;
 

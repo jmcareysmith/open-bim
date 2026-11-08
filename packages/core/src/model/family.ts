@@ -23,6 +23,7 @@ export type FamilyCategory =
   | "Window"
   | "DetailItem"
   | "ViewMarker"
+  | "TitleBlock"
   | "MechanicalEquipment"
   | "AirTerminal"
   | "PlumbingFixture"
@@ -292,6 +293,7 @@ const STARTER: Record<FamilyCategory, [string, number][]> = {
   ],
   DetailItem: [],
   ViewMarker: [],
+  TitleBlock: [],
   MechanicalEquipment: [
     ["Width", 900],
     ["Depth", 600],
@@ -332,10 +334,11 @@ export function applyFamilyTemplate(doc: Document, category: FamilyCategory = "G
     const level = createLevel(tx, "Ref. Level", 0);
     // Detail items and view markers are 2D, in one plan view. Detail items are drawn full size (shown
     // at 1:5); markers are drawn at paper size (mm on the sheet), so their view is 1:1.
-    const flat = category === "DetailItem" || category === "ViewMarker";
+    // Title blocks are drawn at paper size too, with the sheet's bottom-left corner at the origin.
+    const flat = category === "DetailItem" || category === "ViewMarker" || category === "TitleBlock";
     createFloorPlan(tx, doc, level.id, {
-      name: category === "DetailItem" ? "Detail" : category === "ViewMarker" ? "Marker" : "Ref. Level",
-      ...(category === "DetailItem" ? { scale: 5 } : category === "ViewMarker" ? { scale: 1 } : {}),
+      name: category === "DetailItem" ? "Detail" : category === "ViewMarker" ? "Marker" : category === "TitleBlock" ? "Title Block" : "Ref. Level",
+      ...(category === "DetailItem" ? { scale: 5 } : category === "ViewMarker" || category === "TitleBlock" ? { scale: 1 } : {}),
     });
     if (!flat) {
       createElevation(tx, doc, { x: -3000, y: -3000 }, { x: 3000, y: -3000 }, { name: "Front", farClip: 8000, zRange: { bottom: -500, top: 3000 } });

@@ -1,4 +1,4 @@
-import {
+import { detailContent, type FamilyDef, type FamilyDefParams,
   Cat,
   PAPER_SIZES,
   currentRevision,
@@ -51,13 +51,6 @@ export function sheetDrawing(doc: Document, kernel: GeometryKernel, sheet: Sheet
     loopSegments([[{ x: x0, y: y0 }, { x: x1, y: y0 }, { x: x1, y: y1 }, { x: x0, y: y1 }]]);
   const line = (x0: number, y0: number, x1: number, y1: number) => [x0, y0, x1, y1];
 
-  // Border and title strip.
-  const right = width - MARGIN;
-  const strip = right - TITLE_STRIP;
-  out.strokes.push({ kind: "cut", segments: rect(MARGIN, MARGIN, right, height - MARGIN) });
-  out.strokes.push({ kind: "annotation", segments: line(strip, MARGIN, strip, height - MARGIN) });
-
-  // Title block fields, bottom up (sheet number largest, as in most NZ practice title blocks).
   const info = projectSettings(doc)?.params.info;
   const scales = [
     ...new Set(
@@ -67,6 +60,35 @@ export function sheetDrawing(doc: Document, kernel: GeometryKernel, sheet: Sheet
       }),
     ),
   ];
+  // A Title Block family: its line work, regions and text at paper size, labels filled in.
+  const tb = sheet.params.titleBlockId ? doc.get<FamilyDefParams>(sheet.params.titleBlockId) : undefined;
+  if (tb && tb.category === Cat.FamilyDef && tb.params.category === "TitleBlock") {
+    const c = detailContent(tb as FamilyDef);
+    const values: Record<string, string> = {
+      "Sheet Number": sheet.params.number,
+      "Sheet Name": sheet.name ?? "",
+      Revision: currentRevision(doc, sheet) || "-",
+      Scale: scales.join(", ") || "-",
+      Date: sheet.params.issueDate,
+      "Drawn By": sheet.params.drawnBy || "-",
+      "Checked By": sheet.params.checkedBy || "-",
+      "Project Name": info?.name || "Untitled project",
+      "Project Number": info?.number || "-",
+      Client: info?.client || "-",
+      Address: info?.address || "-",
+    };
+    const fill = (t: string) => t.replace(/\{([^}]+)\}/g, (m, k: string) => values[k.trim()] ?? m);
+    for (const l of c.lines) out.strokes.push({ kind: l.style === "wide" ? "cut" : "annotation", segments: [l.start.x, l.start.y, l.end.x, l.end.y], ...(l.style === "hidden" ? { dashed: true } : {}) });
+    for (const r of c.regions) out.fills.push({ kind: "region", loops: [r.boundary, ...r.holes], color: r.color });
+    for (const t of c.texts) out.texts.push({ text: fill(t.text), x: t.position.x, y: t.position.y, size: t.size, align: "left" });
+  } else {
+  // Border and title strip.
+  const right = width - MARGIN;
+  const strip = right - TITLE_STRIP;
+  out.strokes.push({ kind: "cut", segments: rect(MARGIN, MARGIN, right, height - MARGIN) });
+  out.strokes.push({ kind: "annotation", segments: line(strip, MARGIN, strip, height - MARGIN) });
+
+  // Title block fields, bottom up (sheet number largest, as in most NZ practice title blocks).
   const fields: [string, string, number][] = [
     ["Sheet", sheet.params.number, 9],
     ["Revision", currentRevision(doc, sheet) || "-", 4],
@@ -107,6 +129,7 @@ export function sheetDrawing(doc: Document, kernel: GeometryKernel, sheet: Sheet
       ry -= 6;
     }
     out.strokes.push({ kind: "annotation", segments: line(strip, ry, right, ry) });
+  }
   }
   // Annotation drawn on the sheet itself (revision clouds), in paper mm.
   for (const c of doc.byCategory(Cat.RevisionCloud)) {

@@ -626,6 +626,7 @@ $("#sel-filter").onclick = () => openSelectionFilter();
     const def = familyDefs(doc).find((d) => d.id === id);
     if (!def) return;
     if (def.params.category === "ViewMarker") return status("View Marker families are chosen in a view's Properties, not placed.");
+    if (def.params.category === "TitleBlock") return status("Title blocks are chosen in a sheet's Properties, not placed.");
     if (isDetailFamily(def)) {
       (tools.detailcomponent as DetailComponentTool).familyId = def.id;
       return setTool("detailcomponent");
@@ -2012,8 +2013,8 @@ function openFamily(fam: Document): void {
   switchDocument(fam);
   const cat = familyInfo(fam)?.params.category;
   status(
-    cat === "DetailItem" || cat === "ViewMarker"
-      ? `Family editor: ${familyName(fam)}. Draw with Annotate → Detail Line, Region and Text${cat === "ViewMarker" ? " (paper mm; {n}, {name}, {sheet} in text)" : " (full size)"}.`
+    cat === "DetailItem" || cat === "ViewMarker" || cat === "TitleBlock"
+      ? `Family editor: ${familyName(fam)}. Draw with Annotate → Detail Line, Region and Text${cat === "ViewMarker" ? " (paper mm; {n}, {name}, {sheet} in text)" : cat === "TitleBlock" ? " (paper mm from the sheet's bottom-left; {Sheet Number}, {Sheet Name}, {Project Name}, {Date}, {Drawn By}, {Revision}, {Scale}… in text)" : " (full size)"}.`
       : `Family editor: ${familyName(fam)}. Sketch forms with Extrusion / Blend / Revolve / Sweep; set parameters and types in Properties.`,
   );
 }
@@ -2022,6 +2023,7 @@ function openFamily(fam: Document): void {
 function placeHint(category: string): string {
   if (category === "DetailItem") return "Place it with Annotate → Detail → Component.";
   if (category === "ViewMarker") return "Pick it in a section's, elevation's or callout's Properties.";
+  if (category === "TitleBlock") return "Pick it in a sheet's Properties (Title block).";
   return "Place it with the Component tool (C).";
 }
 
@@ -2033,7 +2035,7 @@ function loadFamilyIntoProject(fam: Document, name: string): void {
   try {
     const reload = familyDefs(doc).some((f) => f.name === name);
     const def = doc.transact(`${reload ? "Reload" : "Load"} family ${name}`, (tx) => loadFamily(tx, doc, fam, name));
-    if (def.params.category !== "DetailItem" && def.params.category !== "ViewMarker") activeComponentKey = `${def.id}|${familyTypeNames(def)[0] ?? ""}`;
+    if (def.params.category !== "DetailItem" && def.params.category !== "ViewMarker" && def.params.category !== "TitleBlock") activeComponentKey = `${def.id}|${familyTypeNames(def)[0] ?? ""}`;
     status(`${reload ? "Reloaded" : "Loaded"} ${name}. ${placeHint(def.params.category)}`);
   } catch (err) {
     status(`⚠ ${(err as Error).message}`);

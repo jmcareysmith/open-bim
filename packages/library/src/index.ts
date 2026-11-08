@@ -823,6 +823,54 @@ export const switchboard: LibraryFamily = {
     }),
 };
 
+// ---- title blocks (paper mm, origin at the sheet's bottom-left) --------------------------------
+
+/**
+ * A simple A1 title block: border, and a box bottom right with the project, sheet and revision.
+ * Text in {braces} is filled from the sheet and Project Information.
+ */
+export const titleBlockA1: LibraryFamily = {
+  name: "Title Block - A1 Simple",
+  category: "TitleBlock",
+  description: "A1 border with a bottom-right title box (project, client, sheet number and name, scale, date, revision)",
+  build: () => {
+    const doc = new Document();
+    applyFamilyTemplate(doc, "TitleBlock", "Title Block - A1 Simple");
+    const view = views(doc)[0]!;
+    const W = 841;
+    const H = 594;
+    doc.transact("Draw title block", (tx) => {
+      const ln = (x0: number, y0: number, x1: number, y1: number, style: "medium" | "wide" = "medium") => void createDetailLine(tx, doc, view.id, { x: x0, y: y0 }, { x: x1, y: y1 }, style);
+      const rect = (x0: number, y0: number, x1: number, y1: number, style: "medium" | "wide" = "medium") => {
+        ln(x0, y0, x1, y0, style);
+        ln(x1, y0, x1, y1, style);
+        ln(x1, y1, x0, y1, style);
+        ln(x0, y1, x0, y0, style);
+      };
+      const txt = (x: number, y: number, t: string, size: number) => void createTextNote(tx, doc, view.id, { x, y }, t, size);
+      rect(20, 10, W - 10, H - 10, "wide");
+      // Title box: 180 wide, 70 high, in rows.
+      const x0 = W - 10 - 180;
+      const y0 = 10;
+      rect(x0, y0, W - 10, y0 + 70);
+      ln(x0, y0 + 24, W - 10, y0 + 24);
+      ln(x0, y0 + 48, W - 10, y0 + 48);
+      ln(x0 + 120, y0, x0 + 120, y0 + 24);
+      txt(x0 + 3, y0 + 64, "PROJECT", 1.8);
+      txt(x0 + 3, y0 + 57, "{Project Name}", 4);
+      txt(x0 + 3, y0 + 51, "{Client}  \u00b7  {Address}", 2.2);
+      txt(x0 + 3, y0 + 43, "SHEET", 1.8);
+      txt(x0 + 3, y0 + 34, "{Sheet Name}", 4);
+      txt(x0 + 3, y0 + 27, "Scale {Scale}   Date {Date}   Drawn {Drawn By}   Checked {Checked By}", 2);
+      txt(x0 + 3, y0 + 19, "PROJECT NO.", 1.8);
+      txt(x0 + 3, y0 + 10, "{Project Number}", 3.5);
+      txt(x0 + 123, y0 + 19, "SHEET  /  REV", 1.8);
+      txt(x0 + 123, y0 + 8, "{Sheet Number} / {Revision}", 5);
+    });
+    return doc;
+  },
+};
+
 export const LIBRARY: LibraryFamily[] = [
   singleDoor,
   casementWindow,
@@ -858,4 +906,5 @@ export const LIBRARY: LibraryFamily[] = [
   lightSwitch,
   switchboard,
   ...VIEW_MARKERS,
+  titleBlockA1,
 ];

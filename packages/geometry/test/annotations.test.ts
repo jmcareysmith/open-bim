@@ -6,6 +6,8 @@ import {
   createDimension,
   createFilledRegion,
   createTextNote,
+  createInsulation,
+  type TextNoteParams,
   createWall,
   floorPlanFor,
   type Vec2,
@@ -58,5 +60,25 @@ describe("annotation line work", () => {
     expect(rl.segments.length / 6).toBe(4);
     const t = doc.transact("T", (tx) => createTextNote(tx, doc, plan.id, p(10, 20), "BED 1", 3.5));
     expect(k.buildLines(doc, t)!.labels).toEqual([{ text: "BED 1", position: [10, 20, 0], size: 350, align: "left" }]);
+  });
+
+  it("insulation loops fill its width; text leaders end in arrows", () => {
+    const { doc, plan, k } = setup();
+    const ins = doc.transact("I", (tx) => createInsulation(tx, doc, plan.id, p(0, 0), p(3000, 0), 90));
+    const l = k.buildLines(doc, ins, 100)!;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (let i = 1; i < l.segments.length; i += 3) {
+      minY = Math.min(minY, l.segments[i]!);
+      maxY = Math.max(maxY, l.segments[i]!);
+    }
+    expect(maxY - minY).toBeCloseTo(90, 0);
+    const t = doc.transact("T", (tx) => createTextNote(tx, doc, plan.id, p(0, 1000), "LINING"));
+    const plain = k.buildLines(doc, t, 100)!.segments.length;
+    doc.transact("Leader", (tx) => tx.update<TextNoteParams>(t.id, { leaders: [p(5000, 0)] }));
+    const withLeader = k.buildLines(doc, doc.require(t.id), 100)!;
+    // Shoulder, leader and two arrow strokes.
+    expect(withLeader.segments.length - plain).toBe(4 * 6);
+    expect(withLeader.segments.slice(-6, -4)).toEqual(new Float32Array([5000, 0]));
   });
 });

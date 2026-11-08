@@ -1,4 +1,4 @@
-import { angularLayout, radialLayout, type AngularDimension, type AngularDimensionParams, type RadialDimension, type RadialDimensionParams,
+import { type InsulationParams, angularLayout, radialLayout, type AngularDimension, type AngularDimensionParams, type RadialDimension, type RadialDimensionParams,
   Cat,
   dimensionLayout,
   lengthInputValue,
@@ -52,6 +52,26 @@ export function buildAnnotationLines(doc: Document, el: Element): LineData | nul
         });
       }
       return { segments: new Float32Array(seg), labels: [], fill: { loops: [p.boundary, ...p.holes], color: p.color } };
+    }
+    case Cat.Insulation: {
+      // Batt loops: a prolate cycloid along the line, filling the width.
+      const p = el.params as InsulationParams;
+      const len = Math.hypot(p.end.x - p.start.x, p.end.y - p.start.y);
+      const d = { x: (p.end.x - p.start.x) / len, y: (p.end.y - p.start.y) / len };
+      const n = { x: -d.y, y: d.x };
+      const h = p.width / 2;
+      const r = p.width / 6;
+      const pts: Vec2[] = [];
+      const steps = Math.min(4000, Math.ceil((len / (2 * Math.PI * r)) * 24));
+      for (let i = 0; i <= steps; i++) {
+        const th = ((len / r) * i) / steps;
+        const u = Math.max(0, Math.min(len, r * th - h * 0.9 * Math.sin(th)));
+        const v = -h * Math.cos(th);
+        pts.push({ x: p.start.x + d.x * u + n.x * v, y: p.start.y + d.y * u + n.y * v });
+      }
+      const seg: number[] = [];
+      for (let i = 0; i + 1 < pts.length; i++) seg.push(pts[i]!.x, pts[i]!.y, 0, pts[i + 1]!.x, pts[i + 1]!.y, 0);
+      return { segments: new Float32Array(seg), labels: [] };
     }
     case Cat.AngularDimension: {
       // Arc between the arms through `at`, ticks at its ends, the angle in degrees outside it.
@@ -138,8 +158,22 @@ export function buildAnnotationLines(doc: Document, el: Element): LineData | nul
       const p = el.params as TextNoteParams;
       const size = modelTextSize(doc, p.viewId, p.size);
       // An invisible anchor segment keeps the note pickable and gives it a bounding box.
+      const seg = [p.position.x, p.position.y, 0, p.position.x + size * 0.01, p.position.y, 0];
+      // Leaders: from the note's nearer end (text width estimated), a short shoulder, then to the point with an arrowhead.
+      const width = size * 0.6 * Math.max(...p.text.split("\n").map((l) => l.length));
+      for (const q of p.leaders ?? []) {
+        const right = q.x > p.position.x + width / 2;
+        const from = { x: right ? p.position.x + width + size * 0.4 : p.position.x - size * 0.4, y: p.position.y };
+        const shoulder = { x: from.x + (right ? 1 : -1) * size, y: from.y };
+        seg.push(from.x, from.y, 0, shoulder.x, shoulder.y, 0, shoulder.x, shoulder.y, 0, q.x, q.y, 0);
+        const l = Math.hypot(q.x - shoulder.x, q.y - shoulder.y) || 1;
+        const u = { x: (q.x - shoulder.x) / l, y: (q.y - shoulder.y) / l };
+        const a = size * 0.8;
+        const back = { x: q.x - u.x * a, y: q.y - u.y * a };
+        seg.push(q.x, q.y, 0, back.x - u.y * a * 0.3, back.y + u.x * a * 0.3, 0, q.x, q.y, 0, back.x + u.y * a * 0.3, back.y - u.x * a * 0.3, 0);
+      }
       return {
-        segments: new Float32Array([p.position.x, p.position.y, 0, p.position.x + size * 0.01, p.position.y, 0]),
+        segments: new Float32Array(seg),
         labels: [{ text: p.text, position: [p.position.x, p.position.y, 0], size, align: "left" }],
       };
     }

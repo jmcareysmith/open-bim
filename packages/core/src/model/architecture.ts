@@ -38,6 +38,7 @@ export const Cat = {
   Graph: "Graph",
   AngularDimension: "AngularDimension",
   RadialDimension: "RadialDimension",
+  Insulation: "Insulation",
   Material: "Material",
   ViewFilter: "ViewFilter",
   ViewTemplate: "ViewTemplate",

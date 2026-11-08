@@ -186,6 +186,7 @@ import {
   type RoofExtrusion,
   type RoofTrims,
   setCurtainEdits,
+  type InsulationParams,
   wallProfileMapping,
   colorSchemes,
   setWallCurve,
@@ -346,6 +347,8 @@ export interface PanelContext {
   addShapePoints(id: ElementId, height: number): void;
   /** Edit Profile: sketch a wall's outline in the open section/elevation. */
   sketchWallProfile(id: ElementId): void;
+  /** Text: click where a new leader points. */
+  addTextLeader(id: ElementId): void;
   activeViewId(): ElementId | undefined;
   setActiveView(id: ElementId): void;
   status(text: string): void;
@@ -3619,6 +3622,14 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       );
       break;
     }
+    case Cat.Insulation: {
+      const ip = el.params as InsulationParams;
+      sec.append(
+        row("Width", numberInput(ip.width, (v) => (v > 0 ? update<InsulationParams>("Insulation width", { width: v }) : ctx.status("⚠ Width must be positive")))),
+        row("Length", len(Math.hypot(ip.end.x - ip.start.x, ip.end.y - ip.start.y))),
+      );
+      break;
+    }
     case Cat.DetailLine: {
       const p = el.params as DetailLineParams;
       sec.append(
@@ -3671,6 +3682,16 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Text", textInput(p.text, (v) => (v ? update<TextNoteParams>("Edit text", { text: v }) : ctx.status("\u26a0 Text can't be empty")))),
         row("Text size (paper mm)", h("span", { class: "value" }, String(p.size))),
       );
+      // Leaders: click where each points.
+      const addLeader = h("button", { textContent: "Add leader", title: "Click where the leader points" });
+      addLeader.onclick = () => ctx.addTextLeader(el.id);
+      const btns: HTMLElement[] = [addLeader];
+      if (p.leaders?.length) {
+        const rm = h("button", { textContent: `Remove leaders (${p.leaders.length})` });
+        rm.onclick = () => update<TextNoteParams>("Remove leaders", { leaders: null });
+        btns.push(rm);
+      }
+      sec.append(row("Leaders", h("div", { class: "buttons wrap" }, ...btns)));
       break;
     }
     case Cat.Dimension: {

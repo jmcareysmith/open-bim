@@ -101,6 +101,7 @@ const COLORS: Record<string, number> = {
   [Cat.SpotElevation]: 0x1f2328,
   [Cat.AngularDimension]: 0x1f2328,
   [Cat.RadialDimension]: 0x1f2328,
+  [Cat.Insulation]: 0x1f2328,
   [Cat.ColorFillLegend]: 0x1f2328,
   [Cat.FilledRegion]: 0x1f2328,
   [Cat.Room]: 0x7a8fa6,

@@ -47,7 +47,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Views are elements: floor plans per level, callouts, sections (S), building elevations, {3D}. Plans and
   sections are true 2D drawings from mesh hidden-line removal (`geometry/src/hlr.ts`), with layer cut
   patterns at Medium/Fine and material surface patterns. V/G per view, rule filters, view templates.
-- Annotation (view-owned): live aligned dimensions (M), detail lines (L), filled regions, text (T).
+- Annotation (view-owned): live aligned dimensions (M), detail lines (L), filled regions, text (T; leaders via
+  Properties → Add leader), batt insulation (Annotate → Detail → Insulation; width in Properties).
 - Sheets with a built-in title block, viewports, and vector PDF export (`geometry/src/pdf.ts`).
 - UI: box select, type selector, temporary hide/isolate (H/I/U), properties for everything, browser.
 - Modify: Move/Copy/Rotate/Mirror/Array (MV, CO, RO, MM, AR; toolbar). Type a value + Enter; options

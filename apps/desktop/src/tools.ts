@@ -82,6 +82,8 @@ import {
   arcLength,
   setWallCurve,
   createColorFillLegend,
+  createInsulation,
+  type TextNoteParams,
   createAngularDimension,
   createRadialDimension,
   SPOT_HOSTS,
@@ -1422,6 +1424,78 @@ export class AngleDimensionTool implements Tool {
       return true;
     }
     return false;
+  }
+}
+
+/** Insulation (Revit: Detail → Insulation): click start and end; the width is set in Properties (default 90). */
+export class InsulationTool implements Tool {
+  readonly name = "insulation";
+  private start: Vec2 | null = null;
+  width = 90;
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.start = null;
+    this.ctx.status(`Insulation: click start, then end (${this.width} mm wide; change it in Properties). Esc to finish.`);
+  }
+
+  deactivate(): void {
+    this.start = null;
+    this.ctx.viewport.setPreviewLines(null);
+  }
+
+  pointerMove(ev: PointerEvent): void {
+    const p = viewPoint(this.ctx, ev, this.start);
+    this.ctx.viewport.setPreviewLines(p && this.start ? tempDimension(this.ctx, this.start, p, linePreview(this.start, p)) : null);
+  }
+
+  click(ev: PointerEvent): void {
+    const viewId = requireAnnotView(this.ctx);
+    if (!viewId) return;
+    const p = viewPoint(this.ctx, ev, this.start);
+    if (!p) return;
+    if (!this.start) {
+      this.start = p;
+      return;
+    }
+    const { doc } = this.ctx;
+    const a = this.start;
+    try {
+      const ins = doc.transact("Insulation", (tx) => createInsulation(tx, doc, viewId, a, p, this.width));
+      this.ctx.setSelection([ins.id]);
+      this.start = p;
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
+  }
+
+  key(ev: KeyboardEvent): boolean {
+    if (ev.key === "Escape" && this.start) {
+      this.start = null;
+      this.ctx.viewport.setPreviewLines(null);
+      return true;
+    }
+    return false;
+  }
+}
+
+/** Add Leader: click where a text note's leader points (more clicks add more; Esc finishes). */
+export class LeaderTool implements Tool {
+  readonly name = "leader";
+  textId: ElementId | null = null;
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.ctx.status("Add leader: click where it points. Esc to finish.");
+  }
+
+  click(ev: PointerEvent): void {
+    const p = viewPoint(this.ctx, ev, null);
+    const { doc } = this.ctx;
+    const t = this.textId ? doc.get<TextNoteParams>(this.textId) : undefined;
+    if (!p || !t || t.category !== Cat.TextNote) return;
+    doc.transact("Add leader", (tx) => tx.update<TextNoteParams>(t.id, { leaders: [...(t.params.leaders ?? []), p] }));
+    this.ctx.setSelection([t.id]);
   }
 }
 

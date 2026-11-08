@@ -252,6 +252,7 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
           title: "Detail",
           items: [
             { label: "Detail Line", icon: "detailline", tool: "detailline", large: true, title: "Detail line (L)" },
+            { label: "Insulation", icon: "region", tool: "insulation", title: "Batt insulation: click start and end; width in Properties" },
             { label: "Region", icon: "region", tool: "region", title: "Filled region" },
             {
               label: "Component",

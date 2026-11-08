@@ -104,10 +104,10 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Feature | Phase | Status |
 |---|---|---|
 | Dimensions (aligned, linear, angular, radial, spot) | 2 | 🟨 (aligned in plans, sections, elevations — live to walls, grids, levels; spot elevations; angular and radial in plans) |
-| Text, leaders | 2 | 🟨 |
+| Text, leaders | 2 | ✅ (text notes with leaders: Properties → Add leader) |
 | Tags (by category, multi-category, material) | 4 | 🟨 |
 | Keynotes | 4 | ✅ |
-| Detail lines, filled regions, detail components, insulation | 2 | 🟨 (detail components fixed-size; no insulation tool) |
+| Detail lines, filled regions, detail components, insulation | 2 | 🟨 (detail components fixed-size; batt insulation) |
 | Symbols, north arrow, section/elevation heads | 2 | 🟨 (north arrow, scale bar, break line; view markers drawn) |
 | Revision clouds & revisions | 4 | ✅ |
 | Sheets, title blocks, viewports | 2 | 🟨 |
@@ -178,5 +178,5 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | File menu, Quick Access Toolbar | 7b | 🟨 (no recent files) |
 | Drag and drop from the Project Browser | 7b | ⬜ |
 | Dockable panels | 7b | ✅ |
-| View tabs, status bar, view control bar | 7b | 🟨 (tabs + view control bar; no tiling or selection filter) |
-| Context menus, keyboard shortcuts | 7b | 🟨 (menus, VV/MV/CO…; no shortcut editor) |
+| View tabs, status bar, view control bar | 7b | 🟨 (tabs, view control bar, tiling/cascade, selection filter) |
+| Context menus, keyboard shortcuts | 7b | 🟨 (menus, VV/MV/CO…, Keyboard Shortcuts editor) |

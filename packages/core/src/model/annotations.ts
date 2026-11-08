@@ -26,6 +26,8 @@ export type TextNoteParams = {
   text: string;
   /** Text height on paper, mm (scaled by the view scale in the model). */
   size: number;
+  /** Leaders: arrows from the note to these points (view 2D). */
+  leaders?: Vec2[] | null;
 };
 
 /**
@@ -62,11 +64,22 @@ export type Dimension = Element<DimensionParams>;
 /** Revit default annotation text height, mm on paper. */
 export const DEFAULT_TEXT_SIZE = 2.5;
 
-export const ANNOTATION_CATEGORIES = [Cat.DetailLine, Cat.FilledRegion, Cat.TextNote, Cat.Dimension, Cat.Area, Cat.AreaBoundary, Cat.Tag, Cat.LegendComponent, Cat.KeynoteLegend, Cat.RevisionCloud, Cat.CadImport, Cat.Symbol, Cat.DetailComponent, Cat.SpotElevation, Cat.ColorFillLegend, Cat.AngularDimension, Cat.RadialDimension] as const;
+export const ANNOTATION_CATEGORIES = [Cat.DetailLine, Cat.FilledRegion, Cat.TextNote, Cat.Dimension, Cat.Area, Cat.AreaBoundary, Cat.Tag, Cat.LegendComponent, Cat.KeynoteLegend, Cat.RevisionCloud, Cat.CadImport, Cat.Symbol, Cat.DetailComponent, Cat.SpotElevation, Cat.ColorFillLegend, Cat.AngularDimension, Cat.RadialDimension, Cat.Insulation] as const;
 
 const refIds = (r: DimRef): ElementId[] => (r.kind === "point" ? [] : [r.id]);
 
-for (const name of [Cat.DetailLine, Cat.FilledRegion, Cat.TextNote]) {
+/** Batt insulation (Revit: Annotate → Detail → Insulation): its loops along a line, `width` thick (model mm). */
+export type InsulationParams = { viewId: ElementId; start: Vec2; end: Vec2; width: number };
+export type Insulation = Element<InsulationParams>;
+
+export function createInsulation(tx: Transaction, doc: Document, viewId: ElementId, start: Vec2, end: Vec2, width = 90): Insulation {
+  requireView(doc, viewId);
+  if (Math.hypot(end.x - start.x, end.y - start.y) < 1) throw new Error("Insulation needs a length");
+  if (!(width > 0)) throw new Error("Insulation width must be positive");
+  return tx.create<InsulationParams>(Cat.Insulation, { viewId, start: { ...start }, end: { ...end }, width });
+}
+
+for (const name of [Cat.DetailLine, Cat.FilledRegion, Cat.TextNote, Cat.Insulation]) {
   registerCategory({ name, dependencies: (el) => [(el.params as { viewId: ElementId }).viewId], cascadeDelete: true, isType: false });
 }
 registerCategory({

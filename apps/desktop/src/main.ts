@@ -145,6 +145,8 @@ import {
   ExtrusionRoofTool,
   SpotElevationTool,
   ColorFillLegendTool,
+  InsulationTool,
+  LeaderTool,
   AngleDimensionTool,
   FootingTool,
   DemolishTool,
@@ -447,6 +449,10 @@ const ctx: ModifyToolContext & PanelContext = {
     viewport.setSelection([]);
     refreshAll();
   },
+  addTextLeader(id) {
+    (tools.leader as LeaderTool).textId = id;
+    setTool("leader");
+  },
   sketchWallProfile(id) {
     (tools.wallProfile as WallProfileTool).wallId = id;
     setTool("wallProfile");
@@ -535,6 +541,8 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   roofextrusion: new ExtrusionRoofTool(ctx),
   spot: new SpotElevationTool(ctx),
   colorlegend: new ColorFillLegendTool(ctx),
+  insulation: new InsulationTool(ctx),
+  leader: new LeaderTool(ctx),
   angulardim: new AngleDimensionTool(ctx, "angular"),
   radialdim: new AngleDimensionTool(ctx, "radial"),
   "face-floor": new FaceTool(ctx, "floor"),

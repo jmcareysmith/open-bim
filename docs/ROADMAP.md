@@ -116,7 +116,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Roofs by extrusion; fascias, gutters and soffits
 - [x] Dimensions in sections/elevations, temporary dimensions while placing, spot elevations
 - [x] Room colour schemes with colour fill legends
-- [ ] Floor shape editing (points, falls to drains), slab edges
+- [x] Floor shape editing (points, falls to drains), slab edges
 - [ ] Curved walls and grids (arcs)
 
 ## Phase 8 — MEP & visual programming (rest paused for 8b)

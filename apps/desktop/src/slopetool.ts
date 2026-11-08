@@ -1,4 +1,4 @@
-import { Cat, type ElementId, type FloorParams, type Vec2 } from "@open-bim/core";
+import { Cat, addFloorShapePoint, type ElementId, type FloorParams, type Vec2 } from "@open-bim/core";
 import { viewPoint, type Tool, type ToolContext } from "./tools.ts";
 
 // Slope Arrow (Revit: floor sketch → Slope Arrow): click the tail (the high end by default), then
@@ -66,5 +66,36 @@ export class SlopeArrowTool implements Tool {
       return true;
     }
     return false;
+  }
+}
+
+/**
+ * Add Point (Revit: floor → Modify Sub Elements → Add Point): click points on the floor; each
+ * moves the top by `height` there (negative: down, e.g. a drain). Esc finishes.
+ */
+export class FloorPointTool implements Tool {
+  readonly name = "floorPoint";
+  floorId: ElementId | null = null;
+  height = -20;
+
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.ctx.status(`Add Point: click on the floor (${this.height} mm there; change points in Properties). Esc to finish.`);
+  }
+
+  click(ev: PointerEvent): void {
+    const p = viewPoint(this.ctx, ev, null);
+    if (!p) return;
+    const { doc } = this.ctx;
+    const id = this.floorId;
+    if (!id || doc.get(id)?.category !== Cat.Floor) return this.ctx.status("Add Point: select a floor first.");
+    try {
+      doc.transact("Add shape point", (tx) => addFloorShapePoint(tx, doc, id, p, this.height));
+      this.ctx.setSelection([id]);
+      this.ctx.status(`Point added (${this.height} mm). Click more, or Esc.`);
+    } catch (e) {
+      this.ctx.status(`\u26a0 ${(e as Error).message}`);
+    }
   }
 }

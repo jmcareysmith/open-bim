@@ -11,7 +11,7 @@ import { openShortcutEditor, shortcutTable } from "./shortcuts.ts";
 import { BROWSER_DRAG } from "./panels.ts";
 import { addRecentFile, fileName, recentFiles, removeRecentFile } from "./recent.ts";
 import { CameraTool } from "./cameratool.ts";
-import { SlopeArrowTool } from "./slopetool.ts";
+import { FloorPointTool, SlopeArrowTool } from "./slopetool.ts";
 import {
   Cat,
   Document,
@@ -444,6 +444,12 @@ const ctx: ModifyToolContext & PanelContext = {
     viewport.setSelection([]);
     refreshAll();
   },
+  addShapePoints(id, height) {
+    const t = tools.floorPoint as FloorPointTool;
+    t.floorId = id;
+    t.height = height;
+    setTool("floorPoint");
+  },
   drawSlopeArrow(id) {
     (tools.slopeArrow as SlopeArrowTool).floorId = id;
     setTool("slopeArrow");
@@ -514,6 +520,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   detailcomponent: new DetailComponentTool(ctx),
   attach: new AttachTool(ctx),
   slopeArrow: new SlopeArrowTool(ctx),
+  floorPoint: new FloorPointTool(ctx),
   "face-wall": new FaceTool(ctx, "wall"),
   "face-curtain": new FaceTool(ctx, "curtain"),
   "face-roof": new FaceTool(ctx, "roof"),

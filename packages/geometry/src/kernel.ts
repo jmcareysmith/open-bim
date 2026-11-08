@@ -11,6 +11,9 @@ import {
   floorSlope,
   floorThickness,
   floorTopPlane,
+  floorTopAt,
+  floorShapeSurface,
+  SLAB_EDGE_PROFILES,
   wallExtent,
   type Document,
   type Ceiling,
@@ -49,7 +52,7 @@ import { buildSymbolLines } from "./symbols.ts";
 import { buildDetailComponentLines } from "./detailcomponents.ts";
 import { buildAreaBoundaryLines, buildAreaLines, buildColorFillLegendLines, buildRoomLines, buildRoomSeparatorLines } from "./rooms.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
-import { wallProfileMesh, wallSweepSolids } from "./sweeps.ts";
+import { profilePrism, wallProfileMesh, wallSweepSolids } from "./sweeps.ts";
 
 /**
  * Converts elements into renderable geometry.
@@ -108,6 +111,85 @@ export function withSweeps(doc: Document, wall: Wall, body: MeshData | null): Me
 
 export function buildFloor(doc: Document, el: Element): MeshData | null {
   const floor = el as Floor;
+  const body = floorBody(doc, floor);
+  const edges = slabEdgeMeshes(doc, floor);
+  return body && edges.length ? mergeMeshes([body, ...edges]) : body;
+}
+
+/** Shape-edited floor: the top triangulated through its points, the bottom flat under it, sides between. */
+function shapedFloorMesh(doc: Document, floor: Floor): MeshData | null {
+  const surf = floorShapeSurface(floor);
+  if (!surf) return null;
+  const t = floorTopPlane(doc, floor);
+  const thick = floorThickness(doc, floor);
+  const plane = (p: Vec2) => t.c + t.gx * p.x + t.gy * p.y;
+  const top = (p: Vec2) => floorTopAt(doc, floor, p);
+  const pos: number[] = [];
+  const tri = (a: number[], b: number[], c: number[]) => pos.push(...a, ...b, ...c);
+  for (const [i, j, k] of surf.triangles) {
+    const [A, B, C] = [surf.vertices[i]!, surf.vertices[j]!, surf.vertices[k]!];
+    const ccw = (B.x - A.x) * (C.y - A.y) - (B.y - A.y) * (C.x - A.x) > 0;
+    const v = (q: { x: number; y: number; z: number }) => [q.x, q.y, plane(q) + q.z];
+    if (ccw) tri(v(A), v(B), v(C));
+    else tri(v(A), v(C), v(B));
+  }
+  // Bottom: the outline's cap, under the unshaped top.
+  const cap = extrudePolygon(floor.params.boundary, floor.params.holes, 0, 1);
+  for (let q = 0; q < cap.indices.length; q += 3) {
+    const ids = [cap.indices[q]!, cap.indices[q + 1]!, cap.indices[q + 2]!];
+    if (ids.some((n) => cap.positions[n * 3 + 2]! > 0.5)) continue;
+    for (const n of ids) {
+      const p = { x: cap.positions[n * 3]!, y: cap.positions[n * 3 + 1]! };
+      pos.push(p.x, p.y, plane(p) - thick);
+    }
+  }
+  // Sides round every loop (outer counter-clockwise, holes clockwise: faces point out of the slab).
+  const ccwLoop = (l: Vec2[]) => l.reduce((s, a, i) => s + a.x * l[(i + 1) % l.length]!.y - l[(i + 1) % l.length]!.x * a.y, 0) > 0;
+  for (const [loop, outer] of [[floor.params.boundary, true], ...floor.params.holes.map((h) => [h, false] as const)] as [Vec2[], boolean][]) {
+    const l = ccwLoop(loop) === outer ? loop : [...loop].reverse();
+    l.forEach((a, i) => {
+      const b = l[(i + 1) % l.length]!;
+      const a0 = [a.x, a.y, plane(a) - thick];
+      const b0 = [b.x, b.y, plane(b) - thick];
+      const a1 = [a.x, a.y, top(a)];
+      const b1 = [b.x, b.y, top(b)];
+      tri(a0, b0, b1);
+      tri(a0, b1, a1);
+    });
+  }
+  const nor = new Float32Array(pos.length);
+  for (let q = 0; q < pos.length; q += 9) {
+    const u = [pos[q + 3]! - pos[q]!, pos[q + 4]! - pos[q + 1]!, pos[q + 5]! - pos[q + 2]!];
+    const w = [pos[q + 6]! - pos[q]!, pos[q + 7]! - pos[q + 1]!, pos[q + 8]! - pos[q + 2]!];
+    const n = [u[1]! * w[2]! - u[2]! * w[1]!, u[2]! * w[0]! - u[0]! * w[2]!, u[0]! * w[1]! - u[1]! * w[0]!];
+    const len = Math.hypot(n[0]!, n[1]!, n[2]!) || 1;
+    for (let r = 0; r < 3; r++) nor.set([n[0]! / len, n[1]! / len, n[2]! / len], q + r * 3);
+  }
+  return { positions: new Float32Array(pos), normals: nor, indices: Uint32Array.from({ length: pos.length / 3 }, (_, i) => i) };
+}
+
+/** Slab edge: its profile along each edge of the floor's outline, hung from the slab's bottom. */
+function slabEdgeMeshes(doc: Document, floor: Floor): MeshData[] {
+  const prof = floor.params.slabEdge ? SLAB_EDGE_PROFILES[floor.params.slabEdge.profile] : undefined;
+  if (!prof) return [];
+  const t = floorTopPlane(doc, floor);
+  const thick = floorThickness(doc, floor);
+  const b = floor.params.boundary;
+  const ccw = b.reduce((s, a, i) => s + a.x * b[(i + 1) % b.length]!.y - b[(i + 1) % b.length]!.x * a.y, 0) > 0;
+  const out: MeshData[] = [];
+  b.forEach((a, i) => {
+    const c = b[(i + 1) % b.length]!;
+    const len = Math.hypot(c.x - a.x, c.y - a.y);
+    if (len < 1) return;
+    const d = { x: (c.x - a.x) / len, y: (c.y - a.y) / len };
+    const outward = ccw ? { x: d.y, y: -d.x } : { x: -d.y, y: d.x };
+    out.push(profilePrism(prof, a, d, outward, t.c + t.gx * a.x + t.gy * a.y - thick, 0, len));
+  });
+  return out;
+}
+
+function floorBody(doc: Document, floor: Floor): MeshData | null {
+  if (floor.params.shape?.length) return shapedFloorMesh(doc, floor);
   if (floor.params.slope) {
     // Sloped (slope arrow): a flat slab sheared onto the top plane, so it keeps its thickness vertically.
     const plane = floorTopPlane(doc, floor);

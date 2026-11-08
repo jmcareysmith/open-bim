@@ -250,4 +250,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   number/area range (areas by name/area); stable automatic colours, stored per value with visibility. Rooms
   aren't filled without a scheme (fill kept hidden for picking). Color Fill Legend tool places the legend.
   Rooms have Department and Occupancy.
+- Floor shape editing (core/model/floorshape.ts): floor Properties → Shape editing: Add Point (click on the
+  floor; height, e.g. −20 drain), points list, Reset Shape; top triangulated through points (floorTopAt via
+  hook), bottom flat. Slab edge (thickening/rebated/nosing profiles) along the outline.
 - Next (Jeremy, 2026-10-14): Phase 8b — Revit look & architectural parity, before the rest of 8.

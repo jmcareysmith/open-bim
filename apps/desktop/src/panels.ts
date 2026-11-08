@@ -187,6 +187,9 @@ import {
   type RoofTrims,
   setCurtainEdits,
   colorSchemes,
+  setFloorShape,
+  setSlabEdge,
+  SLAB_EDGE_PROFILES,
   MULLION_PROFILES,
   curtainOf,
   type CurtainEdits,
@@ -335,6 +338,8 @@ export interface PanelContext {
   modelBounds(): { min: { x: number; y: number; z: number }; max: { x: number; y: number; z: number } } | null;
   /** Draw a floor's slope arrow (two clicks in the view). */
   drawSlopeArrow(id: ElementId): void;
+  /** Shape editing: click points onto a floor, each moving its top by `height`. */
+  addShapePoints(id: ElementId, height: number): void;
   activeViewId(): ElementId | undefined;
   setActiveView(id: ElementId): void;
   status(text: string): void;
@@ -3154,6 +3159,33 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
           h("div", { class: "row" }, h("span", {}), off),
         );
       }
+      // Shape editing (Revit: Modify Sub Elements): points moving the top, e.g. falls to a drain.
+      const pts = p.shape ?? [];
+      const setPts = (next: typeof pts, name: string) => edit(ctx, name, (tx) => setFloorShape(tx, doc, el.id, next));
+      let newHeight = -20;
+      const hIn = numberInput(newHeight, (v) => (newHeight = v));
+      const addBtn = h("button", { textContent: "Add Point", title: "Click points on the floor; each moves the top by the height (negative = down)" });
+      addBtn.onclick = () => ctx.addShapePoints(el.id, newHeight);
+      sec.append(h("div", { class: "subhead" }, "Shape editing"), row("New point height", hIn), row("", addBtn));
+      pts.forEach((q, i) => {
+        const put = (patch: Partial<typeof q>) => setPts(pts.map((x, j) => (j === i ? { ...x, ...patch } : x)), "Edit shape point");
+        const rm = h("button", { textContent: "\u00d7", class: "mini", title: "Remove point" });
+        rm.onclick = () => setPts(pts.filter((_, j) => j !== i), "Remove shape point");
+        sec.append(row(`Point ${i + 1} (${Math.round(q.x)}, ${Math.round(q.y)})`, h("div", { class: "buttons wrap" }, numberInput(q.dz, (v) => put({ dz: v })), rm)));
+      });
+      if (pts.length) {
+        const reset = h("button", { textContent: "Reset Shape" });
+        reset.onclick = () => setPts([], "Reset shape");
+        sec.append(row("", reset));
+      }
+      sec.append(
+        row(
+          "Slab edge",
+          select([{ value: "", label: "<None>" }, ...Object.keys(SLAB_EDGE_PROFILES).map((n) => ({ value: n, label: n }))], p.slabEdge?.profile ?? "", (v) =>
+            edit(ctx, v ? "Slab edge" : "Remove slab edge", (tx) => setSlabEdge(tx, doc, el.id, v ? { profile: v } : null)),
+          ),
+        ),
+      );
       break;
     }
     case Cat.Ceiling: {

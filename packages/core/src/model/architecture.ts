@@ -5,6 +5,7 @@ import { relatedWalls } from "./joins.ts";
 import { validateRegion } from "./sketch.ts";
 import type { PatternName } from "./materials.ts";
 import type { WallSweep } from "./sweeps.ts";
+import type { FloorShapePoint, SlabEdge } from "./floorshape.ts";
 
 // ---- categories ----------------------------------------------------------
 
@@ -384,6 +385,10 @@ export type FloorParams = {
   holes: Vec2[][];
   /** Slope arrow (Revit): the top tilts as a plane from the tail to the head. */
   slope?: SlopeArrow | null;
+  /** Shape editing: points moving the top (falls to drains); see model/floorshape.ts. */
+  shape?: FloorShapePoint[] | null;
+  /** Slab edge along the outer boundary (SLAB_EDGE_PROFILES). */
+  slabEdge?: SlabEdge | null;
 };
 export type Floor = Element<FloorParams>;
 
@@ -409,10 +414,18 @@ export function floorTopPlane(doc: Document, floor: Floor): { c: number; gx: num
   return { c: base + s.tailOffset - gx * s.tail.x - gy * s.tail.y, gx, gy };
 }
 
-/** Height of the floor's top at plan point `p`, mm. */
+type FloorShapeHook = (floor: Floor, p: Vec2) => number;
+let shapeHook: FloorShapeHook | null = null;
+/** Set by model/floorshape.ts so the top everywhere includes shape points. */
+export function setFloorShapeHook(hook: FloorShapeHook): void {
+  shapeHook = hook;
+}
+
+/** Height of the floor's top at plan point `p`, mm (slope arrow and shape points included). */
 export function floorTopAt(doc: Document, floor: Floor, p: Vec2): number {
   const t = floorTopPlane(doc, floor);
-  return t.c + t.gx * p.x + t.gy * p.y;
+  const dz = floor.params.shape?.length && shapeHook ? shapeHook(floor, p) : 0;
+  return t.c + t.gx * p.x + t.gy * p.y + dz;
 }
 
 /** Slope as rise over run (e.g. 0.02 = 1:50), from the arrow; 0 when flat. */
@@ -430,10 +443,13 @@ export function floorThickness(doc: Document, floor: Floor): number {
 
 /** Absolute Z of floor top and bottom, mm. */
 export function floorExtent(doc: Document, floor: Floor): { bottom: number; top: number } {
-  if (floor.params.slope) {
-    // Sloped: the highest and lowest points of the top over the boundary.
-    const zs = floor.params.boundary.map((p) => floorTopAt(doc, floor, p));
-    return { top: Math.max(...zs), bottom: Math.min(...zs) - floorThickness(doc, floor) };
+  if (floor.params.slope || floor.params.shape?.length) {
+    // Sloped or shaped: the highest point of the top; the bottom follows the unshaped top.
+    const t = floorTopPlane(doc, floor);
+    const plane = (p: Vec2) => t.c + t.gx * p.x + t.gy * p.y;
+    const pts = [...floor.params.boundary, ...(floor.params.shape ?? [])];
+    const zs = pts.map((p) => floorTopAt(doc, floor, p));
+    return { top: Math.max(...zs), bottom: Math.min(...floor.params.boundary.map(plane)) - floorThickness(doc, floor) };
   }
   const level = doc.require<LevelParams>(floor.params.levelId).params.elevation;
   const top = level + floor.params.offset;

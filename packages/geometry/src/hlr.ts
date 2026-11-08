@@ -11,6 +11,33 @@ export interface PlanRange {
   bottom: number;
   /** Cut plane Z. */
   cut: number;
+  /** Looking up (reflected ceiling plans): from `cut` to `top`. */
+  top?: number;
+  up?: boolean;
+}
+
+/**
+ * Plan line work for any plan: looking down, or — for reflected ceiling plans — looking up, done by
+ * mirroring the meshes in Z so the same hidden-line pass sees their undersides from "above".
+ * Plan coordinates (x, y) are unchanged, as Revit draws an RCP.
+ */
+export function planViewLinework(items: { id: ElementId; mesh: MeshData; surface?: LineFamily[] | null }[], range: PlanRange): PlanLinework[] {
+  if (!range.up) return planLinework(items, range);
+  const flip = (m: MeshData): MeshData => {
+    const pos = new Float32Array(m.positions);
+    const nor = new Float32Array(m.normals);
+    for (let i = 2; i < pos.length; i += 3) {
+      pos[i] = -pos[i]!;
+      nor[i] = -nor[i]!;
+    }
+    const idx = new Uint32Array(m.indices.length);
+    for (let t = 0; t < idx.length; t += 3) idx.set([m.indices[t]!, m.indices[t + 2]!, m.indices[t + 1]!], t);
+    return { ...m, positions: pos, normals: nor, indices: idx };
+  };
+  return planLinework(
+    items.map((it) => ({ ...it, mesh: flip(it.mesh) })),
+    { cut: -range.cut, bottom: -(range.top ?? range.cut + 3000) },
+  );
 }
 
 export interface PlanLinework {

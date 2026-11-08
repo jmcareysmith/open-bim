@@ -39,7 +39,7 @@ import {
   graphicsCategory,
   MASS_CATEGORY,
 } from "@open-bim/core";
-import { viewSchemeFill,
+import { planViewLinework, viewSchemeFill,
   GRID_BUBBLE_RADIUS,
   fillLoops,
   lineworkDrawing,
@@ -1355,7 +1355,7 @@ void main() {
       });
     let linework: PlanLinework[];
     try {
-      linework = drawingMode ? sectionLinework(items, this.drawingView!) : planLinework(items, this.planRange);
+      linework = drawingMode ? sectionLinework(items, this.drawingView!) : planViewLinework(items, this.planRange);
     } catch (err) {
       console.warn("Could not compute drawing", err);
       return;
@@ -1420,8 +1420,9 @@ void main() {
     this.renderer.clippingPlanes =
       this.mode === "plan"
         ? [
-            new THREE.Plane(new THREE.Vector3(0, 0, -1), cut),
-            new THREE.Plane(new THREE.Vector3(0, 0, 1), -(bottom - 1)),
+            // Plans keep what's below the cut. Reflected ceiling plans aren't clipped in height: their
+            // line work (drawn at the level) must stay, and picking from above meets the ceiling first.
+            ...(this.planRange.up ? [] : [new THREE.Plane(new THREE.Vector3(0, 0, -1), cut), new THREE.Plane(new THREE.Vector3(0, 0, 1), -(bottom - 1))]),
             ...(crop
               ? [
                   new THREE.Plane(new THREE.Vector3(1, 0, 0), -crop.min.x),

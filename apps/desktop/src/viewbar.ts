@@ -171,7 +171,7 @@ export class ViewBar {
     }
     this.bar.append(detail);
 
-    const planLike = p.kind === "floorPlan" || p.kind === "callout" || p.kind === "areaPlan";
+    const planLike = p.kind === "floorPlan" || p.kind === "ceilingPlan" || p.kind === "callout" || p.kind === "areaPlan";
     // Every model view (plans, callouts, sections, elevations, details, 3D) has visual styles,
     // sun, shadows and lighting; legends draw no model.
     const modelView = p.kind !== "legend";

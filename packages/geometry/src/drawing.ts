@@ -28,7 +28,7 @@ import {
   penWidth,
 } from "@open-bim/core";
 import { GRID_BUBBLE_RADIUS, type LineData } from "./datums.ts";
-import { planLinework, type PlanLinework } from "./hlr.ts";
+import { planLinework, planViewLinework, type PlanLinework } from "./hlr.ts";
 import type { GeometryKernel } from "./kernel.ts";
 import { planFrame } from "./layers.ts";
 import { cleanCuts } from "./wallcleanup.ts";
@@ -131,7 +131,7 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
       return [{ id: el.id, mesh, surface: m ? patternFamilies(m.params.surfacePattern, g.scale) : null }];
     });
   const range = section ? null : viewRange(doc, view);
-  const linework: PlanLinework[] = section ? sectionLinework(items, view) : planLinework(items, range!);
+  const linework: PlanLinework[] = section ? sectionLinework(items, view) : planViewLinework(items, range!);
   const frame = section ? viewFrame(view) : planFrame(range!.cut);
   const lw = lineworkDrawing(doc, (el) => elementGraphics(doc, g, el), linework, frame, { detailed: g.detailLevel !== "coarse", plan: !section, scale: g.scale });
   out.strokes.push(...lw.strokes);

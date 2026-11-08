@@ -11,6 +11,9 @@ export const PLAN_CUT_HEIGHT = 1200;
 export interface ViewRange {
   bottom: number;
   cut: number;
+  /** Reflected ceiling plans: looking up from `cut` to `top`. */
+  top?: number;
+  up?: boolean;
 }
 
 /** Default floor plan range for a level: from the level up to the cut plane. */

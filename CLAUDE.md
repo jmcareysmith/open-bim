@@ -44,7 +44,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   as parametric hosted types, wall openings, grids (G), reference planes (R), project units + info.
 - Kernels: SimpleKernel (extrusions) and OcctKernel (OpenCascade via replicad-opencascadejs, async load;
   boolean wall openings).
-- Views are elements: floor plans per level, callouts, sections (S), building elevations, {3D}. Plans and
+- Views are elements: floor plans per level, reflected ceiling plans (View → Plan ▾; kind `ceilingPlan`, cut 2300
+  looking up — geometry `planViewLinework` mirrors meshes in Z), callouts, sections (S), building elevations, {3D}. Plans and
   sections are true 2D drawings from mesh hidden-line removal (`geometry/src/hlr.ts`), with layer cut
   patterns at Medium/Fine and material surface patterns. V/G per view, rule filters, view templates.
 - Annotation (view-owned): live aligned dimensions (M), detail lines (L), filled regions, text (T; leaders via

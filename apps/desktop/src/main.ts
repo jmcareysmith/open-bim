@@ -15,6 +15,8 @@ import { CameraTool } from "./cameratool.ts";
 import { FloorPointTool, SlopeArrowTool } from "./slopetool.ts";
 import { WallProfileTool } from "./profiletool.ts";
 import {
+  ceilingPlanFor,
+  createCeilingPlan,
   Cat,
   Document,
   transformElements,
@@ -1104,6 +1106,12 @@ const commands: Record<string, () => void | Promise<void>> = {
     if (v) ctx.setActiveView(v.id);
     else status("\u26a0 No 3D view in this project");
   },
+  ceilingPlan() {
+    // The active level's reflected ceiling plan, made the first time.
+    let v = ceilingPlanFor(doc, activeLevelId);
+    if (!v) edit("Create ceiling plan", (tx) => (v = createCeilingPlan(tx, doc, activeLevelId)));
+    if (v) ctx.setActiveView(v.id);
+  },
   viewPlan() {
     const v = floorPlanFor(doc, activeLevelId);
     if (v) ctx.setActiveView(v.id);
@@ -1385,11 +1393,11 @@ function configureViewport(vp: Viewport, target: ModelElement, primary: boolean)
   }
   const v = target as View;
   // Visual style: 3D views default to Shaded, plans to Hidden Line (line work only).
-  const planLike = v.params.kind === "floorPlan" || v.params.kind === "callout" || v.params.kind === "areaPlan";
+  const planLike = v.params.kind === "floorPlan" || v.params.kind === "ceilingPlan" || v.params.kind === "callout" || v.params.kind === "areaPlan";
   vp.setVisualStyle(v.params.kind === "3d" ? (v.params.visualStyle ?? "shaded") : v.params.kind === "legend" ? "hiddenLine" : (v.params.visualStyle ?? "hiddenLine"));
   // Sun, shadows and lighting (any model view): the true sun for the site, at the view's date and time.
   vp.setDisplay(v.params.kind === "legend" ? {} : (v.params.display ?? {}));
-  vp.setSchemeView(v.params.kind === "floorPlan" || v.params.kind === "callout" || v.params.kind === "areaPlan" ? v.id : null);
+  vp.setSchemeView(v.params.kind === "floorPlan" || v.params.kind === "ceilingPlan" || v.params.kind === "callout" || v.params.kind === "areaPlan" ? v.id : null);
   if (v.params.kind !== "legend") vp.setSun(viewSun(doc, v.params), !!v.params.shadows, v.params.lighting ?? {});
   else vp.setSun(null, false);
   if (isPlanView(v)) {

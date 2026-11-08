@@ -897,7 +897,7 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
   const { doc } = ctx;
   const p = view.params;
   const set = (name: string, patch: Partial<ViewParams>) => edit(ctx, name, (tx) => tx.update<ViewParams>(view.id, patch));
-  const title = { floorPlan: "Floor Plan", "3d": "3D View", section: "Section", elevation: "Elevation", callout: "Callout", areaPlan: "Area Plan", legend: "Legend" }[p.kind];
+  const title = { floorPlan: "Floor Plan", ceilingPlan: "Reflected Ceiling Plan", "3d": "3D View", section: "Section", elevation: "Elevation", callout: "Callout", areaPlan: "Area Plan", legend: "Legend" }[p.kind];
   const sec = h("div", { class: "section" }, h("h3", {}, title));
   if (view.id !== ctx.activeViewId()) {
     const open = h("button", { textContent: "Open view" });
@@ -1028,7 +1028,7 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
       });
     sec.append(row("Area scheme", AREA_SCHEMES[scheme].label), row("", fromWalls));
   }
-  if (p.kind === "floorPlan" || p.kind === "callout" || p.kind === "areaPlan") {
+  if (p.kind === "floorPlan" || p.kind === "ceilingPlan" || p.kind === "callout" || p.kind === "areaPlan") {
     // Colour scheme (Revit: Color Scheme): fills rooms (areas in area plans) by a value.
     const cat = p.kind === "areaPlan" ? "Area" : "Room";
     const opts = [{ value: "", label: "<None>" }, ...colorSchemes(doc, cat).map((s) => ({ value: s.id, label: s.name ?? "Scheme" }))];
@@ -1036,7 +1036,7 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
     editBtn.onclick = () => openColorSchemes(doc, ctx.status, cat, p.colorScheme ?? null);
     sec.append(row("Colour scheme", h("div", { class: "buttons wrap" }, select(opts, p.colorScheme ?? "", (v) => set(v ? "Colour scheme" : "No colour scheme", { colorScheme: v || null })), editBtn)));
   }
-  if ((p.kind === "floorPlan" || p.kind === "areaPlan") && p.range && p.levelId) {
+  if ((p.kind === "floorPlan" || p.kind === "ceilingPlan" || p.kind === "areaPlan") && p.range && p.levelId) {
     const range = p.range;
     const setRange = (key: keyof ViewRangeOffsets, v: number) =>
       edit(ctx, "Change view range", (tx) => {
@@ -2110,6 +2110,12 @@ function projectSections(ctx: PanelContext): Record<string, HTMLElement> {
       "Floor Plans",
       allViews
         .filter((v) => v.params.kind === "floorPlan")
+        .sort((a, b) => (levelOrder.get(a.params.levelId!) ?? 0) - (levelOrder.get(b.params.levelId!) ?? 0)),
+    ],
+    [
+      "Ceiling Plans",
+      allViews
+        .filter((v) => v.params.kind === "ceilingPlan")
         .sort((a, b) => (levelOrder.get(a.params.levelId!) ?? 0) - (levelOrder.get(b.params.levelId!) ?? 0)),
     ],
     ["Callouts", allViews.filter((v) => v.params.kind === "callout")],

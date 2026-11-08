@@ -422,7 +422,17 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
                 { label: "Camera", action: () => m.cmd("camera") },
               ],
             },
-            { label: "Plan", icon: "plan", cmd: "viewPlan", large: true, title: "Floor plan of the active level" },
+            {
+              label: "Plan",
+              icon: "plan",
+              cmd: "viewPlan",
+              large: true,
+              title: "Floor plan of the active level (\u25be: reflected ceiling plan)",
+              menu: () => [
+                { label: "Floor Plan", action: () => m.cmd("viewPlan") },
+                { label: "Reflected Ceiling Plan", action: () => m.cmd("ceilingPlan") },
+              ],
+            },
             { label: "Section", icon: "section", tool: "section", title: "Section (S)" },
             { label: "Callout", icon: "callout", tool: "callout" },
             {

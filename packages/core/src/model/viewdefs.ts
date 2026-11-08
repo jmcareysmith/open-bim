@@ -8,7 +8,7 @@ import type { AppliedFilter, GraphicOverride, LinePattern } from "./graphics.ts"
 // Views are elements, as in Revit: saved with the project, listed in the browser, each with its
 // own range, scale, detail level and visibility. Sections, elevations and sheets build on this.
 
-export type ViewKind = "floorPlan" | "3d" | "section" | "elevation" | "callout" | "areaPlan" | "legend";
+export type ViewKind = "floorPlan" | "ceilingPlan" | "3d" | "section" | "elevation" | "callout" | "areaPlan" | "legend";
 export type DetailLevel = "coarse" | "medium" | "fine";
 /** Revit's visual styles (3D views). "rendered" shows the path-traced render. */
 export type VisualStyle = "wireframe" | "hiddenLine" | "shaded" | "consistent" | "realistic" | "rendered";
@@ -215,7 +215,31 @@ export function viewRange(doc: Document, view: View): ViewRange {
   const p = view.params;
   if (!isPlanView(view) || !p.levelId || !p.range) throw new Error("Only plan views have a view range");
   const elevation = doc.require<LevelParams>(p.levelId).params.elevation;
+  // Reflected ceiling plans look up from the cut plane to the top.
+  if (p.kind === "ceilingPlan") return { bottom: elevation + p.range.cut, cut: elevation + p.range.cut, top: elevation + p.range.top, up: true };
   return { bottom: elevation + Math.min(p.range.bottom, p.range.depth), cut: elevation + p.range.cut };
+}
+
+/** Revit's reflected ceiling plan cut plane, mm above the level. */
+export const RCP_CUT_HEIGHT = 2300;
+
+export function ceilingPlanFor(doc: Document, levelId: ElementId): View | undefined {
+  return views(doc).find((v) => v.params.kind === "ceilingPlan" && v.params.levelId === levelId);
+}
+
+/**
+ * Reflected ceiling plan (Revit: View → Plan Views → Reflected Ceiling Plan): what's above the cut
+ * plane (2300) up to the level above, seen looking up and drawn as a plan from above.
+ */
+export function createCeilingPlan(tx: Transaction, doc: Document, levelId: ElementId, opts: { name?: string; scale?: number } = {}): View {
+  const level = doc.require<LevelParams>(levelId);
+  if (level.category !== Cat.Level) throw new Error("Ceiling plans belong to a level");
+  const above = levels(doc).find((l) => l.params.elevation > level.params.elevation);
+  const top = above ? above.params.elevation - level.params.elevation : 3000;
+  const range = { top: Math.max(top, RCP_CUT_HEIGHT + 1), cut: RCP_CUT_HEIGHT, bottom: RCP_CUT_HEIGHT, depth: RCP_CUT_HEIGHT };
+  const name = opts.name ?? uniqueName(doc, "ceilingPlan", level.name ?? "Level");
+  if (nameInUse(doc, "ceilingPlan", name)) throw new Error(`A ceiling plan called "${name}" already exists`);
+  return tx.create<ViewParams>(Cat.View, { kind: "ceilingPlan", levelId, range, scale: opts.scale ?? 100, detailLevel: "coarse", hiddenCategories: [] }, { name });
 }
 
 export function floorPlanFor(doc: Document, levelId: ElementId): View | undefined {
@@ -537,5 +561,5 @@ export function isDrawingView(view: View): boolean {
 
 /** Views drawn as plans (floor plans, callouts and area plans). */
 export function isPlanView(view: View): boolean {
-  return view.params.kind === "floorPlan" || view.params.kind === "callout" || view.params.kind === "areaPlan";
+  return view.params.kind === "floorPlan" || view.params.kind === "ceilingPlan" || view.params.kind === "callout" || view.params.kind === "areaPlan";
 }

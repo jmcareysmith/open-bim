@@ -35,6 +35,7 @@ export const Cat = {
   SpotElevation: "SpotElevation",
   ColorScheme: "ColorScheme",
   ColorFillLegend: "ColorFillLegend",
+  Graph: "Graph",
   Material: "Material",
   ViewFilter: "ViewFilter",
   ViewTemplate: "ViewTemplate",

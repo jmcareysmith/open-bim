@@ -67,3 +67,5 @@ export * from "./model/spots.ts";
 export * from "./model/colorschemes.ts";
 export * from "./model/floorshape.ts";
 export * from "./model/arcs.ts";
+export * from "./model/graphs.ts";
+import "./model/graphnodes.ts";

@@ -323,6 +323,18 @@ falls back to the built-in marks. FamilyDefs list the views using them as `relat
 **Serialisation** — `doc.toJSON()` / `Document.fromJSON()`. Project file `.obim` is
 JSON for now; move to SQLite (via Rust) when files get large, keeping the same element schema.
 
+### Visual programming (`model/graphs.ts`, `model/graphnodes.ts`)
+Graphs (Dynamo-like) are `Graph` elements: nodes (a registered type + literal `values`), links from
+outputs to inputs, and `bindings` (the element ids each node made at its last run). `runGraph`
+evaluates nodes in dependency order inside one transaction (one undo step):
+- incremental: a node re-runs only when its inputs' JSON changed; `volatile` nodes (model reads)
+  and `effect` nodes (make/change elements) always run;
+- lacing: a list into a single-value input runs the node per item (shortest list wins);
+- binding: element nodes make elements through `ctx.bind(slot, create)`; an element from the last
+  run in that slot takes the new params and keeps its id, surplus ones are deleted, and deleted
+  nodes' elements go on the next run.
+Elements travel between nodes as ids; geometry values are plan points `{x,y}`, lines and polygons (mm).
+
 ## Geometry (`packages/geometry`)
 
 `GeometryKernel` interface converts elements into `MeshData`

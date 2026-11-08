@@ -33,7 +33,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Curved (arc) walls | 8b | 🟨 (Wall ▾ Arc, Properties → Curve or the middle grip; doors/windows/openings square to the arc; no joins, sweeps or curtain/stacked types on arcs yet) |
 | Wall joins, cleanup, wall attach top/base | 1 | ✅ (plan cleanup by layer priority; disallow join; crossing walls) |
 | Stacked walls | 6 | ✅ |
-| Wall sweeps and reveals, Edit Profile | 8b | ✅ (type and instance; built-in profiles; profile by presets/points, not sketched in elevation yet) |
+| Wall sweeps and reveals, Edit Profile | 8b | ✅ (type and instance; built-in profiles; profile by presets/points or sketched in a section/elevation along the wall) |
 | Curtain walls, grids, mullions, panels | 6 | ✅ (per wall: own grid lines, removed mullion segments, panel swaps glass/solid/empty/door; mullion profiles per type (interior/border) and per segment; pick a mullion or panel in the view — click the selected wall or Tab) |
 | Floors (sketch-based, layered, slope arrows) | 1 | ✅ (Pick Walls for floors/ceilings/roofs; slope arrows; shape editing points (falls to drains, variable thickness); slab edges) |
 | Roofs (footprint, extrusion, slopes, fascia/gutter) | 1 | ✅ (footprint: exact for convex/L/T/U; extrusion: gable/mono/curved/points profile; fascia, gutter, soffit on eaves; barge boards on gable rakes) |

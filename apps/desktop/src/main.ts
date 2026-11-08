@@ -13,6 +13,7 @@ import { BROWSER_DRAG } from "./panels.ts";
 import { addRecentFile, fileName, recentFiles, removeRecentFile } from "./recent.ts";
 import { CameraTool } from "./cameratool.ts";
 import { FloorPointTool, SlopeArrowTool } from "./slopetool.ts";
+import { WallProfileTool } from "./profiletool.ts";
 import {
   Cat,
   Document,
@@ -446,6 +447,10 @@ const ctx: ModifyToolContext & PanelContext = {
     viewport.setSelection([]);
     refreshAll();
   },
+  sketchWallProfile(id) {
+    (tools.wallProfile as WallProfileTool).wallId = id;
+    setTool("wallProfile");
+  },
   addShapePoints(id, height) {
     const t = tools.floorPoint as FloorPointTool;
     t.floorId = id;
@@ -523,6 +528,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   attach: new AttachTool(ctx),
   slopeArrow: new SlopeArrowTool(ctx),
   floorPoint: new FloorPointTool(ctx),
+  wallProfile: new WallProfileTool(ctx),
   "face-wall": new FaceTool(ctx, "wall"),
   "face-curtain": new FaceTool(ctx, "curtain"),
   "face-roof": new FaceTool(ctx, "roof"),

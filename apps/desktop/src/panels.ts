@@ -186,6 +186,7 @@ import {
   type RoofExtrusion,
   type RoofTrims,
   setCurtainEdits,
+  wallProfileMapping,
   colorSchemes,
   setWallCurve,
   setGridCurve,
@@ -343,6 +344,8 @@ export interface PanelContext {
   drawSlopeArrow(id: ElementId): void;
   /** Shape editing: click points onto a floor, each moving its top by `height`. */
   addShapePoints(id: ElementId, height: number): void;
+  /** Edit Profile: sketch a wall's outline in the open section/elevation. */
+  sketchWallProfile(id: ElementId): void;
   activeViewId(): ElementId | undefined;
   setActiveView(id: ElementId): void;
   status(text: string): void;
@@ -684,6 +687,11 @@ function profileRows(ctx: PanelContext, w: Wall): HTMLElement[] {
         btn("Gable", "Gable end: the wall's height at the ends, peaking 1500 higher in the middle", () => save(gableProfile(len, height, height + 1500), "Gable profile")),
         btn("Step", "Step down to half height over the first half", () => save(stepProfile(len, len / 2, height / 2, height), "Stepped profile")),
         ...(prof ? [btn("Reset profile", "Back to a rectangle", () => save(null, "Reset wall profile"))] : [btn("Points", "Edit the outline point by point", () => save(rect()))]),
+        // Sketch it on the drawing, when a section or elevation along the wall is open.
+        ...(() => {
+          const v = ctx.activeViewId() ? doc.get<ViewParams>(ctx.activeViewId()!) : undefined;
+          return v && wallProfileMapping(w, v) ? [btn("Sketch", "Click the outline's corners on this drawing, then Enter", () => ctx.sketchWallProfile(w.id))] : [];
+        })(),
       ),
     ),
   );

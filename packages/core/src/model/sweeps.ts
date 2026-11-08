@@ -1,6 +1,7 @@
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
 import { Cat, type LayeredTypeParams, type Wall, type WallParams } from "./architecture.ts";
+import type { ViewParams } from "./viewdefs.ts";
 
 // Wall sweeps and reveals (Revit: Wall Sweep / Reveal, and a wall type's Edit Assembly → Sweeps /
 // Reveals). A sweep is a profile run along a wall face (skirting, chair rail, cornice, plinth); a
@@ -111,4 +112,20 @@ export function gableProfile(length: number, eaves: number, peak: number): Vec2[
 /** A stepped outline: `low` for the first `at` mm, `high` for the rest. */
 export function stepProfile(length: number, at: number, low: number, high: number): Vec2[] {
   return [p(0, 0), p(length, 0), p(length, high), p(at, high), p(at, low), p(0, low)];
+}
+
+/** The wall's frame in a view along it: drawing x → distance along the wall, or null if the view isn't parallel. */
+export function wallProfileMapping(wall: Wall, view: { params: ViewParams }): ((p: Vec2) => Vec2) | null {
+  const line = view.params.line;
+  if (!line) return null;
+  const vl = Math.hypot(line.end.x - line.start.x, line.end.y - line.start.y);
+  const wl = Math.hypot(wall.params.end.x - wall.params.start.x, wall.params.end.y - wall.params.start.y);
+  if (vl < 1 || wl < 1 || wall.params.curve) return null;
+  const r = { x: (line.end.x - line.start.x) / vl, y: (line.end.y - line.start.y) / vl };
+  const d = { x: (wall.params.end.x - wall.params.start.x) / wl, y: (wall.params.end.y - wall.params.start.y) / wl };
+  if (Math.abs(r.x * d.y - r.y * d.x) > 0.01) return null;
+  return (p) => {
+    const plan = { x: line.start.x + r.x * p.x, y: line.start.y + r.y * p.x };
+    return { x: (plan.x - wall.params.start.x) * d.x + (plan.y - wall.params.start.y) * d.y, y: p.y };
+  };
 }

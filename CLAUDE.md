@@ -238,7 +238,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Wall sweeps/reveals (core/model/sweeps.ts, geometry/src/sweeps.ts): wall type or wall Properties →
   Sweeps and reveals (built-in profiles: skirting, chair rail, cornice, plinth, band; reveals cut by OCCT);
   sweeps run the joined face and stop at openings. Edit Profile: wall Properties → Profile (Gable, Step,
-  Points; `profile` in wall coords) — no elevation sketch mode yet.
+  Points, or Sketch when a section/elevation along the wall is open: click corners, Enter — profiletool.ts,
+  core `wallProfileMapping`; `profile` in wall coords).
 - Roof ▾ → Roof by Extrusion (two corners in plan; profile across the shorter side; Properties: Gable/Mono/
   Curved or points, extrusion start/end; walls attach to it). Roof Properties → Eaves: fascia, gutter (quad/
   half round), soffit depth, barge board up gable rakes (`trims`; core `roofRakes`; core `roofEaves`, geometry `roofTrimMeshes`, `profilePrism`).

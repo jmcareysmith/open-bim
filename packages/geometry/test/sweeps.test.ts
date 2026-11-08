@@ -8,6 +8,8 @@ import {
   setWallProfile,
   gableProfile,
   sweepProfileNames,
+  wallProfileMapping,
+  createSection,
   wallSweeps,
   type Vec2,
   type Wall,
@@ -92,5 +94,17 @@ describe("wall sweeps and reveals", () => {
     expect(() => doc.transact("Bad", (tx) => setWallProfile(tx, doc, wall.id, [p(0, 0), p(1, 1)]))).toThrow(/3 points/);
     doc.transact("Reset", (tx) => setWallProfile(tx, doc, wall.id, null));
     expect(boundingBox(new SimpleKernel().build(doc, doc.require(wall.id))!).max[2]).toBeCloseTo(2400, 3);
+  });
+
+  it("maps a sketch on a section along the wall into the wall's coordinates", () => {
+    const { doc, wall } = setup();
+    // A section along y = -2000 looking at the wall, starting 1000 before the wall's start.
+    const along = doc.transact("S", (tx) => createSection(tx, doc, p(-1000, -2000), p(5000, -2000)));
+    const map = wallProfileMapping(doc.require(wall.id) as Wall, doc.require(along.id) as never)!;
+    expect(map(p(1000, 3000))).toEqual(p(0, 3000));
+    expect(map(p(5000, 500))).toEqual(p(4000, 500));
+    // Across the wall: no mapping.
+    const across = doc.transact("S2", (tx) => createSection(tx, doc, p(2000, -1000), p(2000, 1000)));
+    expect(wallProfileMapping(doc.require(wall.id) as Wall, doc.require(across.id) as never)).toBeNull();
   });
 });

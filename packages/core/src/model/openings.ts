@@ -1,7 +1,8 @@
 import { registerCategory } from "../categories.ts";
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
-import { Cat, wallExtent, wallLength, type Wall, type WallParams } from "./architecture.ts";
+import { Cat, wallExtent, type Wall, type WallParams } from "./architecture.ts";
+import { alongArc, arcLength } from "./arcs.ts";
 
 // Hosted elements that cut their host wall (Revit: wall openings, doors, windows).
 // The cut is a box through the wall's full thickness, positioned along the wall's location line.
@@ -85,10 +86,9 @@ export function wallCuts(doc: Document, wall: Wall): WallCut[] {
 export function validateHosted(doc: Document, p: HostedParams): void {
   const host = doc.get<WallParams>(p.hostId);
   if (!host || host.category !== Cat.Wall) throw new Error("Openings must be hosted by a wall");
-  if (host.params.curve) throw new Error("Curved walls can't host doors, windows or openings yet");
   if (!(p.width > 0) || !(p.height > 0)) throw new Error("Opening width and height must be positive");
   if (p.sillHeight < 0) throw new Error("Sill height can't be below the wall base");
-  const len = wallLength(host);
+  const len = arcLength(host.params.start, host.params.end, host.params.curve);
   if (p.position - p.width / 2 < 0 || p.position + p.width / 2 > len) throw new Error("Opening runs past the end of the wall");
   const { bottom, top } = wallExtent(doc, host);
   if (p.sillHeight + p.height > top - bottom) throw new Error("Opening is taller than the wall");
@@ -97,6 +97,7 @@ export function validateHosted(doc: Document, p: HostedParams): void {
 /** Distance along the wall of the point on its location line closest to `p`, clamped to the wall. */
 export function positionAlongWall(wall: Wall, p: Vec2): number {
   const { start, end } = wall.params;
+  if (wall.params.curve) return alongArc(start, end, wall.params.curve, p);
   const dx = end.x - start.x;
   const dy = end.y - start.y;
   const len = Math.hypot(dx, dy);
@@ -129,9 +130,11 @@ export function createWallOpening(
 export function flipWall(tx: Transaction, doc: Document, wallId: ElementId): void {
   const wall = doc.require<WallParams>(wallId) as Wall;
   if (wall.category !== Cat.Wall) throw new Error("Only walls can be flipped");
-  const len = wallLength(wall);
+  const len = arcLength(wall.params.start, wall.params.end, wall.params.curve);
   const dj = wall.params.disallowJoin;
-  tx.update<WallParams>(wallId, { start: wall.params.end, end: wall.params.start, ...(dj ? { disallowJoin: { start: !!dj.end, end: !!dj.start } } : {}) });
+  // An arc keeps its shape: reversed, it bows the other way relative to start → end.
+  const curve = wall.params.curve ? { curve: -wall.params.curve } : {};
+  tx.update<WallParams>(wallId, { start: wall.params.end, end: wall.params.start, ...curve, ...(dj ? { disallowJoin: { start: !!dj.end, end: !!dj.start } } : {}) });
   for (const e of doc.all()) {
     if (!cutters.has(e.category)) continue;
     const p = e.params as { hostId?: ElementId; position: number; facingFlipped?: boolean; handFlipped?: boolean };

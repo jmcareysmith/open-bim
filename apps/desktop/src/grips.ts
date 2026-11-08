@@ -1,4 +1,4 @@
-import { Cat, dragGrip, elementGrips, flipWall, lineLength, setLineLength, viewFrame, wallThickness, type View, type ViewParams, type Element, type ElementId, type Grip, type Vec2 } from "@open-bim/core";
+import { arcMid, arcLength, Cat, dragGrip, elementGrips, flipWall, lineLength, setLineLength, viewFrame, wallThickness, type View, type ViewParams, type Element, type ElementId, type Grip, type Vec2 } from "@open-bim/core";
 import { viewPoint, type ToolContext } from "./tools.ts";
 
 // Grips and temporary dimensions over the viewport (Revit's drag controls). Shown for the
@@ -150,7 +150,9 @@ export class GripLayer {
     if (len < 1) return;
     // Exterior is to the left of start → end.
     const n = { x: -(end.y - start.y) / len, y: (end.x - start.x) / len };
-    const mid = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+    const curve = (wall.params as { curve?: number | null }).curve ?? 0;
+    // On an arc, its middle (where its normal is the chord's).
+    const mid = curve ? arcMid(start, end, curve) : { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
     const half = wallThickness(this.ctx.doc, wall as never) / 2;
     const b = document.createElement("button");
     b.className = "flip-arrow";
@@ -179,16 +181,18 @@ export class GripLayer {
 
   /** Temporary dimension: the length at the line's midpoint; click to type a new length. */
   private addLength(el: Element): void {
-    const len = lineLength(el);
-    if (len === null) return;
-    const { start, end } = el.params as unknown as { start: Vec2; end: Vec2 };
-    const mid = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+    const chord = lineLength(el);
+    if (chord === null) return;
+    const { start, end, curve } = el.params as unknown as { start: Vec2; end: Vec2; curve?: number | null };
+    const mid = curve ? arcMid(start, end, curve) : { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
+    const len = curve ? arcLength(start, end, curve) : chord;
     const label = document.createElement("div");
     label.className = "temp-dim";
     label.textContent = `${Math.round(len)}`;
-    label.title = "Click to type a new length (the start stays put)";
+    label.title = curve ? "Arc length (drag the middle grip to change the bow)" : "Click to type a new length (the start stays put)";
     label.onpointerdown = (ev) => ev.stopPropagation();
     label.onclick = () => {
+      if (curve) return;
       const input = document.createElement("input");
       input.type = "number";
       input.value = String(Math.round(len));

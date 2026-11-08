@@ -1,11 +1,10 @@
-import { arcPoints,
+import { tangentLine, arcPoints,
   classificationInfo,
   evaluate,
   familyValues,
   type ConnectorParams,
   type Num,
   wallCuts,
-  wallDirection,
   wallThickness,
   type Document,
   type Element,
@@ -136,10 +135,9 @@ export function buildOpeningLines(doc: Document, el: Element): LineData | null {
   if (!host) return null;
   const cut = wallCuts(doc, host).find((c) => c.id === el.id);
   if (!cut) return null;
-  const d = wallDirection(host);
+  const { start, dir: d } = tangentLine(host, (cut.u0 + cut.u1) / 2);
   const n = { x: -d.y, y: d.x };
   const h = wallThickness(doc, host) / 2;
-  const { start } = host.params;
   const seg: number[] = [];
   for (const s of [-1, 1]) {
     const at = (u: number, z: number) => [start.x + d.x * u + n.x * h * s, start.y + d.y * u + n.y * h * s, z];

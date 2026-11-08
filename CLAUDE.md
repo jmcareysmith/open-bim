@@ -254,9 +254,10 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   floor; height, e.g. −20 drain), points list, Reset Shape; top triangulated through points (floorTopAt via
   hook), bottom flat. Slab edge (thickening/rebated/nosing profiles) along the outline.
 - Curved walls and grids (core/model/arcs.ts: `curve` = sagitta, + left): Wall ▾ Arc (start, end, bow) or
-  Properties → Curve; arc walls' footprint is the band along the arc (no joins/cleanup, openings refused,
-  no sweeps/profile, not curtain/stacked); grids draw dashes and bubbles along the arc (skipped in sections
-  and dimensions). Selected arc walls' grips/length label still use the chord.
+  Properties → Curve, or drag the arc's middle grip; arc walls' footprint is the band along the arc (no
+  joins/cleanup, sweeps/profile, curtain/stacked yet). Doors/windows/openings/hosted families sit square to the
+  arc (core `tangentLine`, `alongArc`); flipping keeps the arc. Grids draw along the arc (not in sections or
+  dimensions). Length label shows the arc length.
 - Phase 8b is done (2026-11-09).
 - Visual programming (Phase 8 done): Manage → Visual Programming (apps/desktop/src/grapheditor.ts): graphs
   per project (New/Rename/Delete), library (search, click to add), drag output dot → input dot to link,

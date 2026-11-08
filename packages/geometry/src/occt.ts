@@ -1,11 +1,10 @@
 import { slopedTopWallMesh } from "./wallattach.ts";
 import type { OpenCascadeInstance, TopoDS_Shape } from "replicad-opencascadejs";
-import {
+import { tangentLine,
   Cat,
   familyValues,
   isFormCategory,
   wallCuts,
-  wallDirection,
   wallExtent,
   wallThickness,
   type Document,
@@ -174,11 +173,11 @@ export class OcctKernel implements GeometryKernel {
       let solid: TopoDS_Shape = sloped ? this.meshToSolid(sloped, keep) : keep(keep(new oc.BRepPrimAPI_MakePrism(face, keep(new oc.gp_Vec(0, 0, top - bottom)), false, true)).Shape());
 
       // Each cut: a box aligned with the wall (x along it, y across), through its full thickness.
-      const d = wallDirection(wall);
-      const n = { x: -d.y, y: d.x };
       const half = wallThickness(doc, wall) / 2 + CUT_OVERSHOOT;
-      const { start } = wall.params;
       for (const c of cuts) {
+        // Square to the wall at the cut's middle (curved walls: the tangent there).
+        const { start, dir: d } = tangentLine(wall, (c.u0 + c.u1) / 2);
+        const n = { x: -d.y, y: d.x };
         const origin = keep(new oc.gp_Pnt(start.x + d.x * c.u0 - n.x * half, start.y + d.y * c.u0 - n.y * half, c.z0));
         const axes = keep(new oc.gp_Ax2(origin, keep(new oc.gp_Dir(0, 0, 1)), keep(new oc.gp_Dir(d.x, d.y, 0))));
         const box = keep(keep(new oc.BRepPrimAPI_MakeBox(axes, c.u1 - c.u0, half * 2, c.z1 - c.z0)).Shape());

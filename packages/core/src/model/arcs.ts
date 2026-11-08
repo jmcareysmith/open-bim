@@ -84,8 +84,6 @@ export function setWallCurve(tx: Transaction, doc: Document, id: ElementId, curv
     validCurve(w.params.start, w.params.end, curve);
     const t = w.typeId ? doc.get<LayeredTypeParams>(w.typeId)?.params : undefined;
     if (t?.curtain || t?.stack?.length) throw new Error("Curtain and stacked walls are straight for now");
-    const hosted = doc.all().some((e) => (e.params as { hostId?: ElementId }).hostId === id);
-    if (hosted) throw new Error("Take the doors, windows and openings out first: curved walls can't host them yet");
   }
   tx.update<WallParams>(id, { curve: curve || null });
 }
@@ -95,4 +93,35 @@ export function setGridCurve(tx: Transaction, doc: Document, id: ElementId, curv
   if (g.category !== Cat.Grid) throw new Error("Only walls and grids curve");
   if (curve) validCurve(g.params.start, g.params.end, curve);
   tx.update(id, { curve: curve || null });
+}
+
+/**
+ * The straight line touching a wall (or grid) at `along` mm from its start (measured along the arc):
+ * a `start` and `dir` such that start + dir·along is that point. Straight walls: their own line.
+ * Doors, windows and openings in curved walls sit square to this line.
+ */
+export function tangentLine(el: { params: { start: Vec2; end: Vec2; curve?: number | null } }, along: number): { start: Vec2; dir: Vec2 } {
+  const { start, end, curve } = el.params;
+  const a = curve ? arcInfo(start, end, curve) : null;
+  if (!a) {
+    const l = Math.hypot(end.x - start.x, end.y - start.y) || 1;
+    return { start, dir: { x: (end.x - start.x) / l, y: (end.y - start.y) / l } };
+  }
+  const s = Math.sign(a.sweep);
+  const t = a.a0 + (s * along) / a.radius;
+  const p = { x: a.center.x + a.radius * Math.cos(t), y: a.center.y + a.radius * Math.sin(t) };
+  const dir = { x: -s * Math.sin(t), y: s * Math.cos(t) };
+  return { start: { x: p.x - dir.x * along, y: p.y - dir.y * along }, dir };
+}
+
+/** Distance along an arc (from its start) of the point on it nearest `p`, clamped to the arc. */
+export function alongArc(start: Vec2, end: Vec2, curve: number, p: Vec2): number {
+  const a = arcInfo(start, end, curve)!;
+  const ang = Math.atan2(p.y - a.center.y, p.x - a.center.x);
+  const norm = (x: number) => ((x % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  let d = a.sweep > 0 ? norm(ang - a.a0) : norm(a.a0 - ang);
+  const span = Math.abs(a.sweep);
+  // Past the end: whichever end is nearer round the circle.
+  if (d > span) d = d - span < 2 * Math.PI - d ? span : 0;
+  return d * a.radius;
 }

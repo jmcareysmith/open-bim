@@ -1,8 +1,7 @@
-import {
+import { tangentLine,
   Cat,
   familyDocument,
   instanceValues,
-  wallDirection,
   type Document,
   type Element,
   type FamilyDef,
@@ -46,10 +45,10 @@ export function instancePlacement(doc: Document, inst: FamilyInstance): Placemen
   const p = inst.params;
   if (p.hostId) {
     const wall = doc.require(p.hostId) as Wall;
-    const d = wallDirection(wall);
+    const { start, dir: d } = tangentLine(wall, p.along);
     const base = doc.require<LevelParams>(wall.params.baseLevelId).params.elevation + wall.params.baseOffset;
     const x = p.flipped ? { x: -d.x, y: -d.y } : d;
-    return { origin: [wall.params.start.x + d.x * p.along, wall.params.start.y + d.y * p.along, base + p.sillHeight], x };
+    return { origin: [start.x + d.x * p.along, start.y + d.y * p.along, base + p.sillHeight], x };
   }
   const z = doc.require<LevelParams>(p.levelId).params.elevation + p.offset;
   return { origin: [p.position.x, p.position.y, z], x: { x: Math.cos(p.rotation), y: Math.sin(p.rotation) } };

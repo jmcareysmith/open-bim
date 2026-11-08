@@ -1,6 +1,5 @@
-import {
+import { tangentLine,
   doorPlacement,
-  wallDirection,
   wallExtent,
   wallThickness,
   windowPlacement,
@@ -28,9 +27,9 @@ interface WallFrame {
   bottom: number;
 }
 
-function wallFrame(doc: Document, wall: Wall): WallFrame {
-  const d = wallDirection(wall);
-  const { start } = wall.params;
+/** The wall's frame around `along` (curved walls: the tangent line there). */
+function wallFrame(doc: Document, wall: Wall, along = 0): WallFrame {
+  const { start, dir: d } = tangentLine(wall, along);
   return {
     at: (u, v) => ({ x: start.x + d.x * u - d.y * v, y: start.y + d.y * u + d.x * v }),
     half: wallThickness(doc, wall) / 2,
@@ -67,8 +66,8 @@ function host(doc: Document, el: Element): Wall {
 
 /** Door: two jambs and a head through the wall's thickness, with a closed leaf in the middle. */
 export function buildDoor(doc: Document, el: Element): MeshData {
-  const f = wallFrame(doc, host(doc, el));
   const p = doorPlacement(doc, el);
+  const f = wallFrame(doc, host(doc, el), p.position);
   const t = doc.require<DoorTypeParams>(el.typeId!).params;
   const u0 = p.position - p.width / 2;
   const u1 = p.position + p.width / 2;
@@ -85,8 +84,8 @@ export function buildDoor(doc: Document, el: Element): MeshData {
 
 /** Plan symbol: the leaf drawn open at 90° and its swing arc, just above the door's sill. */
 export function buildDoorLines(doc: Document, el: Element): LineData {
-  const f = wallFrame(doc, host(doc, el));
   const p = el.params as DoorParams;
+  const f = wallFrame(doc, host(doc, el), p.position);
   const t = doc.require<DoorTypeParams>(el.typeId!).params;
   const side = p.facingFlipped ? -1 : 1;
   const hinge = p.position + (p.handFlipped ? 1 : -1) * (t.leafWidth / 2);
@@ -108,8 +107,8 @@ export function buildDoorLines(doc: Document, el: Element): LineData {
 
 /** Window: four frame members centred in the wall, glass in the middle. */
 export function buildWindow(doc: Document, el: Element): MeshData {
-  const f = wallFrame(doc, host(doc, el));
   const p = windowPlacement(doc, el);
+  const f = wallFrame(doc, host(doc, el), p.position);
   const t = doc.require<WindowTypeParams>(el.typeId!).params;
   const u0 = p.position - p.width / 2;
   const u1 = p.position + p.width / 2;
@@ -130,8 +129,8 @@ export function buildWindow(doc: Document, el: Element): MeshData {
 /** Plan symbol: frame outline through the wall and the glass line, drawn just above the floor. */
 export function buildWindowLines(doc: Document, el: Element): LineData {
   const wall = host(doc, el);
-  const f = wallFrame(doc, wall);
   const p = windowPlacement(doc, el);
+  const f = wallFrame(doc, wall, p.position);
   const u0 = p.position - p.width / 2;
   const u1 = p.position + p.width / 2;
   const d = Math.min(WINDOW_DEPTH, f.half * 2) / 2;

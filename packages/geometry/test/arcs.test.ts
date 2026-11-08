@@ -8,12 +8,17 @@ import {
   createGrid,
   createWall,
   createWallOpening,
+  dragGrip,
+  elementGrips,
+  flipWall,
+  positionAlongWall,
+  tangentLine,
   setGridCurve,
   setWallCurve,
   type Vec2,
   type Wall,
 } from "@open-bim/core";
-import { SimpleKernel, boundingBox, meshVolume } from "../src/index.ts";
+import { OcctKernel, SimpleKernel, boundingBox, meshVolume } from "../src/index.ts";
 
 const p = (x: number, y: number): Vec2 => ({ x, y });
 const T = 110; // interior wall thickness
@@ -45,13 +50,41 @@ describe("curved walls and grids", () => {
     const bb = boundingBox(m);
     expect(bb.max[1]).toBeCloseTo(2000 + T / 2, 0);
     expect(() => doc.transact("Too much", (tx) => setWallCurve(tx, doc, w.id, 2500))).toThrow(/semicircle/);
-    expect(() => doc.transact("Door", (tx) => createWallOpening(tx, doc, w.id, 2000))).toThrow(/Curved walls/);
     // Back to straight.
     doc.transact("Straight", (tx) => setWallCurve(tx, doc, w.id, null));
     expect(boundingBox(new SimpleKernel().build(doc, doc.require(w.id))!).max[1]).toBeCloseTo(T / 2);
     const cw = doc.transact("CW", (tx) => createWall(tx, ids.wallTypes.curtain, p(0, 5000), p(4000, 5000), ids.levels.ground, { height: 2400 }));
     expect(() => doc.transact("Curve CW", (tx) => setWallCurve(tx, doc, cw.id, 500))).toThrow(/straight for now/);
   });
+
+  it("curved walls host openings square to the arc; clicks project onto it; flips keep the shape; the bow grip bends it", async () => {
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const w = doc.transact("W", (tx) => createWall(tx, ids.wallTypes.interior, p(0, 0), p(4000, 0), ids.levels.ground, { height: 2400 })) as Wall;
+    doc.transact("Curve", (tx) => setWallCurve(tx, doc, w.id, 2000));
+    const arc = () => doc.require(w.id) as Wall;
+    // Half way round the semicircle is its top, (2000, 2000).
+    expect(positionAlongWall(arc(), p(2000, 2600))).toBeCloseTo(Math.PI * 1000, 0);
+    const t = tangentLine(arc(), Math.PI * 1000);
+    expect(t.start.x + t.dir.x * Math.PI * 1000).toBeCloseTo(2000, 3);
+    expect(t.start.y + t.dir.y * Math.PI * 1000).toBeCloseTo(2000, 3);
+    expect(Math.abs(t.dir.x)).toBeCloseTo(1, 6);
+    const occt = await OcctKernel.create();
+    const before = meshVolume(occt.build(doc, arc())!);
+    doc.transact("Opening", (tx) => createWallOpening(tx, doc, w.id, Math.PI * 1000, { width: 900, height: 2100 }));
+    expect(meshVolume(occt.build(doc, arc())!)).toBeLessThan(before - 900 * 2000 * T * 0.9);
+    // Flipped: same arc, same place for the opening.
+    const bb0 = boundingBox(new SimpleKernel().build(doc, arc())!);
+    doc.transact("Flip", (tx) => flipWall(tx, doc, w.id));
+    const bb1 = boundingBox(new SimpleKernel().build(doc, arc())!);
+    expect(bb1.max[1]).toBeCloseTo(bb0.max[1], 3);
+    expect(bb1.min[1]).toBeCloseTo(bb0.min[1], 3);
+    // The middle grip: drag it to bow less.
+    const bow = elementGrips(doc, arc()).find((g) => g.key === "bow")!;
+    expect(bow.point.y).toBeCloseTo(2000, 3);
+    doc.transact("Bow", (tx) => dragGrip(tx, doc, w.id, "bow", p(2000, 800)));
+    expect(Math.abs(arc().params.curve!)).toBe(800);
+  }, 60_000);
 
   it("curved grids draw along their arc with bubbles at the ends", () => {
     const doc = new Document();

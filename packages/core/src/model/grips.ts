@@ -10,6 +10,13 @@ import { validateRegion } from "./sketch.ts";
 import { tagPosition, type Tag } from "./tags.ts";
 import type { DimensionParams } from "./annotations.ts";
 import { calloutHeadPosition, viewFrame, type View, type ViewParams } from "./viewdefs.ts";
+import { setGridCurve, setWallCurve } from "./arcs.ts";
+
+/** The middle of an arc (start → end, bowing by `curve` to the left). */
+export function arcMid(start: Vec2, end: Vec2, curve: number): Vec2 {
+  const c = Math.hypot(end.x - start.x, end.y - start.y) || 1;
+  return { x: (start.x + end.x) / 2 - ((end.y - start.y) / c) * curve, y: (start.y + end.y) / 2 + ((end.x - start.x) / c) * curve };
+}
 
 // Grips (Revit's drag controls): handles on a selected element that reshape it when dragged —
 // line ends, sketch vertices, stair run ends, a door's place along its wall — or move it.
@@ -58,11 +65,14 @@ export function elementGrips(doc: Document, el: Element): Grip[] {
     return [{ key: "along", point: { x: l.point.x + l.dir.x * t, y: l.point.y + l.dir.y * t }, kind: "move" }];
   }
   if (isLinear(el)) {
-    const { start, end } = p as { start: Vec2; end: Vec2 };
-    return [
+    const { start, end, curve } = p as { start: Vec2; end: Vec2; curve?: number | null };
+    const grips: Grip[] = [
       { key: "start", point: start, kind: "end" },
       { key: "end", point: end, kind: "end" },
     ];
+    // Arcs: drag the middle to change how far they bow.
+    if (curve) grips.push({ key: "bow", point: arcMid(start, end, curve), kind: "move" });
+    return grips;
   }
   if (POLYGON.has(el.category)) return (p.boundary as Vec2[]).map((q, i) => ({ key: `v${i}`, point: q, kind: "vertex" }));
   if (el.category === Cat.Railing && !p.hostId) return (p.path as Vec2[]).map((q, i) => ({ key: `v${i}`, point: q, kind: "vertex" }));
@@ -179,10 +189,20 @@ export function dragGrip(tx: Transaction, doc: Document, id: ElementId, key: str
       return;
     }
   }
+  if (isLinear(el) && key === "bow") {
+    const { start, end } = p as { start: Vec2; end: Vec2 };
+    const c = Math.hypot(end.x - start.x, end.y - start.y);
+    const n = { x: -(end.y - start.y) / c, y: (end.x - start.x) / c };
+    const d = (to.x - (start.x + end.x) / 2) * n.x + (to.y - (start.y + end.y) / 2) * n.y;
+    const curve = Math.round(Math.max(-c / 2, Math.min(c / 2, d))) || 1;
+    if (el.category === Cat.Wall) setWallCurve(tx, doc, id, curve);
+    else setGridCurve(tx, doc, id, curve);
+    return;
+  }
   if (isLinear(el) && (key === "start" || key === "end")) {
     const { start, end } = p as { start: Vec2; end: Vec2 };
-    // Grids and reference planes keep their line: their ends only slide along it.
-    if (el.category === Cat.Grid || el.category === Cat.ReferencePlane) {
+    // Grids and reference planes keep their line: their ends only slide along it (arcs move freely).
+    if ((el.category === Cat.Grid || el.category === Cat.ReferencePlane) && !(p as { curve?: number }).curve) {
       const l = elementLine(el);
       const t = (to.x - l.point.x) * l.dir.x + (to.y - l.point.y) * l.dir.y;
       to = { x: l.point.x + l.dir.x * t, y: l.point.y + l.dir.y * t };

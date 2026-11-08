@@ -290,6 +290,8 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.FilledRegion, buildAnnotationLines],
     [Cat.TextNote, buildAnnotationLines],
     [Cat.SpotElevation, buildAnnotationLines],
+    [Cat.AngularDimension, buildAnnotationLines],
+    [Cat.RadialDimension, buildAnnotationLines],
     [Cat.ColorFillLegend, (d, e) => buildColorFillLegendLines(d, e)],
     [Cat.Dimension, buildAnnotationLines],
     [Cat.Room, buildRoomLines],

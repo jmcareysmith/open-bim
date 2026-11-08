@@ -220,7 +220,18 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
         {
           title: "Dimension",
           items: [
-            { label: "Aligned", icon: "dimension", tool: "dimension", large: true, title: "Aligned dimension (DI / M): plans, sections and elevations" },
+            {
+              label: "Aligned",
+              icon: "dimension",
+              tool: "dimension",
+              large: true,
+              title: "Aligned dimension (DI / M): plans, sections and elevations (\u25be: angular, radial)",
+              menu: () => [
+                { label: "Aligned", action: () => m.tool("dimension") },
+                { label: "Angular", action: () => m.tool("angulardim") },
+                { label: "Radial", action: () => m.tool("radialdim") },
+              ],
+            },
             { label: "Spot Elevation", icon: "level", tool: "spot", large: true, title: "Spot elevation (EL): click a floor, roof or ground, then where the text goes" },
           ],
         },

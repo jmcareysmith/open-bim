@@ -82,6 +82,8 @@ import {
   arcLength,
   setWallCurve,
   createColorFillLegend,
+  createAngularDimension,
+  createRadialDimension,
   SPOT_HOSTS,
   refPoint,
   ensureStairType,
@@ -1356,6 +1358,67 @@ export class BeamTool implements Tool {
     if (ev.key === "Escape" && this.start) {
       this.start = null;
       this.ctx.viewport.setPreviewLines(null);
+      return true;
+    }
+    return false;
+  }
+}
+
+/** Angular (two walls/grids/reference planes, then where) and Radial (an arc wall or grid, then where) dimensions. */
+export class AngleDimensionTool implements Tool {
+  readonly name: string;
+  private refs: DimRef[] = [];
+  private arc: { id: ElementId; side: "left" | "right" | "centre" } | null = null;
+  constructor(
+    private ctx: ToolContext,
+    private kind: "angular" | "radial",
+  ) {
+    this.name = kind === "angular" ? "angulardim" : "radialdim";
+  }
+
+  activate(): void {
+    this.refs = [];
+    this.arc = null;
+    this.ctx.status(this.kind === "angular" ? "Angular dimension: click two walls, grids or reference planes, then where the arc goes." : "Radial dimension: click a curved wall or grid, then where the dimension goes.");
+  }
+
+  click(ev: PointerEvent): void {
+    const viewId = requireAnnotView(this.ctx);
+    if (!viewId) return;
+    const { doc, viewport } = this.ctx;
+    const ready = this.kind === "angular" ? this.refs.length === 2 : !!this.arc;
+    if (!ready) {
+      const pickable = new Set<string>(this.kind === "angular" ? [Cat.Wall, Cat.Grid, Cat.ReferencePlane] : [Cat.Wall, Cat.Grid]);
+      const hit = viewport.pickHit(ev, (id) => pickable.has(doc.get(id)?.category ?? ""));
+      if (!hit) return this.ctx.status(this.kind === "angular" ? "Angular dimension: click a wall, grid or reference plane." : "Radial dimension: click a curved wall or grid.");
+      const el = doc.require(hit.id);
+      if (this.kind === "radial") {
+        if (!(el.params as { curve?: number }).curve) return this.ctx.status("Radial dimension: that one is straight: pick a curved wall or grid.");
+        this.arc = { id: el.id, side: "centre" };
+        this.ctx.setSelection([el.id]);
+        return this.ctx.status("Radial dimension: click where it goes.");
+      }
+      this.refs.push(el.category === Cat.Wall ? { kind: "wallFace", id: el.id, side: "centre", pick: hit.point } : { kind: "datum", id: el.id, pick: hit.point });
+      this.ctx.setSelection(this.refs.flatMap((r) => (r.kind === "point" ? [] : [r.id])));
+      return this.ctx.status(this.refs.length === 2 ? "Angular dimension: click where the arc goes." : "Angular dimension: click the second line.");
+    }
+    const at = viewPoint(this.ctx, ev, null);
+    if (!at) return;
+    try {
+      const d = doc.transact(this.kind === "angular" ? "Angular dimension" : "Radial dimension", (tx) =>
+        this.kind === "angular" ? createAngularDimension(tx, doc, viewId, this.refs[0]!, this.refs[1]!, at) : createRadialDimension(tx, doc, viewId, this.arc!.id, at),
+      );
+      this.ctx.setSelection([d.id]);
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
+    this.refs = [];
+    this.arc = null;
+  }
+
+  key(ev: KeyboardEvent): boolean {
+    if (ev.key === "Escape" && (this.refs.length || this.arc)) {
+      this.activate();
       return true;
     }
     return false;

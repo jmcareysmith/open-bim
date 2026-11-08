@@ -1,4 +1,4 @@
-import {
+import { angularLayout, radialLayout, type AngularDimension, type AngularDimensionParams, type RadialDimension, type RadialDimensionParams,
   Cat,
   dimensionLayout,
   lengthInputValue,
@@ -52,6 +52,54 @@ export function buildAnnotationLines(doc: Document, el: Element): LineData | nul
         });
       }
       return { segments: new Float32Array(seg), labels: [], fill: { loops: [p.boundary, ...p.holes], color: p.color } };
+    }
+    case Cat.AngularDimension: {
+      // Arc between the arms through `at`, ticks at its ends, the angle in degrees outside it.
+      const p = el.params as AngularDimensionParams;
+      const k = modelTextSize(doc, p.viewId, 1);
+      const L = angularLayout(doc, el as AngularDimension);
+      const a0 = Math.atan2(L.u.y, L.u.x);
+      let a1 = Math.atan2(L.w.y, L.w.x);
+      while (a1 - a0 > Math.PI) a1 -= 2 * Math.PI;
+      while (a0 - a1 > Math.PI) a1 += 2 * Math.PI;
+      const seg: number[] = [];
+      const at = (ang: number, r: number) => ({ x: L.o.x + r * Math.cos(ang), y: L.o.y + r * Math.sin(ang) });
+      const n = Math.max(8, Math.ceil(Math.abs(a1 - a0) / (Math.PI / 36)));
+      for (let i = 0; i < n; i++) {
+        const q = at(a0 + ((a1 - a0) * i) / n, L.r);
+        const r2 = at(a0 + ((a1 - a0) * (i + 1)) / n, L.r);
+        seg.push(q.x, q.y, 0, r2.x, r2.y, 0);
+      }
+      for (const ang of [a0, a1]) {
+        // Witness line from the vertex out past the arc, and a tick across it.
+        const e = at(ang, L.r + 2 * k);
+        seg.push(L.o.x, L.o.y, 0, e.x, e.y, 0);
+        const c = at(ang, L.r);
+        const t = TICK * k * 0.5;
+        seg.push(c.x - t, c.y - t, 0, c.x + t, c.y + t, 0);
+      }
+      const mid = at((a0 + a1) / 2, L.r + 3 * k);
+      return { segments: new Float32Array(seg), labels: [{ text: `${((L.angle * 180) / Math.PI).toFixed(2)}\u00b0`, position: [mid.x, mid.y, 0], size: p.size * k }] };
+    }
+    case Cat.RadialDimension: {
+      // From the centre through `at` to the arc, an arrow on the arc, "R …" along it.
+      const p = el.params as RadialDimensionParams;
+      const k = modelTextSize(doc, p.viewId, 1);
+      const { arc, r } = radialLayout(doc, el as RadialDimension);
+      const c = arc.center;
+      const dx = p.at.x - c.x;
+      const dy = p.at.y - c.y;
+      const l = Math.hypot(dx, dy) || 1;
+      const u = { x: dx / l, y: dy / l };
+      const tip = { x: c.x + u.x * r, y: c.y + u.y * r };
+      const far = l > r ? p.at : tip;
+      const seg = [c.x, c.y, 0, far.x, far.y, 0];
+      const h = 2.5 * k;
+      const back = { x: tip.x - u.x * h, y: tip.y - u.y * h };
+      seg.push(tip.x, tip.y, 0, back.x - u.y * h * 0.35, back.y + u.x * h * 0.35, 0, tip.x, tip.y, 0, back.x + u.y * h * 0.35, back.y - u.x * h * 0.35, 0);
+      const label = { x: c.x + u.x * (r * 0.5) - u.y * 1.5 * k, y: c.y + u.y * (r * 0.5) + u.x * 1.5 * k };
+      const units = projectUnits(doc);
+      return { segments: new Float32Array(seg), labels: [{ text: `R ${lengthInputValue(r, units)}`, position: [label.x, label.y, 0], size: p.size * k }] };
     }
     case Cat.SpotElevation: {
       // A target (plans) or a triangle standing on the point (sections), a leader, and the height.

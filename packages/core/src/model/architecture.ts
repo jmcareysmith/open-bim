@@ -36,6 +36,8 @@ export const Cat = {
   ColorScheme: "ColorScheme",
   ColorFillLegend: "ColorFillLegend",
   Graph: "Graph",
+  AngularDimension: "AngularDimension",
+  RadialDimension: "RadialDimension",
   Material: "Material",
   ViewFilter: "ViewFilter",
   ViewTemplate: "ViewTemplate",

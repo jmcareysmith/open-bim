@@ -68,4 +68,5 @@ export * from "./model/colorschemes.ts";
 export * from "./model/floorshape.ts";
 export * from "./model/arcs.ts";
 export * from "./model/graphs.ts";
+export * from "./model/angulardims.ts";
 import "./model/graphnodes.ts";

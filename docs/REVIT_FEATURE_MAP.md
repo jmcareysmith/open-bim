@@ -36,7 +36,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Wall sweeps and reveals, Edit Profile | 8b | ✅ (type and instance; built-in profiles; profile by presets/points, not sketched in elevation yet) |
 | Curtain walls, grids, mullions, panels | 6 | ✅ (per wall: own grid lines, removed mullion segments, panel swaps glass/solid/empty/door; mullion profiles per type (interior/border) and per segment; pick a mullion or panel in the view — click the selected wall or Tab) |
 | Floors (sketch-based, layered, slope arrows) | 1 | ✅ (Pick Walls for floors/ceilings/roofs; slope arrows; shape editing points (falls to drains, variable thickness); slab edges) |
-| Roofs (footprint, extrusion, slopes, fascia/gutter) | 1 | ✅ (footprint: exact for convex/L/T/U; extrusion: gable/mono/curved/points profile; fascia, gutter, soffit on eaves; no barge boards) |
+| Roofs (footprint, extrusion, slopes, fascia/gutter) | 1 | ✅ (footprint: exact for convex/L/T/U; extrusion: gable/mono/curved/points profile; fascia, gutter, soffit on eaves; barge boards on gable rakes) |
 | Ceilings | 1 | 🟨 |
 | Doors & windows (hosted, cut openings) | 1 | 🟨 |
 | Openings (shaft, wall, vertical) | 1 | 🟨 |

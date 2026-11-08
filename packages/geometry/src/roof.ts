@@ -3,6 +3,7 @@ import {
   planeHeight,
   ROOF_TRIM_PROFILES,
   roofEaves,
+  roofRakes,
   roofBaseElevation,
   roofPlaneAt,
   roofPlanes,
@@ -133,12 +134,34 @@ export function buildRoof(doc: Document, el: Element): MeshData | null {
 /** Fascia, gutter and soffit along each eave, merged with the roof. */
 export function roofTrimMeshes(roof: Roof, base: number, t: number): MeshData[] {
   const tr = roof.params.trims;
-  if (!tr || (!tr.fascia && !tr.gutter && !tr.soffit)) return [];
+  if (!tr || (!tr.fascia && !tr.gutter && !tr.soffit && !tr.barge)) return [];
   const fascia = tr.fascia ? ROOF_TRIM_PROFILES[tr.fascia]?.points : undefined;
   const gutter = tr.gutter ? ROOF_TRIM_PROFILES[tr.gutter]?.points : undefined;
   const fT = fascia ? Math.max(...fascia.map((q) => q.x)) : 0;
   const fD = fascia ? -Math.min(...fascia.map((q) => q.y)) : t;
   const out: MeshData[] = [];
+  // Barge boards: the profile along each rake, sheared to follow its slope.
+  const barge = tr.barge ? ROOF_TRIM_PROFILES[tr.barge]?.points : undefined;
+  if (barge) {
+    for (const rake of roofRakes(roof)) {
+      for (let i = 0; i + 1 < rake.pts.length; i++) {
+        const a = rake.pts[i]!;
+        const b = rake.pts[i + 1]!;
+        const len = Math.hypot(b.x - a.x, b.y - a.y);
+        if (len < 1) continue;
+        const d = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
+        const za = base + rake.z[i]! + t;
+        const zb = base + rake.z[i + 1]! + t;
+        const m = profilePrism(barge, a, d, rake.out, za, 0, len);
+        const P = m.positions;
+        for (let k = 0; k < P.length; k += 3) {
+          const u = (P[k]! - a.x) * d.x + (P[k + 1]! - a.y) * d.y;
+          P[k + 2] = P[k + 2]! + ((zb - za) * u) / len;
+        }
+        out.push(m);
+      }
+    }
+  }
   for (const eave of roofEaves(roof)) {
     const len = Math.hypot(eave.b.x - eave.a.x, eave.b.y - eave.a.y);
     if (len < 1) continue;

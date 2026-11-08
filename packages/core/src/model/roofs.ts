@@ -41,7 +41,7 @@ export type RoofExtrusion = {
 };
 
 /** Eave trims: profile names (ROOF_TRIM_PROFILES) or null, and the soffit's depth back from the edge. */
-export type RoofTrims = { fascia?: string | null; gutter?: string | null; soffit?: number | null };
+export type RoofTrims = { fascia?: string | null; gutter?: string | null; soffit?: number | null; /** Barge board up the gable rakes (a fascia profile). */ barge?: string | null };
 
 /**
  * Trim profiles, mm: x out from the roof edge, y from the roof's top at the edge (fascias hang from
@@ -162,6 +162,43 @@ export function extrusionHeightAt(e: RoofExtrusion, p: Vec2): number | null {
     if (s <= b.x + 1e-9) return a.y + ((b.y - a.y) * (s - a.x)) / (b.x - a.x);
   }
   return P[P.length - 1]!.y;
+}
+
+/**
+ * The roof's rakes (gable edges), for barge boards: each a polyline in plan with the underside
+ * height above the roof base at its points, and the outward normal. Footprint roofs: their unsloped
+ * edges (heights from the planes either side); extrusion roofs: the profile at both ends.
+ */
+export function roofRakes(roof: Roof): { pts: Vec2[]; z: number[]; out: Vec2 }[] {
+  const e = roof.params.extrusion;
+  if (e) {
+    const n = { x: -e.dir.y, y: e.dir.x };
+    const at = (s: number, t: number) => v(e.origin.x + e.dir.x * s + n.x * t, e.origin.y + e.dir.y * s + n.y * t);
+    return [
+      { pts: e.profile.map((q) => at(q.x, e.start)), z: e.profile.map((q) => q.y), out: v(-n.x, -n.y) },
+      { pts: e.profile.map((q) => at(q.x, e.end)), z: e.profile.map((q) => q.y), out: n },
+    ];
+  }
+  const { boundary, slopes } = roof.params;
+  const planes = roofPlanes(boundary, slopes);
+  return boundary.flatMap((a, i) => {
+    if (slopes[i] != null) return [];
+    const b = boundary[(i + 1) % boundary.length]!;
+    const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    // Sample the rake (it rises to a ridge), keeping the points where it bends.
+    const N = 48;
+    const raw = Array.from({ length: N + 1 }, (_, k) => {
+      const p = v(a.x + ((b.x - a.x) * k) / N, a.y + ((b.y - a.y) * k) / N);
+      return { p, z: roofHeightAt(planes, p) };
+    });
+    const keep = raw.filter((q, k) => {
+      if (k === 0 || k === N) return true;
+      const prev = raw[k - 1]!;
+      const next = raw[k + 1]!;
+      return Math.abs(q.z - (prev.z + next.z) / 2) > 0.5;
+    });
+    return [{ pts: keep.map((q) => q.p), z: keep.map((q) => q.z), out: v((b.y - a.y) / l, -(b.x - a.x) / l) }];
+  });
 }
 
 /**

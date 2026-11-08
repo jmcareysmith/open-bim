@@ -600,6 +600,7 @@ function roofTrimRows(ctx: PanelContext, r: Roof): HTMLElement[] {
     h("div", { class: "subhead" }, "Eaves"),
     row("Fascia", select(opts("fascia"), tr.fascia ?? "", (v) => set({ fascia: v || null }, "Roof fascia"))),
     row("Gutter", select(opts("gutter"), tr.gutter ?? "", (v) => set({ gutter: v || null }, "Roof gutter"))),
+    row("Barge board", select(opts("fascia"), tr.barge ?? "", (v) => set({ barge: v || null }, "Barge board"))),
     row("Soffit depth (0 = none)", numberInput(tr.soffit ?? 0, (v) => set({ soffit: v > 0 ? v : null }, "Roof soffit"))),
   ];
 }

@@ -77,4 +77,22 @@ describe("roof by extrusion", () => {
     expect(xb.min[0]).toBeCloseTo(20000 - 25, 3);
     expect(xb.max[0]).toBeCloseTo(26000 + 25, 3);
   });
+
+  it("barge boards run up the gable rakes to the ridge", () => {
+    const { doc, ids } = setup();
+    const r = doc.transact("Roof", (tx) => createRoof(tx, ids.roofTypes.steel, ids.levels.roof, [p(0, 0), p(10000, 0), p(10000, 6000), p(0, 6000)], { slopes: [deg(30), null, deg(30), null] }));
+    doc.transact("Barge", (tx) => tx.update<RoofParams>(r.id, { trims: { barge: "Fascia 185 x 25" } }));
+    const bb = boundingBox(new SimpleKernel().build(doc, doc.require(r.id))!);
+    // Out past both gable ends (x), not the eaves (y), up to the ridge.
+    expect(bb.min[0]).toBeCloseTo(-25, 3);
+    expect(bb.max[0]).toBeCloseTo(10025, 3);
+    expect(bb.min[1]).toBeCloseTo(0, 3);
+    expect(bb.max[2]).toBeCloseTo(BASE + 3000 * Math.tan(deg(30)) + T, 0);
+    // Extrusion roofs: on both ends of the profile.
+    const x = doc.transact("X", (tx) => createExtrusionRoof(tx, ids.roofTypes.steel, ids.levels.roof, p(20000, 0), p(26000, 10000)));
+    doc.transact("Barge X", (tx) => tx.update<RoofParams>(x.id, { trims: { barge: "Fascia 185 x 25" } }));
+    const xb = boundingBox(new SimpleKernel().build(doc, doc.require(x.id))!);
+    expect(xb.min[1]).toBeCloseTo(-25, 3);
+    expect(xb.max[1]).toBeCloseTo(10025, 3);
+  });
 });

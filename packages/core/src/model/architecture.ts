@@ -143,6 +143,11 @@ export type LayeredTypeParams = {
    * draw hollow (outline only), as Revit's types do by default.
    */
   coarseFill?: CoarseFill | null;
+  /**
+   * Wall types only: Wrapping at Ends (Revit) — at free ends, the finish layers of this side turn
+   * the corner across the end. Default none.
+   */
+  wrapEnds?: "none" | "exterior" | "interior" | null;
   /** Wall types only: sweeps and reveals on every wall of the type (Edit Assembly). */
   sweeps?: WallSweep[] | null;
 };

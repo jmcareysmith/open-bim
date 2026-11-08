@@ -155,4 +155,30 @@ describe("disallow join", () => {
     expect((doc.require(second) as Wall).params.disallowJoin).toEqual({ start: false, end: true });
     expect(wallJoins(doc, doc.require(a.id) as Wall).end?.kind).toBe("corner");
   });
+
+  it("wraps the finish layers round free ends when the type asks", () => {
+    const { doc, wall, types } = setup();
+    const w = wall(p(0, 0), p(2000, 0));
+    const regionAt = (q: Vec2) => {
+      const cuts = cleanCuts(doc, linework(doc, [doc.require(w.id) as Wall]), planFrame(1200), true, true);
+      return cuts.get(w.id)!.regions!.find((r) => pointIn(q, r.loop));
+    };
+    // Unwrapped: the framing runs to the end.
+    expect(regionAt(p(5, 0))!.materialId).toBe(types.timber);
+    doc.transact("Wrap", (tx) => tx.update<LayeredTypeParams>(types.lined, { wrapEnds: "exterior" }));
+    // Wrapped: the lining turns the corner, 10 deep across the end; the framing stops short.
+    expect(regionAt(p(5, 0))!.materialId).toBe(types.gib);
+    expect(regionAt(p(15, 0))!.materialId).toBe(types.timber);
+    expect(regionAt(p(1995, 0))!.materialId).toBe(types.gib);
+  });
 });
+
+function pointIn(q: Vec2, poly: Vec2[]): boolean {
+  let c = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i]!;
+    const b = poly[j]!;
+    if (a.y > q.y !== b.y > q.y && q.x < ((b.x - a.x) * (q.y - a.y)) / (b.y - a.y) + a.x) c = !c;
+  }
+  return c;
+}

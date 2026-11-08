@@ -3840,6 +3840,22 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename type", (tx) => tx.setName(el.id, v || undefined)))),
         row("Total", len(totalThickness(t))),
         ...coarseFillRows(ctx, t),
+        ...(el.category === Cat.WallType && !t.params.stack && !t.params.curtain
+          ? [
+              row(
+                "Wrapping at ends",
+                select(
+                  [
+                    { value: "none", label: "Do not wrap" },
+                    { value: "exterior", label: "Exterior" },
+                    { value: "interior", label: "Interior" },
+                  ],
+                  t.params.wrapEnds ?? "none",
+                  (v) => edit(ctx, "Wrapping at ends", (tx) => tx.update<LayeredTypeParams>(t.id, { wrapEnds: v === "none" ? null : (v as "exterior" | "interior") })),
+                ),
+              ),
+            ]
+          : []),
         ...(el.category === Cat.WallType && !t.params.stack && !t.params.curtain ? sweepRows(ctx, el) : []),
         ...thermalRows(ctx, el),
       );

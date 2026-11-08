@@ -1,5 +1,5 @@
 import polygonClipping, { type Polygon, type Ring } from "polygon-clipping";
-import {
+import { 
   Cat,
   wallDirection,
   wallEndPoint,
@@ -111,6 +111,7 @@ export function cleanCuts(doc: Document, linework: PlanLinework[], frame: ViewFr
     it.regions = detailed
       ? layerRegions(doc, it.wall, loops, frame).map((r) => ({ loop: r.loop, materialId: r.materialId, priority: r.function ? PRIORITY[r.function] : 9 }))
       : loops.map((loop) => ({ loop, materialId: undefined, priority: 1 }));
+    if (detailed && plan) it.regions = wrapEnds(doc, it.wall, it.regions);
   }
 
   // Overlaps: the lower priority layer gives way. Ties go to the through wall of a tee, then the
@@ -146,6 +147,46 @@ export function cleanCuts(doc: Document, linework: PlanLinework[], frame: ViewFr
       : null;
     out.set(id, { loops: detailed ? loops : it.regions.map((r) => r.loop), lines: subtractCoincident(loopSegments(loops), otherOutline), regions });
   }
+  return out;
+}
+
+/**
+ * Wrapping at Ends: at a free (unjoined) end, the wrapping side's finish layers — those outside the
+ * structure — carry round the end. The strip across the end, as deep as those layers, takes the
+ * outermost one's material.
+ */
+function wrapEnds(doc: Document, wall: Wall, regions: Region[]): Region[] {
+  const t = wall.typeId ? doc.get<LayeredTypeParams>(wall.typeId)?.params : undefined;
+  const side = t?.wrapEnds;
+  if (!t || !side || side === "none" || !t.layers.length) return regions;
+  const layers = side === "exterior" ? t.layers : [...t.layers].reverse();
+  const core = layers.findIndex((l) => l.function === "structure");
+  const wrap = layers.slice(0, core < 0 ? 1 : core);
+  const depth = wrap.reduce((s, l) => s + l.thickness, 0);
+  const outer = wrap[0];
+  if (!outer || depth <= 0) return regions;
+  const joins = wallJoins(doc, wall);
+  const d = wallDirection(wall);
+  const n = { x: -d.y, y: d.x };
+  const len = Math.hypot(wall.params.end.x - wall.params.start.x, wall.params.end.y - wall.params.start.y);
+  const h = wallThickness(doc, wall) / 2 + 1;
+  const at = (u: number, v: number): [number, number] => [wall.params.start.x + d.x * u + n.x * v, wall.params.start.y + d.y * u + n.y * v];
+  const zones: Ring[] = [];
+  if (!joins.start) zones.push([at(-1, -h), at(depth, -h), at(depth, h), at(-1, h), at(-1, -h)]);
+  if (!joins.end) zones.push([at(len - depth, -h), at(len + 1, -h), at(len + 1, h), at(len - depth, h), at(len - depth, -h)]);
+  if (!zones.length) return regions;
+  const ring = (l: Vec2[]): Ring => [...l.map((q): [number, number] => [q.x, q.y]), [l[0]!.x, l[0]!.y]];
+  const toLoops = (mp: Polygon[]) => mp.flatMap((poly) => poly.slice(0, 1).map((r) => r.slice(0, -1).map(([x, y]) => ({ x, y }))));
+  const out: Region[] = [];
+  const all: Polygon[] = [];
+  for (const r of regions) {
+    out.push(...toLoops(polygonClipping.difference([ring(r.loop)], ...zones.map((z) => [z]))).map((loop) => ({ ...r, loop })));
+    all.push([ring(r.loop)]);
+  }
+  // The end strips: whatever of the wall lies in them, in the wrapping material.
+  const strip = polygonClipping.intersection(polygonClipping.union(all[0]!, ...all.slice(1)), zones.map((z) => [z]));
+  const mat = outer.materialId ?? null;
+  for (const loop of toLoops(strip)) out.push({ loop, materialId: mat ?? undefined, priority: PRIORITY[outer.function] });
   return out;
 }
 

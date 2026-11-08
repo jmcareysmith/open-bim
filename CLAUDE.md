@@ -41,7 +41,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   interface: ribbon, menus, drag and drop), then 8 (MEP & visual programming).
 - Modelling: levels, layered wall/floor/ceiling/roof types with materials, walls (W; auto L/T/X joins,
   Flip), floors/ceilings/roofs from sketches (roofs: per-edge slope or gable), doors (D) and windows (N)
-  as parametric hosted types, wall openings, grids (G), reference planes (R), project units + info.
+  as parametric hosted types, wall openings, shaft openings (Architecture → Opening → Shaft: sketch; cut floors and
+  ceilings between base/top levels via polygon difference — core/model/shafts.ts, kernel `extrudeCut`), grids (G), reference planes (R), project units + info.
 - Kernels: SimpleKernel (extrusions) and OcctKernel (OpenCascade via replicad-opencascadejs, async load;
   boolean wall openings).
 - Views are elements: floor plans per level, reflected ceiling plans (View → Plan ▾; kind `ceilingPlan`, cut 2300

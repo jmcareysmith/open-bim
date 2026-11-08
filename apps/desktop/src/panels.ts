@@ -186,6 +186,7 @@ import {
   type RoofExtrusion,
   type RoofTrims,
   setCurtainEdits,
+  type ShaftParams,
   type InsulationParams,
   wallProfileMapping,
   colorSchemes,
@@ -3224,6 +3225,16 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
             edit(ctx, v ? "Slab edge" : "Remove slab edge", (tx) => setSlabEdge(tx, doc, el.id, v ? { profile: v } : null)),
           ),
         ),
+      );
+      break;
+    }
+    case Cat.Shaft: {
+      const sp = el.params as ShaftParams;
+      sec.append(
+        row("Base level", select(levelOpts, sp.baseLevelId, (v) => update<ShaftParams>("Shaft base", { baseLevelId: v }))),
+        row("Base offset", numberInput(sp.baseOffset, (v) => update<ShaftParams>("Shaft base offset", { baseOffset: v }))),
+        row("Top level", select(levelOpts, sp.topLevelId, (v) => update<ShaftParams>("Shaft top", { topLevelId: v }))),
+        row("Top offset", numberInput(sp.topOffset, (v) => update<ShaftParams>("Shaft top offset", { topOffset: v }))),
       );
       break;
     }

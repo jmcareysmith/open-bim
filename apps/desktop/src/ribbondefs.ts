@@ -123,7 +123,13 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
             { label: "Railing", icon: "railing", tool: "railing" },
           ],
         },
-        { title: "Opening", items: [{ label: "Wall Opening", icon: "opening", tool: "opening", large: true }] },
+        {
+          title: "Opening",
+          items: [
+            { label: "Wall Opening", icon: "opening", tool: "opening", large: true },
+            { label: "Shaft", icon: "opening", tool: "shaft", large: true, title: "Shaft opening: sketch its outline; it cuts floors and ceilings up to the next level" },
+          ],
+        },
         {
           title: "Room & Area",
           items: [

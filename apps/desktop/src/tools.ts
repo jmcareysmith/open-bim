@@ -83,6 +83,7 @@ import {
   setWallCurve,
   createColorFillLegend,
   createInsulation,
+  createShaft,
   type TextNoteParams,
   createAngularDimension,
   createRadialDimension,
@@ -664,7 +665,7 @@ export class ReferencePlaneTool extends DatumLineTool {
 
 // ---- Sketch (floors, ceilings) --------------------------------------------
 
-type SketchKind = "floor" | "ceiling" | "roof" | "region" | "cloud" | "toposolid" | "pad" | "subregion" | "property" | "extrusion" | "blend" | "revolution";
+type SketchKind = "floor" | "ceiling" | "roof" | "region" | "cloud" | "toposolid" | "pad" | "subregion" | "property" | "shaft" | "extrusion" | "blend" | "revolution";
 
 const SKETCH: Record<SketchKind, { category: string; typeCategory: string; label: string }> = {
   floor: { category: Cat.Floor, typeCategory: Cat.FloorType, label: "Floor" },
@@ -676,6 +677,7 @@ const SKETCH: Record<SketchKind, { category: string; typeCategory: string; label
   pad: { category: Cat.BuildingPad, typeCategory: "", label: "Building pad" },
   subregion: { category: Cat.SiteSubregion, typeCategory: "", label: "Subregion" },
   property: { category: Cat.PropertyLine, typeCategory: "", label: "Property line" },
+  shaft: { category: Cat.Shaft, typeCategory: "", label: "Shaft opening" },
   extrusion: { category: Cat.Extrusion, typeCategory: "", label: "Extrusion" },
   blend: { category: Cat.Blend, typeCategory: "", label: "Blend (bottom loop, then top loop)" },
   revolution: { category: Cat.Revolution, typeCategory: "", label: "Revolve (profile right of the centre line)" },
@@ -906,6 +908,14 @@ export class SketchTool implements Tool {
         doc.transact(`Edit ${this.def.label.toLowerCase()} boundary`, (tx) => tx.update(editing, patch));
         id = editing;
       } else {
+        if (this.name === "shaft") {
+          const sh = doc.transact("Create shaft opening", (tx) => createShaft(tx, doc, this.ctx.activeLevelId(), region.boundary));
+          this.reset();
+          this.redraw();
+          this.ctx.setSelection([sh.id]);
+          this.ctx.status("Shaft opening made: it cuts floors and ceilings up to the next level (change in Properties).");
+          return;
+        }
         if (this.name === "property") {
           const pl = doc.transact("Create property line", (tx) => createPropertyLine(tx, region.boundary));
           this.reset();

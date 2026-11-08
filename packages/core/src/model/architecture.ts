@@ -39,6 +39,7 @@ export const Cat = {
   AngularDimension: "AngularDimension",
   RadialDimension: "RadialDimension",
   Insulation: "Insulation",
+  Shaft: "Shaft",
   Material: "Material",
   ViewFilter: "ViewFilter",
   ViewTemplate: "ViewTemplate",

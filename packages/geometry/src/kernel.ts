@@ -1,3 +1,4 @@
+import polygonClipping from "polygon-clipping";
 import { buildMepSymbol, setSymbolSolids } from "./mepsymbols.ts";
 import { buildMassFloorLines } from "./massfloors.ts";
 import { buildDuct, buildDuctFitting, buildDuctFittingLines, buildDuctLines } from "./ducts.ts";
@@ -12,6 +13,8 @@ import {
   floorThickness,
   floorTopPlane,
   floorTopAt,
+  shaftsCutting,
+  type ShaftParams,
   floorShapeSurface,
   SLAB_EDGE_PROFILES,
   wallExtent,
@@ -194,7 +197,8 @@ function floorBody(doc: Document, floor: Floor): MeshData | null {
     // Sloped (slope arrow): a flat slab sheared onto the top plane, so it keeps its thickness vertically.
     const plane = floorTopPlane(doc, floor);
     const thick = floorThickness(doc, floor);
-    const mesh = extrudePolygon(floor.params.boundary, floor.params.holes, -thick, 0);
+    const fe = floorExtent(doc, floor);
+    const mesh = extrudeCut(doc, floor.params.boundary, floor.params.holes, -thick, 0, fe.bottom, fe.top);
     const { positions: pos, normals: nor } = mesh;
     const k = Math.hypot(plane.gx, plane.gy, 1);
     for (let i = 0; i < pos.length; i += 3) {
@@ -211,7 +215,23 @@ function floorBody(doc: Document, floor: Floor): MeshData | null {
     return mesh;
   }
   const { bottom, top } = floorExtent(doc, floor);
-  return extrudePolygon(floor.params.boundary, floor.params.holes, bottom, top);
+  return extrudeCut(doc, floor.params.boundary, floor.params.holes, bottom, top);
+}
+
+/**
+ * Extrude an outline (with holes) less any shafts crossing [cutZ0, cutZ1] (default: the extrusion's
+ * own height), as one mesh of however many pieces are left.
+ */
+function extrudeCut(doc: Document, boundary: Vec2[], holes: Vec2[][], z0: number, z1: number, cutZ0 = z0, cutZ1 = z1): MeshData {
+  const shafts = shaftsCutting(doc, cutZ0, cutZ1);
+  if (!shafts.length) return extrudePolygon(boundary, holes, z0, z1);
+  const ring = (l: Vec2[]): [number, number][] => [...l.map((q): [number, number] => [q.x, q.y]), [l[0]!.x, l[0]!.y]];
+  const rest = polygonClipping.difference([ring(boundary), ...holes.map(ring)], ...shafts.map((s) => [ring(s)]));
+  const pieces = rest.map((poly) => {
+    const [outer, ...inner] = poly.map((r) => r.slice(0, -1).map(([x, y]) => ({ x, y })));
+    return extrudePolygon(outer!, inner, z0, z1);
+  });
+  return pieces.length ? mergeMeshes(pieces) : { positions: new Float32Array(), normals: new Float32Array(), indices: new Uint32Array() };
 }
 
 /** Plan symbol for a sloped floor: its slope arrow, tail to head, with the fall as 1:n. */
@@ -239,7 +259,7 @@ export function buildFloorLines(doc: Document, el: Element): LineData | null {
 export function buildCeiling(doc: Document, el: Element): MeshData | null {
   const ceiling = el as Ceiling;
   const { bottom, top } = ceilingExtent(doc, ceiling);
-  return extrudePolygon(ceiling.params.boundary, ceiling.params.holes, bottom, top);
+  return extrudeCut(doc, ceiling.params.boundary, ceiling.params.holes, bottom, top);
 }
 
 export class SimpleKernel implements GeometryKernel {
@@ -293,6 +313,7 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.AngularDimension, buildAnnotationLines],
     [Cat.RadialDimension, buildAnnotationLines],
     [Cat.Insulation, buildAnnotationLines],
+    [Cat.Shaft, (_d, e) => buildShaftLines(e)],
     [Cat.ColorFillLegend, (d, e) => buildColorFillLegendLines(d, e)],
     [Cat.Dimension, buildAnnotationLines],
     [Cat.Room, buildRoomLines],
@@ -357,3 +378,18 @@ export class SimpleKernel implements GeometryKernel {
 // MEP plan symbols size themselves from the instance's solid.
 let symbolKernel: SimpleKernel | null = null;
 setSymbolSolids((doc, el) => (symbolKernel ??= new SimpleKernel()).build(doc, el));
+
+/** Shaft in plan: its outline and a cross through it (Revit's opening symbol). */
+export function buildShaftLines(el: Element): LineData {
+  const b = (el.params as ShaftParams).boundary;
+  const seg: number[] = [];
+  b.forEach((a, i) => {
+    const c = b[(i + 1) % b.length]!;
+    seg.push(a.x, a.y, 0, c.x, c.y, 0);
+  });
+  const xs = b.map((q) => q.x);
+  const ys = b.map((q) => q.y);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  seg.push(x0, y0, 0, x1, y1, 0, x0, y1, 0, x1, y0, 0);
+  return { segments: new Float32Array(seg), labels: [], planOnly: true };
+}

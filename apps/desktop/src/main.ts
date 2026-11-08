@@ -506,6 +506,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   pad: new SketchTool(ctx, "pad"),
   subregion: new SketchTool(ctx, "subregion"),
   property: new SketchTool(ctx, "property"),
+  shaft: new SketchTool(ctx, "shaft"),
   text: new TextTool(ctx),
   dimension: new DimensionTool(ctx),
   room: new RoomTool(ctx),

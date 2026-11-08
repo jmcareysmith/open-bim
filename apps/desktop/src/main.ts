@@ -1091,6 +1091,14 @@ const commands: Record<string, () => void | Promise<void>> = {
     if (v) ctx.setActiveView(v.id);
     else status("\u26a0 No floor plan for this level");
   },
+  wallStraight() {
+    (tools.wall as WallTool).arc = false;
+    setTool("wall");
+  },
+  wallArc() {
+    (tools.wall as WallTool).arc = true;
+    setTool("wall");
+  },
   importKeynotes: () => ctx.importKeynotes(),
   exportKeynotes: () => ctx.exportKeynotes(),
   colorSchemes: () => {

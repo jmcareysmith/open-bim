@@ -1,4 +1,4 @@
-import {
+import { arcPoints,
   classificationInfo,
   evaluate,
   familyValues,
@@ -49,29 +49,58 @@ const BUBBLE_SEGMENTS = 32;
 export function buildGridLines(_doc: Document, el: Element, scale = 100): LineData {
   const g = el as Grid;
   const { start, end } = g.params;
-  const len = Math.hypot(end.x - start.x, end.y - start.y);
-  const ux = (end.x - start.x) / len;
-  const uy = (end.y - start.y) / len;
+  // Along the grid (straight, or its arc): distance → point, by the path's cumulative length.
+  const path = arcPoints(start, end, g.params.curve, Math.PI / 90);
+  const cum = [0];
+  for (let i = 1; i < path.length; i++) cum.push(cum[i - 1]! + Math.hypot(path[i]!.x - path[i - 1]!.x, path[i]!.y - path[i - 1]!.y));
+  const len = cum[cum.length - 1]!;
   const k = scale / 100;
   const r = GRID_BUBBLE_RADIUS * k;
   // Dash-dot-dash centre line with short solid ends at the bubbles (Revit's default grid).
   const seg: number[] = [];
-  const at = (t: number) => [start.x + ux * t, start.y + uy * t, 0];
+  const at = (t: number) => {
+    let i = 1;
+    while (i < path.length - 1 && cum[i]! < t) i++;
+    const a = path[i - 1]!;
+    const b = path[i]!;
+    const f = cum[i]! - cum[i - 1]! > 0 ? (t - cum[i - 1]!) / (cum[i]! - cum[i - 1]!) : 0;
+    return [a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f, 0];
+  };
+  const tangent = (a: Vec2, b: Vec2) => {
+    const l = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    return { x: (b.x - a.x) / l, y: (b.y - a.y) / l };
+  };
+  const tStart = tangent(path[0]!, path[1]!);
+  const tEnd = tangent(path[path.length - 2]!, path[path.length - 1]!);
+  // Dashes on a curved grid follow it, piece by piece.
+  const dash = (t0: number, t1: number) => {
+    let t = t0;
+    while (t < t1 - 1e-6) {
+      let i = 1;
+      while (i < path.length - 1 && cum[i]! <= t) i++;
+      const next = Math.min(t1, cum[i]!);
+      seg.push(...at(t), ...at(next));
+      t = next;
+    }
+  };
   const ends = len > 4 * GRID_END * k ? GRID_END * k : 0;
-  if (ends) seg.push(...at(0), ...at(ends), ...at(len - ends), ...at(len));
+  if (ends) {
+    dash(0, ends);
+    dash(len - ends, len);
+  }
   let t = ends;
   for (let i = 0; t < len - ends; i++) {
     const d = GRID_DASH[i % GRID_DASH.length]! * k;
-    if (i % 2 === 0) seg.push(...at(t), ...at(Math.min(len - ends, t + d)));
+    if (i % 2 === 0) dash(t, Math.min(len - ends, t + d));
     t += d;
   }
   const labels: LineData["labels"] = [];
-  for (const [p, s] of [
-    [start, -1],
-    [end, 1],
+  for (const [p, s, u] of [
+    [start, -1, tStart],
+    [end, 1, tEnd],
   ] as const) {
-    const cx = p.x + ux * r * s;
-    const cy = p.y + uy * r * s;
+    const cx = p.x + u.x * r * s;
+    const cy = p.y + u.y * r * s;
     for (let i = 0; i < BUBBLE_SEGMENTS; i++) {
       const a0 = (i / BUBBLE_SEGMENTS) * 2 * Math.PI;
       const a1 = ((i + 1) / BUBBLE_SEGMENTS) * 2 * Math.PI;

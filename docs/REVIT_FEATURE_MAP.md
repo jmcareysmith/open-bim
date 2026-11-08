@@ -22,7 +22,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Feature | Phase | Status |
 |---|---|---|
 | Levels | 0 | 🟨 |
-| Grids | 1 | 🟨 |
+| Grids | 1 | ✅ (straight or arc; arc grids not in sections or dimensions yet) |
 | Reference planes | 1 | ✅ |
 | Scope boxes | 2 | ⬜ |
 
@@ -30,6 +30,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Feature | Phase | Status |
 |---|---|---|
 | Basic walls (layered compound structure) | 0–1 | 🟨 |
+| Curved (arc) walls | 8b | 🟨 (Wall ▾ Arc or Properties → Curve; no joins, hosted openings, sweeps or curtain/stacked types on arcs yet) |
 | Wall joins, cleanup, wall attach top/base | 1 | ✅ (plan cleanup by layer priority; disallow join; crossing walls) |
 | Stacked walls | 6 | ✅ |
 | Wall sweeps and reveals, Edit Profile | 8b | ✅ (type and instance; built-in profiles; profile by presets/points, not sketched in elevation yet) |

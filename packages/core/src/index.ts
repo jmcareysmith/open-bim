@@ -66,3 +66,4 @@ export * from "./model/sweeps.ts";
 export * from "./model/spots.ts";
 export * from "./model/colorschemes.ts";
 export * from "./model/floorshape.ts";
+export * from "./model/arcs.ts";

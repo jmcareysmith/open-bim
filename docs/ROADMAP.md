@@ -117,9 +117,9 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Dimensions in sections/elevations, temporary dimensions while placing, spot elevations
 - [x] Room colour schemes with colour fill legends
 - [x] Floor shape editing (points, falls to drains), slab edges
-- [ ] Curved walls and grids (arcs)
+- [x] Curved walls and grids (arcs)
 
-## Phase 8 — MEP & visual programming (rest paused for 8b)
+## Phase 8 — MEP & visual programming (next: 8b is done)
 - [x] Connectors and MEP systems (supply/return air, cold/hot water, sanitary, power); system browser
 - [x] Ducts with auto fittings (elbows, tees, transitions), round/rectangular types, sizing from airflow
 - [x] Pipes with auto fittings, falls on waste pipes, pipe materials

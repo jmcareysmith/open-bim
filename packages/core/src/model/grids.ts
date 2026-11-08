@@ -10,6 +10,8 @@ export type GridParams = {
   /** Plan mm. The bubble/label sits at both ends. */
   start: Vec2;
   end: Vec2;
+  /** Curved grids: the arc's sagitta, mm (see model/arcs.ts). */
+  curve?: number | null;
 };
 export type Grid = Element<GridParams>;
 

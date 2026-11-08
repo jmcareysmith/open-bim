@@ -166,6 +166,7 @@ export function resolveRef(doc: Document, ref: DimRef, viewId?: ElementId): Reso
     }
     case "datum": {
       const g = doc.require<DatumLineParams>(ref.id);
+      if ((g.params as { curve?: number | null }).curve) throw new Error("Curved grids can't be dimensioned yet");
       return { point: g.params.start, dir: unit({ x: g.params.end.x - g.params.start.x, y: g.params.end.y - g.params.start.y }) };
     }
     case "level": {

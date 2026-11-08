@@ -78,6 +78,9 @@ import {
   resolveRef,
   curtainOf,
   createSpotElevation,
+  arcBand,
+  arcLength,
+  setWallCurve,
   createColorFillLegend,
   SPOT_HOSTS,
   refPoint,
@@ -412,18 +415,35 @@ const SNAP_LABEL: Record<Snapped["kind"], string> = {
 export class WallTool implements Tool {
   readonly name = "wall";
   private start: Vec2 | null = null;
+  /** Start-End-Radius Arc: after the end, a third click sets how far the wall bows. */
+  arc = false;
+  private end: Vec2 | null = null;
 
   constructor(private ctx: ToolContext) {}
 
   activate(): void {
     this.start = null;
-    this.ctx.status("Wall: click start point, then end point. Walls chain; Esc to finish. Shift = free angle.");
+    this.end = null;
+    this.ctx.status(
+      this.arc
+        ? "Wall (arc): click the start, the end, then how far it bows. Walls chain; Esc to finish."
+        : "Wall: click start point, then end point. Walls chain; Esc to finish. Shift = free angle.",
+    );
   }
 
   deactivate(): void {
     this.start = null;
+    this.end = null;
     this.ctx.viewport.setPreview(null);
     this.ctx.viewport.setPreviewLines(null);
+  }
+
+  /** The arc's sagitta for a cursor at `p`: its offset from the chord, at most a semicircle. */
+  private curveFor(a: Vec2, b: Vec2, p: Vec2): number {
+    const c = Math.hypot(b.x - a.x, b.y - a.y);
+    const n = { x: -(b.y - a.y) / c, y: (b.x - a.x) / c };
+    const d = (p.x - (a.x + b.x) / 2) * n.x + (p.y - (a.y + b.y) / 2) * n.y;
+    return Math.round(Math.max(-c / 2, Math.min(c / 2, d)));
   }
 
   private levelElevation(): number {
@@ -449,13 +469,13 @@ export class WallTool implements Tool {
     const p = this.point(ev);
     if (!p || !this.start) {
       this.ctx.viewport.setPreview(null);
-    this.ctx.viewport.setPreviewLines(null);
+      this.ctx.viewport.setPreviewLines(null);
       return;
     }
     const len = Math.hypot(p.x - this.start.x, p.y - this.start.y);
     if (len < 1) {
       this.ctx.viewport.setPreview(null);
-    this.ctx.viewport.setPreviewLines(null);
+      this.ctx.viewport.setPreviewLines(null);
       return;
     }
     const typeId = this.ctx.activeTypeId(Cat.WallType);
@@ -464,6 +484,15 @@ export class WallTool implements Tool {
     const z0 = this.levelElevation();
     const top = this.topLevelId();
     const z1 = top ? this.ctx.doc.require<LevelParams>(top).params.elevation : z0 + 2400;
+    if (this.arc && this.end) {
+      // Third click of an arc: the wall bows through the cursor.
+      const curve = this.curveFor(this.start, this.end, p);
+      const band = curve ? arcBand(this.start, this.end, curve, totalThickness(type) / 2) : wallFootprint(this.start, this.end, totalThickness(type));
+      this.ctx.viewport.setPreview(extrudePolygon(band, [], z0, z1));
+      this.ctx.viewport.setPreviewLines(null);
+      this.ctx.status(`Wall (arc): curve ${formatLength(Math.abs(curve), projectUnits(this.ctx.doc))}, length ${formatLength(arcLength(this.start, this.end, curve), projectUnits(this.ctx.doc))}`);
+      return;
+    }
     this.ctx.viewport.setPreview(extrudePolygon(wallFootprint(this.start, p, totalThickness(type)), [], z0, z1));
     this.ctx.viewport.setPreviewLines(tempDimension(this.ctx, this.start, p));
     this.ctx.status(`Wall length: ${formatLength(len, projectUnits(this.ctx.doc))}${SNAP_LABEL[this.snapped!.kind]}`);
@@ -476,25 +505,41 @@ export class WallTool implements Tool {
       this.start = p;
       return;
     }
-    if (Math.hypot(p.x - this.start.x, p.y - this.start.y) < 10) return;
+    if (this.arc && !this.end) {
+      if (Math.hypot(p.x - this.start.x, p.y - this.start.y) < 10) return;
+      this.end = p;
+      this.ctx.status("Wall (arc): click how far it bows (either side).");
+      return;
+    }
+    const end = this.arc ? this.end! : p;
+    if (Math.hypot(end.x - this.start.x, end.y - this.start.y) < 10) return;
     const start = this.start;
+    const curve = this.arc ? this.curveFor(start, end, p) : 0;
     let wall: Wall | undefined;
-    this.ctx.doc.transact("Create wall", (tx) => {
-      const typeId = this.ctx.activeTypeId(Cat.WallType);
-      if (!typeId) throw new Error("No wall types in this project");
-      wall = createWall(tx, typeId, start, p, this.ctx.activeLevelId(), {
-        topLevelId: this.topLevelId(),
+    try {
+      this.ctx.doc.transact("Create wall", (tx) => {
+        const typeId = this.ctx.activeTypeId(Cat.WallType);
+        if (!typeId) throw new Error("No wall types in this project");
+        wall = createWall(tx, typeId, start, end, this.ctx.activeLevelId(), {
+          topLevelId: this.topLevelId(),
+        });
+        if (curve) setWallCurve(tx, this.ctx.doc, wall.id, curve);
       });
-    });
-    this.start = p;
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+      return;
+    }
+    this.start = end;
+    this.end = null;
     if (wall) this.ctx.setSelection([wall.id]);
   }
 
   key(ev: KeyboardEvent): boolean {
     if (ev.key === "Escape" && this.start) {
       this.start = null;
+      this.end = null;
       this.ctx.viewport.setPreview(null);
-    this.ctx.viewport.setPreviewLines(null);
+      this.ctx.viewport.setPreviewLines(null);
       this.ctx.status("Wall: click start point.");
       return true;
     }

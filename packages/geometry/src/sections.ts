@@ -134,6 +134,7 @@ export function sectionAnnotations(doc: Document, view: View): LineData {
   }
   const r = GRID_BUBBLE_RADIUS;
   for (const g of doc.byCategory<GridParams>(Cat.Grid)) {
+    if (g.params.curve) continue; // curved grids: not in sections yet
     const x = crossing(view, g.params.start, g.params.end);
     if (x === null || x < crop.min.x || x > crop.max.x) continue;
     line({ x, y: crop.min.y }, { x, y: crop.max.y });

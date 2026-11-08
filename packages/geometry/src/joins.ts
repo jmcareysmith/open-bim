@@ -1,4 +1,4 @@
-import {
+import { arcBand,
   wallDirection,
   wallEndPoint,
   wallJoins,
@@ -66,6 +66,8 @@ function meet(f: EndFrame, s: 1 | -1, line: Line, limit: number): Vec2 {
  * matching cut points, so joined footprints tile without overlaps or gaps.
  */
 export function joinedWallFootprint(doc: Document, wall: Wall): Vec2[] {
+  // Curved walls: the band along their arc (no joins yet).
+  if (wall.params.curve) return arcBand(wall.params.start, wall.params.end, wall.params.curve, wallThickness(doc, wall) / 2);
   const joins = wallJoins(doc, wall);
   // Each cap runs from its frame's left face to its right face; end then start gives a CCW loop.
   return [...endCap(doc, wall, "end", joins.end), ...endCap(doc, wall, "start", joins.start)];

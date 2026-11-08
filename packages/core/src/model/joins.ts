@@ -35,6 +35,7 @@ export function wallDirection(wall: Wall): Vec2 {
 
 /** How each end of `wall` joins its neighbours. */
 export function wallJoins(doc: Document, wall: Wall): Record<WallEnd, WallJoin | null> {
+  if (wall.params.curve) return { start: null, end: null };
   const others = joinCandidates(doc, wall);
   return { start: joinAt(doc, wall, "start", others), end: joinAt(doc, wall, "end", others) };
 }
@@ -115,7 +116,7 @@ function teeDistance(p: Vec2, dir: Vec2, target: Wall, half: number): number | n
 function joinCandidates(doc: Document, wall: Wall): Wall[] {
   const range = zRange(doc, wall);
   return doc.byCategory<WallParams>(Cat.Wall).filter((o) => {
-    if (o.id === wall.id) return false;
+    if (o.id === wall.id || o.params.curve) return false;
     const r = zRange(doc, o);
     if (!range || !r) return true;
     return Math.min(range[1], r[1]) > Math.max(range[0], r[0]);

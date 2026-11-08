@@ -12,7 +12,7 @@ const REVEAL_OVERSHOOT = 2;
 export function wallSweepSolids(doc: Document, wall: Wall): { sweeps: MeshData[]; reveals: MeshData[] } {
   const out = { sweeps: [] as MeshData[], reveals: [] as MeshData[] };
   const list = wallSweeps(doc, wall);
-  if (!list.length) return out;
+  if (!list.length || wall.params.curve) return out;
   const { bottom, top } = wallExtent(doc, wall);
   if (top <= bottom) return out;
   const d = wallDirection(wall);
@@ -86,7 +86,7 @@ export function wallSweepSolids(doc: Document, wall: Wall): { sweeps: MeshData[]
 /** Edit Profile: the wall as its elevation outline through its thickness (joins don't trim it). */
 export function wallProfileMesh(doc: Document, wall: Wall): MeshData | null {
   const prof = wall.params.profile;
-  if (!prof || prof.length < 3) return null;
+  if (!prof || prof.length < 3 || wall.params.curve) return null;
   const { bottom } = wallExtent(doc, wall);
   const d = wallDirection(wall);
   const nl = { x: -d.y, y: d.x };

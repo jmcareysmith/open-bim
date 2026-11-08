@@ -98,7 +98,7 @@ export function buildWall(doc: Document, el: Element): MeshData | null {
   const segments = stackSegments(doc, wall);
   if (segments.length) return buildStackedWall(doc, wall, segments);
   // Attached under a sloped roof: the top follows it.
-  const body = wallProfileMesh(doc, wall) ?? (hasSlopedTop(doc, wall) ? slopedTopWallMesh(doc, wall) : extrudePolygon(joinedWallFootprint(doc, wall), [], bottom, top));
+  const body = wallProfileMesh(doc, wall) ?? (hasSlopedTop(doc, wall) && !wall.params.curve ? slopedTopWallMesh(doc, wall) : extrudePolygon(joinedWallFootprint(doc, wall), [], bottom, top));
   return withSweeps(doc, wall, body);
 }
 

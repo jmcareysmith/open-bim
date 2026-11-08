@@ -85,6 +85,7 @@ export function wallCuts(doc: Document, wall: Wall): WallCut[] {
 export function validateHosted(doc: Document, p: HostedParams): void {
   const host = doc.get<WallParams>(p.hostId);
   if (!host || host.category !== Cat.Wall) throw new Error("Openings must be hosted by a wall");
+  if (host.params.curve) throw new Error("Curved walls can't host doors, windows or openings yet");
   if (!(p.width > 0) || !(p.height > 0)) throw new Error("Opening width and height must be positive");
   if (p.sillHeight < 0) throw new Error("Sill height can't be below the wall base");
   const len = wallLength(host);

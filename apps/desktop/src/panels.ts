@@ -187,6 +187,9 @@ import {
   type RoofTrims,
   setCurtainEdits,
   colorSchemes,
+  setWallCurve,
+  setGridCurve,
+  arcLength,
   setFloorShape,
   setSlabEdge,
   SLAB_EDGE_PROFILES,
@@ -2643,6 +2646,14 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         sec.append(...curtainRows(ctx, w));
         break;
       }
+      // Curve (Revit: an arc wall): how far its middle bows off the straight line, mm; 0 = straight.
+      sec.append(
+        row(
+          "Curve",
+          numberInput(p.curve ?? 0, (v) => edit(ctx, v ? "Curve wall" : "Straighten wall", (tx) => setWallCurve(tx, doc, w.id, v || null))),
+        ),
+      );
+      if (p.curve) sec.append(row("Arc length", len(arcLength(p.start, p.end, p.curve))));
       sec.append(...profileRows(ctx, w));
       sec.append(...sweepRows(ctx, w));
       sec.append(...bracingRows(ctx, w));
@@ -3203,7 +3214,8 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       const { start, end } = el.params as GridParams;
       sec.append(
         row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename grid", (tx) => renameGrid(tx, doc, el.id, v)))),
-        row("Length", len(Math.hypot(end.x - start.x, end.y - start.y))),
+        row("Length", len(arcLength(start, end, (el.params as GridParams).curve))),
+        row("Curve", numberInput((el.params as GridParams).curve ?? 0, (v) => edit(ctx, v ? "Curve grid" : "Straighten grid", (tx) => setGridCurve(tx, doc, el.id, v || null)))),
       );
       break;
     }

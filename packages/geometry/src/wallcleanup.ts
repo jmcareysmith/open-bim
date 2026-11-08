@@ -151,7 +151,7 @@ export function cleanCuts(doc: Document, linework: PlanLinework[], frame: ViewFr
 
 /** Walls that join and clean: plain layered walls (not curtain or stacked). */
 function cleanable(doc: Document, wall: Wall): boolean {
-  if (wall.category !== Cat.Wall || !wall.typeId) return false;
+  if (wall.category !== Cat.Wall || !wall.typeId || (wall as Wall).params.curve) return false;
   const t = doc.get<LayeredTypeParams>(wall.typeId)?.params;
   return !!t && !t.curtain && !t.stack?.length && t.layers.length > 0;
 }

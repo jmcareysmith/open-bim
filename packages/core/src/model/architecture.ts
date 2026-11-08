@@ -332,6 +332,8 @@ export type WallParams = {
   disallowJoin?: { start?: boolean; end?: boolean } | null;
   /** This wall's own sweeps and reveals (the type's come first; see model/sweeps.ts). */
   sweeps?: WallSweep[] | null;
+  /** Curved walls: the arc's sagitta, mm, positive to the left of start → end (see model/arcs.ts). */
+  curve?: number | null;
   /** Curtain walls: this wall's grid lines, mullion segments and panel swaps. */
   curtainEdits?: CurtainEdits | null;
   /** Edit Profile: the wall's elevation outline (x along from its start, y up from its base, mm); a rectangle when unset. */

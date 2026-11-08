@@ -86,7 +86,17 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
         {
           title: "Build",
           items: [
-            { label: "Wall", icon: "wall", tool: "wall", large: true, title: "Wall (W)" },
+            {
+              label: "Wall",
+              icon: "wall",
+              tool: "wall",
+              large: true,
+              title: "Wall (W) (\u25be: straight or arc)",
+              menu: () => [
+                { label: "Wall: Straight", action: () => m.cmd("wallStraight") },
+                { label: "Wall: Arc (start, end, bow)", action: () => m.cmd("wallArc") },
+              ],
+            },
             { label: "Door", icon: "door", tool: "door", large: true, title: "Door (D)" },
             { label: "Window", icon: "window", tool: "window", large: true, title: "Window (N)" },
             { label: "Component", icon: "component", tool: "component", large: true, title: "Place a loaded family (C)", menu: libraryMenu },

@@ -119,7 +119,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Wall join cleanup in plans (`geometry/src/wallcleanup.ts`): layers give way by priority (structure
   first), tee stems' cores run to the through wall's core, crossing walls clean (thicker wins), no
   lines between joined walls of the same material. Disallow Join per end (Properties / right-click).
-- Known gaps: join cleanup is plan-only (3D solids overlap at crossings); grids straight only;
+- Known gaps: join cleanup is plan-only (3D solids overlap at crossings); arc walls don't join or host openings;
   floors: Pick Walls (sketch options strip: face/core/centre line + offset) and slope arrows (floor
   Properties → Add slope arrow; tail/head heights; plane top, sheared slab, 1:n arrow in plan); roofs exact for convex/L/T/U only; doors/windows parametric;
   no angular/radial dimensions.
@@ -253,4 +253,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Floor shape editing (core/model/floorshape.ts): floor Properties → Shape editing: Add Point (click on the
   floor; height, e.g. −20 drain), points list, Reset Shape; top triangulated through points (floorTopAt via
   hook), bottom flat. Slab edge (thickening/rebated/nosing profiles) along the outline.
-- Next (Jeremy, 2026-10-14): Phase 8b — Revit look & architectural parity, before the rest of 8.
+- Curved walls and grids (core/model/arcs.ts: `curve` = sagitta, + left): Wall ▾ Arc (start, end, bow) or
+  Properties → Curve; arc walls' footprint is the band along the arc (no joins/cleanup, openings refused,
+  no sweeps/profile, not curtain/stacked); grids draw dashes and bubbles along the arc (skipped in sections
+  and dimensions). Selected arc walls' grips/length label still use the chord.
+- Phase 8b is done (2026-11-09). Next: rest of Phase 8 (visual programming) unless Jeremy reprioritises.

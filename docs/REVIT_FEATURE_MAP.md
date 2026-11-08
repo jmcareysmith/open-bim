@@ -40,7 +40,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Ceilings | 1 | 🟨 |
 | Doors & windows (hosted, cut openings) | 1 | 🟨 |
 | Openings (shaft, wall, vertical) | 1 | 🟨 |
-| Stairs (run, landing, sketch) & railings | 6 | ✅ (multi-run L/U with landings; winders at square turns (2–4); no curved runs) |
+| Stairs (run, landing, sketch) & railings | 6 | ✅ (multi-run L/U with landings; winders at square turns (2–4); curved runs (per-run curve)) |
 | Ramps | 6 | ✅ |
 | Components / furniture (loadable families) | 3 | ✅ |
 | Model in-place | 3 | ⬜ |

@@ -154,7 +154,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - glTF (.glb) and OBJ (+MTL, zipped) export.
 - Stairs (Stair tool: run ends, Enter; D1/AS1 checks), ramps (1:12 check), railings (sketched or
   on stairs/ramps, F4/AS1 gap). Runs are straight; L/U by drawing runs; stair Properties → Turns: landings or 2–4 winders per square turn
-  (provisional walking-line going check); railings round the corners. No curved runs.
+  (provisional walking-line going check); railings round the corners. Curved runs: stair Properties → Run n
+  curve (wedge treads along the arc, walking-line going check, railings and walking line follow).
 - Curtain walls: wall type "Curtain Wall - Aluminium 1200 x 1500" (grid, mullion type rectangular/circular, border
   mullions in type properties). Per wall (Properties → Curtain grid and panels): elevation diagram (click panel
   = glass → solid → empty → door; click grid line = remove/restore segment), typed line positions; `curtainEdits`.

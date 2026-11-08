@@ -2757,6 +2757,16 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Risers", `${L.risers} \u00d7 ${L.riser.toFixed(1)} mm`),
         row("Going", len(L.going)),
         row("Runs", L.runs.map((r) => r.risers).join(" + ")),
+        ...p.runs.map((r, i) =>
+          row(
+            `Run ${i + 1} curve`,
+            numberInput(r.curve ?? 0, (v) => {
+              const c = Math.hypot(r.end.x - r.start.x, r.end.y - r.start.y);
+              if (Math.abs(v) > c / 2) return ctx.status("\u26a0 A run can bow out at most half its length (a semicircle)");
+              update<StairParams>(v ? "Curve stair run" : "Straighten stair run", { runs: p.runs.map((x, j) => (j === i ? { ...x, curve: v || null } : x)) });
+            }),
+          ),
+        ),
         row(
           "Turns",
           select(

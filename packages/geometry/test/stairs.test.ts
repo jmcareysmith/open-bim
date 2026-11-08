@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Document, applyResidentialTemplate, createStair, ensureStairType, stairLayout, type StairTypeParams, type StairParams } from "@open-bim/core";
+import { Document, applyResidentialTemplate, arcLength, createStair, ensureStairType, stairLayout, type StairTypeParams, type StairParams } from "@open-bim/core";
 import { SimpleKernel, boundingBox, buildStairLines, meshVolume } from "../src/index.ts";
 
 function setup() {
@@ -67,6 +67,28 @@ describe("stairs", () => {
     for (const w of L.winders) expect(w.boundary[0]).toEqual({ x: 1960, y: 450 });
     expect(L.checks.some((c) => c.label.startsWith("Winder going"))).toBe(true);
     expect(boundingBox(new SimpleKernel().build(doc, doc.require(s.id))!).max[2]).toBeCloseTo(2700);
+  });
+
+  it("curved runs spread their treads along the arc; railings follow it", () => {
+    const { doc, ids, typeId } = setup();
+    // A quarter-ish arc: 4000 chord bowing 1500.
+    const s = doc.transact("Stair", (tx) => createStair(tx, doc, typeId, ids.levels.ground, ids.levels.first, [{ start: { x: 0, y: 0 }, end: { x: 6000, y: 0 } }]));
+    doc.transact("Curve", (tx) => tx.update<StairParams>(s.id, { runs: [{ start: { x: 0, y: 0 }, end: { x: 6000, y: 0 }, curve: 1500 }] }));
+    const L = stairLayout(doc, doc.require(s.id) as never);
+    const run = L.runs[0]!;
+    expect(run.arc).toBeTruthy();
+    expect(run.risers).toBe(15);
+    expect(run.length).toBeCloseTo(arcLength({ x: 0, y: 0 }, { x: 6000, y: 0 }, 1500), 3);
+    expect(L.checks.some((c) => c.label.startsWith("Curved run going"))).toBe(true);
+    const bb = boundingBox(new SimpleKernel().build(doc, doc.require(s.id))!);
+    // The top tread is a riser below the floor; the last riser steps onto it.
+    expect(bb.max[2]).toBeCloseTo(14 * 180);
+    // Bows up to 1500 at its middle, plus half the width.
+    expect(bb.max[1]).toBeCloseTo(1500 + 450, -1);
+    const lines = buildStairLines(doc, doc.require(s.id))!;
+    let maxY = 0;
+    for (let i = 1; i < lines.segments.length; i += 3) maxY = Math.max(maxY, lines.segments[i]!);
+    expect(maxY).toBeCloseTo(1500, 0);
   });
 
   it("builds when a run has a single riser", () => {

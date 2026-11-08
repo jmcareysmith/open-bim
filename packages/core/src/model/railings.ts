@@ -3,6 +3,7 @@ import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
 import { Cat, type LevelParams } from "./architecture.ts";
 import { DEFAULT_STAIR_TYPE, stairLayout, type Stair, type StairTypeParams } from "./stairs.ts";
+import { arcInfo, arcPoints } from "./arcs.ts";
 import { rampLayout, type Ramp } from "./ramps.ts";
 
 // Railings (Revit: Railing — sketch path, or placed on a stair). A railing follows a 3D path: a
@@ -84,6 +85,21 @@ export function railingPath(doc: Document, r: Railing): { x: number; y: number; 
     const off = (width / 2 - EDGE_INSET) * (p.side === "left" ? 1 : -1);
     const out: { x: number; y: number; z: number }[] = [];
     L.runs.forEach((run, i) => {
+      if (run.arc) {
+        // Curved: the edge arc, rising from the first nosing to the last.
+        const info = arcInfo(run.arc.start, run.arc.end, run.arc.curve)!;
+        const pts = arcPoints(run.arc.start, run.arc.end, run.arc.curve, Math.PI / 36);
+        // Left of travel is away from the centre when the arc bows left.
+        const sgn = Math.sign(run.arc.curve) * (off > 0 ? 1 : -1);
+        const z0 = run.z0 + L.riser;
+        const z1 = run.z0 + run.risers * L.riser;
+        pts.forEach((q, k) => {
+          const ux = (q.x - info.center.x) / info.radius;
+          const uy = (q.y - info.center.y) / info.radius;
+          out.push({ x: q.x + ux * Math.abs(off) * sgn, y: q.y + uy * Math.abs(off) * sgn, z: z0 + ((z1 - z0) * k) / (pts.length - 1) });
+        });
+        return;
+      }
       const n = { x: -run.dir.y, y: run.dir.x };
       const at = (u: number) => ({ x: run.start.x + run.dir.x * u + n.x * off, y: run.start.y + run.dir.y * u + n.y * off });
       // Along the nosing line: tread j's nose is at u = j·G, height z0 + (j+1)·R.

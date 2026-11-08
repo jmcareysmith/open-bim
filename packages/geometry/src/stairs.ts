@@ -1,4 +1,4 @@
-import { stairLayout, type Document, type Element, type Stair, type StairTypeParams, type Vec2 } from "@open-bim/core";
+import { arcInfo, arcPoints, stairLayout, tangentLine, type Document, type Element, type Stair, type StairTypeParams, type Vec2 } from "@open-bim/core";
 import type { LineData } from "./datums.ts";
 import { mergeMeshes } from "./doors.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
@@ -38,6 +38,35 @@ export function buildStair(doc: Document, el: Element): MeshData | null {
   for (const r of L.runs) {
     // A run of one riser has no tread: it's just the step up to the landing or floor edge.
     if (r.treads < 1) continue;
+    if (r.arc) {
+      // Curved: each tread a wedge of the arc band, a riser above the last, down to the soffit.
+      const a = r.arc;
+      for (let j = 0; j < r.treads; j++) {
+        const s0 = (r.length * j) / r.treads;
+        const s1 = (r.length * (j + 1)) / r.treads;
+        const pts = arcPoints(a.start, a.end, a.curve, Math.PI / 90);
+        const cum = [0];
+        for (let q = 1; q < pts.length; q++) cum.push(cum[q - 1]! + Math.hypot(pts[q]!.x - pts[q - 1]!.x, pts[q]!.y - pts[q - 1]!.y));
+        const scale = r.length / cum[cum.length - 1]!;
+        const inside = pts.filter((_, q) => cum[q]! * scale > s0 + 1e-6 && cum[q]! * scale < s1 - 1e-6);
+        const t0 = tangentLine({ params: a }, s0);
+        const t1 = tangentLine({ params: a }, s1);
+        const p0 = { x: t0.start.x + t0.dir.x * s0, y: t0.start.y + t0.dir.y * s0 };
+        const p1 = { x: t1.start.x + t1.dir.x * s1, y: t1.start.y + t1.dir.y * s1 };
+        const path = [p0, ...inside, p1];
+        // Offset the centre path both ways (radially) for the tread's edges.
+        const info = arcInfo(a.start, a.end, a.curve)!;
+        const off = (p: Vec2, d: number) => {
+          const ux = (p.x - info.center.x) / info.radius;
+          const uy = (p.y - info.center.y) / info.radius;
+          return { x: p.x + ux * d, y: p.y + uy * d };
+        };
+        const outline = [...path.map((p) => off(p, L.width / 2)), ...[...path].reverse().map((p) => off(p, -L.width / 2))];
+        const top = r.z0 + (j + 1) * L.riser;
+        parts.push(extrudePolygon(outline, [], Math.max(r.z0, top - L.riser - t.waist), top));
+      }
+      continue;
+    }
     const R = L.riser;
     const G = L.going;
     const prof: Vec2[] = [{ x: 0, y: r.z0 }];
@@ -77,8 +106,15 @@ export function buildStairLines(doc: Document, el: Element): LineData | null {
   const line = (a: Vec2, b: Vec2) => seg.push(a.x, a.y, 0, b.x, b.y, 0);
   L.runs.forEach((r, i) => {
     const a = r.start;
-    const b = { x: a.x + r.dir.x * r.length, y: a.y + r.dir.y * r.length };
-    line(a, b);
+    let b = { x: a.x + r.dir.x * r.length, y: a.y + r.dir.y * r.length };
+    if (r.arc) {
+      // Walking line along the arc; the arrow points along its end.
+      const pts = arcPoints(r.arc.start, r.arc.end, r.arc.curve);
+      for (let q = 0; q + 1 < pts.length; q++) line(pts[q]!, pts[q + 1]!);
+      b = r.arc.end;
+      const e = tangentLine({ params: r.arc }, r.length).dir;
+      r = { ...r, dir: e };
+    } else line(a, b);
     if (i === L.runs.length - 1) {
       const n = { x: -r.dir.y, y: r.dir.x };
       const h = Math.min(250, L.width / 4);
@@ -90,7 +126,7 @@ export function buildStairLines(doc: Document, el: Element): LineData | null {
   // Joins between runs across landings.
   for (let i = 0; i + 1 < L.runs.length; i++) {
     const a = L.runs[i]!;
-    line({ x: a.start.x + a.dir.x * a.length, y: a.start.y + a.dir.y * a.length }, L.runs[i + 1]!.start);
+    line(a.arc ? a.arc.end : { x: a.start.x + a.dir.x * a.length, y: a.start.y + a.dir.y * a.length }, L.runs[i + 1]!.start);
   }
   return { segments: new Float32Array(seg), labels, planOnly: true, placement: "workplane" };
 }

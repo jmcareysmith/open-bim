@@ -2,6 +2,7 @@ import { registerCategory } from "../categories.ts";
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
 import { Cat, type LevelParams } from "./architecture.ts";
+import { arcLength, tangentLine } from "./arcs.ts";
 
 // Stairs (Revit: Stair by component). A stair joins a base and a top level with runs drawn as
 // centrelines; the riser count comes from the height and the type's maximum riser, each run takes
@@ -19,7 +20,8 @@ export type StairTypeParams = {
   landingThickness: number;
 };
 
-export type StairRun = { start: Vec2; end: Vec2 };
+/** A run from start to end; `curve` bows it into an arc (sagitta, mm, + to the left), as walls. */
+export type StairRun = { start: Vec2; end: Vec2; curve?: number | null };
 
 export type StairParams = {
   baseLevelId: ElementId;
@@ -74,6 +76,8 @@ export interface RunLayout {
   /** Height at the run's start. */
   z0: number;
   length: number;
+  /** Curved runs: the arc (treads spread evenly along it; `length` is its length). */
+  arc?: { start: Vec2; end: Vec2; curve: number } | null;
 }
 
 export interface StairLayout {
@@ -115,7 +119,7 @@ export function stairLayout(doc: Document, stair: Stair): StairLayout {
   const counts: number[] = [];
   let left = Math.max(p.runs.length, risers - extra);
   p.runs.forEach((r, i) => {
-    const len = Math.hypot(r.end.x - r.start.x, r.end.y - r.start.y);
+    const len = arcLength(r.start, r.end, r.curve);
     const runsAfter = p.runs.length - 1 - i;
     const want = i === p.runs.length - 1 ? left : Math.max(1, Math.round(len / going) + 1);
     const n = Math.max(1, Math.min(want, left - runsAfter));
@@ -125,22 +129,32 @@ export function stairLayout(doc: Document, stair: Stair): StairLayout {
   const runs: RunLayout[] = [];
   let z = bottom;
   p.runs.forEach((r, i) => {
-    const len = Math.hypot(r.end.x - r.start.x, r.end.y - r.start.y) || 1;
-    const dir = { x: (r.end.x - r.start.x) / len, y: (r.end.y - r.start.y) / len };
     const n = counts[i]!;
-    runs.push({ start: { ...r.start }, dir, treads: n - 1, risers: n, z0: z, length: (n - 1) * going });
+    if (r.curve) {
+      // Curved: the treads share the arc, measured on the walking line (its centre).
+      const arc = { start: { ...r.start }, end: { ...r.end }, curve: r.curve };
+      runs.push({ start: { ...r.start }, dir: tangentLine({ params: arc }, 0).dir, treads: n - 1, risers: n, z0: z, length: arcLength(r.start, r.end, r.curve), arc });
+    } else {
+      const len = Math.hypot(r.end.x - r.start.x, r.end.y - r.start.y) || 1;
+      const dir = { x: (r.end.x - r.start.x) / len, y: (r.end.y - r.start.y) / len };
+      runs.push({ start: { ...r.start }, dir, treads: n - 1, risers: n, z0: z, length: (n - 1) * going });
+    }
     z += n * riser;
     if (winderAt[i]) z += (k - 1) * riser;
   });
 
   // Landings between runs, or winders in their place at square turns.
-  const plan = runs.map((r) => ({ start: r.start, dir: r.dir, length: r.length, zEnd: r.z0 + r.risers * riser }));
+  // A run as a straight line for the landing next to it: curved runs by their tangent at that end.
+  const startFrame = (r: RunLayout): PlanRun => ({ start: r.start, dir: r.dir, length: r.length, zEnd: r.z0 + r.risers * riser });
+  const endFrame = (r: RunLayout): PlanRun => (r.arc ? { ...tangentLine({ params: r.arc }, r.length), length: r.length, zEnd: r.z0 + r.risers * riser } : startFrame(r));
   const landings: StairLayout["landings"] = [];
   const winders: StairLayout["winders"] = [];
-  for (let i = 0; i + 1 < plan.length; i++) {
-    const land = landingsBetween([plan[i]!, plan[i + 1]!], t.width)[0];
+  for (let i = 0; i + 1 < runs.length; i++) {
+    const a = endFrame(runs[i]!);
+    const b = startFrame(runs[i + 1]!);
+    const land = landingsBetween([a, b], t.width)[0];
     if (!land) continue;
-    if (winderAt[i]) winders.push(...winderTreads(plan[i]!, plan[i + 1]!, land, k, riser));
+    if (winderAt[i]) winders.push(...winderTreads(a, b, land, k, riser));
     else landings.push(land);
   }
 
@@ -150,6 +164,12 @@ export function stairLayout(doc: Document, stair: Stair): StairLayout {
     { label: `Going ${going.toFixed(0)} mm ≥ 280`, ok: going >= 280 - 1e-6 },
     { label: `2R + G ${twoRG.toFixed(0)} mm in 550–700`, ok: twoRG >= 550 && twoRG <= 700 },
   ];
+  for (const r of runs) {
+    if (!r.arc || r.treads < 1) continue;
+    // Curved runs: the going on the walking line, and at the narrow end (300 mm in from the inside edge, provisional).
+    const g = r.length / r.treads;
+    checks.push({ label: `Curved run going ${g.toFixed(0)} mm on the walking line \u2265 ${going.toFixed(0)}`, ok: g >= going - 1e-6 });
+  }
   if (winders.length) {
     // Provisional: winder going on the walking line (the stair's centreline) against the type's going.
     const wg = ((Math.PI / 2) * (t.width / 2)) / k;

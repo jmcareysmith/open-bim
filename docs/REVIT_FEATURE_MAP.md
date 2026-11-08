@@ -87,7 +87,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 |---|---|---|
 | 3D view (orbit, pan, zoom, section box) | 0–1 | ✅ (ViewCube, orthographic {3D}, section box with face arrows) |
 | Floor plans (cut plane, view range) | 2 | ✅ |
-| Reflected ceiling plans | 8b | ✅ (View → Plan ▾ Reflected Ceiling Plan; cut 2300 looking up to the level above; door swings still drawn) |
+| Reflected ceiling plans | 8b | ✅ (View → Plan ▾ Reflected Ceiling Plan; cut 2300 looking up to the level above; ceiling grid patterns 600 × 600 / 1200 × 600; no door swings) |
 | Reflected ceiling plans | 2 | ⬜ |
 | Elevations | 2 | ✅ |
 | Sections & callouts | 2 | 🟨 |

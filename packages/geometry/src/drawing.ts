@@ -150,6 +150,8 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
       const c = viewSchemeFill(doc, view as Element<ViewParams>, el);
       lines = { ...lines, fill: c === null ? { ...lines.fill, hidden: true } : { ...lines.fill, color: c, hidden: false } };
     }
+    // Reflected ceiling plans don't draw door swings or window symbols.
+    if ((view.params as ViewParams).kind === "ceilingPlan" && SYMBOLIC.has(el.category)) continue;
     // Beam symbols belong to plans of the beam's level.
     if (el.category === Cat.Beam && (view.params as ViewParams).levelId !== (el.params as { levelId?: string }).levelId) continue;
     // So do duct outlines.

@@ -19,6 +19,8 @@ export const PATTERNS = [
   "weatherboard",
   "brick",
   "tile300",
+  "ceiling600",
+  "ceiling1200x600",
 ] as const;
 export type PatternName = (typeof PATTERNS)[number];
 

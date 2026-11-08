@@ -7,6 +7,9 @@ import {
   createCeilingPlan,
   createFloor,
   createWall,
+  createDoor,
+  elementMaterial,
+  type MaterialParams,
   viewRange,
   type Vec2,
   type View,
@@ -39,5 +42,14 @@ describe("reflected ceiling plans", () => {
     expect(all.has("Floor")).toBe(false);
     // Plan coordinates are not mirrored.
     expect(d.bounds.max.x).toBeLessThan(9000);
+    // A 600 grid on the ceiling's material shows; a door draws no swing.
+    const ceiling = doc.byCategory("Ceiling")[0]!;
+    const mat = elementMaterial(doc, ceiling)!;
+    doc.transact("Grid", (tx) => tx.update<MaterialParams>(mat.id, { surfacePattern: "ceiling600" }));
+    const wall = doc.byCategory("Wall")[0]!;
+    doc.transact("Door", (tx) => createDoor(tx, doc, ids.doorTypes.single810, wall.id, 2500));
+    const d2 = viewDrawing(doc, new SimpleKernel(), doc.require(rcp.id) as never);
+    expect(d2.strokes.some((s) => s.kind === "surface" && s.id === ceiling.id && s.segments.length > 0)).toBe(true);
+    expect(d2.strokes.some((s) => s.id && doc.get(s.id)?.category === "Door")).toBe(false);
   });
 });

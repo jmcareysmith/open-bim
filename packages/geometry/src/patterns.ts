@@ -34,6 +34,9 @@ export const PATTERN_DEFS: Record<Exclude<PatternName, "none" | "solid">, Patter
   weatherboard: { units: "model", families: [{ angle: 0, spacing: 150 }] },
   brick: { units: "model", families: [{ angle: 0, spacing: 86 }] },
   tile300: { units: "model", families: [{ angle: 0, spacing: 300 }, { angle: 90, spacing: 300 }] },
+  // Suspended ceiling grids (seen in reflected ceiling plans).
+  ceiling600: { units: "model", families: [{ angle: 0, spacing: 600 }, { angle: 90, spacing: 600 }] },
+  ceiling1200x600: { units: "model", families: [{ angle: 0, spacing: 600 }, { angle: 90, spacing: 1200 }] },
 };
 
 /** Pattern line families in model mm for a view at 1:`scale` (null for none/solid). */

@@ -435,8 +435,8 @@ export class Viewport {
         group = isVoid ? makeGroup(mesh, VOID_COLOR, 0.35) : mass ? makeGroup(mesh, MASS_COLOR, 0.45) : makeGroup(mesh, material?.params.color ?? (el.params as { color?: number }).color ?? COLORS[el.category] ?? 0xcccccc);
         group.userData.baseColor = mass ? MASS_COLOR : material?.params.color;
         group.userData.solid = true;
-        // Symbols drawn with a solid (door swings) ride along in the same group.
-        if (lines) group.add(makeLineGroup(lines, SYMBOL));
+        // Symbols drawn with a solid (door swings) ride along in the same group (not in ceiling plans).
+        if (lines && !(this.planRange.up && SYMBOLIC_IN_PLAN.has(el.category))) group.add(makeLineGroup(lines, SYMBOL));
       } else if (lines) {
         group = makeLineGroup(lines, COLORS[el.category] ?? 0xcccccc);
         const owner = annotationView(el);
@@ -1395,7 +1395,10 @@ void main() {
 
   /** Vertical range shown in plan (usually the active level up to its cut plane). */
   setPlanRange(range: ViewRange): void {
+    const flipped = !!range.up !== !!this.planRange.up;
     this.planRange = range;
+    // Door swings and window symbols come and go with ceiling plans.
+    if (flipped) for (const cat of SYMBOLIC_IN_PLAN) for (const el of this.doc.byCategory(cat)) this.rebuild(el.id);
     this.applyClipping();
   }
 

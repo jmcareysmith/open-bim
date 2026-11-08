@@ -40,7 +40,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Phases 0–7b done. Order agreed with Jeremy: Phase 7a (close known gaps), 7b (Revit-style
   interface: ribbon, menus, drag and drop), then 8 (MEP & visual programming).
 - Modelling: levels, layered wall/floor/ceiling/roof types with materials, walls (W; auto L/T/X joins,
-  Flip), floors/ceilings/roofs from sketches (roofs: per-edge slope or gable), doors (D) and windows (N)
+  Flip), floors/ceilings/roofs from sketches (Ceiling ▾ Automatic: click inside walls — geometry `wallEnclosure`) (roofs: per-edge slope or gable), doors (D) and windows (N)
   as parametric hosted types, wall openings, shaft openings (Architecture → Opening → Shaft: sketch; cut floors and
   ceilings between base/top levels via polygon difference — core/model/shafts.ts, kernel `extrudeCut`), grids (G), reference planes (R), project units + info.
 - Kernels: SimpleKernel (extrusions) and OcctKernel (OpenCascade via replicad-opencascadejs, async load;

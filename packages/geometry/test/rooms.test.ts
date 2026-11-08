@@ -11,7 +11,7 @@ import {
   type Vec2,
   type WallParams,
 } from "@open-bim/core";
-import { SimpleKernel, roomBoundary, viewDrawing } from "../src/index.ts";
+import { SimpleKernel, roomBoundary, viewDrawing, wallEnclosure } from "../src/index.ts";
 
 function box(doc: Document, ids: ReturnType<typeof applyResidentialTemplate>, w: number, d: number) {
   const pts: Vec2[] = [
@@ -139,5 +139,15 @@ describe("area plans", () => {
     expect(texts(ap)).toContain("Level 0");
     expect(texts(ap)).not.toContain("Lounge");
     expect(texts(plan)).not.toContain("Level 0");
+  });
+
+  it("finds the walls' enclosure for automatic ceilings", () => {
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    box(doc, ids, 4000, 3000);
+    const b = wallEnclosure(doc, ids.levels.ground, { x: 2000, y: 1500 })!;
+    const t = wallThickness(doc, doc.byCategory("Wall")[0] as never);
+    expect(b.area / 1e6).toBeCloseTo(((4000 - t) * (3000 - t)) / 1e6, 3);
+    expect(wallEnclosure(doc, ids.levels.ground, { x: 9000, y: 9000 })).toBeNull();
   });
 });

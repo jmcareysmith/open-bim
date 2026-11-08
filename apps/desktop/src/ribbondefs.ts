@@ -110,7 +110,16 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
                 { label: "Roof by Extrusion", action: () => m.tool("roofextrusion") },
               ],
             },
-            { label: "Ceiling", icon: "ceiling", tool: "ceiling" },
+            {
+              label: "Ceiling",
+              icon: "ceiling",
+              tool: "autoceiling",
+              title: "Automatic Ceiling: click inside walls (\u25be: sketch)",
+              menu: () => [
+                { label: "Automatic Ceiling", action: () => m.tool("autoceiling") },
+                { label: "Sketch Ceiling", action: () => m.tool("ceiling") },
+              ],
+            },
             { label: "Floor", icon: "floor", tool: "floor" },
             { label: "Column", icon: "column", tool: "column", title: "Column" },
           ],

@@ -115,7 +115,7 @@ import {
   createPropertyLine,
 } from "@open-bim/core";
 import { curtainPart, partLabel, setCurtainPart } from "./curtainpart.ts";
-import { areaBoundary, buildGridLines, buildReferencePlaneLines, buildRoomLines, extrudePolygon, roomBoundary, wallFootprint, type LineData } from "@open-bim/geometry";
+import { wallEnclosure, areaBoundary, buildGridLines, buildReferencePlaneLines, buildRoomLines, extrudePolygon, roomBoundary, wallFootprint, type LineData } from "@open-bim/geometry";
 import type { Viewport } from "./viewport.ts";
 
 export interface ToolContext {
@@ -1450,6 +1450,33 @@ export class AngleDimensionTool implements Tool {
       return true;
     }
     return false;
+  }
+}
+
+/** Automatic Ceiling (Revit's default ceiling mode): click inside walls; the ceiling fills the space. */
+export class AutoCeilingTool implements Tool {
+  readonly name = "autoceiling";
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.ctx.status("Automatic Ceiling: click inside a room's walls.");
+  }
+
+  click(ev: PointerEvent): void {
+    const p = viewPoint(this.ctx, ev, null);
+    if (!p) return;
+    const { doc } = this.ctx;
+    const levelId = this.ctx.activeLevelId();
+    const b = wallEnclosure(doc, levelId, p);
+    if (!b) return this.ctx.status("\u26a0 That isn't enclosed by walls: sketch the ceiling instead (Ceiling \u25be Sketch).");
+    const typeId = this.ctx.activeTypeId(Cat.CeilingType);
+    if (!typeId) return this.ctx.status("\u26a0 No ceiling types in this project");
+    try {
+      const c = doc.transact("Automatic ceiling", (tx) => createCeiling(tx, typeId, levelId, b.outer, { holes: b.holes }));
+      this.ctx.setSelection([c.id]);
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
   }
 }
 

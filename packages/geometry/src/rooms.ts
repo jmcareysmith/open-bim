@@ -63,6 +63,19 @@ export function roomBoundary(doc: Document, room: Room): RoomBoundary | null {
 }
 
 /**
+ * The space enclosed by room-bounding walls (and separators) around `p` on a level, tested at
+ * `height` above it — Revit's Automatic Ceiling/Floor boundary. Null when it isn't enclosed.
+ */
+export function wallEnclosure(doc: Document, levelId: ElementId, p: Vec2, height = ROOM_COMPUTATION_HEIGHT): RoomBoundary | null {
+  const z = (doc.get<LevelParams>(levelId)?.params.elevation ?? 0) + height;
+  const obstacles: Polygon[] = boundingWalls(doc, z).map((w) => [w.ring]);
+  for (const s of doc.byCategory<RoomSeparatorParams>(Cat.RoomSeparator)) {
+    if (s.params.levelId === levelId) obstacles.push([ring(thinRect(s.params.start, s.params.end))]);
+  }
+  return enclosingRegion(obstacles, p);
+}
+
+/**
  * The region of free space (plan minus obstacles) containing `p`, or null when `p` is in an
  * obstacle or the region is open to the outside.
  */

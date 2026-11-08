@@ -35,7 +35,6 @@ export function wallDirection(wall: Wall): Vec2 {
 
 /** How each end of `wall` joins its neighbours. */
 export function wallJoins(doc: Document, wall: Wall): Record<WallEnd, WallJoin | null> {
-  if (wall.params.curve) return { start: null, end: null };
   const others = joinCandidates(doc, wall);
   return { start: joinAt(doc, wall, "start", others), end: joinAt(doc, wall, "end", others) };
 }
@@ -55,7 +54,7 @@ export function relatedWalls(doc: Document, wall: Wall): ElementId[] {
   const half = halfThickness(doc, wall) ?? UNKNOWN_HALF_THICKNESS;
   for (const o of others) {
     for (const end of WALL_ENDS) {
-      if (teeDistance(wallEndPoint(o, end), wallDirection(o), wall, half) !== null) out.add(o.id);
+      if (!wall.params.curve && !o.params.curve && teeDistance(wallEndPoint(o, end), wallDirection(o), wall, half) !== null) out.add(o.id);
     }
   }
   return [...out];
@@ -80,11 +79,14 @@ function joinAt(doc: Document, wall: Wall, end: WallEnd, others: Wall[]): WallJo
     }
   }
   if (meeting.length) return { kind: "corner", others: meeting };
+  // Curved walls only join end to end (no tees into or out of an arc yet).
+  if (wall.params.curve) return null;
 
   const dir = wallDirection(wall);
   let best: Wall | null = null;
   let bestDist = Infinity;
   for (const o of others) {
+    if (o.params.curve) continue;
     const d = teeDistance(p, dir, o, halfThickness(doc, o) ?? UNKNOWN_HALF_THICKNESS);
     if (d !== null && d < bestDist) {
       best = o;
@@ -116,7 +118,7 @@ function teeDistance(p: Vec2, dir: Vec2, target: Wall, half: number): number | n
 function joinCandidates(doc: Document, wall: Wall): Wall[] {
   const range = zRange(doc, wall);
   return doc.byCategory<WallParams>(Cat.Wall).filter((o) => {
-    if (o.id === wall.id || o.params.curve) return false;
+    if (o.id === wall.id) return false;
     const r = zRange(doc, o);
     if (!range || !r) return true;
     return Math.min(range[1], r[1]) > Math.max(range[0], r[0]);

@@ -13,12 +13,13 @@ import {
   flipWall,
   positionAlongWall,
   tangentLine,
+  wallJoins,
   setGridCurve,
   setWallCurve,
   type Vec2,
   type Wall,
 } from "@open-bim/core";
-import { OcctKernel, SimpleKernel, boundingBox, meshVolume } from "../src/index.ts";
+import { OcctKernel, SimpleKernel, boundingBox, joinedWallFootprint, meshVolume } from "../src/index.ts";
 
 const p = (x: number, y: number): Vec2 => ({ x, y });
 const T = 110; // interior wall thickness
@@ -96,5 +97,25 @@ describe("curved walls and grids", () => {
     for (let i = 1; i < lines.segments.length; i += 3) ys.push(lines.segments[i]!);
     expect(Math.max(...ys)).toBeGreaterThan(1900);
     expect(lines.labels.map((l) => l.text)).toEqual(["R1", "R1"]);
+  });
+
+  it("curved walls corner-join straight ones end to end, mitred on the end tangent", () => {
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const [arc, straight] = doc.transact("W", (tx) => [
+      createWall(tx, ids.wallTypes.interior, p(0, 0), p(4000, 0), ids.levels.ground, { height: 2400 }),
+      createWall(tx, ids.wallTypes.interior, p(4000, 0), p(4000, 3000), ids.levels.ground, { height: 2400 }),
+    ]);
+    // Bow right (down), so the arc leaves (4000, 0) heading up-ish and meets the straight wall at an angle.
+    doc.transact("Curve", (tx) => setWallCurve(tx, doc, arc!.id, -800));
+    expect(wallJoins(doc, doc.require(arc!.id) as Wall).end?.kind).toBe("corner");
+    const fa = joinedWallFootprint(doc, doc.require(arc!.id) as Wall);
+    const fb = joinedWallFootprint(doc, doc.require(straight!.id) as Wall);
+    // The two footprints share their cut points at the joint (no gap, no overlap there).
+    const shared = fa.filter((q) => fb.some((r) => Math.hypot(q.x - r.x, q.y - r.y) < 1e-6));
+    expect(shared.length).toBe(2);
+    // And the straight wall's end is no longer square.
+    const square = fb.filter((q) => Math.abs(q.y) < 1e-6).length;
+    expect(square).toBeLessThan(2);
   });
 });

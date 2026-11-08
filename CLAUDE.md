@@ -125,7 +125,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Wall join cleanup in plans (`geometry/src/wallcleanup.ts`): layers give way by priority (structure
   first), tee stems' cores run to the through wall's core, crossing walls clean (thicker wins), no
   lines between joined walls of the same material. Disallow Join per end (Properties / right-click).
-- Known gaps: join cleanup is plan-only (3D solids overlap at crossings); arc walls don't join or host openings;
+- Known gaps: join cleanup is plan-only (3D solids overlap at crossings); arc walls corner-join end to end only (no tees or layer cleanup);
   floors: Pick Walls (sketch options strip: face/core/centre line + offset) and slope arrows (floor
   Properties → Add slope arrow; tail/head heights; plane top, sheared slab, 1:n arrow in plan); roofs exact for convex/L/T/U only; doors/windows parametric;
   angular/radial dimensions are plan-only (Dimension ▾ Angular / Radial; core/model/angulardims.ts).
@@ -263,8 +263,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   floor; height, e.g. −20 drain), points list, Reset Shape; top triangulated through points (floorTopAt via
   hook), bottom flat. Slab edge (thickening/rebated/nosing profiles) along the outline.
 - Curved walls and grids (core/model/arcs.ts: `curve` = sagitta, + left): Wall ▾ Arc (start, end, bow) or
-  Properties → Curve, or drag the arc's middle grip; arc walls' footprint is the band along the arc (no
-  joins/cleanup, sweeps/profile, curtain/stacked yet). Doors/windows/openings/hosted families sit square to the
+  Properties → Curve, or drag the arc's middle grip; arc walls' footprint is the band along the arc, mitred
+  at corner joins on the end tangents (no tees/cleanup, sweeps/profile, curtain/stacked yet). Doors/windows/openings/hosted families sit square to the
   arc (core `tangentLine`, `alongArc`); flipping keeps the arc. Grids draw along the arc (not in sections or
   dimensions). Length label shows the arc length.
 - Phase 8b is done (2026-11-09).

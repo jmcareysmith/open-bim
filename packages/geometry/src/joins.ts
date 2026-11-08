@@ -1,4 +1,4 @@
-import { arcBand,
+import { arcBand, arcLength, tangentLine,
   wallDirection,
   wallEndPoint,
   wallJoins,
@@ -38,7 +38,8 @@ function intersect(l1: Line, l2: Line): Vec2 | null {
 }
 
 function frame(doc: Document, wall: Wall, end: WallEnd): EndFrame {
-  const d = wallDirection(wall);
+  // Curved walls: the arc's tangent at that end.
+  const d = wall.params.curve ? tangentLine(wall, end === "start" ? 0 : arcLength(wall.params.start, wall.params.end, wall.params.curve)).dir : wallDirection(wall);
   return {
     p: wallEndPoint(wall, end),
     a: end === "start" ? d : { x: -d.x, y: -d.y },
@@ -66,9 +67,15 @@ function meet(f: EndFrame, s: 1 | -1, line: Line, limit: number): Vec2 {
  * matching cut points, so joined footprints tile without overlaps or gaps.
  */
 export function joinedWallFootprint(doc: Document, wall: Wall): Vec2[] {
-  // Curved walls: the band along their arc (no joins yet).
-  if (wall.params.curve) return arcBand(wall.params.start, wall.params.end, wall.params.curve, wallThickness(doc, wall) / 2);
   const joins = wallJoins(doc, wall);
+  if (wall.params.curve) {
+    // Curved: the band along the arc between its end caps (joined ends mitre on the end tangents).
+    const band = arcBand(wall.params.start, wall.params.end, wall.params.curve, wallThickness(doc, wall) / 2);
+    const n = band.length / 2;
+    const right = band.slice(1, n - 1);
+    const left = band.slice(n + 1, band.length - 1);
+    return [...right, ...endCap(doc, wall, "end", joins.end), ...left, ...endCap(doc, wall, "start", joins.start)];
+  }
   // Each cap runs from its frame's left face to its right face; end then start gives a CCW loop.
   return [...endCap(doc, wall, "end", joins.end), ...endCap(doc, wall, "start", joins.start)];
 }

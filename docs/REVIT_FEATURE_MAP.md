@@ -30,7 +30,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Feature | Phase | Status |
 |---|---|---|
 | Basic walls (layered compound structure) | 0–1 | 🟨 |
-| Curved (arc) walls | 8b | 🟨 (Wall ▾ Arc, Properties → Curve or the middle grip; doors/windows/openings square to the arc; no joins, sweeps or curtain/stacked types on arcs yet) |
+| Curved (arc) walls | 8b | 🟨 (Wall ▾ Arc, Properties → Curve or the middle grip; doors/windows/openings square to the arc; corner joins end to end (mitred on the end tangent); no tees, layer cleanup, sweeps or curtain/stacked types on arcs yet) |
 | Wall joins, cleanup, wall attach top/base | 1 | ✅ (plan cleanup by layer priority; disallow join; crossing walls) |
 | Stacked walls | 6 | ✅ |
 | Wall sweeps and reveals, Edit Profile | 8b | ✅ (type and instance; built-in profiles; profile by presets/points or sketched in a section/elevation along the wall) |

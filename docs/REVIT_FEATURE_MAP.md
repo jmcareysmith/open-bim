@@ -38,7 +38,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Floors (sketch-based, layered, slope arrows) | 1 | ✅ (Pick Walls for floors/ceilings/roofs; slope arrows; shape editing points (falls to drains, variable thickness); slab edges) |
 | Roofs (footprint, extrusion, slopes, fascia/gutter) | 1 | ✅ (footprint: exact for convex/L/T/U; extrusion: gable/mono/curved/points profile; fascia, gutter, soffit on eaves; barge boards on gable rakes) |
 | Ceilings | 1 | ✅ (Automatic Ceiling by clicking inside walls, or sketched; grid patterns; reflected ceiling plans) |
-| Doors & windows (hosted, cut openings) | 1 | 🟨 |
+| Doors & windows (hosted, cut openings) | 1 | 🟨 (parametric types with architraves, handles, sashes, mullion, sill; loadable door/window families) |
 | Openings (shaft, wall, vertical) | 1 | 🟨 (wall openings; shaft openings cut floors/ceilings between levels; vertical openings in footprint roofs; floors via sketch holes) |
 | Stairs (run, landing, sketch) & railings | 6 | ✅ (multi-run L/U with landings; winders at square turns (2–4); curved runs (per-run curve)) |
 | Ramps | 6 | ✅ |

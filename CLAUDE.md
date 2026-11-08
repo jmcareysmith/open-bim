@@ -175,7 +175,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   (`npm run serve -w @open-bim/collab`; PORT, OPEN_BIM_DATA, OPEN_BIM_TOKEN). Defaults chosen without
   Jeremy's answer: Yjs, self-hosted, one shared token, no accounts. Revisit if he wants a hosted service.
 - Render (toolbar, from a 3D view): path traced, sun from site/date/time, Save PNG. Materials have
-  roughness/metalness/transparency. No textures, no AI render (needs a service decision).
+  roughness/metalness/transparency. Realistic style shows textures (Material Browser → Texture: an image,
+  else drawn from colour + surface pattern; world-position mapping in viewport, apps/desktop/src/textures.ts); no AI render (needs a service decision).
 - H1 energy: toolbar NZ Checks; R-values in type properties (Energy (H1)); zone and provisional
   minimums in Project Information → H1 energy. Jeremy said build with my own figures for now.
 - Bracing: wall Properties → Bracing (NZS 3604) panels; zones/weights/systems in Project Information;

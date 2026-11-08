@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { ViewCube } from "./viewcube.ts";
+import { materialTexture } from "./textures.ts";
 import { showContextMenu } from "./dialog.ts";
 import { LineMaterial } from "three/examples/jsm/lines/LineMaterial.js";
 import { LineSegments2 } from "three/examples/jsm/lines/LineSegments2.js";
@@ -530,6 +531,17 @@ export class Viewport {
     mat.opacity = baseOpacity * (1 - t);
     mat.depthWrite = t < 0.5;
     mat.color.setHex(flat ? 0x000000 : color);
+    // Realistic: the material's texture (it carries the colour; overrides and selection still tint it).
+    const material = style === "realistic" && !mesh.geometry.getAttribute("color") ? elementMaterial(this.doc, el) : undefined;
+    const tex = material ? materialTexture(material, () => (this.needsRender = true)) : null;
+    if ((mat.map ?? null) !== (tex?.tex ?? null)) {
+      mat.map = tex?.tex ?? null;
+      mat.needsUpdate = true;
+    }
+    if (tex) {
+      (mat.userData.texScale as { value: number }).value = tex.size;
+      if (color === base) mat.color.setHex(0xffffff);
+    }
     mat.emissive.setHex(flat ? (plain ? 0xffffff : color) : 0x000000);
     const edges = g.children[1];
     if (edges instanceof THREE.LineSegments) {
@@ -1784,7 +1796,18 @@ function makeGroup(mesh: MeshData, color: number, opacity = 1): THREE.Group {
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 1,
   });
+  // World-position texture mapping (Realistic textures): meshes carry no UVs, so each face takes
+  // the plane its normal faces most — floors x/y, walls along/up — scaled by the tile size.
+  const texScale = { value: 1000 };
+  mat.userData.texScale = texScale;
   mat.onBeforeCompile = (shader) => {
+    shader.uniforms.texScale = texScale;
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nuniform float texScale;")
+      .replace(
+        "#include <uv_vertex>",
+        "#include <uv_vertex>\n#ifdef USE_MAP\n  vec3 tpW = (modelMatrix * vec4(position, 1.0)).xyz;\n  vec3 tpN = abs(normalize(mat3(modelMatrix) * normal));\n  vMapUv = (tpN.z > 0.5 ? tpW.xy : (tpN.x > tpN.y ? tpW.yz : tpW.xz)) / texScale;\n#endif",
+      );
     shader.fragmentShader = shader.fragmentShader.replace("#include <dithering_fragment>", "#include <dithering_fragment>\n  if (!gl_FrontFacing) gl_FragColor = vec4(0.42, 0.43, 0.45, gl_FragColor.a);");
   };
   const edges = new THREE.LineSegments(

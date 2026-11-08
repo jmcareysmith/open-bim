@@ -127,7 +127,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 10. Materials & visualisation
 | Feature | Phase | Status |
 |---|---|---|
-| Materials (graphics, appearance, physical, thermal) | 2 | 🟨 |
+| Materials (graphics, appearance, physical, thermal) | 2 | 🟨 (graphics, render appearance, textures in Realistic: image or drawn from the surface pattern; no physical properties) |
 | Surface / cut patterns | 2 | ✅ |
 | Realistic rendering | 7 | ✅ (path traced; no textures yet) |
 | AI render (Gemini-style) | 7 | ✅ (self-hosted SD WebUI or Gemini, user key) |

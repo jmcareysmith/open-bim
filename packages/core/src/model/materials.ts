@@ -33,6 +33,9 @@ export type MaterialParams = {
   roughness?: number;
   metalness?: number;
   transparency?: number;
+  /** Realistic views: an image (data URL) tiled over faces, and the real size of one tile, mm. */
+  texture?: string | null;
+  textureSize?: number | null;
 };
 export type Material = Element<MaterialParams>;
 

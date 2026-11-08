@@ -114,6 +114,32 @@ export function openMaterialBrowser(doc: Document, status: (s: string) => void, 
       slider("Roughness", "roughness", m.params.roughness ?? 0.85);
       slider("Metalness", "metalness", m.params.metalness ?? 0);
       slider("Transparency", "transparency", m.params.transparency ?? 0);
+      // Texture (Realistic views): an image, or (none) one drawn from the colour and surface pattern.
+      const load = Object.assign(document.createElement("button"), { textContent: m.params.texture ? "Replace image\u2026" : "Load image\u2026" });
+      load.onclick = () => {
+        const input = Object.assign(document.createElement("input"), { type: "file", accept: "image/*" });
+        input.onchange = () => {
+          const f = input.files?.[0];
+          if (!f) return;
+          if (f.size > 4_000_000) return status("\u26a0 Use an image under 4 MB (it's saved in the project).");
+          const reader = new FileReader();
+          reader.onload = () => edit("Material texture", { texture: String(reader.result) });
+          reader.readAsDataURL(f);
+        };
+        input.click();
+      };
+      const btns = document.createElement("span");
+      btns.className = "buttons wrap";
+      btns.append(load);
+      if (m.params.texture) {
+        const clear = Object.assign(document.createElement("button"), { textContent: "Use pattern" });
+        clear.onclick = () => edit("Material texture", { texture: null });
+        btns.append(clear);
+      }
+      row("Texture", btns);
+      const size = Object.assign(document.createElement("input"), { type: "number", min: "10", step: "10", value: String(m.params.textureSize ?? ""), placeholder: "auto" });
+      size.onchange = () => edit("Texture size", { textureSize: Number(size.value) > 0 ? Number(size.value) : null });
+      row("Texture tile size (mm)", size);
     }
     box.append(listBox, form);
     return box;

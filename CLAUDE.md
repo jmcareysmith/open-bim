@@ -140,7 +140,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   family editor → Save Family File (`.obim-family`, open JSON).
 - Rooms (Room / Separator tools, plans) and area plans (browser → New area plan; GFA/NLA,
   boundaries from walls; Area / Area Boundary tools).
-- Tags (Tag / Keynote tools; Mark property), keynote table (browser → Project → Load keynotes),
+- Tags (Tag ▾ by category / multi-category / material, Keynote tools; Mark property), keynote table (browser → Project → Load keynotes),
   legends (Views → New legend; add components / keynote legend in its properties).
 - Schedules/Quantities and material takeoffs (browser → Schedules; fields, filter, sort/group,
   totals; Export CSV / Excel). Calculated values (formula over fields by name; m, m², m³; numbers

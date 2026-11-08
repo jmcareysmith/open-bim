@@ -1749,11 +1749,11 @@ export class TagTool implements Tool {
     private ctx: ToolContext,
     private kind: TagKind,
   ) {
-    this.name = kind === "keynote" ? "keynote" : "tag";
+    this.name = kind === "keynote" ? "keynote" : kind === "material" ? "materialtag" : kind === "multi" ? "multitag" : "tag";
   }
 
   activate(): void {
-    const what = this.kind === "keynote" ? "Keynote" : "Tag";
+    const what = { keynote: "Keynote", material: "Material tag", multi: "Multi-category tag", category: "Tag" }[this.kind];
     this.ctx.status(`${what}: click a wall, door, window, component, floor or room. The tag goes where you click.`);
   }
 

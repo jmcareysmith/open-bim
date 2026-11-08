@@ -6,6 +6,7 @@ import { DEFAULT_TEXT_SIZE } from "./annotations.ts";
 import type { AreaParams } from "./areas.ts";
 import type { FamilyInstanceParams } from "./components.ts";
 import { hostedPlacement, isWallCutter } from "./openings.ts";
+import { elementMaterial } from "./materials.ts";
 import { roomExtent, type Room, type RoomParams } from "./rooms.ts";
 import { isDrawingView, toViewCoords, viewFrame, type View, type ViewParams } from "./viewdefs.ts";
 
@@ -13,7 +14,8 @@ import { isDrawingView, toViewCoords, viewFrame, type View, type ViewParams } fr
 // text is read from the element (Mark, type name, room name/number, keynote), so it updates when
 // the element changes, and it is placed relative to the element's anchor so it moves with it.
 
-export type TagKind = "category" | "keynote";
+/** Tag by Category, Keynote, Material (the element's main material) or Multi-Category ("Category: Mark/type"). */
+export type TagKind = "category" | "keynote" | "material" | "multi";
 
 export type TagParams = {
   viewId: ElementId;
@@ -116,6 +118,11 @@ export function tagText(doc: Document, tag: Tag): string {
   const host = doc.get(tag.params.hostId);
   if (!host) return "?";
   if (tag.params.kind === "keynote") return elementKeynote(doc, host) ?? "?";
+  if (tag.params.kind === "material") return elementMaterial(doc, host)?.name ?? "<no material>";
+  if (tag.params.kind === "multi") {
+    const what = elementMark(host) ?? (host.typeId ? doc.get(host.typeId)?.name : undefined) ?? host.name ?? "?";
+    return `${CATEGORY_LABEL[host.category] ?? host.category}: ${what}`;
+  }
   switch (host.category) {
     case Cat.Room:
       return `${host.name ?? "Room"} ${(host.params as RoomParams).number}`;
@@ -127,6 +134,9 @@ export function tagText(doc: Document, tag: Tag): string {
       return elementMark(host) ?? (host.typeId ? (doc.get(host.typeId)?.name ?? "?") : "?");
   }
 }
+
+/** Short category names for multi-category tags. */
+const CATEGORY_LABEL: Record<string, string> = { FamilyInstance: "Component", Column: "Column", Beam: "Beam", Floor: "Floor", Wall: "Wall", Door: "Door", Window: "Window", Roof: "Roof", Ceiling: "Ceiling", Room: "Room" };
 
 /** Keynote of an element: its own, else its type's (Revit: element and type keynotes). */
 export function elementKeynote(doc: Document, el: Element): string | undefined {

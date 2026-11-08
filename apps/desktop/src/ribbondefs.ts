@@ -290,7 +290,18 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
         {
           title: "Tag",
           items: [
-            { label: "Tag by Category", icon: "tag", tool: "tag", large: true },
+            {
+              label: "Tag by Category",
+              icon: "tag",
+              tool: "tag",
+              large: true,
+              title: "Tag by Category (\u25be: multi-category, material)",
+              menu: () => [
+                { label: "Tag by Category", action: () => m.tool("tag") },
+                { label: "Multi-Category", action: () => m.tool("multitag") },
+                { label: "Material", action: () => m.tool("materialtag") },
+              ],
+            },
             {
               label: "Keynote",
               icon: "keynote",

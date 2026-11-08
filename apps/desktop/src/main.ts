@@ -522,6 +522,8 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   area: new AreaTool(ctx),
   tag: new TagTool(ctx, "category"),
   keynote: new TagTool(ctx, "keynote"),
+  materialtag: new TagTool(ctx, "material"),
+  multitag: new TagTool(ctx, "multi"),
   areaboundary: new AreaBoundaryTool(ctx),
   move: new ModifyTool(ctx, "move"),
   copy: new ModifyTool(ctx, "copy"),

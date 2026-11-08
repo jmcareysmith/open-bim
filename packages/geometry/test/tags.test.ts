@@ -7,6 +7,7 @@ import {
   createRoom,
   createTag,
   createWall,
+  elementMaterial,
   floorPlanFor,
   tagPosition,
   tagText,
@@ -69,5 +70,14 @@ describe("tags", () => {
     const v3d = doc.all().find((e) => (e.params as { kind?: string }).kind === "3d")!;
     expect(() => doc.transact("T", (tx) => createTag(tx, doc, v3d.id, door.id, { x: 0, y: 0 }))).toThrow(/plans/);
     expect(() => doc.transact("T", (tx) => createTag(tx, doc, plan.id, ids.levels.ground, { x: 0, y: 0 }))).toThrow(/can't be tagged/);
+  });
+
+  it("material and multi-category tags", () => {
+    const t = setup();
+    const plan = floorPlanFor(t.doc, t.ids.levels.ground)!;
+    const mat = t.doc.transact("M", (tx) => createTag(tx, t.doc, plan.id, t.wall.id, { x: 1000, y: 500 }, { kind: "material" }));
+    expect(tagText(t.doc, mat)).toBe(elementMaterial(t.doc, t.wall)!.name);
+    const multi = t.doc.transact("X", (tx) => createTag(tx, t.doc, plan.id, t.wall.id, { x: 1000, y: 900 }, { kind: "multi" }));
+    expect(tagText(t.doc, multi)).toBe(`Wall: ${t.doc.get(t.wall.typeId!)!.name}`);
   });
 });

@@ -106,7 +106,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 |---|---|---|
 | Dimensions (aligned, linear, angular, radial, spot) | 2 | 🟨 (aligned in plans, sections, elevations — live to walls, grids, levels; spot elevations; angular and radial in plans) |
 | Text, leaders | 2 | ✅ (text notes with leaders: Properties → Add leader) |
-| Tags (by category, multi-category, material) | 4 | 🟨 |
+| Tags (by category, multi-category, material) | 4 | ✅ (Tag ▾ by category, multi-category, material; keynotes) |
 | Keynotes | 4 | ✅ |
 | Detail lines, filled regions, detail components, insulation | 2 | 🟨 (detail components fixed-size; batt insulation) |
 | Symbols, north arrow, section/elevation heads | 2 | 🟨 (north arrow, scale bar, break line; view markers drawn) |

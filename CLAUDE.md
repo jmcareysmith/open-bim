@@ -245,4 +245,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   `resolveRef(doc, ref, viewId)`; other clicks are fixed points). Spot Elevation (EL; Annotate → Dimension;
   core/model/spots.ts): floor/roof/toposolid top live, else the section point or plan level; +2.700 m text.
   Temporary dimensions (length + off-axis angle) while drawing walls, detail lines and beams.
+- Colour schemes (core/model/colorschemes.ts; dialog apps/desktop/src/colorschemes.ts): plan Properties →
+  Colour scheme (+ Edit…), or Annotate → Color Fill ▾ Edit Color Scheme; rooms by name/department/occupancy/
+  number/area range (areas by name/area); stable automatic colours, stored per value with visibility. Rooms
+  aren't filled without a scheme (fill kept hidden for picking). Color Fill Legend tool places the legend.
+  Rooms have Department and Occupancy.
 - Next (Jeremy, 2026-10-14): Phase 8b — Revit look & architectural parity, before the rest of 8.

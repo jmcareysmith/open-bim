@@ -78,6 +78,7 @@ import {
   resolveRef,
   curtainOf,
   createSpotElevation,
+  createColorFillLegend,
   SPOT_HOSTS,
   refPoint,
   ensureStairType,
@@ -1313,6 +1314,30 @@ export class BeamTool implements Tool {
       return true;
     }
     return false;
+  }
+}
+
+/** Color Fill Legend: click where the open plan's colour scheme legend goes. */
+export class ColorFillLegendTool implements Tool {
+  readonly name = "colorlegend";
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.ctx.status("Color Fill Legend: click where it goes (the plan needs a colour scheme: view Properties).");
+  }
+
+  click(ev: PointerEvent): void {
+    const viewId = requireAnnotView(this.ctx);
+    if (!viewId) return;
+    const p = viewPoint(this.ctx, ev, null);
+    if (!p) return;
+    const { doc } = this.ctx;
+    try {
+      const l = doc.transact("Place colour fill legend", (tx) => createColorFillLegend(tx, doc, viewId, p));
+      this.ctx.setSelection([l.id]);
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
   }
 }
 

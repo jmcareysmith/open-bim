@@ -215,6 +215,19 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
           ],
         },
         {
+          title: "Color Fill",
+          items: [
+            {
+              label: "Color Fill Legend",
+              icon: "region",
+              tool: "colorlegend",
+              large: true,
+              title: "Place the plan's colour scheme legend (\u25be: Edit Color Scheme)",
+              menu: () => [{ label: "Edit Color Scheme\u2026", action: () => m.cmd("colorSchemes") }],
+            },
+          ],
+        },
+        {
           title: "Detail",
           items: [
             { label: "Detail Line", icon: "detailline", tool: "detailline", large: true, title: "Detail line (L)" },

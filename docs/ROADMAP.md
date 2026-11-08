@@ -115,7 +115,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Curtain walls: add/remove grid lines, mullion types, panel swaps (doors, solid panels)
 - [x] Roofs by extrusion; fascias, gutters and soffits
 - [x] Dimensions in sections/elevations, temporary dimensions while placing, spot elevations
-- [ ] Room colour schemes with colour fill legends
+- [x] Room colour schemes with colour fill legends
 - [ ] Floor shape editing (points, falls to drains), slab edges
 - [ ] Curved walls and grids (arcs)
 

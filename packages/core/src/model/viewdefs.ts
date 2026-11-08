@@ -44,6 +44,8 @@ export type ViewParams = {
   detailLevel: DetailLevel;
   /** Categories hidden in this view (Visibility/Graphics). */
   hiddenCategories: string[];
+  /** Plans: the colour scheme filling rooms (area plans: areas); none = no fill (Revit). */
+  colorScheme?: ElementId | null;
   /**
    * Sections and elevations: the view plane's trace in plan. The view looks to the left of
    * start -> end (Revit's section head direction); its width is the line's length.

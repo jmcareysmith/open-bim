@@ -64,3 +64,4 @@ export * from "./model/property.ts";
 export * from "./model/markers.ts";
 export * from "./model/sweeps.ts";
 export * from "./model/spots.ts";
+export * from "./model/colorschemes.ts";

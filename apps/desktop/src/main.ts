@@ -1,6 +1,7 @@
 import { openObjectStyles } from "./objectstyles.ts";
 import { ContainmentTool } from "./containtool.ts";
 import { FaceTool } from "./facetool.ts";
+import { openColorSchemes } from "./colorschemes.ts";
 import { curtainPart, onCurtainPart, setCurtainPart } from "./curtainpart.ts";
 import { MANAGE_SECTIONS, projectSection } from "./panels.ts";
 import { openMaterialBrowser } from "./materialbrowser.ts";
@@ -141,6 +142,7 @@ import {
   BeamTool,
   ExtrusionRoofTool,
   SpotElevationTool,
+  ColorFillLegendTool,
   FootingTool,
   DemolishTool,
   RailingTool,
@@ -517,6 +519,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   "face-roof": new FaceTool(ctx, "roof"),
   roofextrusion: new ExtrusionRoofTool(ctx),
   spot: new SpotElevationTool(ctx),
+  colorlegend: new ColorFillLegendTool(ctx),
   "face-floor": new FaceTool(ctx, "floor"),
   duct: new RunTool(ctx, "duct"),
   pipe: new RunTool(ctx, "pipe"),
@@ -1083,6 +1086,10 @@ const commands: Record<string, () => void | Promise<void>> = {
   },
   importKeynotes: () => ctx.importKeynotes(),
   exportKeynotes: () => ctx.exportKeynotes(),
+  colorSchemes: () => {
+    const v = activeView();
+    openColorSchemes(doc, status, v?.params.kind === "areaPlan" ? "Area" : "Room", v?.params.colorScheme ?? null);
+  },
   loadFamilyFile: () => ctx.loadFamilyFile(),
   newSheet() {
     edit("Create sheet", (tx) => {
@@ -1348,6 +1355,7 @@ function configureViewport(vp: Viewport, target: ModelElement, primary: boolean)
   vp.setVisualStyle(v.params.kind === "3d" ? (v.params.visualStyle ?? "shaded") : v.params.kind === "legend" ? "hiddenLine" : (v.params.visualStyle ?? "hiddenLine"));
   // Sun, shadows and lighting (any model view): the true sun for the site, at the view's date and time.
   vp.setDisplay(v.params.kind === "legend" ? {} : (v.params.display ?? {}));
+  vp.setSchemeView(v.params.kind === "floorPlan" || v.params.kind === "callout" || v.params.kind === "areaPlan" ? v.id : null);
   if (v.params.kind !== "legend") vp.setSun(viewSun(doc, v.params), !!v.params.shadows, v.params.lighting ?? {});
   else vp.setSun(null, false);
   if (isPlanView(v)) {

@@ -39,7 +39,7 @@ import {
   graphicsCategory,
   MASS_CATEGORY,
 } from "@open-bim/core";
-import {
+import { viewSchemeFill,
   GRID_BUBBLE_RADIUS,
   fillLoops,
   lineworkDrawing,
@@ -99,6 +99,7 @@ const COLORS: Record<string, number> = {
   [Cat.Dimension]: 0x1f2328,
   [Cat.TextNote]: 0x1f2328,
   [Cat.SpotElevation]: 0x1f2328,
+  [Cat.ColorFillLegend]: 0x1f2328,
   [Cat.FilledRegion]: 0x1f2328,
   [Cat.Room]: 0x7a8fa6,
   [Cat.RoomSeparator]: 0x1f2328,
@@ -385,6 +386,13 @@ export class Viewport {
   private sync(c: ChangeSet): void {
     for (const id of c.removed) this.remove(id);
     for (const id of c.regenerate) this.rebuild(id);
+    // Colour schemes: a scheme or the plan's choice of one recolours its rooms; rooms and areas
+    // changing (names, departments, areas) change the legends.
+    const cats = new Set([...c.regenerate].map((id) => this.doc.get(id)?.category));
+    const schemeChanged = cats.has(Cat.ColorScheme) || (!!this.schemeView && c.regenerate.includes(this.schemeView));
+    if (schemeChanged) for (const el of [...this.doc.byCategory(Cat.Room), ...this.doc.byCategory(Cat.Area)]) this.rebuild(el.id);
+    if (schemeChanged || cats.has(Cat.Room) || cats.has(Cat.Area) || cats.has(Cat.Wall) || cats.has(Cat.RoomSeparator))
+      for (const el of this.doc.byCategory(Cat.ColorFillLegend)) if (!c.regenerate.includes(el.id)) this.rebuild(el.id);
     for (const id of [...this.selected]) if (!this.doc.has(id)) this.selected.delete(id);
     this.drawingDirty = true;
     this.needsRender = true;
@@ -407,7 +415,13 @@ export class Viewport {
     let group: THREE.Group;
     try {
       const mesh = this.kernel.build(this.doc, el);
-      const lines = this.kernel.buildLines(this.doc, el, this.graphics.scale, this.graphics.detailLevel);
+      let lines = this.kernel.buildLines(this.doc, el, this.graphics.scale, this.graphics.detailLevel);
+      // Rooms and areas take the open plan's colour scheme fill (none: not drawn, still pickable).
+      if (lines?.fill && (el.category === Cat.Room || el.category === Cat.Area)) {
+        const view = this.schemeView ? this.doc.get<ViewParams>(this.schemeView) : undefined;
+        const c = view ? viewSchemeFill(this.doc, view, el) : null;
+        lines = { ...lines, fill: c === null ? { ...lines.fill, hidden: true } : { ...lines.fill, color: c, opaque: true, hidden: false } };
+      }
       if (mesh) {
         this.meshes.set(id, mesh);
         const material = elementMaterial(this.doc, el);
@@ -531,6 +545,15 @@ export class Viewport {
 
   private visualStyle: VisualStyle = "shaded";
   private revealHidden = false;
+  /** The plan whose colour scheme fills rooms and areas. */
+  private schemeView: ElementId | null = null;
+
+  setSchemeView(id: ElementId | null): void {
+    if (id === this.schemeView) return;
+    this.schemeView = id;
+    for (const el of [...this.doc.byCategory(Cat.Room), ...this.doc.byCategory(Cat.Area)]) this.rebuild(el.id);
+    this.needsRender = true;
+  }
   /** Graphic Display Options → Model Display (edges, transparency, silhouettes). */
   private display: ViewDisplay = {};
 
@@ -1864,11 +1887,27 @@ function makeLineGroup(lines: LineData, color: number): THREE.Group {
     fillGeom.setAttribute("position", new THREE.BufferAttribute(new Float32Array(tris.flatMap((t) => t.flatMap((p) => [p.x, p.y, 0]))), 3));
     const fill = new THREE.Mesh(
       fillGeom,
-      new THREE.MeshBasicMaterial({ color: lines.fill.color, transparent: !lines.fill.opaque, opacity: lines.fill.opaque ? 1 : 0.55, side: THREE.DoubleSide, depthWrite: false }),
+      new THREE.MeshBasicMaterial({
+        color: lines.fill.color,
+        transparent: lines.fill.hidden || !lines.fill.opaque,
+        opacity: lines.fill.hidden ? 0 : lines.fill.opaque ? 1 : 0.55,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      }),
     );
     fill.position.z = DATUM_LIFT - 0.5;
     fill.renderOrder = -4;
     g.add(fill);
+  }
+  // Extra solid fills (legend swatches).
+  for (const f of lines.fills ?? []) {
+    const tris = fillLoops(f.loops);
+    const fg = new THREE.BufferGeometry();
+    fg.setAttribute("position", new THREE.BufferAttribute(new Float32Array(tris.flatMap((t) => t.flatMap((p) => [p.x, p.y, 0]))), 3));
+    const m = new THREE.Mesh(fg, new THREE.MeshBasicMaterial({ color: f.color, side: THREE.DoubleSide, depthWrite: false }));
+    m.position.z = DATUM_LIFT - 0.5;
+    m.renderOrder = -4;
+    g.add(m);
   }
   for (const label of lines.labels) {
     const { texture, aspect } = labelTexture(label.text, label.size !== undefined, undefined, label.align === "left");

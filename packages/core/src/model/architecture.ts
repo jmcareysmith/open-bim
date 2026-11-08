@@ -32,6 +32,8 @@ export const Cat = {
   TextNote: "TextNote",
   Dimension: "Dimension",
   SpotElevation: "SpotElevation",
+  ColorScheme: "ColorScheme",
+  ColorFillLegend: "ColorFillLegend",
   Material: "Material",
   ViewFilter: "ViewFilter",
   ViewTemplate: "ViewTemplate",

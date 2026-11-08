@@ -32,7 +32,9 @@ export interface LineData {
   /** Only drawn in plan views (e.g. door swings). */
   planOnly?: boolean;
   /** Filled areas (filled regions), as loops with even-odd nesting. */
-  fill?: { loops: Vec2[][]; color: number; /** Solid (symbols, markers) rather than translucent (filled regions). */ opaque?: boolean };
+  fill?: { loops: Vec2[][]; color: number; /** Solid (symbols, markers) rather than translucent (filled regions). */ opaque?: boolean; /** Kept for picking only (rooms with no colour scheme). */ hidden?: boolean };
+  /** More solid fills (legend swatches). */
+  fills?: { loops: Vec2[][]; color: number }[];
 }
 
 /** Grid head (bubble) radius, mm. ~8 mm on paper at 1:100. */

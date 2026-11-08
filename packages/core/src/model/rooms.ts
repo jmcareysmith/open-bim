@@ -17,6 +17,9 @@ export type RoomParams = {
   limitOffset: number;
   /** Room bottom above its level, mm. */
   baseOffset: number;
+  /** Identity data (Revit): used by colour schemes and schedules. */
+  department?: string | null;
+  occupancy?: string | null;
 };
 export type Room = Element<RoomParams>;
 

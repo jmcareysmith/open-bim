@@ -18,6 +18,16 @@ import {
   type Wall,
   type WallParams,
 } from "@open-bim/core";
+import {
+  colorSchemes,
+  modelTextSize,
+  schemeColor,
+  schemeLegend,
+  schemeValue,
+  type ColorFillLegendParams,
+  type ColorScheme,
+  type ViewParams,
+} from "@open-bim/core";
 import type { LineData } from "./datums.ts";
 import { joinedWallFootprint } from "./joins.ts";
 
@@ -155,7 +165,7 @@ export function buildAreaLines(doc: Document, el: Element): LineData {
     return { segments: new Float32Array([x - c, y - c, 0, x + c, y + c, 0, x - c, y + c, 0, x + c, y - c, 0]), labels };
   }
   // Fill only: the boundary lines draw the edges.
-  return { segments: new Float32Array([x, y, 0, x + 1, y, 0]), labels, fill: { loops: [b.outer, ...b.holes], color: 0xf3e2c4 } };
+  return { segments: new Float32Array([x, y, 0, x + 1, y, 0]), labels, fill: { loops: [b.outer, ...b.holes], color: 0xf3e2c4, hidden: true } };
 }
 
 export function buildAreaBoundaryLines(_doc: Document, el: Element): LineData {
@@ -185,7 +195,7 @@ export function buildRoomLines(doc: Document, el: Element): LineData | null {
       seg.push(a.x, a.y, 0, n.x, n.y, 0);
     });
   }
-  return { segments: new Float32Array(seg), labels, planOnly: true, fill: { loops: [b.outer, ...b.holes], color: 0xe4edf6 } };
+  return { segments: new Float32Array(seg), labels, planOnly: true, fill: { loops: [b.outer, ...b.holes], color: 0xe4edf6, hidden: true } };
 }
 
 export function buildRoomSeparatorLines(_doc: Document, el: Element): LineData {
@@ -261,4 +271,75 @@ function loopLength(l: Vec2[]): number {
     const b = l[(i + 1) % l.length]!;
     return s + Math.hypot(b.x - a.x, b.y - a.y);
   }, 0);
+}
+
+// ---- colour schemes -----------------------------------------------------------------------
+
+/** The scheme a plan colours by, if it has one (and it colours this kind of element). */
+function viewScheme(doc: Document, view: Element<ViewParams>, el?: Element): ColorScheme | null {
+  const id = view.params.colorScheme;
+  const s = id ? (doc.get(id) as ColorScheme | undefined) : undefined;
+  if (!s || s.category !== Cat.ColorScheme) return null;
+  if (el && (el.category === Cat.Room) !== (s.params.category === "Room")) return null;
+  return s;
+}
+
+/** A room's or area's value for a scheme (area schemes measure the boundary). */
+function valueOf(doc: Document, s: ColorScheme, el: Element): string {
+  if (s.params.by !== "area") return schemeValue(s, el);
+  const b = el.category === Cat.Room ? roomBoundary(doc, el as Room) : areaBoundary(doc, el as Area);
+  return schemeValue(s, el, b ? b.area / 1e6 : null);
+}
+
+/** The fill a room or area takes in a plan: its colour scheme's colour, or null (no scheme / no value). */
+export function viewSchemeFill(doc: Document, view: Element<ViewParams>, el: Element): number | null {
+  const s = viewScheme(doc, view, el);
+  return s ? schemeColor(s, valueOf(doc, s, el)) : null;
+}
+
+/** Rooms (or areas) a plan shows, for its legend. */
+function schemeElements(doc: Document, view: Element<ViewParams>, s: ColorScheme): Element[] {
+  if (s.params.category === "Area") return doc.byCategory(Cat.Area).filter((a) => (a.params as { viewId: ElementId }).viewId === view.id);
+  return doc.byCategory(Cat.Room).filter((r) => (r.params as { levelId: ElementId }).levelId === view.params.levelId);
+}
+
+/** Color Fill Legend: the scheme's title, then a swatch and value for each colour in the view. */
+export function buildColorFillLegendLines(doc: Document, el: Element): LineData | null {
+  const p = el.params as ColorFillLegendParams;
+  const view = doc.get<ViewParams>(p.viewId);
+  if (!view) return null;
+  const s = viewScheme(doc, view);
+  const k = modelTextSize(doc, p.viewId, 1);
+  const { x, y } = p.position;
+  const text = p.size * k;
+  if (!s) return { segments: new Float32Array([x, y, 0, x + k, y, 0]), labels: [{ text: "No colour scheme", position: [x, y, 0], size: text, align: "left" }] };
+  const rows = schemeLegend(s, schemeElements(doc, view, s).map((r) => valueOf(doc, s, r)));
+  const seg: number[] = [];
+  const fills: NonNullable<LineData["fills"]> = [];
+  const labels: LineData["labels"] = [{ text: s.params.title, position: [x, y, 0], size: text * 1.2, align: "left" }];
+  const w = 8 * k;
+  const h = 5 * k;
+  const pitch = 7 * k;
+  rows.forEach((r, i) => {
+    const top = y - 4 * k - i * pitch;
+    const box = [
+      { x, y: top },
+      { x: x + w, y: top },
+      { x: x + w, y: top - h },
+      { x, y: top - h },
+    ];
+    box.forEach((a, j) => {
+      const b = box[(j + 1) % 4]!;
+      seg.push(a.x, a.y, 0, b.x, b.y, 0);
+    });
+    fills.push({ loops: [box], color: r.color });
+    labels.push({ text: r.value, position: [x + w + 2 * k, top - h / 2, 0], size: text, align: "left" });
+  });
+  if (!rows.length) labels.push({ text: "(no values in this view)", position: [x, y - 5 * k, 0], size: text, align: "left" });
+  return { segments: new Float32Array(seg.length ? seg : [x, y, 0, x + k, y, 0]), labels, fills };
+}
+
+/** Schemes this plan can use: rooms in floor plans and callouts, areas in area plans. */
+export function schemesForView(doc: Document, view: Element<ViewParams>): ColorScheme[] {
+  return colorSchemes(doc, view.params.kind === "areaPlan" ? "Area" : "Room");
 }

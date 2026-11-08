@@ -47,7 +47,7 @@ import { buildCadImportLines } from "./dxf.ts";
 import { buildRevisionCloudLines } from "./revisions.ts";
 import { buildSymbolLines } from "./symbols.ts";
 import { buildDetailComponentLines } from "./detailcomponents.ts";
-import { buildAreaBoundaryLines, buildAreaLines, buildRoomLines, buildRoomSeparatorLines } from "./rooms.ts";
+import { buildAreaBoundaryLines, buildAreaLines, buildColorFillLegendLines, buildRoomLines, buildRoomSeparatorLines } from "./rooms.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
 import { wallProfileMesh, wallSweepSolids } from "./sweeps.ts";
 
@@ -208,6 +208,7 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.FilledRegion, buildAnnotationLines],
     [Cat.TextNote, buildAnnotationLines],
     [Cat.SpotElevation, buildAnnotationLines],
+    [Cat.ColorFillLegend, (d, e) => buildColorFillLegendLines(d, e)],
     [Cat.Dimension, buildAnnotationLines],
     [Cat.Room, buildRoomLines],
     [Cat.RoomSeparator, buildRoomSeparatorLines],

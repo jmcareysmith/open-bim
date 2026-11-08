@@ -44,6 +44,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Components / furniture (loadable families) | 3 | ✅ |
 | Model in-place | 3 | ⬜ |
 | Rooms, room separation, room bounding | 4 | ✅ |
+| Colour schemes, colour fill legends | 8b | ✅ (rooms by name/department/occupancy/number/area ranges; areas by name/area; per plan; no fill without a scheme) |
 | Areas & area plans (GFA, NLA) | 4 | ✅ |
 | Toposolid / topography, building pads, site components | 6 | ✅ (toposolid, pads, subregions, graded region cut/fill, property lines, site/parking components) |
 | Conceptual masses (in-place, loadable, Show Mass) | 8a | ✅ |

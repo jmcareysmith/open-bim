@@ -1,4 +1,5 @@
 import { areaBoundary, curtainGridLines, areaLoopsFromWalls, massFloorArea, massTotals, roomBoundary, scheduleFields, scheduleTable } from "@open-bim/geometry";
+import { openColorSchemes } from "./colorschemes.ts";
 import { curtainPart, partLabel, setCurtainPart } from "./curtainpart.ts";
 import {
   Cat,
@@ -185,6 +186,7 @@ import {
   type RoofExtrusion,
   type RoofTrims,
   setCurtainEdits,
+  colorSchemes,
   MULLION_PROFILES,
   curtainOf,
   type CurtainEdits,
@@ -1005,6 +1007,14 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
         for (const l of loops) l.forEach((a, i) => createAreaBoundary(tx, doc, view.id, a, l[(i + 1) % l.length]!));
       });
     sec.append(row("Area scheme", AREA_SCHEMES[scheme].label), row("", fromWalls));
+  }
+  if (p.kind === "floorPlan" || p.kind === "callout" || p.kind === "areaPlan") {
+    // Colour scheme (Revit: Color Scheme): fills rooms (areas in area plans) by a value.
+    const cat = p.kind === "areaPlan" ? "Area" : "Room";
+    const opts = [{ value: "", label: "<None>" }, ...colorSchemes(doc, cat).map((s) => ({ value: s.id, label: s.name ?? "Scheme" }))];
+    const editBtn = h("button", { textContent: "Edit\u2026", title: "Edit Color Scheme" });
+    editBtn.onclick = () => openColorSchemes(doc, ctx.status, cat, p.colorScheme ?? null);
+    sec.append(row("Colour scheme", h("div", { class: "buttons wrap" }, select(opts, p.colorScheme ?? "", (v) => set(v ? "Colour scheme" : "No colour scheme", { colorScheme: v || null })), editBtn)));
   }
   if ((p.kind === "floorPlan" || p.kind === "areaPlan") && p.range && p.levelId) {
     const range = p.range;
@@ -2641,6 +2651,8 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       sec.append(
         row("Name", textInput(r.name ?? "", (v) => edit(ctx, "Rename room", (tx) => tx.setName(r.id, v || undefined)))),
         row("Number", textInput(p.number, (v) => update<RoomParams>("Change room number", { number: v }))),
+        row("Department", textInput(p.department ?? "", (v) => update<RoomParams>("Change department", { department: v || null }))),
+        row("Occupancy", textInput(p.occupancy ?? "", (v) => update<RoomParams>("Change occupancy", { occupancy: v || null }))),
         row("Level", select(levelOpts, p.levelId, (v) => update<RoomParams>("Change room level", { levelId: v }))),
         row(
           "Upper limit",

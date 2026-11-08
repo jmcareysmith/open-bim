@@ -32,6 +32,7 @@ import { planLinework, type PlanLinework } from "./hlr.ts";
 import type { GeometryKernel } from "./kernel.ts";
 import { planFrame } from "./layers.ts";
 import { cleanCuts } from "./wallcleanup.ts";
+import { viewSchemeFill } from "./rooms.ts";
 import { ductPlanLevel, isRunCategory } from "./ducts.ts";
 import { hatch, patternFamilies } from "./patterns.ts";
 import { sectionAnnotations, sectionLinework, type Rect } from "./sections.ts";
@@ -141,9 +142,14 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
   for (const el of lineEls) {
     const owner = annotationView(el);
     if (section && !owner) continue; // sections draw their own level/grid annotations below
-    const lines = kernel.buildLines(doc, el, g.scale, g.detailLevel);
+    let lines = kernel.buildLines(doc, el, g.scale, g.detailLevel);
     if (!lines) continue;
     if (lines.planOnly && section) continue;
+    // Rooms and areas: the plan's colour scheme fills them (none: no fill).
+    if (lines.fill && (el.category === Cat.Room || el.category === Cat.Area)) {
+      const c = viewSchemeFill(doc, view as Element<ViewParams>, el);
+      lines = { ...lines, fill: c === null ? { ...lines.fill, hidden: true } : { ...lines.fill, color: c, hidden: false } };
+    }
     // Beam symbols belong to plans of the beam's level.
     if (el.category === Cat.Beam && (view.params as ViewParams).levelId !== (el.params as { levelId?: string }).levelId) continue;
     // So do duct outlines.
@@ -237,7 +243,8 @@ export function addLineData(out: Drawing, lines: LineData, kind: StrokeKind, sty
   const seg: number[] = [];
   for (let i = 0; i < lines.segments.length; i += 6) seg.push(lines.segments[i]!, lines.segments[i + 1]!, lines.segments[i + 3]!, lines.segments[i + 4]!);
   if (seg.length) out.strokes.push({ kind, segments: seg, ...style, ...(lines.dashed ? { dashed: true } : {}) });
-  if (lines.fill) out.fills.push({ kind: "region", loops: lines.fill.loops, color: lines.fill.color, ...(style.id ? { id: style.id } : {}) });
+  if (lines.fill && !lines.fill.hidden) out.fills.push({ kind: "region", loops: lines.fill.loops, color: lines.fill.color, ...(style.id ? { id: style.id } : {}) });
+  for (const f of lines.fills ?? []) out.fills.push({ kind: "region", loops: f.loops, color: f.color, ...(style.id ? { id: style.id } : {}) });
   for (const l of lines.labels) {
     out.texts.push({
       text: l.text,

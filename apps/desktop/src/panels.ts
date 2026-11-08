@@ -348,6 +348,8 @@ export interface PanelContext {
   addShapePoints(id: ElementId, height: number): void;
   /** Edit Profile: sketch a wall's outline in the open section/elevation. */
   sketchWallProfile(id: ElementId): void;
+  /** Roofs: sketch a vertical opening through it. */
+  sketchRoofOpening(id: ElementId): void;
   /** Text: click where a new leader points. */
   addTextLeader(id: ElementId): void;
   activeViewId(): ElementId | undefined;
@@ -3281,6 +3283,18 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Base elevation", len(roofBaseElevation(doc, r))),
       );
       sec.append(...roofTrimRows(ctx, r));
+      if (!p.extrusion) {
+        // Vertical openings (skylights, voids).
+        const add = h("button", { textContent: "Sketch opening", title: "Sketch an outline; it's cut straight down through the roof" });
+        add.onclick = () => ctx.sketchRoofOpening(r.id);
+        const btns: HTMLElement[] = [add];
+        if (p.openings?.length) {
+          const rm = h("button", { textContent: `Remove openings (${p.openings.length})` });
+          rm.onclick = () => update<RoofParams>("Remove roof openings", { openings: null });
+          btns.push(rm);
+        }
+        sec.append(row("Openings", h("div", { class: "buttons wrap" }, ...btns)));
+      }
       if (p.extrusion) {
         sec.append(...extrusionRoofRows(ctx, r));
         break;

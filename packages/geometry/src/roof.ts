@@ -1,3 +1,4 @@
+import polygonClipping from "polygon-clipping";
 import earcut from "earcut";
 import {
   planeHeight,
@@ -208,6 +209,65 @@ function footprintRoofBody(roof: Roof, base: number, t: number): MeshData {
     }
     idx.push(i0, i0 + 1, i0 + 2);
   };
+
+  const openings = (roof.params.openings ?? []).filter((o) => o.length >= 3);
+  if (openings.length) {
+    // Vertical openings: each cell less the openings, triangulated; faces down the openings' sides.
+    const ring = (l: Vec2[]): [number, number][] => [...l.map((q): [number, number] => [q.x, q.y]), [l[0]!.x, l[0]!.y]];
+    for (const { poly, plane } of cells) {
+      const h = (p: Vec2) => (plane ? Math.max(0, planeHeight(plane, p)) : 0);
+      for (const piece of polygonClipping.difference([ring(poly)], ...openings.map((o) => [ring(o)]))) {
+        const rings = piece.map((r) => r.slice(0, -1).map(([x, y]) => ({ x, y })));
+        const flat: number[] = [];
+        const holeIdx: number[] = [];
+        rings.forEach((r, k) => {
+          if (k > 0) holeIdx.push(flat.length / 2);
+          for (const q of r) flat.push(q.x, q.y);
+        });
+        const all = rings.flat();
+        const tris = earcut(flat, holeIdx);
+        const B = (q: Vec2) => [q.x, q.y, base + h(q)];
+        const T = (q: Vec2) => [q.x, q.y, base + h(q) + t];
+        for (let k = 0; k < tris.length; k += 3) {
+          let [a, b, c] = [all[tris[k]!]!, all[tris[k + 1]!]!, all[tris[k + 2]!]!];
+          if ((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x) < 0) [b, c] = [c, b];
+          tri(T(a), T(b), T(c));
+          tri(B(a), B(c), B(b));
+        }
+        // Ring edges on the footprint (eaves, gables) or on an opening get vertical faces. Rings keep
+        // the roof on their left, so (a → b) × up faces out.
+        for (const r of rings) {
+          const left = signedArea(r) > 0 === (r === rings[0]);
+          const rr = left ? r : [...r].reverse();
+          const face = (a: Vec2, b: Vec2) => {
+            tri(B(a), B(b), T(b));
+            tri(B(a), T(b), T(a));
+          };
+          rr.forEach((a, k) => {
+            const b = rr[(k + 1) % rr.length]!;
+            if (onBoundary(a, b, boundary)) return face(a, b);
+            // The stretches of this edge that run along an opening's edge (an opening can straddle
+            // the line between two roof cells, so only part of a cell's edge may face it).
+            const len = Math.hypot(b.x - a.x, b.y - a.y);
+            if (len < 1e-6) return;
+            const d = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
+            const along = (q: Vec2) => (q.x - a.x) * d.x + (q.y - a.y) * d.y;
+            const off = (q: Vec2) => Math.abs((q.x - a.x) * d.y - (q.y - a.y) * d.x);
+            for (const o of openings)
+              o.forEach((c, m) => {
+                const e = o[(m + 1) % o.length]!;
+                if (off(c) > 0.5 || off(e) > 0.5) return;
+                const t0 = Math.max(0, Math.min(along(c), along(e)));
+                const t1 = Math.min(len, Math.max(along(c), along(e)));
+                if (t1 - t0 < 1) return;
+                face({ x: a.x + d.x * t0, y: a.y + d.y * t0 }, { x: a.x + d.x * t1, y: a.y + d.y * t1 });
+              });
+          });
+        }
+      }
+    }
+    return { positions: new Float32Array(pos), normals: new Float32Array(nor), indices: new Uint32Array(idx) };
+  }
 
   for (const { poly, plane } of cells) {
     const h = (p: Vec2) => (plane ? Math.max(0, planeHeight(plane, p)) : 0);

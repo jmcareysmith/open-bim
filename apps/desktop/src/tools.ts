@@ -84,6 +84,7 @@ import {
   createColorFillLegend,
   createInsulation,
   createShaft,
+  type RoofParams,
   type TextNoteParams,
   createAngularDimension,
   createRadialDimension,
@@ -665,7 +666,7 @@ export class ReferencePlaneTool extends DatumLineTool {
 
 // ---- Sketch (floors, ceilings) --------------------------------------------
 
-type SketchKind = "floor" | "ceiling" | "roof" | "region" | "cloud" | "toposolid" | "pad" | "subregion" | "property" | "shaft" | "extrusion" | "blend" | "revolution";
+type SketchKind = "floor" | "ceiling" | "roof" | "region" | "cloud" | "toposolid" | "pad" | "subregion" | "property" | "shaft" | "roofopening" | "extrusion" | "blend" | "revolution";
 
 const SKETCH: Record<SketchKind, { category: string; typeCategory: string; label: string }> = {
   floor: { category: Cat.Floor, typeCategory: Cat.FloorType, label: "Floor" },
@@ -678,6 +679,7 @@ const SKETCH: Record<SketchKind, { category: string; typeCategory: string; label
   subregion: { category: Cat.SiteSubregion, typeCategory: "", label: "Subregion" },
   property: { category: Cat.PropertyLine, typeCategory: "", label: "Property line" },
   shaft: { category: Cat.Shaft, typeCategory: "", label: "Shaft opening" },
+  roofopening: { category: Cat.Roof, typeCategory: "", label: "Roof opening" },
   extrusion: { category: Cat.Extrusion, typeCategory: "", label: "Extrusion" },
   blend: { category: Cat.Blend, typeCategory: "", label: "Blend (bottom loop, then top loop)" },
   revolution: { category: Cat.Revolution, typeCategory: "", label: "Revolve (profile right of the centre line)" },
@@ -690,6 +692,8 @@ const SKETCH: Record<SketchKind, { category: string; typeCategory: string; label
  */
 export class SketchTool implements Tool {
   readonly name: SketchKind;
+  /** Roof openings: the roof they go in. */
+  target: ElementId | null = null;
   private loops: Vec2[][] = [];
   private current: Vec2[] = [];
   private cursor: Vec2 | null = null;
@@ -908,6 +912,18 @@ export class SketchTool implements Tool {
         doc.transact(`Edit ${this.def.label.toLowerCase()} boundary`, (tx) => tx.update(editing, patch));
         id = editing;
       } else {
+        if (this.name === "roofopening") {
+          const roofId = this.target;
+          const roof = roofId ? doc.get<RoofParams>(roofId) : undefined;
+          if (!roof || roof.category !== Cat.Roof) throw new Error("Select a roof first");
+          if (roof.params.extrusion) throw new Error("Openings go in footprint roofs");
+          doc.transact("Roof opening", (tx) => tx.update<RoofParams>(roof.id, { openings: [...(roof.params.openings ?? []), region.boundary] }));
+          this.reset();
+          this.redraw();
+          this.ctx.setSelection([roof.id]);
+          this.ctx.status("Opening cut through the roof. Sketch another, or Esc.");
+          return;
+        }
         if (this.name === "shaft") {
           const sh = doc.transact("Create shaft opening", (tx) => createShaft(tx, doc, this.ctx.activeLevelId(), region.boundary));
           this.reset();

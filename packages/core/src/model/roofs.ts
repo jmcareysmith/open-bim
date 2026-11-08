@@ -22,6 +22,8 @@ export type RoofParams = {
   extrusion?: RoofExtrusion | null;
   /** Fascia, gutter and soffit along the eaves. */
   trims?: RoofTrims | null;
+  /** Vertical openings through the roof (skylights, voids), plan outlines. Footprint roofs only. */
+  openings?: Vec2[][] | null;
 };
 export type Roof = Element<RoofParams>;
 

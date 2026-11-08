@@ -455,6 +455,10 @@ const ctx: ModifyToolContext & PanelContext = {
     (tools.leader as LeaderTool).textId = id;
     setTool("leader");
   },
+  sketchRoofOpening(id) {
+    (tools.roofopening as SketchTool).target = id;
+    setTool("roofopening");
+  },
   sketchWallProfile(id) {
     (tools.wallProfile as WallProfileTool).wallId = id;
     setTool("wallProfile");
@@ -507,6 +511,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   subregion: new SketchTool(ctx, "subregion"),
   property: new SketchTool(ctx, "property"),
   shaft: new SketchTool(ctx, "shaft"),
+  roofopening: new SketchTool(ctx, "roofopening"),
   text: new TextTool(ctx),
   dimension: new DimensionTool(ctx),
   room: new RoomTool(ctx),

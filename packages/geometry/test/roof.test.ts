@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Document, applyResidentialTemplate, createRoof, type Vec2 } from "@open-bim/core";
+import { Document, applyResidentialTemplate, createRoof, type RoofParams, type Vec2 } from "@open-bim/core";
 import { SimpleKernel, boundingBox, meshVolume } from "../src/index.ts";
 
 const deg = (d: number) => (d * Math.PI) / 180;
@@ -47,5 +47,24 @@ describe("roof geometry", () => {
     const m = roof([p(0, 0), p(4000, 0), p(4000, 3000), p(0, 3000)], [null, null, null, null]);
     expect(meshVolume(m)).toBeCloseTo(4000 * 3000 * T, -4);
     expect(boundingBox(m).max[2]).toBeCloseTo(BASE + T);
+  });
+
+  it("vertical openings cut through, faced down their sides", () => {
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const r = doc.transact("Roof", (tx) => createRoof(tx, ids.roofTypes.steel, ids.levels.roof, [p(0, 0), p(10000, 0), p(10000, 6000), p(0, 6000)], { slopes: Array(4).fill(deg(30)) }));
+    const k = new SimpleKernel();
+    const before = meshVolume(k.build(doc, r)!);
+    // A 1000 × 1000 skylight on one slope, and one straddling the hip/ridge.
+    doc.transact("Openings", (tx) =>
+      tx.update<RoofParams>(r.id, {
+        openings: [
+          [p(4000, 500), p(5000, 500), p(5000, 1500), p(4000, 1500)],
+          [p(4500, 2500), p(5500, 2500), p(5500, 3500), p(4500, 3500)],
+        ],
+      }),
+    );
+    const after = meshVolume(k.build(doc, doc.require(r.id))!);
+    expect(before - after).toBeCloseTo(2e6 * T, -5);
   });
 });

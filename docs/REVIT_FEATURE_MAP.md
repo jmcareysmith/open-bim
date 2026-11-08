@@ -39,7 +39,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Roofs (footprint, extrusion, slopes, fascia/gutter) | 1 | ✅ (footprint: exact for convex/L/T/U; extrusion: gable/mono/curved/points profile; fascia, gutter, soffit on eaves; barge boards on gable rakes) |
 | Ceilings | 1 | 🟨 |
 | Doors & windows (hosted, cut openings) | 1 | 🟨 |
-| Openings (shaft, wall, vertical) | 1 | 🟨 (wall openings; shaft openings cut floors/ceilings between levels; no vertical/by-face openings) |
+| Openings (shaft, wall, vertical) | 1 | 🟨 (wall openings; shaft openings cut floors/ceilings between levels; vertical openings in footprint roofs; floors via sketch holes) |
 | Stairs (run, landing, sketch) & railings | 6 | ✅ (multi-run L/U with landings; winders at square turns (2–4); curved runs (per-run curve)) |
 | Ramps | 6 | ✅ |
 | Components / furniture (loadable families) | 3 | ✅ |

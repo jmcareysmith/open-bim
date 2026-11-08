@@ -246,7 +246,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   core `wallProfileMapping`; `profile` in wall coords).
 - Roof ▾ → Roof by Extrusion (two corners in plan; profile across the shorter side; Properties: Gable/Mono/
   Curved or points, extrusion start/end; walls attach to it). Roof Properties → Eaves: fascia, gutter (quad/
-  half round), soffit depth, barge board up gable rakes (`trims`; core `roofRakes`; core `roofEaves`, geometry `roofTrimMeshes`, `profilePrism`).
+  half round), soffit depth, barge board up gable rakes, vertical openings (Properties → Sketch opening; `openings`) (`trims`; core `roofRakes`; core `roofEaves`, geometry `roofTrimMeshes`, `profilePrism`).
 - Dimensions in sections/elevations (Aligned tool: levels, grids and walls crossing the view stay live —
   `resolveRef(doc, ref, viewId)`; other clicks are fixed points). Spot Elevation (EL; Annotate → Dimension;
   core/model/spots.ts): floor/roof/toposolid top live, else the section point or plan level; +2.700 m text.

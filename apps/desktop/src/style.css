@@ -402,3 +402,40 @@ body.pane-dragging canvas { pointer-events: none; }
 .cs-table th, .cs-table td { text-align: left; padding: 2px 6px; border-bottom: 1px solid #e3e6ea; }
 .cs-table tr.unused td { color: #9aa3ad; }
 .cs .dlg-field input, .cs .dlg-field select { width: 200px; max-width: 100%; }
+
+/* Visual programming editor */
+.ge { position: fixed; inset: 40px; z-index: 50; display: flex; flex-direction: column; background: #f4f5f7; border: 1px solid #b9c0c8; box-shadow: 0 8px 30px rgba(0,0,0,.25); font: 12px system-ui, sans-serif; }
+.ge-bar { display: flex; gap: 6px; align-items: center; padding: 6px 8px; border-bottom: 1px solid #ccd2d8; background: #e9ecef; }
+.ge-spacer { flex: 1; }
+.ge-auto { display: flex; gap: 3px; align-items: center; }
+.ge-body { flex: 1; display: flex; min-height: 0; }
+.ge-lib { width: 190px; display: flex; flex-direction: column; border-right: 1px solid #ccd2d8; background: #fbfbfc; }
+.ge-lib input { margin: 6px; }
+.ge-libList { overflow: auto; flex: 1; padding: 0 6px 8px; }
+.ge-libCat { margin: 8px 0 2px; font-weight: 600; color: #5a6470; text-transform: uppercase; font-size: 10px; }
+.ge-libItem { display: block; width: 100%; text-align: left; border: none; background: none; padding: 3px 4px; cursor: pointer; }
+.ge-libItem:hover { background: #dce9fb; }
+.ge-canvas { flex: 1; position: relative; overflow: hidden; background-color: #fff; background-image: radial-gradient(#d5dae0 1px, transparent 1px); background-size: 20px 20px; cursor: grab; }
+.ge-world { position: absolute; left: 0; top: 0; }
+.ge-links { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; }
+.ge-link { fill: none; stroke: #6b7785; stroke-width: 2; pointer-events: stroke; cursor: pointer; }
+.ge-link:hover { stroke: #c0392b; stroke-width: 3; }
+.ge-temp { fill: none; stroke: #2f6fd6; stroke-width: 2; stroke-dasharray: 5 3; }
+.ge-empty { padding: 30px; color: #7a838d; }
+.ge-node { position: absolute; min-width: 150px; background: #fff; border: 1px solid #9aa4ae; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.15); cursor: default; }
+.ge-node.sel { border-color: #2f6fd6; box-shadow: 0 0 0 2px #9ec2f5; }
+.ge-node.err { border-color: #c0392b; }
+.ge-title { padding: 4px 8px; background: #e6eaee; border-bottom: 1px solid #cdd3d9; font-weight: 600; cursor: move; border-radius: 4px 4px 0 0; }
+.ge-setting { display: flex; gap: 6px; align-items: center; justify-content: space-between; padding: 2px 8px; }
+.ge-setting input, .ge-setting select { width: 90px; }
+.ge-ports { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; }
+.ge-port { display: flex; align-items: center; gap: 4px; height: 20px; }
+.ge-port.out { justify-content: flex-end; }
+.ge-dot { width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 2px solid #6b7785; flex: none; }
+.ge-port.in .ge-dot { margin-left: -6px; }
+.ge-port.out .ge-dot { margin-right: -6px; cursor: crosshair; }
+.ge-port.out .ge-dot:hover, .ge-port.in .ge-dot:hover { border-color: #2f6fd6; background: #dce9fb; }
+.ge-val { width: 60px; font-size: 11px; padding: 0 2px; }
+.ge-out, .ge-watch, .ge-error { padding: 2px 8px 4px; color: #4a5560; font-size: 11px; border-top: 1px dashed #e0e4e8; max-width: 260px; overflow-wrap: anywhere; }
+.ge-watch { background: #f6f9fd; color: #1d3f6e; }
+.ge-error { color: #c0392b; }

@@ -2,6 +2,7 @@ import { openObjectStyles } from "./objectstyles.ts";
 import { ContainmentTool } from "./containtool.ts";
 import { FaceTool } from "./facetool.ts";
 import { openColorSchemes } from "./colorschemes.ts";
+import { openGraphEditor } from "./grapheditor.ts";
 import { curtainPart, onCurtainPart, setCurtainPart } from "./curtainpart.ts";
 import { MANAGE_SECTIONS, projectSection } from "./panels.ts";
 import { openMaterialBrowser } from "./materialbrowser.ts";
@@ -1091,6 +1092,7 @@ const commands: Record<string, () => void | Promise<void>> = {
     if (v) ctx.setActiveView(v.id);
     else status("\u26a0 No floor plan for this level");
   },
+  visualProgramming: () => openGraphEditor({ doc, status, selection: () => selection }),
   wallStraight() {
     (tools.wall as WallTool).arc = false;
     setTool("wall");

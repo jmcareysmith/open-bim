@@ -257,4 +257,10 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Properties → Curve; arc walls' footprint is the band along the arc (no joins/cleanup, openings refused,
   no sweeps/profile, not curtain/stacked); grids draw dashes and bubbles along the arc (skipped in sections
   and dimensions). Selected arc walls' grips/length label still use the chord.
-- Phase 8b is done (2026-11-09). Next: rest of Phase 8 (visual programming) unless Jeremy reprioritises.
+- Phase 8b is done (2026-11-09).
+- Visual programming (Phase 8 done): Manage → Visual Programming (apps/desktop/src/grapheditor.ts): graphs
+  per project (New/Rename/Delete), library (search, click to add), drag output dot → input dot to link,
+  click a link to remove, Delete removes a node, unlinked inputs take values, Run (one undo step) or
+  Automatic; values/errors under nodes. Engine: core/model/graphs.ts (+ graphnodes.ts library), see
+  ARCHITECTURE.md. Next (Jeremy): back to Revit parity (arc-wall gaps, curved stairs, angular/radial
+  dimensions, barge boards, elevation sketch profiles). Jeremy caps usage: 75% of weekly by Wednesday.

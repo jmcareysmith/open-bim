@@ -454,6 +454,10 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
           ],
         },
         {
+          title: "Visual Programming",
+          items: [{ label: "Visual Programming", icon: "parameters", cmd: "visualProgramming", large: true, title: "Node graphs that make and change the model (Dynamo-like)" }],
+        },
+        {
           title: "Phasing & Options",
           items: [
             { label: "Design Options", icon: "options", cmd: "manageDesignOptions", large: true, title: "Design option sets and options" },

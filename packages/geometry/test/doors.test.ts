@@ -13,15 +13,21 @@ function setup() {
 }
 
 describe("door geometry", () => {
-  it("frame through the wall plus a closed 40 mm leaf", () => {
+  it("frame through the wall, architraves both faces, a closed 40 mm leaf and handles", () => {
     const { doc, ids, wall, k } = setup();
     const d = doc.transact("D", (tx) => createDoor(tx, doc, ids.doorTypes.single810, wall.id, 2000));
     const m = k.build(doc, d)!;
     const jambs = 2 * 30 * T * 2010;
     const head = 810 * T * 30;
     const leaf = 810 * 40 * 1980;
-    expect(meshVolume(m)).toBeCloseTo(jambs + head + leaf, -3);
-    expect(boundingBox(m)).toEqual({ min: [2000 - 435, -55, 0], max: [2000 + 435, 55, 2010] });
+    // 70 × 18 architraves: two legs and a head each side.
+    const arch = 2 * (2 * 70 * 18 * 2080 + 870 * 18 * 70);
+    const handles = 2 * (20 * 50 * 20 + 130 * 20 * 18);
+    expect(meshVolume(m)).toBeCloseTo(jambs + head + leaf + arch + handles, -3);
+    // Architraves stand 70 past the opening and 18 off each face.
+    expect(boundingBox(m)).toEqual({ min: [2000 - 435 - 70, -80, 0], max: [2000 + 435 + 70, 80, 2080] }); // handles stand 80 off the leaf centre
+    // Trim, timber and metal colours.
+    expect(m.colors).toBeDefined();
   });
 
   it("draws its swing in plan only, on the facing side, hinged per hand", () => {
@@ -43,14 +49,14 @@ describe("window geometry", () => {
     const w = doc.transact("Win", (tx) => createWindow(tx, doc, ids.windowTypes.w1200x1200, wall.id, 2000));
     const m = k.build(doc, w)!;
     const bb = boundingBox(m);
-    expect(bb.min[2]).toBe(900);
+    // A sill sits just under the frame, standing 40 out from the exterior face.
+    expect(bb.min[2]).toBe(875);
     expect(bb.max[2]).toBe(2100);
     expect(bb.min[1]).toBeCloseTo(-50); // 100 deep frame inside a 110 wall
-    const frame = (2 * 50 * 1200 + 2 * 1100 * 50) * 100;
-    const glass = 1100 * 1100 * 10;
-    expect(meshVolume(m)).toBeCloseTo(frame + glass, -3);
-    // The glazing is the last box, flagged for rendering.
-    expect(m.glass).toEqual({ start: m.indices.length - 36, count: 36 });
+    expect(bb.max[1]).toBeCloseTo(55 + 40);
+    // Wider than 1000: two sashes either side of a mullion, each with its own glass.
+    expect(m.glass!.count).toBe(2 * 36);
+    expect(m.glass!.start + m.glass!.count).toBe(m.indices.length);
   });
 });
 

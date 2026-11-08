@@ -48,23 +48,44 @@ export function mergeMeshes(meshes: MeshData[]): MeshData {
   const positions = new Float32Array(n);
   const normals = new Float32Array(n);
   const indices = new Uint32Array(k);
+  // Vertex colours survive the merge (white where a part has none).
+  const colored = meshes.some((m) => m.colors);
+  const colors = colored ? new Float32Array(n).fill(1) : null;
   let po = 0;
   let io = 0;
   for (const m of meshes) {
     positions.set(m.positions, po);
     normals.set(m.normals, po);
+    if (colors && m.colors) colors.set(m.colors, po);
     for (let i = 0; i < m.indices.length; i++) indices[io + i] = m.indices[i]! + po / 3;
     po += m.positions.length;
     io += m.indices.length;
   }
-  return { positions, normals, indices };
+  return colors ? { positions, normals, indices, colors } : { positions, normals, indices };
 }
 
 function host(doc: Document, el: Element): Wall {
   return doc.require((el.params as { hostId: string }).hostId) as Wall;
 }
 
-/** Door: two jambs and a head through the wall's thickness, with a closed leaf in the middle. */
+/** Painted trim, timber leaf, satin chrome hardware (Revit's default door look). */
+const TRIM: RGB = [0.93, 0.92, 0.89];
+const TIMBER: RGB = [0.56, 0.39, 0.25];
+const METAL: RGB = [0.66, 0.68, 0.7];
+const ARCHITRAVE = 70;
+const ARCHITRAVE_T = 18;
+type RGB = [number, number, number];
+
+function paint(m: MeshData, c: RGB): MeshData {
+  const colors = new Float32Array(m.positions.length);
+  for (let i = 0; i < colors.length; i += 3) colors.set(c, i);
+  return { ...m, colors };
+}
+
+/**
+ * Door: jambs and head through the wall, architraves round the opening on both faces, the leaf
+ * in the middle and a lever handle each side on the latch edge.
+ */
 export function buildDoor(doc: Document, el: Element): MeshData {
   const p = doorPlacement(doc, el);
   const f = wallFrame(doc, host(doc, el), p.position);
@@ -74,12 +95,35 @@ export function buildDoor(doc: Document, el: Element): MeshData {
   const z0 = f.bottom + p.sillHeight;
   const z1 = z0 + p.height;
   const fw = t.frameWidth;
-  return mergeMeshes([
-    box(f, u0, u0 + fw, -f.half, f.half, z0, z1),
-    box(f, u1 - fw, u1, -f.half, f.half, z0, z1),
-    box(f, u0 + fw, u1 - fw, -f.half, f.half, z1 - fw, z1),
-    box(f, u0 + fw, u1 - fw, -LEAF / 2, LEAF / 2, z0, z0 + t.leafHeight),
-  ]);
+  const parts: MeshData[] = [
+    paint(box(f, u0, u0 + fw, -f.half, f.half, z0, z1), TRIM),
+    paint(box(f, u1 - fw, u1, -f.half, f.half, z0, z1), TRIM),
+    paint(box(f, u0 + fw, u1 - fw, -f.half, f.half, z1 - fw, z1), TRIM),
+    paint(box(f, u0 + fw, u1 - fw, -LEAF / 2, LEAF / 2, z0, z0 + t.leafHeight), TIMBER),
+  ];
+  const A = ARCHITRAVE;
+  for (const s of [1, -1]) {
+    const va = s > 0 ? f.half : -f.half - ARCHITRAVE_T;
+    const vb = va + ARCHITRAVE_T;
+    parts.push(
+      paint(box(f, u0 - A, u0, va, vb, z0, z1 + A), TRIM),
+      paint(box(f, u1, u1 + A, va, vb, z0, z1 + A), TRIM),
+      paint(box(f, u0, u1, va, vb, z1, z1 + A), TRIM),
+    );
+  }
+  // Lever handles at 1000, 60 in from the latch edge, pointing back towards the hinge.
+  const handFlipped = !!(el.params as DoorParams).handFlipped;
+  const latch = p.position + (handFlipped ? -1 : 1) * (t.leafWidth / 2 - 60);
+  const toHinge = handFlipped ? 1 : -1;
+  const zh = z0 + 1000;
+  for (const s of [1, -1]) {
+    const v0 = s > 0 ? LEAF / 2 : -LEAF / 2 - 50;
+    parts.push(paint(box(f, latch - 10, latch + 10, v0, v0 + 50, zh - 10, zh + 10), METAL));
+    const vl = s > 0 ? LEAF / 2 + 40 : -LEAF / 2 - 60;
+    const ua = Math.min(latch, latch + toHinge * 130);
+    parts.push(paint(box(f, ua, ua + 130, vl, vl + 20, zh - 9, zh + 9), METAL));
+  }
+  return mergeMeshes(parts);
 }
 
 /** Plan symbol: the leaf drawn open at 90° and its swing arc, just above the door's sill. */
@@ -116,13 +160,28 @@ export function buildWindow(doc: Document, el: Element): MeshData {
   const z1 = z0 + p.height;
   const fw = t.frameWidth;
   const d = Math.min(WINDOW_DEPTH, f.half * 2) / 2;
-  const frame = mergeMeshes([
+  const parts: MeshData[] = [
     box(f, u0, u0 + fw, -d, d, z0, z1),
     box(f, u1 - fw, u1, -d, d, z0, z1),
     box(f, u0 + fw, u1 - fw, -d, d, z0, z0 + fw),
     box(f, u0 + fw, u1 - fw, -d, d, z1 - fw, z1),
-  ]);
-  const glass = box(f, u0 + fw, u1 - fw, -GLASS / 2, GLASS / 2, z0 + fw, z1 - fw);
+    // A sill standing out from the exterior face (left of the wall's direction).
+    box(f, u0 - 30, u1 + 30, d, f.half + 40, z0 - 25, z0 + 5),
+  ];
+  // Wide windows split into two sashes with a mullion; each sash a slim frame round its glass.
+  const panes: [number, number][] = p.width > 1000 ? [[u0 + fw, p.position - fw / 2], [p.position + fw / 2, u1 - fw]] : [[u0 + fw, u1 - fw]];
+  if (panes.length > 1) parts.push(box(f, p.position - fw / 2, p.position + fw / 2, -d, d, z0 + fw, z1 - fw));
+  const S = 35;
+  for (const [a, b] of panes) {
+    parts.push(
+      box(f, a, a + S, -20, 20, z0 + fw, z1 - fw),
+      box(f, b - S, b, -20, 20, z0 + fw, z1 - fw),
+      box(f, a + S, b - S, -20, 20, z0 + fw, z0 + fw + S),
+      box(f, a + S, b - S, -20, 20, z1 - fw - S, z1 - fw),
+    );
+  }
+  const frame = mergeMeshes(parts);
+  const glass = mergeMeshes(panes.map(([a, b]) => box(f, a + S, b - S, -GLASS / 2, GLASS / 2, z0 + fw + S, z1 - fw - S)));
   return { ...mergeMeshes([frame, glass]), glass: { start: frame.indices.length, count: glass.indices.length } };
 }
 

@@ -1,5 +1,5 @@
 import type { ToolOption } from "./modifytools.ts";
-import { createScopeBox, pointCloudPoints, type PointCloud, type PointCloudParams,
+import { createBeamSystem, createScopeBox, pointCloudPoints, type PointCloud, type PointCloudParams,
   boundaryFromWalls,
   PICK_WALL_LINES,
   type PickWallLine,
@@ -1752,6 +1752,49 @@ export class FootingTool implements Tool {
       if (!p) return;
       const f = doc.transact("Create pad footing", (tx) => createPadFooting(tx, doc, this.ctx.activeLevelId(), p));
       this.ctx.setSelection([f.id]);
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
+  }
+}
+
+/** Beam System (Revit: Structure → Beam System): click a floor; beams at a spacing under it. */
+export class BeamSystemTool implements Tool {
+  readonly name = "beamsystem";
+  spacing = 450;
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    if (!this.ctx.doc.byCategory(Cat.StructuralType).length) this.ctx.doc.transact("Load structural sections", (tx) => ensureStructuralTypes(tx, this.ctx.doc));
+    this.ctx.status(`Beam System: click a floor; beams of the chosen type span its short way at ${this.spacing} centres (type a spacing + Enter to change).`);
+  }
+
+  private typed = "";
+
+  key(ev: KeyboardEvent): boolean {
+    if (/^[0-9]$/.test(ev.key)) {
+      this.typed += ev.key;
+      this.ctx.status(`Beam System spacing: ${this.typed} (Enter)`);
+      return true;
+    }
+    if (ev.key === "Enter" && this.typed) {
+      this.spacing = Math.max(100, Number(this.typed));
+      this.typed = "";
+      this.activate();
+      return true;
+    }
+    return false;
+  }
+
+  click(ev: PointerEvent): void {
+    const { doc } = this.ctx;
+    const hit = this.ctx.viewport.pickHit(ev, (id) => doc.get(id)?.category === Cat.Floor);
+    if (!hit) return this.ctx.status("\u26a0 Click a floor.");
+    try {
+      const typeId = sectionType(this.ctx, (n) => n.includes("190x45") || n.includes("UB"));
+      const beams = doc.transact("Create beam system", (tx) => createBeamSystem(tx, doc, typeId, hit.id, { spacing: this.spacing }));
+      this.ctx.setSelection(beams.map((b) => b.id));
+      this.ctx.status(`${beams[0]!.params.system}: ${beams.length} beams at ${this.spacing} centres.`);
     } catch (err) {
       this.ctx.status(`\u26a0 ${(err as Error).message}`);
     }

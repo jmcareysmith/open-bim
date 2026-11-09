@@ -4,6 +4,10 @@ import {
   applyResidentialTemplate,
   createBeam,
   createBrace,
+  createBeamSystem,
+  createFloor,
+  floorExtent,
+  type Floor,
   ensureFoundationSlabType,
   createColumn,
   createPadFooting,
@@ -24,6 +28,29 @@ function setup() {
 }
 
 describe("structure", () => {
+  it("beam systems fill a floor at a spacing, spanning its short way, under its underside", () => {
+    const { doc, ids, byName } = setup();
+    const slab = doc.byCategory("FloorType")[0]!.id;
+    // 6 m wide (x) by 4 m deep (y), with a 1 m square hole: beams run along y (short way), across x.
+    const f = doc.transact("F", (tx) =>
+      createFloor(tx, slab, ids.levels.first, [{ x: 0, y: 0 }, { x: 6000, y: 0 }, { x: 6000, y: 4000 }, { x: 0, y: 4000 }], { holes: [[{ x: 2500, y: 1500 }, { x: 2500, y: 2500 }, { x: 3500, y: 2500 }, { x: 3500, y: 1500 }]] }),
+    );
+    const beams = doc.transact("S", (tx) => createBeamSystem(tx, doc, byName("Timber 190x45 SG8"), f.id, { spacing: 600 }));
+    const xs = [...new Set(beams.map((b) => b.params.start.x))].sort((a, b) => a - b);
+    // (6000 − 2×300) / 600 = 9 gaps → 10 lines, centred: 300, 900 … 5700.
+    expect(xs).toHaveLength(10);
+    expect(xs[0]).toBeCloseTo(300);
+    expect(xs[1]! - xs[0]!).toBeCloseTo(600);
+    // Lines through the hole (x 2700, 3300) are split in two.
+    expect(beams.filter((b) => Math.abs(b.params.start.x - 2700) < 1)).toHaveLength(2);
+    expect(beams.every((b) => b.params.system === "Beam System 1")).toBe(true);
+    const lv = 2700;
+    expect(beams[0]!.params.offset).toBeCloseTo(floorExtent(doc, doc.require(f.id) as Floor).bottom - lv);
+    const again = doc.transact("S", (tx) => createBeamSystem(tx, doc, byName("Timber 190x45 SG8"), f.id, { spacing: 1200, direction: "long" }));
+    expect(again[0]!.params.system).toBe("Beam System 2");
+    expect(again[0]!.params.start.y).toBe(again[0]!.params.end.y); // long way: along x
+  });
+
   it("braces slope from the level up to the level above, section square to the axis", () => {
     const { doc, ids, byName } = setup();
     const t = byName("Steel SHS 100x100x4");

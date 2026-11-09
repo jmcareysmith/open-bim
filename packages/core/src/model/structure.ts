@@ -1,7 +1,7 @@
 import { registerCategory } from "../categories.ts";
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
-import { Cat, type LevelParams } from "./architecture.ts";
+import { Cat, floorExtent, type Floor, type LevelParams } from "./architecture.ts";
 
 // Structure (Revit: Structural Column, Beam, Foundation). Columns and beams take a section type
 // (rectangle, circle, I-section, SHS); columns run between levels, beams along a line with their
@@ -42,6 +42,8 @@ export type BeamParams = {
   endOffset?: number | null;
   /** Structural brace (Revit: Brace): drawn in plan as a dashed line with its slope. */
   brace?: boolean | null;
+  /** Beam systems: the system's name, shared by its beams (Revit: Structural Beam System). */
+  system?: string | null;
   /** Tributary width for floor area loads, mm (unset: worked out from neighbouring beams). */
   tributary?: number | null;
 };
@@ -107,6 +109,74 @@ export function createBeam(tx: Transaction, doc: Document, typeId: ElementId, le
   requireSection(doc, typeId);
   if (Math.hypot(end.x - start.x, end.y - start.y) < 1) throw new Error("A beam needs a length");
   return tx.create<BeamParams>(Cat.Beam, { levelId, offset: 0, start: { ...start }, end: { ...end } }, { typeId }) as Beam;
+}
+
+export interface BeamSystemOptions {
+  /** Centres, mm. */
+  spacing: number;
+  /** Which way the beams run: across the floor's short side (default) or its long side. */
+  direction?: "short" | "long";
+  /** Keep the first and last beams this far in from the edges, mm (default half the spacing, capped at 300). */
+  edge?: number;
+}
+
+/**
+ * Beams at a spacing under a floor (Revit: Beam System) — spanning its short way across its
+ * outline (holes split them), their tops at the floor's underside. Returns the line of each.
+ */
+export function beamSystemLayout(doc: Document, floorId: ElementId, opts: BeamSystemOptions): { start: Vec2; end: Vec2 }[] {
+  const f = doc.get(floorId) as Floor | undefined;
+  if (!f || f.category !== Cat.Floor) throw new Error("Pick a floor");
+  const ring = f.params.boundary;
+  const xs = ring.map((q) => q.x);
+  const ys = ring.map((q) => q.y);
+  const w = Math.max(...xs) - Math.min(...xs);
+  const h = Math.max(...ys) - Math.min(...ys);
+  // Beams along x when the floor is shorter in x (they span the short way).
+  const alongX = (w <= h) !== (opts.direction === "long");
+  const spacing = Math.max(100, opts.spacing);
+  const edge = opts.edge ?? Math.min(spacing / 2, 300);
+  // Scan across: lines perpendicular to the beams at the spacing.
+  const lo = alongX ? Math.min(...ys) : Math.min(...xs);
+  const hi = alongX ? Math.max(...ys) : Math.max(...xs);
+  const n = Math.floor((hi - lo - 2 * edge) / spacing + 1e-6);
+  const first = lo + (hi - lo - n * spacing) / 2;
+  const rings = [ring, ...f.params.holes];
+  const out: { start: Vec2; end: Vec2 }[] = [];
+  for (let i = 0; i <= n; i++) {
+    const c = first + i * spacing;
+    const cuts: number[] = [];
+    for (const r of rings) {
+      for (let k = 0; k < r.length; k++) {
+        const a = r[k]!;
+        const b = r[(k + 1) % r.length]!;
+        const [ac, bc, aa, ba] = alongX ? [a.y, b.y, a.x, b.x] : [a.x, b.x, a.y, b.y];
+        if (ac > c !== bc > c) cuts.push(aa + ((c - ac) * (ba - aa)) / (bc - ac));
+      }
+    }
+    cuts.sort((p, q) => p - q);
+    for (let k = 0; k + 1 < cuts.length; k += 2) {
+      const [u0, u1] = [cuts[k]!, cuts[k + 1]!];
+      if (u1 - u0 < 300) continue;
+      out.push(alongX ? { start: { x: u0, y: c }, end: { x: u1, y: c } } : { start: { x: c, y: u0 }, end: { x: c, y: u1 } });
+    }
+  }
+  return out;
+}
+
+/** Create a beam system's beams (named "Beam System n"), tops at the floor's underside. */
+export function createBeamSystem(tx: Transaction, doc: Document, typeId: ElementId, floorId: ElementId, opts: BeamSystemOptions): Beam[] {
+  requireSection(doc, typeId);
+  const f = doc.require(floorId) as Floor;
+  const lines = beamSystemLayout(doc, floorId, opts);
+  if (!lines.length) throw new Error("The floor is too small for beams at that spacing");
+  const level = doc.require<LevelParams>(f.params.levelId);
+  const offset = floorExtent(doc, f).bottom - level.params.elevation;
+  const taken = new Set(doc.byCategory<BeamParams>(Cat.Beam).map((b) => b.params.system).filter(Boolean));
+  let k = 1;
+  while (taken.has(`Beam System ${k}`)) k++;
+  const system = `Beam System ${k}`;
+  return lines.map((l) => tx.create<BeamParams>(Cat.Beam, { levelId: level.id, offset, start: l.start, end: l.end, system }, { typeId }) as Beam);
 }
 
 /**

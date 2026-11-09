@@ -149,6 +149,7 @@ import {
   ColorFillLegendTool,
   InsulationTool,
   ScopeBoxTool,
+  BeamSystemTool,
   AutoCeilingTool,
   LeaderTool,
   AngleDimensionTool,
@@ -252,6 +253,7 @@ const TOOL_TYPES: Record<string, string> = {
   column: Cat.StructuralType,
   beam: Cat.StructuralType,
   brace: Cat.StructuralType,
+  beamsystem: Cat.StructuralType,
 };
 const activeTypeId = (cat: string): ElementId | undefined => {
   const id = activeTypes.get(cat);
@@ -524,6 +526,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   column: new ColumnTool(ctx),
   beam: new BeamTool(ctx),
   brace: new BeamTool(ctx, true),
+  beamsystem: new BeamSystemTool(ctx),
   footing: new FootingTool(ctx),
   demolish: new DemolishTool(ctx),
   railing: new RailingTool(ctx),

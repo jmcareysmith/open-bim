@@ -2962,6 +2962,12 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("End top offset", numberInput(p.endOffset ?? p.offset, (v) => update<BeamParams>("Change beam end offset", { endOffset: v }))),
         row("Length", len(Math.hypot(p.end.x - p.start.x, p.end.y - p.start.y))),
       );
+      if (p.system) {
+        const all = doc.byCategory<BeamParams>(Cat.Beam).filter((b) => b.params.system === p.system);
+        const selAll = h("button", { textContent: `Select all ${all.length}` });
+        selAll.onclick = () => ctx.setSelection(all.map((b) => b.id));
+        sec.append(row(p.system, selAll));
+      }
       sec.append(row("Tributary width", numberInput(p.tributary ?? 0, (v) => update<BeamParams>("Tributary width", { tributary: v > 0 ? v : null }))));
       sec.append(h("div", { class: "hint" }, "Tributary width 0: worked out from neighbouring beams and the floor's edge."));
       sec.append(...beamLoadRows(ctx, el.id));

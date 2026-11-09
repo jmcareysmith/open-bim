@@ -168,6 +168,7 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
             { label: "Beam", icon: "beam", tool: "beam", large: true },
             { label: "Column", icon: "column", tool: "column", large: true },
             { label: "Brace", icon: "beam", tool: "brace", title: "Brace: bottom end on this level, top end at the level above" },
+            { label: "Beam System", icon: "beam", tool: "beamsystem", title: "Beam System: click a floor; beams at a spacing under it" },
           ],
         },
         { title: "Analytical Model", items: [{ label: "Analytical Model", icon: "grid", cmd: "analyticalModel", large: true, title: "Show or hide the structural analytical model (3D)" }] },

@@ -117,6 +117,7 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
                 { label: "Generic Model", action: () => m.cmd("inPlaceGeneric") },
                 { label: "Furniture", action: () => m.cmd("inPlaceFurniture") },
                 { label: "Casework", action: () => m.cmd("inPlaceCasework") },
+                { label: "Mass", action: () => m.cmd("inPlaceMass") },
               ],
             },
             {

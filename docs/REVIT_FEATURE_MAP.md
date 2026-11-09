@@ -43,7 +43,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Stairs (run, landing, sketch) & railings | 6 | ✅ (multi-run L/U with landings; winders at square turns (2–4); curved runs (per-run curve)) |
 | Ramps | 6 | ✅ |
 | Components / furniture (loadable families) | 3 | ✅ |
-| Model in-place | 3 | ✅ (Architecture → Model In-Place ▾ Generic Model / Furniture / Casework; In-Place Mass; placed where modelled) |
+| Model in-place | 3 | ✅ (Architecture → Model In-Place ▾ Generic Model / Furniture / Casework / Mass; placed where modelled) |
 | Rooms, room separation, room bounding | 4 | ✅ |
 | Colour schemes, colour fill legends | 8b | ✅ (rooms by name/department/occupancy/number/area ranges; areas by name/area; per plan; no fill without a scheme) |
 | Areas & area plans (GFA, NLA) | 4 | ✅ |

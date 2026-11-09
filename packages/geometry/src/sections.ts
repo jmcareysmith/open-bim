@@ -331,3 +331,27 @@ export function buildViewMarker(doc: Document, el: Element, scale = 100): LineDa
 const END = 6;
 /** Dash patterns, paper mm: on, off, on, off… (solid draws one line). */
 const DASHES: Record<string, number[] | null> = { solid: null, dash: [4, 2], dot: [0.6, 1.4], dashDot: [6, 1.5, 0.6, 1.5], longDash: [9, 2.5] };
+
+/**
+ * Points (model mm, xyz) seen in a section/elevation: those between its cut plane and far clip
+ * (each jog's stretch on its own plane) and inside the crop, in drawing coordinates (x along the
+ * view, y = absolute Z). `keep` lists the source indices, for their colours.
+ */
+export function sectionPoints(positions: Float32Array, view: View): { xy: Float32Array; keep: number[] } {
+  const f = viewFrame(view);
+  const far = view.params.farClip ?? 10_000;
+  const crop = viewCrop(view);
+  const segs = sectionSegments(view);
+  const keep: number[] = [];
+  const xy: number[] = [];
+  for (let i = 0; i < positions.length / 3; i++) {
+    const v = toViewCoords(f, [positions[i * 3]!, positions[i * 3 + 1]!, positions[i * 3 + 2]!]);
+    if (v[0] < crop.min.x || v[0] > crop.max.x || v[1] < crop.min.y || v[1] > crop.max.y) continue;
+    const s = segs.find((g) => v[0] >= g.u0 && v[0] <= g.u1) ?? segs[0]!;
+    // depth ≤ 0 is beyond the line; a jog moves the cut plane s.depth further away.
+    if (v[2] > -s.depth || v[2] < -far) continue;
+    keep.push(i);
+    xy.push(v[0], v[1]);
+  }
+  return { xy: new Float32Array(xy), keep };
+}

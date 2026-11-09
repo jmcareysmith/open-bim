@@ -10,7 +10,7 @@ import {
   type Vec2,
   type ViewParams,
 } from "@open-bim/core";
-import { SimpleKernel, cropLinework, sectionAnnotations, sectionLinework } from "../src/index.ts";
+import { SimpleKernel, cropLinework, sectionAnnotations, sectionLinework, sectionPoints } from "../src/index.ts";
 
 const p = (x: number, y: number): Vec2 => ({ x, y });
 const loopArea = (l: Vec2[]) => Math.abs(l.reduce((s, q, i) => s + q.x * l[(i + 1) % l.length]!.y - l[(i + 1) % l.length]!.x * q.y, 0) / 2);
@@ -64,6 +64,16 @@ describe("section linework", () => {
     const cut = lw.find((l) => l.id === far.id)!;
     expect(cut.cutLoops).toHaveLength(1);
     expect(loopArea(cut.cutLoops[0]!)).toBeCloseTo(110 * 2700, -1);
+  });
+
+  it("keeps the points between the cut and the far clip, inside the crop", () => {
+    const { doc } = model();
+    const s = doc.transact("S", (tx) => createSection(tx, doc, p(0, 4000), p(10000, 4000)));
+    // Looking north (+y): in front (y 3000), beyond (y 6000), past the far clip (y 20000), off to the side (x -500).
+    const pts = new Float32Array([1000, 3000, 500, 2000, 6000, 1500, 3000, 20000, 500, -500, 6000, 500]);
+    const r = sectionPoints(pts, s);
+    expect(r.keep).toEqual([1]);
+    expect(Array.from(r.xy)).toEqual([2000, 1500]);
   });
 
   it("crops linework to a rectangle", () => {

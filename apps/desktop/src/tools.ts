@@ -1,5 +1,5 @@
 import type { ToolOption } from "./modifytools.ts";
-import {
+import { pointCloudPoints, type PointCloud, type PointCloudParams,
   boundaryFromWalls,
   PICK_WALL_LINES,
   type PickWallLine,
@@ -330,7 +330,7 @@ const ORTHO_DEG = 4;
 export interface Snapped {
   p: Vec2;
   /** What the point snapped to, for status feedback. */
-  kind: "endpoint" | "intersection" | "grid" | "increment";
+  kind: "endpoint" | "intersection" | "point" | "grid" | "increment";
 }
 
 /**
@@ -368,6 +368,22 @@ export function snapPoint(ctx: ToolContext, p: Vec2, start: Vec2 | null, free: b
   }
   const cross = nearest(crossings);
   if (cross) return { p: cross, kind: "intersection" };
+
+  // 2b. Point cloud points (Revit snaps to scans), on this storey: level to 2300 above.
+  const z0 = ctx.doc.get<LevelParams>(ctx.activeLevelId())?.params.elevation ?? 0;
+  let scan: Vec2 | null = null;
+  let scanD = POINT_SNAP / 3;
+  for (const pc of ctx.doc.byCategory<PointCloudParams>(Cat.PointCloud)) {
+    if (ctx.viewport.isHidden(pc)) continue;
+    const pos = pointCloudPoints(pc as PointCloud).positions;
+    for (let i = 0; i < pos.length; i += 3) {
+      const z = pos[i + 2]!;
+      if (z < z0 - 50 || z > z0 + 2300) continue;
+      const d = Math.hypot(pos[i]! - p.x, pos[i + 1]! - p.y);
+      if (d < scanD) [scan, scanD] = [{ x: pos[i]!, y: pos[i + 1]! }, d];
+    }
+  }
+  if (scan) return { p: scan, kind: "point" };
 
   // 3. Ortho to start point
   let q = { ...p };
@@ -413,6 +429,7 @@ function orthoOnGrid(g: DatumLine, start: Vec2, locked: "x" | "y"): Vec2 | null 
 const SNAP_LABEL: Record<Snapped["kind"], string> = {
   endpoint: " · snap: endpoint",
   intersection: " · snap: grid intersection",
+  point: " · snap: point cloud",
   grid: " · snap: grid / reference plane",
   increment: "",
 };

@@ -281,8 +281,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   concrete, so in 3D they show only with the host hidden/transparent (no "view unobscured" yet).
 - Point clouds (core/model/pointclouds.ts): Insert → Point Cloud (or File → Import): LAS 1.0–1.4 and ASCII XYZ/PTS/TXT/CSV
   in metres, thinned to 200k points, stored base64 float32 in the element; map coordinates (>10 km) go through the
-  shared coordinates, else centred on the origin. Viewport draws THREE.Points (scan colours); move only. Not yet in
-  plans/sections/sheets, no snapping.
+  shared coordinates, else centred on the origin. Viewport draws THREE.Points (scan colours, sRGB→linear); move only;
+  plans clip them by the view range, sections draw `sectionPoints` (geometry); tools snap to scan points on the storey.
+  Not on sheets/PDF yet.
 - Analytical model (core/model/analytical.ts `analyticalModel`): derived, not stored — column axes, beam/brace centrelines
   snapped to column axes within 300, nodes merged within 300, column bases on pads or the lowest level are pinned
   supports, wall mid-surface and floor mid-depth panels. Structure → Analytical Model toggles a 3D overlay (viewport).

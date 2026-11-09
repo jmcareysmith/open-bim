@@ -138,8 +138,18 @@ export function createPointCloud(tx: Transaction, doc: Document, raw: RawPoints,
   );
 }
 
-/** The cloud's points in project mm, and colours 0–1 (or null). */
+const decoded = new WeakMap<object, { positions: Float32Array; colors: Float32Array | null }>();
+
+/** The cloud's points in project mm, and colours 0–1 (or null). Cached per params (they're replaced on edit). */
 export function pointCloudPoints(el: PointCloud): { positions: Float32Array; colors: Float32Array | null } {
+  const hit = decoded.get(el.params);
+  if (hit) return hit;
+  const out = decodePoints(el);
+  decoded.set(el.params, out);
+  return out;
+}
+
+function decodePoints(el: PointCloud): { positions: Float32Array; colors: Float32Array | null } {
   const p = el.params;
   const bytes = fromBase64(p.positions);
   const rel = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);

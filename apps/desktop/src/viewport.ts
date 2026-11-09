@@ -51,6 +51,7 @@ import { planViewLinework, viewSchemeFill,
   planLinework,
   sectionAnnotations,
   sectionLinework,
+  sectionPoints,
   sheetDrawing,
   type Drawing,
   type StrokeKind,
@@ -424,7 +425,8 @@ export class Viewport {
       const pc = pointCloudPoints(el as PointCloud);
       const geom = new THREE.BufferGeometry();
       geom.setAttribute("position", new THREE.BufferAttribute(pc.positions, 3));
-      if (pc.colors) geom.setAttribute("color", new THREE.BufferAttribute(pc.colors, 3));
+      // Scan colours are sRGB; vertex colours are linear in three.js.
+      if (pc.colors) geom.setAttribute("color", new THREE.BufferAttribute(pc.colors.map(srgbToLinear), 3));
       geom.computeBoundingSphere();
       const size = (el.params as PointCloudParams).pointSize ?? 2;
       const base = pc.colors ? 0xffffff : 0x6a7b8c;
@@ -1469,6 +1471,26 @@ void main() {
       frame.computeLineDistances();
       frame.position.set((crop.min.x + crop.max.x) / 2, (crop.min.y + crop.max.y) / 2, -1);
       extras.add(frame);
+      // Point clouds: the points this view sees, flat in the drawing (behind the line work).
+      for (const pc of this.doc.byCategory(Cat.PointCloud) as PointCloud[]) {
+        if (!this.objects.get(pc.id)?.visible) continue;
+        const { positions, colors } = pointCloudPoints(pc);
+        const { xy, keep } = sectionPoints(positions, view as View);
+        if (!keep.length) continue;
+        const pos = new Float32Array(keep.length * 3);
+        for (let i = 0; i < keep.length; i++) pos.set([xy[i * 2]!, xy[i * 2 + 1]!, -2], i * 3);
+        const geom = new THREE.BufferGeometry();
+        geom.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+        if (colors) {
+          const col = new Float32Array(keep.length * 3);
+          keep.forEach((k, i) => col.set([0, 1, 2].map((c) => srgbToLinear(colors[k * 3 + c]!)), i * 3));
+          geom.setAttribute("color", new THREE.BufferAttribute(col, 3));
+        }
+        const size = (pc.params as PointCloudParams).pointSize ?? 2;
+        const pts = new THREE.Points(geom, new THREE.PointsMaterial({ size, sizeAttenuation: false, vertexColors: !!colors, color: colors ? 0xffffff : 0x6a7b8c }));
+        pts.userData.elementId = pc.id;
+        extras.add(pts);
+      }
       this.drawExtras = extras;
       this.drawScene.add(extras);
     }
@@ -2127,4 +2149,9 @@ function renderPaper(d: Drawing & { width: number; height: number; viewports: { 
   const vpIds = new Set(d.viewports.map((v) => v.id));
   g.add(renderDrawing({ strokes: d.strokes.filter((s) => !s.id || !vpIds.has(s.id)), fills: d.fills.filter((f) => !f.id || !vpIds.has(f.id)), texts: d.texts, bounds: d.bounds }));
   return g;
+}
+
+/** sRGB channel (0–1) → linear, for vertex colours. */
+function srgbToLinear(c: number): number {
+  return c < 0.04045 ? c * 0.0773993808 : Math.pow(c * 0.9478672986 + 0.0521327014, 2.4);
 }

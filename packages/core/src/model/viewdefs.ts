@@ -51,6 +51,11 @@ export type ViewParams = {
    * start -> end (Revit's section head direction); its width is the line's length.
    */
   line?: { start: Vec2; end: Vec2 } | null;
+  /**
+   * Sections: jogs (Revit's Split Segment). From `at` mm along the line onwards, the cut plane sits
+   * `depth` mm further in the view direction (until the next jog). Sorted by `at`.
+   */
+  jogs?: { at: number; depth: number }[] | null;
   /** Elevations: where the marker sits in plan (default: the line's midpoint). */
   marker?: Vec2 | null;
   /** View Marker families (model/markers.ts): section head/tail, or the elevation/callout mark. */
@@ -539,6 +544,31 @@ export function toViewCoords(f: ViewFrame, p: V3): V3 {
   const d = [p[0] - f.origin[0], p[1] - f.origin[1], p[2] - f.origin[2]];
   const dot = (v: V3) => d[0]! * v[0] + d[1]! * v[1] + d[2]! * v[2];
   return [dot(f.right), dot(f.up), -dot(f.dir)];
+}
+
+/** A stretch of a (jogged) section: from u0 to u1 mm along the line, cut `depth` mm beyond it. */
+export interface SectionSegment {
+  u0: number;
+  u1: number;
+  depth: number;
+}
+
+/** The section's segments, start to end (one at depth 0 when it isn't jogged). */
+export function sectionSegments(view: View): SectionSegment[] {
+  const line = view.params.line;
+  if (!line) return [];
+  const len = Math.hypot(line.end.x - line.start.x, line.end.y - line.start.y);
+  const jogs = view.params.kind === "section" ? [...(view.params.jogs ?? [])].filter((j) => j.at > 0 && j.at < len).sort((a, b) => a.at - b.at) : [];
+  const out: SectionSegment[] = [];
+  let u = 0;
+  let depth = 0;
+  for (const j of jogs) {
+    if (j.at > u) out.push({ u0: u, u1: j.at, depth });
+    u = j.at;
+    depth = j.depth;
+  }
+  out.push({ u0: u, u1: len, depth });
+  return out;
 }
 
 /** Drawing-space crop of a section/elevation: x across the line, y = absolute Z. */

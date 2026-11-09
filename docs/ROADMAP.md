@@ -30,7 +30,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 ## Phase 2 — Views & drawing production (done)
 - [x] View system: each view = camera + view range + visibility rules + detail level — 3D camera not yet saved per view
 - [x] Floor plans via cut plane + hidden-line removal → 2D vector — exact mesh-based HLR (not OCCT); line weights come with materials
-- [x] Sections, elevations, callouts — straight sections only (no jogs); callouts of floor plans
+- [x] Sections, elevations, callouts — jogged sections (Properties → Split segment; shaded underlay not jogged); callouts of floor plans
 - [x] Detail lines, filled regions, text, dimensions (live, associative) — aligned dims in plans (sections: levels via API); no leaders yet
 - [x] Materials with cut/surface patterns — graphics only; appearance (textures) and thermal properties later
 - [x] Visibility/Graphics, filters, view templates — visible / halftone / line colour overrides; no line weights or patterns overrides yet

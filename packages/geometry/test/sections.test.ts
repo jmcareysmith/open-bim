@@ -50,6 +50,22 @@ describe("section linework", () => {
     expect(lw.find((l) => l.id === front.id)).toBeUndefined();
   });
 
+  it("jogged sections cut each segment on its own plane", () => {
+    const { doc, k, wall } = model();
+    // A short wall at y 5000..5500 lies beyond the straight line; a jog 1200 deep at x 6000 cuts it.
+    const near = wall(p(2000, 4500), p(2000, 5500));
+    const far = wall(p(8000, 4500), p(8000, 5500));
+    const s = doc.transact("S", (tx) => createSection(tx, doc, p(0, 4000), p(10000, 4000)));
+    doc.transact("Jog", (tx) => tx.update<ViewParams>(s.id, { jogs: [{ at: 6000, depth: 1000 }] }));
+    const items = [near, far].map((w) => ({ id: w.id, mesh: k.build(doc, w)! }));
+    const lw = sectionLinework(items, doc.get(s.id) as typeof s);
+    // Left segment (depth 0) sees the near wall beyond; right segment (depth 1000, y = 5000) cuts the far wall.
+    expect(lw.find((l) => l.id === near.id)!.cutLoops).toEqual([]);
+    const cut = lw.find((l) => l.id === far.id)!;
+    expect(cut.cutLoops).toHaveLength(1);
+    expect(loopArea(cut.cutLoops[0]!)).toBeCloseTo(110 * 2700, -1);
+  });
+
   it("crops linework to a rectangle", () => {
     const lw = cropLinework(
       { id: "x", cutLoops: [[p(-100, 0), p(100, 0), p(100, 100), p(-100, 100)]], projection: [-500, 50, 500, 50] },

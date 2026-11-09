@@ -229,6 +229,7 @@ import {
   views as viewElements,
   SCALES,
   type View,
+  sectionSegments,
   type ViewParams,
   type ViewRangeOffsets,
   type DetailLevel,
@@ -996,6 +997,30 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
       row("Crop bottom", numberInput(z.bottom, (v) => setZ("bottom", v))),
       row("Crop top", numberInput(z.top, (v) => setZ("top", v))),
     );
+  }
+  if (p.kind === "section" && p.line && !template) {
+    // Jogs (Revit: Split Segment): each moves the cut plane deeper from a point along the line.
+    const jogs = [...(p.jogs ?? [])].sort((a, b) => a.at - b.at);
+    const setJogs = (next: { at: number; depth: number }[]) => set("Edit section jogs", { jogs: next.length ? next : null });
+    jogs.forEach((j, i) => {
+      const del = h("button", { textContent: "×", title: "Remove jog" });
+      del.onclick = () => setJogs(jogs.filter((_, k) => k !== i));
+      const wrap = h("span");
+      wrap.style.cssText = "display:flex;gap:4px";
+      wrap.append(
+        numberInput(j.at, (v) => setJogs(jogs.map((q, k) => (k === i ? { ...q, at: v } : q)))),
+        numberInput(j.depth, (v) => setJogs(jogs.map((q, k) => (k === i ? { ...q, depth: v } : q)))),
+        del,
+      );
+      sec.append(row(`Jog ${i + 1} (along, depth)`, wrap));
+    });
+    const split = h("button", { textContent: "Split segment", title: "Add a jog: the line steps 1000 deeper halfway along its longest segment" });
+    split.onclick = () => {
+      const segs = sectionSegments(view as View);
+      const s = segs.reduce((a, b) => (b.u1 - b.u0 > a.u1 - a.u0 ? b : a));
+      setJogs([...jogs, { at: Math.round((s.u0 + s.u1) / 2), depth: s.depth + 1000 }]);
+    };
+    sec.append(row("Jogs", split));
   }
   if (p.kind === "legend") {
     const types = doc.all().filter((e) => LEGEND_TYPE_CATEGORIES.has(e.category));

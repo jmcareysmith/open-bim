@@ -18,6 +18,7 @@ import {
   viewNumber,
   type MarkerRole,
   calloutHeadPosition,
+  sectionSegments,
 } from "@open-bim/core";
 import { GRID_BUBBLE_RADIUS, type LineData } from "./datums.ts";
 import { planLinework, type PlanLinework } from "./hlr.ts";
@@ -49,11 +50,33 @@ export function meshToView(mesh: MeshData, f: ViewFrame): MeshData {
 export function sectionLinework(items: { id: ElementId; mesh: MeshData; surface?: LineFamily[] | null }[], view: View): PlanLinework[] {
   const f = viewFrame(view);
   const far = view.params.farClip ?? 10_000;
-  const lw = planLinework(
-    items.map((it) => ({ id: it.id, mesh: meshToView(it.mesh, f), surface: it.surface ?? null })),
-    { bottom: -far, cut: 0 },
-  );
-  return lw.map((l) => cropLinework(l, viewCrop(view))).filter((l) => l.cutLoops.length || l.projection.length || l.surface.length);
+  const crop = viewCrop(view);
+  const segments = sectionSegments(view);
+  const inView = items.map((it) => ({ id: it.id, mesh: meshToView(it.mesh, f), surface: it.surface ?? null }));
+  if (segments.length <= 1) {
+    const lw = planLinework(inView, { bottom: -far, cut: 0 });
+    return lw.map((l) => cropLinework(l, crop)).filter((l) => l.cutLoops.length || l.projection.length || l.surface.length);
+  }
+  // Jogged: each segment cut on its own plane (the far clip stays put), cropped to its stretch.
+  const byId = new Map<ElementId, PlanLinework>();
+  for (const s of segments) {
+    const shifted = inView.map((it) => ({ ...it, mesh: shiftDepth(it.mesh, s.depth) }));
+    for (const l of planLinework(shifted, { bottom: -far + s.depth, cut: 0 })) {
+      const c = cropLinework(l, { min: { x: Math.max(crop.min.x, s.u0), y: crop.min.y }, max: { x: Math.min(crop.max.x, s.u1), y: crop.max.y } });
+      const prev = byId.get(l.id);
+      if (!prev) byId.set(l.id, c);
+      else byId.set(l.id, { id: l.id, cutLoops: [...prev.cutLoops, ...c.cutLoops], projection: [...prev.projection, ...c.projection], surface: [...prev.surface, ...c.surface] });
+    }
+  }
+  return [...byId.values()].filter((l) => l.cutLoops.length || l.projection.length || l.surface.length);
+}
+
+/** A view-space mesh with its cut plane moved `d` mm further away (depth + d). */
+function shiftDepth(mesh: MeshData, d: number): MeshData {
+  if (!d) return mesh;
+  const p = new Float32Array(mesh.positions);
+  for (let i = 2; i < p.length; i += 3) p[i] = p[i]! + d;
+  return { ...mesh, positions: p };
 }
 
 /** Clip linework to a rectangle: loops by Sutherland–Hodgman, segments by Liang–Barsky. */
@@ -252,11 +275,20 @@ export function buildViewMarker(doc: Document, el: Element, scale = 100): LineDa
     const dir = { x: f.dir[0], y: f.dir[1] };
     const along = { x: f.right[0], y: f.right[1] };
     if (p.kind === "section") {
-      patterned(start, end);
+      // The line, stepping across at each jog.
+      const segs = sectionSegments(v);
+      const at = (u: number, d: number) => add(add(start, along, u), dir, d);
+      segs.forEach((s, i) => {
+        patterned(at(s.u0, s.depth), at(s.u1, s.depth));
+        const next = segs[i + 1];
+        if (next) line(at(s.u1, s.depth), at(s.u1, next.depth));
+      });
+      const last = segs.at(-1)!;
       // Head: bubble just beyond the start, on the line (or the head family, origin at the start).
       if (!family("sectionHead", start, dir, along)) bubble(add(start, along, -R), dir);
       // Tail: a heavy bar at the end, pointing the way the view looks.
-      if (!family("sectionTail", end, dir, along)) bar(end, dir, END * K);
+      const tail = at(last.u1, last.depth);
+      if (!family("sectionTail", tail, dir, along)) bar(tail, dir, END * K);
     } else {
       const m = p.marker ?? { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
       if (!family("elevation", m, dir, along)) bubble(m, dir);

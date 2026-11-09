@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Cat, Document, applyResidentialTemplate, createWall, type LayeredTypeParams, type Vec2, type Wall } from "@open-bim/core";
+import { Cat, Document, applyResidentialTemplate, createWall, setWallCurve, wallJoins, type LayeredTypeParams, type Vec2, type Wall } from "@open-bim/core";
 import { SimpleKernel, boundingBox, joinedWallFootprint, meshVolume, signedArea } from "../src/index.ts";
 
 const H = 2400;
@@ -88,5 +88,22 @@ describe("joined wall footprints", () => {
     wall(p(1000, 0), p(2000, 0));
     expect(area(doc, a)).toBeCloseTo(1000 * 100);
   });
+  it("straight walls tee into the side of a curved wall, stopping on its face", () => {
+    const { doc, wall } = setup();
+    // Arc wall from (-5000,0) to (5000,0) bowing 5000 towards +y: a half circle, radius 5000 about the origin.
+    const arc = wall(p(-5000, 0), p(5000, 0));
+    doc.transact("Curve", (tx) => setWallCurve(tx, doc, arc.id, 5000));
+    // A wall from the centre up to the arc: inside, so it stops on the inner face (r = 4950).
+    const stem = wall(p(0, 0), p(0, 5000));
+    const j = wallJoins(doc, doc.require(stem.id) as Wall);
+    expect(j.end).toEqual({ kind: "tee", wallId: arc.id });
+    const fp = joinedWallFootprint(doc, doc.require(stem.id) as Wall);
+    const top = fp.filter((q) => q.y > 4000);
+    expect(top).toHaveLength(2);
+    for (const q of top) expect(Math.hypot(q.x, q.y)).toBeCloseTo(4950, 3);
+    // The arc wall knows the stem tees into it (regenerates with it) and stays a whole band.
+    const arcJ = wallJoins(doc, doc.require(arc.id) as Wall);
+    expect(arcJ.start).toBeNull();
+    expect(arcJ.end).toBeNull();
+  });
 });
-

@@ -1,6 +1,7 @@
 import type { Document } from "../document.ts";
 import type { ElementId, Vec2 } from "../element.ts";
 import { Cat, totalThickness, type LayeredTypeParams, type LevelParams, type Wall, type WallParams } from "./architecture.ts";
+import { alongArc, arcInfo, arcLength, tangentLine } from "./arcs.ts";
 
 // Wall joins are derived from geometry, not stored: wall ends that meet, or a wall end that
 // runs into the side of another wall, join automatically (Revit's default behaviour).
@@ -54,7 +55,7 @@ export function relatedWalls(doc: Document, wall: Wall): ElementId[] {
   const half = halfThickness(doc, wall) ?? UNKNOWN_HALF_THICKNESS;
   for (const o of others) {
     for (const end of WALL_ENDS) {
-      if (!wall.params.curve && !o.params.curve && teeDistance(wallEndPoint(o, end), wallDirection(o), wall, half) !== null) out.add(o.id);
+      if (teeDistance(wallEndPoint(o, end), endDirection(o, end), wall, half) !== null) out.add(o.id);
     }
   }
   return [...out];
@@ -79,14 +80,11 @@ function joinAt(doc: Document, wall: Wall, end: WallEnd, others: Wall[]): WallJo
     }
   }
   if (meeting.length) return { kind: "corner", others: meeting };
-  // Curved walls only join end to end (no tees into or out of an arc yet).
-  if (wall.params.curve) return null;
 
-  const dir = wallDirection(wall);
+  const dir = endDirection(wall, end);
   let best: Wall | null = null;
   let bestDist = Infinity;
   for (const o of others) {
-    if (o.params.curve) continue;
     const d = teeDistance(p, dir, o, halfThickness(doc, o) ?? UNKNOWN_HALF_THICKNESS);
     if (d !== null && d < bestDist) {
       best = o;
@@ -102,6 +100,19 @@ function joinAt(doc: Document, wall: Wall, end: WallEnd, others: Wall[]): WallJo
  */
 function teeDistance(p: Vec2, dir: Vec2, target: Wall, half: number): number | null {
   const { start } = target.params;
+  const arc = target.params.curve ? arcInfo(start, target.params.end, target.params.curve) : null;
+  if (arc) {
+    // Curved target: within its thickness of the arc, clear of its ends, not running along it.
+    const r = Math.hypot(p.x - arc.center.x, p.y - arc.center.y);
+    const off = Math.abs(r - arc.radius);
+    if (off > half + JOIN_TOLERANCE || r < 1e-6) return null;
+    const along = alongArc(start, target.params.end, target.params.curve!, p);
+    const span = Math.abs(arc.sweep) * arc.radius;
+    if (along <= JOIN_TOLERANCE || along >= span - JOIN_TOLERANCE) return null;
+    const radial = { x: (p.x - arc.center.x) / r, y: (p.y - arc.center.y) / r };
+    if (Math.abs(dir.x * radial.x + dir.y * radial.y) < PARALLEL_SIN) return null;
+    return off;
+  }
   const u = wallDirection(target);
   const len = Math.hypot(target.params.end.x - start.x, target.params.end.y - start.y);
   const rx = p.x - start.x;
@@ -112,6 +123,13 @@ function teeDistance(p: Vec2, dir: Vec2, target: Wall, half: number): number | n
   if (off > half + JOIN_TOLERANCE) return null;
   if (Math.abs(dir.x * u.y - dir.y * u.x) < PARALLEL_SIN) return null;
   return off;
+}
+
+/** Direction of the wall at an end, start → end (curved walls: the arc's tangent there). */
+function endDirection(wall: Wall, end: WallEnd): Vec2 {
+  const { start, end: e, curve } = wall.params;
+  if (!curve) return wallDirection(wall);
+  return tangentLine(wall, end === "start" ? 0 : arcLength(start, e, curve)).dir;
 }
 
 /** Other walls that overlap `wall` vertically (walls on different storeys never join). */

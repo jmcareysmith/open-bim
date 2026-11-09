@@ -1,4 +1,4 @@
-import { arcBand, arcLength, tangentLine,
+import { arcBand, arcInfo, arcLength, tangentLine,
   wallDirection,
   wallEndPoint,
   wallJoins,
@@ -53,6 +53,17 @@ function face(f: EndFrame, s: 1 | -1): Line {
   return { p: { x: f.p.x + n.x * f.h * s, y: f.p.y + n.y * f.h * s }, d: f.a };
 }
 
+/** Where `line` crosses the circle (centre, radius) nearest `near`, or null when it misses. */
+function circleMeet(line: Line, c: Vec2, radius: number, near: Vec2): Vec2 | null {
+  const fx = line.p.x - c.x;
+  const fy = line.p.y - c.y;
+  const b = fx * line.d.x + fy * line.d.y;
+  const disc = b * b - (fx * fx + fy * fy - radius * radius);
+  if (disc < 0) return null;
+  const pts = [-b - Math.sqrt(disc), -b + Math.sqrt(disc)].map((t) => ({ x: line.p.x + line.d.x * t, y: line.p.y + line.d.y * t }));
+  return dist(pts[0]!, near) <= dist(pts[1]!, near) ? pts[0]! : pts[1]!;
+}
+
 /** Where face `s` of `f` meets `line`; falls back to a square end if parallel or too far. */
 function meet(f: EndFrame, s: 1 | -1, line: Line, limit: number): Vec2 {
   const own = face(f, s);
@@ -86,10 +97,20 @@ function endCap(doc: Document, wall: Wall, end: WallEnd, join: WallJoin | null):
 
   if (join.kind === "tee") {
     const target = doc.require(join.wallId) as Wall;
+    const ht = wallThickness(doc, target) / 2;
+    const arc = target.params.curve ? arcInfo(target.params.start, target.params.end, target.params.curve) : null;
+    if (arc) {
+      // Into a curved wall: each face line stops on the arc face on the side this wall runs off.
+      const inside = Math.hypot(f.p.x + f.a.x * f.h * 4 - arc.center.x, f.p.y + f.a.y * f.h * 4 - arc.center.y) < arc.radius;
+      const rf = arc.radius + (inside ? -ht : ht);
+      return [1, -1].map((s) => {
+        const own = face(f, s as 1 | -1);
+        return circleMeet(own, arc.center, rf, f.p) ?? own.p;
+      });
+    }
     const u = wallDirection(target);
     const n = perp(u);
     const s = n.x * f.a.x + n.y * f.a.y >= 0 ? 1 : -1; // side of the target this wall runs off
-    const ht = wallThickness(doc, target) / 2;
     const { start } = target.params;
     const targetFace: Line = { p: { x: start.x + n.x * ht * s, y: start.y + n.y * ht * s }, d: u };
     const limit = MITRE_LIMIT * Math.max(f.h, ht);

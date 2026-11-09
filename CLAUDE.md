@@ -300,3 +300,6 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   net of openings; unset R-values take the H1 minimum), ventilation 0.5 ach, peak load at the zone design temperature,
   annual heating by degree-days (no gains), H1 calculation-method reference comparison. Zone figures provisional.
   Analyse panes (NZ Checks, Clashes, Collaborate) sit above the ViewCube (z-index 7).
+- Scope boxes (core/model/scopeboxes.ts): View → Scope Box (two corners in a plan); plan Properties → Scope box sets the
+  crop (`planCrop` used by drawings and the viewport); box Properties edit bounds/heights; movable. Grids/levels aren't
+  limited by them yet.

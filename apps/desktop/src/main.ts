@@ -14,7 +14,7 @@ import { addRecentFile, fileName, recentFiles, removeRecentFile } from "./recent
 import { CameraTool } from "./cameratool.ts";
 import { FloorPointTool, SlopeArrowTool } from "./slopetool.ts";
 import { WallProfileTool } from "./profiletool.ts";
-import { createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
+import { planCrop, createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
   ceilingPlanFor,
   createCeilingPlan,
   Cat,
@@ -148,6 +148,7 @@ import {
   SpotElevationTool,
   ColorFillLegendTool,
   InsulationTool,
+  ScopeBoxTool,
   AutoCeilingTool,
   LeaderTool,
   AngleDimensionTool,
@@ -556,6 +557,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   spot: new SpotElevationTool(ctx),
   colorlegend: new ColorFillLegendTool(ctx),
   insulation: new InsulationTool(ctx),
+  scopebox: new ScopeBoxTool(ctx),
   autoceiling: new AutoCeilingTool(ctx),
   leader: new LeaderTool(ctx),
   angulardim: new AngleDimensionTool(ctx, "angular"),
@@ -1455,7 +1457,7 @@ function configureViewport(vp: Viewport, target: ModelElement, primary: boolean)
   if (isPlanView(v)) {
     vp.setPlanRange(viewRange(doc, v));
     vp.setViewMode("plan");
-    vp.setPlanCrop(v.params.kind === "callout" ? (v.params.crop ?? null) : null);
+    vp.setPlanCrop(planCrop(doc, v));
   } else if (is2DView(v)) {
     vp.setDrawingView(v);
   } else {

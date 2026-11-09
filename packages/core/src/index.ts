@@ -48,6 +48,7 @@ export * from "./scripting.ts";
 export * from "./model/solar.ts";
 export * from "./model/h1.ts";
 export * from "./model/energy.ts";
+export * from "./model/scopeboxes.ts";
 export * from "./model/bracing.ts";
 export * from "./model/modify.ts";
 export * from "./model/edits.ts";

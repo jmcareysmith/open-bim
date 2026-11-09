@@ -44,6 +44,8 @@ import {
   type BarSize,
   type Rebar,
   type RebarParams,
+  type ScopeBoxParams,
+  scopeBoxViews,
   createDraftingView,
   type StructuralLoadParams,
   type LoadCase,
@@ -1012,6 +1014,19 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
       row("Far clip offset", numberInput(p.farClip ?? 0, (v) => (v > 0 ? set("Change far clip", { farClip: v }) : ctx.status("\u26a0 Far clip must be positive")))),
       row("Crop bottom", numberInput(z.bottom, (v) => setZ("bottom", v))),
       row("Crop top", numberInput(z.top, (v) => setZ("top", v))),
+    );
+  }
+  if ((p.kind === "floorPlan" || p.kind === "ceilingPlan" || p.kind === "areaPlan") && !template) {
+    const boxes = doc.byCategory<ScopeBoxParams>(Cat.ScopeBox);
+    sec.append(
+      row(
+        "Scope box",
+        select(
+          [{ value: "", label: "None" }, ...boxes.map((b) => ({ value: b.id, label: b.name ?? b.id }))],
+          p.scopeBoxId && doc.has(p.scopeBoxId) ? p.scopeBoxId : "",
+          (v) => set("Scope box", { scopeBoxId: v || null }),
+        ),
+      ),
     );
   }
   if (p.kind === "section" && p.line && !template) {
@@ -4078,6 +4093,27 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
           row("", numberInput(layer.thickness, (v) => setLayer("Edit layer thickness", { thickness: Math.max(0, v) }))),
         );
       });
+      break;
+    }
+    case Cat.ScopeBox: {
+      const p = el.params as ScopeBoxParams;
+      const setBox = (patch: Partial<ScopeBoxParams>) =>
+        edit(ctx, "Edit scope box", (tx) => {
+          const next = { ...p, ...patch };
+          if (!(next.max.x > next.min.x && next.max.y > next.min.y && next.top > next.bottom)) throw new Error("The box needs a positive size");
+          tx.update<ScopeBoxParams>(el.id, patch);
+        });
+      const users = scopeBoxViews(doc, el.id);
+      sec.append(
+        row("Name", textInput(el.name ?? "", (v) => v && edit(ctx, "Rename scope box", (tx) => tx.setName(el.id, v)))),
+        row("Left (x)", numberInput(p.min.x, (v) => setBox({ min: { ...p.min, x: v } }))),
+        row("Right (x)", numberInput(p.max.x, (v) => setBox({ max: { ...p.max, x: v } }))),
+        row("Bottom (y)", numberInput(p.min.y, (v) => setBox({ min: { ...p.min, y: v } }))),
+        row("Top (y)", numberInput(p.max.y, (v) => setBox({ max: { ...p.max, y: v } }))),
+        row("From height", numberInput(p.bottom, (v) => setBox({ bottom: v }))),
+        row("To height", numberInput(p.top, (v) => setBox({ top: v }))),
+        row("Views", h("span", {}, users.length ? users.map((v) => v.name).join(", ") : "None (set in a plan's Properties)")),
+      );
       break;
     }
     case Cat.PointCloud: {

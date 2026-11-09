@@ -13,6 +13,7 @@ import { tangentLine, arcPoints,
   type ReferencePlane,
   type Vec2,
   type Wall,
+  type ScopeBoxParams,
 } from "@open-bim/core";
 
 /** Line work for datums and annotation, model mm, Z up. */
@@ -187,4 +188,22 @@ export function buildConnectorLines(doc: Document, el: Element): LineData | null
     seg.push(x - k, y - k, z, x + k, y + k, z, x - k, y + k, z, x + k, y - k, z);
   }
   return { segments: new Float32Array(seg), labels: [{ text: classificationInfo(p.classification).prefix, position: [x, y - r - 60, z], size: 60 }], placement: "model" };
+}
+
+/** Scope box in plan: its rectangle, dash-dot, with its name inside the top-left corner (sized for the view scale). */
+export function buildScopeBoxLines(_doc: Document, el: Element, scale = 100): LineData | null {
+  const p = el.params as ScopeBoxParams;
+  const { min, max } = p;
+  const c = [min, { x: max.x, y: min.y }, max, { x: min.x, y: max.y }];
+  const seg = c.flatMap((a, i) => {
+    const b = c[(i + 1) % 4]!;
+    return [a.x, a.y, 0, b.x, b.y, 0];
+  });
+  const size = 2.5 * scale;
+  return {
+    segments: new Float32Array(seg),
+    labels: [{ text: el.name ?? "Scope Box", position: [min.x + size * 0.4, max.y - size * 1.2, 0], size, align: "left" }],
+    dashed: true,
+    planOnly: true,
+  };
 }

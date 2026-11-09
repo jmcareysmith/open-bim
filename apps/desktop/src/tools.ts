@@ -1,5 +1,5 @@
 import type { ToolOption } from "./modifytools.ts";
-import { pointCloudPoints, type PointCloud, type PointCloudParams,
+import { createScopeBox, pointCloudPoints, type PointCloud, type PointCloudParams,
   boundaryFromWalls,
   PICK_WALL_LINES,
   type PickWallLine,
@@ -1946,6 +1946,70 @@ export class RoomTool implements Tool {
 }
 
 /** Callout: click two opposite corners on a floor plan. */
+/** Scope Box (Revit: View → Scope Box): two opposite corners in a plan. */
+export class ScopeBoxTool implements Tool {
+  readonly name = "scopebox";
+  private start: Vec2 | null = null;
+  get dragPlace(): boolean {
+    return !this.start;
+  }
+  constructor(private ctx: ToolContext) {}
+
+  activate(): void {
+    this.start = null;
+    this.ctx.status("Scope Box: click two opposite corners in a plan, or drag. Then set plans to use it (view Properties \u2192 Scope box).");
+  }
+
+  deactivate(): void {
+    this.start = null;
+    this.ctx.viewport.setPreviewLines(null);
+  }
+
+  private point(ev: PointerEvent): Vec2 | null {
+    if (this.ctx.viewport.viewMode !== "plan") return null;
+    const elevation = this.ctx.doc.require<LevelParams>(this.ctx.activeLevelId()).params.elevation;
+    const p = this.ctx.viewport.pickPlane(ev, elevation);
+    return p && snapPoint(this.ctx, p, null, true).p;
+  }
+
+  pointerMove(ev: PointerEvent): void {
+    const p = this.point(ev);
+    if (!p || !this.start) return;
+    const a = this.start;
+    const c = [a, { x: p.x, y: a.y }, p, { x: a.x, y: p.y }];
+    this.ctx.viewport.setPreviewLines({ segments: new Float32Array(c.flatMap((q, i) => [q.x, q.y, 0, c[(i + 1) % 4]!.x, c[(i + 1) % 4]!.y, 0])), labels: [], dashed: true });
+  }
+
+  click(ev: PointerEvent): void {
+    const p = this.point(ev);
+    if (!p) return this.ctx.status("Scope boxes are drawn in plans.");
+    if (!this.start) {
+      this.start = p;
+      return;
+    }
+    const a = this.start;
+    this.start = null;
+    this.ctx.viewport.setPreviewLines(null);
+    try {
+      const { doc } = this.ctx;
+      const box = doc.transact("Create scope box", (tx) => createScopeBox(tx, doc, a, p));
+      this.ctx.setSelection([box.id]);
+      this.ctx.status(`${box.name} created. Plans use it from their Properties (Scope box).`);
+    } catch (err) {
+      this.ctx.status(`\u26a0 ${(err as Error).message}`);
+    }
+  }
+
+  key(ev: KeyboardEvent): boolean {
+    if (ev.key === "Escape" && this.start) {
+      this.start = null;
+      this.ctx.viewport.setPreviewLines(null);
+      return true;
+    }
+    return false;
+  }
+}
+
 export class CalloutTool implements Tool {
   readonly name = "callout";
   private start: Vec2 | null = null;

@@ -29,6 +29,7 @@ import {
   pointCloudPoints,
   type PointCloud,
   isAnnotationView,
+  planCrop,
 } from "@open-bim/core";
 import { GRID_BUBBLE_RADIUS, type LineData } from "./datums.ts";
 import { planLinework, planViewLinework, type PlanLinework } from "./hlr.ts";
@@ -169,7 +170,7 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
   if (section) addLineData(out, sectionAnnotations(doc, view), "datum", {});
 
   // Bounds: the view's crop when it has one, else everything drawn.
-  const crop = section ? viewCrop(view) : (view.params as ViewParams).crop;
+  const crop = section ? viewCrop(view) : planCrop(doc, view);
   out.bounds = crop ? { min: { ...crop.min }, max: { ...crop.max } } : contentBounds(out);
   if (section) {
     // Leave room for level heads to the right and grid bubbles above.

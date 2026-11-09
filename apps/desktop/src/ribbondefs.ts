@@ -479,6 +479,7 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
             },
             { label: "Legend", icon: "legend", cmd: "newLegend" },
             { label: "Drafting View", icon: "legend", cmd: "newDraftingView", title: "A 2D view for standard details: no model, drafting only" },
+            { label: "Scope Box", icon: "callout", tool: "scopebox", title: "Scope Box: a named plan box that crops the plans set to it" },
             { label: "Schedules", icon: "schedule", menu: () => [...scheduleMenu("schedule"), "-", ...scheduleMenu("takeoff")] },
             { label: "Sheet", icon: "sheet", cmd: "newSheet" },
           ],

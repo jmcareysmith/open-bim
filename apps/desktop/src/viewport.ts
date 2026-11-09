@@ -125,7 +125,7 @@ const COLORS: Record<string, number> = {
 /** Plan styles that show the coloured model under the line work. */
 const SHADED_STYLES = new Set<string>(["shaded", "consistent", "realistic"]);
 /** Model elements whose plan marks scale with the view (bubbles, heads, labels). */
-const SCALED_MARKS = new Set<string>([Cat.Grid, Cat.ReferencePlane, Cat.View]);
+const SCALED_MARKS = new Set<string>([Cat.Grid, Cat.ReferencePlane, Cat.View, Cat.ScopeBox]);
 /** Hidden elements while revealing them (Revit shows them magenta). */
 const REVEALED = 0xd0389c;
 const SELECTED = 0x3d8bfd;

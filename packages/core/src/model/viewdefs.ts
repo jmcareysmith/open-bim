@@ -70,6 +70,8 @@ export type ViewParams = {
   farClip?: number | null;
   /** Sections/elevations: absolute Z crop, mm. */
   zRange?: { bottom: number; top: number } | null;
+  /** Plans: the scope box that sets the crop (model/scopeboxes.ts). */
+  scopeBoxId?: ElementId | null;
   /** Callouts: the view they're drawn from, and the plan region they show. */
   parentId?: ElementId | null;
   crop?: { min: Vec2; max: Vec2 } | null;

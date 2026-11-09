@@ -309,6 +309,7 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
                 const loaded = m.detailFamilies();
                 const lib = m.libraryDetailItems().filter((n) => !loaded.some((f) => f.name === n));
                 return [
+                  { label: "Repeating detail (along a line)…", action: () => m.tool("repeatingdetail") },
                   { heading: "Loaded detail items" },
                   ...(loaded.length ? loaded.map((f) => ({ label: f.name, action: () => m.placeDetail(f.id) })) : [{ label: "(none yet)", disabled: true, action: () => {} }]),
                   { heading: "Load from library" },

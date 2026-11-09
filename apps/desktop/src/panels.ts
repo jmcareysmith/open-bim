@@ -44,6 +44,7 @@ import {
   type BarSize,
   type Rebar,
   type RebarParams,
+  detailCopies,
   STOCK_LENGTH,
   lapLength,
   canReinforce,
@@ -3935,6 +3936,14 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Rotation (\u00b0)", numberInput(+((p.rotation * 180) / Math.PI).toFixed(2), (v) => update<DetailComponentParams>("Rotate detail", { rotation: (v * Math.PI) / 180 }))),
         row("Mirrored", checkbox(p.mirrored, (v) => update<DetailComponentParams>("Mirror detail", { mirrored: v }))),
       );
+      if (p.repeat) {
+        const r = p.repeat;
+        sec.append(
+          row("Spacing", numberInput(r.spacing, (v) => (v > 0 ? update<DetailComponentParams>("Repeat spacing", { repeat: { ...r, spacing: v } }) : ctx.status("⚠ Must be positive")))),
+          row("Length", len(Math.hypot(r.end.x - p.position.x, r.end.y - p.position.y))),
+          row("Copies", h("span", {}, String(detailCopies(p).length))),
+        );
+      }
       const editFam = h("button", { textContent: "Edit family" });
       editFam.onclick = () => ctx.editFamily(p.familyId);
       sec.append(row("", editFam));

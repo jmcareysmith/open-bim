@@ -215,6 +215,8 @@ function transformed(c: Ctx, el: Element): Record<string, unknown> | null {
       return p;
     case Cat.DetailComponent: {
       pt("position");
+      const rep = p.repeat as { end: Vec2; spacing: number } | null | undefined;
+      if (rep) p.repeat = { ...rep, end: applyAffine(t, rep.end) };
       const th = p.rotation as number;
       if (mirror) {
         // Mirroring flips the component; the rotation that goes with the flip keeps it a true mirror image.

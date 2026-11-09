@@ -19,6 +19,11 @@ export type DetailComponentParams = {
   rotation: number;
   /** Mirrored across its own Y axis (Revit's flip). */
   mirrored: boolean;
+  /**
+   * Repeating Detail Component (Revit): copies from `position` along the line to `end`, every
+   * `spacing` mm, each turned along the line (`rotation` is then the line's direction).
+   */
+  repeat?: { end: Vec2; spacing: number } | null;
 };
 export type DetailComponent = Element<DetailComponentParams>;
 
@@ -81,6 +86,36 @@ export function createDetailComponent(
 }
 
 /** Family coordinates → the view: mirror (across family Y), rotate, then move to the position. */
+/** How wide a detail family is along its X (its natural repeat), mm; 100 when it has no line work. */
+export function detailWidth(def: FamilyDef): number {
+  const c = detailContent(def);
+  const xs = [...c.lines.flatMap((l) => [l.start.x, l.end.x]), ...c.regions.flatMap((r) => r.boundary.map((q) => q.x))];
+  const w = xs.length ? Math.max(...xs) - Math.min(...xs) : 0;
+  return w > 1 ? w : 100;
+}
+
+/** A repeating detail: the family repeated from `start` to `end` at its own width (or `spacing`). */
+export function createRepeatingDetail(tx: Transaction, doc: Document, viewId: ElementId, familyId: ElementId, start: Vec2, end: Vec2, spacing?: number): DetailComponent {
+  const len = Math.hypot(end.x - start.x, end.y - start.y);
+  if (len < 1) throw new Error("Draw the repeating detail along a line");
+  const def = doc.require(familyId) as FamilyDef;
+  const el = createDetailComponent(tx, doc, viewId, familyId, start, { rotation: Math.atan2(end.y - start.y, end.x - start.x) });
+  tx.update<DetailComponentParams>(el.id, { repeat: { end: { ...end }, spacing: spacing ?? detailWidth(def) } });
+  return doc.require(el.id) as DetailComponent;
+}
+
+/** Where each copy of a (repeating) detail component sits: its own position, or one per spacing along its line. */
+export function detailCopies(p: DetailComponentParams): DetailComponentParams[] {
+  const r = p.repeat;
+  if (!r) return [p];
+  const len = Math.hypot(r.end.x - p.position.x, r.end.y - p.position.y);
+  const step = Math.max(1, r.spacing);
+  const n = Math.min(2000, Math.floor(len / step + 1e-6));
+  const d = len > 0 ? { x: (r.end.x - p.position.x) / len, y: (r.end.y - p.position.y) / len } : { x: 1, y: 0 };
+  const rotation = Math.atan2(d.y, d.x);
+  return Array.from({ length: n + 1 }, (_, i) => ({ ...p, rotation, position: { x: p.position.x + d.x * step * i, y: p.position.y + d.y * step * i } }));
+}
+
 export function detailTransform(p: DetailComponentParams): (q: Vec2) => Vec2 {
   const c = Math.cos(p.rotation);
   const s = Math.sin(p.rotation);

@@ -71,7 +71,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Annotate: Dimension, Detail (line, region, cloud), Text (+ Check Spelling, Find/Replace), Tag (+
   Keynote ▾ load/export keynote files), Revisions, Groups. Symbol ▾ places a north arrow
   (true north option), scale bar or break line. Detail → Component ▾ places Detail Item
-  families (library or your own: New family → Detail Item, draw detail lines/regions). Detail Group (or
+  families (library or your own: New family → Detail Item, draw detail lines/regions); Component ▾ Repeating detail repeats one
+  along a line at its width (`repeat` on the component, core `detailCopies`). Detail Group (or
   Ctrl+G on one view's drafting) makes a detail group; Place Group puts copies in the open view. Options bar under the ribbon holds Level/Type.
 - View markers: bubbles with the view's number and a filled arrow, or a View Marker family picked in
   the view's Properties (library: several heads/tails/marks; New family → View Marker for your own); Elevation tool places one

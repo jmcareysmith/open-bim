@@ -187,7 +187,7 @@ import { ribbonTabs } from "./ribbondefs.ts";
 import { openFindReplace, openSpelling } from "./textdialogs.ts";
 import { SymbolTool } from "./symboltool.ts";
 import { openOverrideDialog } from "./overridedialog.ts";
-import { DetailComponentTool } from "./detailtool.ts";
+import { DetailComponentTool, RepeatingDetailTool } from "./detailtool.ts";
 import { AttachTool } from "./attachtool.ts";
 import { ElevationTool } from "./elevationtool.ts";
 
@@ -560,6 +560,10 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   split: new SplitTool(ctx),
   symbol: new SymbolTool(ctx),
   detailcomponent: new DetailComponentTool(ctx),
+  repeatingdetail: new RepeatingDetailTool(ctx, () => {
+    const t = tools.detailcomponent as DetailComponentTool;
+    return t.families().find((f) => f.id === t.familyId)?.id ?? t.families()[0]?.id ?? null;
+  }),
   attach: new AttachTool(ctx),
   slopeArrow: new SlopeArrowTool(ctx),
   floorPoint: new FloorPointTool(ctx),
@@ -588,7 +592,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   elevation: new ElevationTool(ctx),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
-const DRAWING_TOOLS = new Set(["select", "symbol", "detailcomponent", "placegroup", "attach", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution", "angulardim"]);
+const DRAWING_TOOLS = new Set(["select", "symbol", "detailcomponent", "repeatingdetail", "placegroup", "attach", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution", "angulardim"]);
 let tool: Tool = tools.select!;
 /** Grips and temporary dimensions for the selection (Select tool only). */
 let grips: GripLayer | undefined = new GripLayer(ctx, $("#viewport"));

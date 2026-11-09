@@ -10,6 +10,9 @@ import {
   createFilledRegion,
   detailContent,
   detailTransform,
+  createRepeatingDetail,
+  detailCopies,
+  detailWidth,
   loadFamily,
   mirrorAcross,
   rotationAbout,
@@ -83,5 +86,18 @@ describe("detail components", () => {
     }
     expect(doc.require<DetailComponentParams>(d.id).params.mirrored).toBe(true);
     expect(before).toBeDefined();
+  });
+  it("repeating details copy the item along a line at its width, and move as one", () => {
+    const { doc, plan, def } = setup();
+    expect(detailWidth(def)).toBe(90);
+    const d = doc.transact("Rep", (tx) => createRepeatingDetail(tx, doc, plan.id, def.id, { x: 0, y: 0 }, { x: 0, y: 900 }));
+    const copies = detailCopies(d.params);
+    // 900 / 90 = 10 steps → 11 copies, each turned along the line (90°).
+    expect(copies).toHaveLength(11);
+    close(copies[10]!.position, { x: 0, y: 900 });
+    expect(copies[0]!.rotation).toBeCloseTo(Math.PI / 2);
+    doc.transact("Move", (tx) => transformElements(tx, doc, [d.id], { xx: 1, xy: 0, yx: 0, yy: 1, tx: 100, ty: 0 }));
+    const moved = doc.require(d.id).params as DetailComponentParams;
+    close(moved.repeat!.end, { x: 100, y: 900 });
   });
 });

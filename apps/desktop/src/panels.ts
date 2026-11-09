@@ -44,6 +44,7 @@ import {
   type BarSize,
   type Rebar,
   type RebarParams,
+  type FormVisibility,
   systemPressure,
   type KeyScheduleParams,
   type KeySchedule,
@@ -1393,6 +1394,22 @@ function formRows(ctx: PanelContext, el: Element): HTMLElement[] {
   const isVoid = h("input", { type: "checkbox", checked: p.isVoid });
   isVoid.onchange = () => update("Toggle void", { isVoid: isVoid.checked });
   const rows: HTMLElement[] = [row("Void (cuts solids)", isVoid), row("Work plane", p.plane.kind)];
+  // Visibility/Graphics Overrides: detail levels and plan views the form shows in.
+  if (!p.isVoid) {
+    const vis = (p.visibility ?? {}) as FormVisibility;
+    const box = h("span");
+    box.style.cssText = "display:flex;gap:8px;flex-wrap:wrap";
+    for (const [key, label] of [["coarse", "Coarse"], ["medium", "Medium"], ["fine", "Fine"], ["plan", "Plan/RCP"]] as const) {
+      const cb = h("input", { type: "checkbox", checked: vis[key] !== false });
+      cb.onchange = () => {
+        const next = { ...vis, [key]: cb.checked };
+        const all = (["coarse", "medium", "fine", "plan"] as const).every((k) => next[k] !== false);
+        update("Form visibility", { visibility: all ? null : next });
+      };
+      box.append(h("label", {}, cb, ` ${label}`));
+    }
+    rows.push(row("Visible in", box));
+  }
   const field = (key: string, label: string) => rows.push(row(label, formulaInput(p[key] as Num, (v) => update(`Edit ${label.toLowerCase()}`, { [key]: v }), check)));
   const pts = (key: string, label: string) => {
     rows.push(h("h3", {}, label));

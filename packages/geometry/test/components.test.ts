@@ -22,6 +22,30 @@ const rect = (x0: string | number, y0: string | number, x1: string | number, y1:
 ];
 
 describe("family instance geometry", () => {
+  it("shows forms by detail level and in plans as their visibility says", () => {
+    const fam = new Document();
+    applyFamilyTemplate(fam, "Furniture");
+    const box = (x: number) => fam.transact("E", (tx) => createExtrusion(tx, rect(x, 0, x + 100, 100), { end: 100 }));
+    box(0);
+    const fine = box(200);
+    const notPlan = box(400);
+    fam.transact("V", (tx) => {
+      tx.update(fine.id, { visibility: { coarse: false, medium: false } });
+      tx.update(notPlan.id, { visibility: { plan: false } });
+    });
+    const project = new Document();
+    const ids = applyResidentialTemplate(project);
+    const def = project.transact("Load", (tx) => loadFamily(tx, project, fam, "Thing"));
+    const inst = project.transact("Place", (tx) => placeFamilyInstance(tx, project, def.id, "Default", { levelId: ids.levels.ground, position: { x: 0, y: 0 } }));
+    const k = new SimpleKernel();
+    const vol = (d?: { detail: "coarse" | "medium" | "fine"; plan: boolean }) => meshVolume(k.build(project, inst, d)!) / 1e6;
+    expect(vol()).toBeCloseTo(3);
+    expect(vol({ detail: "fine", plan: false })).toBeCloseTo(3);
+    expect(vol({ detail: "medium", plan: false })).toBeCloseTo(2);
+    expect(vol({ detail: "medium", plan: true })).toBeCloseTo(1);
+    expect(vol({ detail: "fine", plan: true })).toBeCloseTo(2);
+  });
+
   it("places the family mesh on its level, rotated", () => {
     const fam = new Document();
     applyFamilyTemplate(fam, "Furniture");

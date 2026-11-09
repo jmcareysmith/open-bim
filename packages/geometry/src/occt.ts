@@ -15,10 +15,11 @@ import { tangentLine,
   curtainOf,
   hasSlopedTop,
   type DetailLevel,
+  formShown,
 } from "@open-bim/core";
 import { mergeMeshes } from "./doors.ts";
 import { formMesh } from "./forms.ts";
-import { buildFamilyInstance, nestedMeshes } from "./components.ts";
+import { buildFamilyInstance, nestedMeshes, type FamilyDisplay } from "./components.ts";
 import type { LineData } from "./datums.ts";
 import { joinedWallFootprint } from "./joins.ts";
 import { SimpleKernel, withSweeps, type GeometryKernel } from "./kernel.ts";
@@ -51,7 +52,7 @@ export class OcctKernel implements GeometryKernel {
     return new OcctKernel(await init(options));
   }
 
-  build(doc: Document, el: Element): MeshData | null {
+  build(doc: Document, el: Element, display?: FamilyDisplay): MeshData | null {
     if (el.category === Cat.Wall) {
       const wall = el as Wall;
       const cuts = wallCuts(doc, wall);
@@ -59,7 +60,7 @@ export class OcctKernel implements GeometryKernel {
       const reveals = wallSweepSolids(doc, wall).reveals;
       if ((cuts.length || reveals.length) && !curtainOf(doc, wall)) return this.buildWallWithCuts(doc, wall, cuts, reveals);
     }
-    if (el.category === Cat.FamilyInstance) return buildFamilyInstance(doc, el, this.mesher);
+    if (el.category === Cat.FamilyInstance) return buildFamilyInstance(doc, el, this.mesher, undefined, display);
     if (el.category === Cat.Link) return buildLink(doc, el, this);
     if (isFormCategory(el.category) && !(el.params as { isVoid?: boolean }).isVoid) {
       // Family solids are cut by every void in the family (Revit behaviour).
@@ -73,7 +74,7 @@ export class OcctKernel implements GeometryKernel {
   /** All solid forms of a family, minus its voids, as one mesh (for placed family instances). */
   familyMesh(familyDoc: Document, values: Values): MeshData | null {
     const forms = familyDoc.all().filter((e) => isFormCategory(e.category));
-    const solids = forms.filter((f) => !(f.params as { isVoid?: boolean }).isVoid).map((f) => formMesh(f, values));
+    const solids = forms.filter((f) => !(f.params as { isVoid?: boolean }).isVoid && formShown(f.params as never, values)).map((f) => formMesh(f, values));
     const voids = forms.filter((f) => (f.params as { isVoid?: boolean }).isVoid).map((f) => formMesh(f, values));
     const nested = nestedMeshes(familyDoc, values, this.mesher);
     if (!solids.length && !nested.length) return null;

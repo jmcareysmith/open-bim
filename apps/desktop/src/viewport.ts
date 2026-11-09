@@ -460,7 +460,7 @@ export class Viewport {
       return;
     }
     try {
-      const mesh = this.kernel.build(this.doc, el);
+      const mesh = this.kernel.build(this.doc, el, { detail: this.graphics.detailLevel, plan: this.mode === "plan" });
       let lines = this.kernel.buildLines(this.doc, el, this.graphics.scale, this.graphics.detailLevel);
       // Rooms and areas take the open plan's colour scheme fill (none: not drawn, still pickable).
       if (lines?.fill && (el.category === Cat.Room || el.category === Cat.Area)) {
@@ -1331,6 +1331,8 @@ void main() {
     this.applyBackground();
     this.grid.visible = false; // Revit shows no work-plane grid in 3D or plan
     for (const g of this.objects.values()) this.applyPlanOnly(g);
+    // Family forms can be hidden in plan views (form visibility): rebuild instances for the new mode.
+    for (const el of this.doc.byCategory(Cat.FamilyInstance)) this.rebuild(el.id);
     this.drawingDirty = true;
     if (mode === "plan" && !this.planFramed) {
       this.planFramed = true;

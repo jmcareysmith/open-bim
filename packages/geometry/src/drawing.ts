@@ -150,7 +150,7 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
     // Coarse plans draw ducts, pipes, trays and conduit single-line (their symbols, not their solids).
     .filter((el) => section || g.detailLevel !== "coarse" || !isRunCategory(el.category))
     .flatMap((el) => {
-      const mesh = kernel.build(doc, el);
+      const mesh = kernel.build(doc, el, { detail: g.detailLevel, plan: !section });
       if (!mesh) return [];
       const m = elementMaterial(doc, el);
       return [{ id: el.id, mesh, surface: m ? patternFamilies(m.params.surfacePattern, g.scale) : null }];

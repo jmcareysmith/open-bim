@@ -70,7 +70,30 @@ export type NumPt = { x: Num; y: Num };
 /** Sketch plane: XY at height `offset` (plan), XZ at y = offset (front), YZ at x = offset (side). */
 export type WorkPlane = { kind: "XY" | "XZ" | "YZ"; offset: Num };
 
-type FormBase = { isVoid: boolean; plane: WorkPlane };
+/**
+ * Visibility/Graphics Overrides of a family form (Revit): which detail levels show it, and whether
+ * it shows in plan and reflected ceiling plan views (e.g. a fine-only handle, a 3D-only sweep with
+ * plan symbol lines instead). Unset = shown everywhere.
+ */
+export type FormVisibility = { coarse?: boolean; medium?: boolean; fine?: boolean; plan?: boolean };
+type FormBase = { isVoid: boolean; plane: WorkPlane; visibility?: FormVisibility | null };
+
+/**
+ * Reserved family values carrying the view's display to the family mesher: `__detail` 0 coarse,
+ * 1 medium, 2 fine; `__plan` 1 in plans. Missing = show everything.
+ */
+export const DISPLAY_DETAIL = "__detail";
+export const DISPLAY_PLAN = "__plan";
+
+/** Does a form show for these display values? */
+export function formShown(params: { visibility?: FormVisibility | null }, values: Record<string, number>): boolean {
+  const v = params.visibility;
+  if (!v) return true;
+  const d = values[DISPLAY_DETAIL];
+  if (d !== undefined && v[(["coarse", "medium", "fine"] as const)[d] ?? "medium"] === false) return false;
+  if (values[DISPLAY_PLAN] === 1 && v.plan === false) return false;
+  return true;
+}
 
 export type ExtrusionParams = FormBase & { profile: NumPt[]; holes: NumPt[][]; start: Num; end: Num };
 /** Blend between a bottom and a top profile, `start` to `end` along the plane normal. */

@@ -80,7 +80,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Type catalogs | 3 | ✅ |
 | Family library (open `.obim-family` format; doors, windows, furniture, casework) | 3 | ✅ |
 | Shared parameters, project parameters, global parameters | 3 | ✅ |
-| Family visibility (detail level, view direction) | 3 | ⬜ |
+| Family visibility (detail level, view direction) | 3 | 🟨 (form Visible in: Coarse/Medium/Fine/Plan; no front/back, left/right yet) |
 
 ## 7. Views
 | Feature | Phase | Status |

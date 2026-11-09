@@ -28,6 +28,7 @@ import {
   stackSegments,
   hasSlopedTop,
   type DetailLevel,
+  formShown,
 } from "@open-bim/core";
 import { buildConnectorLines, buildGridLines, buildOpeningLines, buildReferencePlaneLines, buildScopeBoxLines, type LineData } from "./datums.ts";
 import { buildDoor, buildDoorLines, buildWindow, buildWindowLines } from "./doors.ts";
@@ -35,7 +36,7 @@ import { joinedWallFootprint } from "./joins.ts";
 import { buildRoof } from "./roof.ts";
 import { buildForm, formMesh } from "./forms.ts";
 import { mergeMeshes } from "./doors.ts";
-import { buildFamilyInstance, nestedMeshes } from "./components.ts";
+import { buildFamilyInstance, type FamilyDisplay, nestedMeshes } from "./components.ts";
 import { buildViewMarker } from "./sections.ts";
 import { buildAnnotationLines } from "./annotations.ts";
 import { buildLegendLines } from "./legends.ts";
@@ -64,8 +65,11 @@ import { profilePrism, wallProfileMesh, wallSweepSolids } from "./sweeps.ts";
  * for booleans (openings), sweeps and hidden-line drawings.
  */
 export interface GeometryKernel {
-  /** Returns null for elements without 3D geometry (levels, types…). */
-  build(doc: Document, el: Element): MeshData | null;
+  /**
+   * Returns null for elements without 3D geometry (levels, types…). `display`: the view's detail
+   * level and plan-ness, for family forms that only show in some (unset: all forms).
+   */
+  build(doc: Document, el: Element, display?: FamilyDisplay): MeshData | null;
   /** Line work: datums (grids…), opening outlines, plan symbols (door swings). May accompany a mesh. */
   /** Plan line work; `scale` (the view's 1:n) sizes annotation-like parts such as grid bubbles. */
   buildLines(doc: Document, el: Element, scale?: number, detail?: DetailLevel): LineData | null;
@@ -360,7 +364,8 @@ export class SimpleKernel implements GeometryKernel {
     this.lineBuilders.set(category, builder);
   }
 
-  build(doc: Document, el: Element): MeshData | null {
+  build(doc: Document, el: Element, display?: FamilyDisplay): MeshData | null {
+    if (el.category === Cat.FamilyInstance) return buildFamilyInstance(doc, el, this.mesher, undefined, display);
     return this.builders.get(el.category)?.(doc, el) ?? null;
   }
 
@@ -372,7 +377,7 @@ export class SimpleKernel implements GeometryKernel {
   familyMesh(familyDoc: Document, values: Values): MeshData | null {
     const solids = familyDoc
       .all()
-      .filter((e) => isFormCategory(e.category) && !(e.params as { isVoid?: boolean }).isVoid)
+      .filter((e) => isFormCategory(e.category) && !(e.params as { isVoid?: boolean }).isVoid && formShown(e.params as never, values))
       .map((e) => formMesh(e, values));
     const parts = [...solids, ...nestedMeshes(familyDoc, values, this.mesher)];
     return parts.length ? mergeMeshes(parts) : null;

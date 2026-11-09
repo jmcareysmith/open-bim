@@ -313,3 +313,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Pressure loss (core/model/mepcalcs.ts `systemPressure`): duct/pipe system Properties → Pressure loss — flows from the
   equipment, Darcy–Weisbach (Swamee–Jain) per run, joint K (elbow by angle, tee 0.2/0.6, size change 0.1), critical
   path to the worst terminal (Select critical path). Fluid/roughness figures provisional; drainage defers to G13.
+- Family form visibility (core family.ts `FormVisibility`, `formShown`): family editor form Properties → Visible in
+  (Coarse/Medium/Fine/Plan). Kernels' `build(doc, el, display)` passes the view's detail level and plan-ness to the family
+  mesher as reserved values `__detail`/`__plan` (cached per value set; nested families inherit). Viewport rebuilds
+  instances on detail-level and view-mode changes; drawings pass the view's. No front/back or left/right yet.

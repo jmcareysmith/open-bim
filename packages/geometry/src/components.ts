@@ -1,4 +1,7 @@
 import { tangentLine,
+  DISPLAY_DETAIL,
+  DISPLAY_PLAN,
+  type DetailLevel,
   Cat,
   familyDocument,
   instanceValues,
@@ -16,6 +19,23 @@ import type { MeshData } from "./mesh.ts";
 // Free-standing: rotated about Z, placed on the level. Wall-hosted: family X along the wall,
 // family Y across it (towards the wall's left / exterior face), origin on the location line at
 // `along`, at the wall base + sill height.
+
+/** The view a family instance is drawn for (form visibility by detail level and plan). */
+export interface FamilyDisplay {
+  detail: DetailLevel;
+  plan: boolean;
+}
+
+export function displayValues(d: FamilyDisplay): Values {
+  return { [DISPLAY_DETAIL]: d.detail === "coarse" ? 0 : d.detail === "fine" ? 2 : 1, [DISPLAY_PLAN]: d.plan ? 1 : 0 };
+}
+
+function pickDisplay(v: Values): Values {
+  const out: Values = {};
+  if (DISPLAY_DETAIL in v) out[DISPLAY_DETAIL] = v[DISPLAY_DETAIL]!;
+  if (DISPLAY_PLAN in v) out[DISPLAY_PLAN] = v[DISPLAY_PLAN]!;
+  return out;
+}
 
 /** Kernel hook: geometry of a family document for given values (solids minus voids where supported). */
 export type FamilyMesher = (familyDoc: Document, values: Values) => MeshData | null;
@@ -75,10 +95,12 @@ export function placeMeshData(m: MeshData, pl: Placement): MeshData {
 }
 
 /** An instance's mesh in `doc`'s coordinates. `hostValues`: when `doc` is a family, its values. */
-export function buildFamilyInstance(doc: Document, el: Element, mesher: FamilyMesher, hostValues?: Values): MeshData | null {
+export function buildFamilyInstance(doc: Document, el: Element, mesher: FamilyMesher, hostValues?: Values, display?: FamilyDisplay): MeshData | null {
   const inst = el as FamilyInstance;
   const def = doc.require(inst.params.familyId) as FamilyDef;
-  const local = familyMeshCached(def, instanceValues(doc, inst, hostValues), mesher);
+  // The view's detail level and plan-ness ride along as reserved values (nested families inherit them).
+  const shown = display ? displayValues(display) : hostValues ? pickDisplay(hostValues) : {};
+  const local = familyMeshCached(def, { ...instanceValues(doc, inst, hostValues), ...shown }, mesher);
   return local ? placeMeshData(local, instancePlacement(doc, inst)) : null;
 }
 

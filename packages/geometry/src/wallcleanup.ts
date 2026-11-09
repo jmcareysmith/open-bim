@@ -158,7 +158,7 @@ export function cleanCuts(doc: Document, linework: PlanLinework[], frame: ViewFr
  */
 function wrapLayers(doc: Document, wall: Wall, regions: Region[], cutZ: number): Region[] {
   const t = wall.typeId ? doc.get<LayeredTypeParams>(wall.typeId)?.params : undefined;
-  if (!t || !t.layers.length) return regions;
+  if (!t || !t.layers.length || wall.params.curve) return regions; // straight walls only
   const ends = t.wrapEnds && t.wrapEnds !== "none" ? t.wrapEnds : null;
   const inserts = t.wrapInserts && t.wrapInserts !== "none" ? t.wrapInserts : null;
   if (!ends && !inserts) return regions;
@@ -222,7 +222,7 @@ function wrapLayers(doc: Document, wall: Wall, regions: Region[], cutZ: number):
 
 /** Walls that join and clean: plain layered walls (not curtain or stacked). */
 function cleanable(doc: Document, wall: Wall): boolean {
-  if (wall.category !== Cat.Wall || !wall.typeId || (wall as Wall).params.curve) return false;
+  if (wall.category !== Cat.Wall || !wall.typeId) return false;
   const t = doc.get<LayeredTypeParams>(wall.typeId)?.params;
   return !!t && !t.curtain && !t.stack?.length && t.layers.length > 0;
 }
@@ -232,6 +232,8 @@ function cleanable(doc: Document, wall: Wall): boolean {
  * the through wall's face and its core face, across the stem's width. Null if there's no finish.
  */
 function teeExtension(doc: Document, stem: Wall, end: "start" | "end", through: Wall): Vec2[] | null {
+  // Straight walls only (an arc's faces aren't lines); curved tees keep their plain butt.
+  if (stem.params.curve || through.params.curve) return null;
   const type = doc.get<LayeredTypeParams>(through.typeId!)?.params;
   const layers = type?.layers ?? [];
   const first = layers.findIndex((l) => l.function === "structure");
@@ -268,6 +270,7 @@ function teeExtension(doc: Document, stem: Wall, end: "start" | "end", through: 
 
 /** Location lines that cross inside both walls (an X crossing, not a join at an end). */
 function crossing(a: Wall, b: Wall): boolean {
+  if (a.params.curve || b.params.curve) return false;
   const p = a.params.start;
   const r = { x: a.params.end.x - p.x, y: a.params.end.y - p.y };
   const q = b.params.start;

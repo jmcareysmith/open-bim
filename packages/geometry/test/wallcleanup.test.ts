@@ -103,6 +103,25 @@ describe("wall join cleanup in plan", () => {
     expect(cuts.get(a.id)!.lines.length).toBeGreaterThan(0);
   });
 
+  it("drops the joint between a straight wall and a curved wall it corners with, layer by layer", () => {
+    const { doc, wall, types } = setup();
+    const a = wall(p(0, 0), p(2000, 0));
+    const arc = wall(p(2000, 0), p(5000, 3000));
+    doc.transact("Curve", (tx) => setWallCurve(tx, doc, arc.id, -800));
+    const walls = [doc.require(a.id) as Wall, doc.require(arc.id) as Wall];
+    const cuts = cleanCuts(doc, linework(doc, walls), planFrame(1200), true, true);
+    // The curved wall's layers come through cleanup as curved regions of both materials.
+    const ar = cuts.get(arc.id)!.regions!;
+    expect(ar.some((r) => r.materialId === types.gib)).toBe(true);
+    expect(ar.some((r) => r.materialId === types.timber && r.loop.length > 10)).toBe(true);
+    // The mitre between them isn't drawn in either outline.
+    const fp = joinedWallFootprint(doc, walls[0]!);
+    const cap = fp.filter((q) => q.x > 1900);
+    expect(cap).toHaveLength(2);
+    expect(hasSegment(cuts.get(a.id)!.lines, cap[0]!, cap[1]!)).toBe(false);
+    expect(hasSegment(cuts.get(arc.id)!.lines, cap[0]!, cap[1]!)).toBe(false);
+  });
+
   it("cleans crossing walls: the thicker wall runs through", () => {
     const { doc, wall, types } = setup();
     const thick = wall(p(0, 0), p(2000, 0), types.t200);

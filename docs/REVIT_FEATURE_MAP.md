@@ -160,7 +160,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | NZ H1 compliance (R-values, schedule method) | 7 | ✅ (provisional minimums) |
 | NZS 3604 bracing | 7 | ✅ (provisional demand; tabulated override) |
 | Structural analysis export | 9 | ⬜ |
-| Structural loads and beam checks (NZS 1170.0 combinations) | 9 | 🟨 (provisional; beams only) |
+| Structural loads and member checks (NZS 1170.0 combinations) | 9 | 🟨 (provisional; beams and columns, area loads by tributary width) |
 
 ## 14. Extensibility
 | Feature | Phase | Status |

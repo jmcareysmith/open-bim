@@ -14,6 +14,9 @@ import {
   type StripFootingParams,
   type StructuralSectionParams,
   type StructuralLoadParams,
+  type Floor,
+  floorExtent,
+  Cat,
   type Vec2,
   type Wall,
 } from "@open-bim/core";
@@ -156,8 +159,30 @@ export function buildStripFooting(doc: Document, el: Element): MeshData | null {
  */
 export function buildLoadLines(doc: Document, el: Element): LineData | null {
   const l = el.params as StructuralLoadParams;
+  if (l.kind === "area") {
+    // Area loads: a grid of arrows standing on the floor (about 1.5 m apart), with the label.
+    const f = doc.get(l.hostId) as Floor | undefined;
+    if (!f || f.category !== Cat.Floor) return null;
+    const top = floorExtent(doc, f).top;
+    const b = f.params.boundary;
+    const xs = b.map((q) => q.x);
+    const ys = b.map((q) => q.y);
+    const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+    const step = Math.max(1500, Math.max(x1 - x0, y1 - y0) / 8);
+    const seg: number[] = [];
+    let first: Vec2 | null = null;
+    for (let x = x0 + step / 2; x < x1; x += step) {
+      for (let y = y0 + step / 2; y < y1; y += step) {
+        if (!inRing({ x, y }, b)) continue;
+        first ??= { x, y };
+        seg.push(x, y, top + 600, x, y, top, x, y, top, x - 60, y, top + 120, x, y, top, x + 60, y, top + 120);
+      }
+    }
+    if (!first) return null;
+    return { segments: new Float32Array(seg), labels: [{ text: `${l.case} ${l.value} kPa`, position: [first.x, first.y, top + 750], size: 150 }], placement: "model" };
+  }
   const beam = doc.get<BeamParams>(l.hostId);
-  if (!beam) return null;
+  if (!beam || beam.category !== Cat.Beam) return null;
   const p = beam.params;
   const len = Math.hypot(p.end.x - p.start.x, p.end.y - p.start.y);
   if (len < 1) return null;
@@ -189,4 +214,14 @@ export function buildLoadLines(doc: Document, el: Element): LineData | null {
   }
   const q = at(label.u);
   return { segments: new Float32Array(seg), labels: [{ text: label.text, position: [q.x, q.y, zAt(label.u) + H + 150], size: 150 }], placement: "model" };
+}
+
+function inRing(q: Vec2, ring: Vec2[]): boolean {
+  let c = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i]!;
+    const b = ring[j]!;
+    if (a.y > q.y !== b.y > q.y && q.x < ((b.x - a.x) * (q.y - a.y)) / (b.y - a.y) + a.x) c = !c;
+  }
+  return c;
 }

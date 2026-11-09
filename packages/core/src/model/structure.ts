@@ -42,6 +42,8 @@ export type BeamParams = {
   endOffset?: number | null;
   /** Structural brace (Revit: Brace): drawn in plan as a dashed line with its slope. */
   brace?: boolean | null;
+  /** Tributary width for floor area loads, mm (unset: worked out from neighbouring beams). */
+  tributary?: number | null;
 };
 export type Beam = Element<BeamParams>;
 

@@ -139,6 +139,6 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Structural analytical model: members (columns, beams, braces) with auto-connected nodes and supports, wall/floor panels; Structure → Analytical Model (3D overlay)
 - [x] Loads (G/Q/W line and point loads on beams, arrows in views) and NZS 1170.0 combinations (provisional)
 - [x] Beam checks: simply supported bending, shear, SLS deflection; steel/timber/concrete (with rebar) — provisional
-- [ ] Area loads on floors (tributary to beams), column axial checks
+- [x] Area loads on floors (tributary width to beams, auto from neighbours), column axial checks (Rankine buckling)
 - [x] Point clouds: Insert → Point Cloud (LAS, XYZ/PTS/TXT/CSV; thinned to 200k; shared coordinates or centred), drawn in 3D, move
 - [ ] Point clouds in plans/sections (clipped by the view range/crop) and snapping to points

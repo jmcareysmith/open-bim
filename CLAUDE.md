@@ -289,4 +289,5 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Loads and beam checks (core/model/loads.ts, PROVISIONAL figures in its header): beam Properties → Loads and check:
   add G/Q/W line (kN/m) or point loads (kN); `beamCheck` — simply supported, NZS 1170.0 ULS combos, self-weight,
   steel 300 / timber SG8 / concrete f'c 30 with its rebar cage's bottom bars, SLS deflection L/250. Load arrows
-  (geometry `buildLoadLines`). No area loads or column checks yet.
+  (geometry `buildLoadLines`). Floor Properties → Area loads (kPa) reach beams over their tributary width (beam
+  `tributary`, else auto); column Properties → Axial check (`columnCheck`: beam reactions via the analytical model).

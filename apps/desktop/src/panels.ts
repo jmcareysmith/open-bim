@@ -48,6 +48,7 @@ import {
   type LoadCase,
   LOAD_CASES,
   beamCheck,
+  columnCheck,
   createLoad,
   type PointCloudParams,
   AREA_REBAR_HOSTS,
@@ -2908,6 +2909,16 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Top offset", numberInput(p.topOffset, (v) => update<ColumnParams>("Change column top offset", { topOffset: v }))),
         row("Rotation (\u00b0)", numberInput(Math.round(((p.rotation * 180) / Math.PI) * 100) / 100, (v) => update<ColumnParams>("Rotate column", { rotation: (v * Math.PI) / 180 }))),
       );
+      const cc = columnCheck(doc, el.id);
+      if (cc) {
+        sec.append(
+          h("h4", {}, "Axial check (provisional)"),
+          row("Material", h("span", {}, `${cc.material}, length ${(cc.length / 1000).toFixed(2)} m`)),
+          row("Governing", h("span", {}, cc.combination)),
+          row(`${cc.ok ? "\u2713" : "\u2717"} Axial`, h("span", { class: cc.ok ? "" : "warn" }, `N* ${cc.N.toFixed(1)} kN / \u03c6Nc ${cc.phiN.toFixed(1)} kN`)),
+          ...cc.notes.map((n) => h("div", { class: "hint" }, n)),
+        );
+      }
       break;
     }
     case Cat.Beam: {
@@ -2919,6 +2930,8 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("End top offset", numberInput(p.endOffset ?? p.offset, (v) => update<BeamParams>("Change beam end offset", { endOffset: v }))),
         row("Length", len(Math.hypot(p.end.x - p.start.x, p.end.y - p.start.y))),
       );
+      sec.append(row("Tributary width", numberInput(p.tributary ?? 0, (v) => update<BeamParams>("Tributary width", { tributary: v > 0 ? v : null }))));
+      sec.append(h("div", { class: "hint" }, "Tributary width 0: worked out from neighbouring beams and the floor's edge."));
       sec.append(...beamLoadRows(ctx, el.id));
       break;
     }
@@ -2926,10 +2939,10 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       const p = el.params as StructuralLoadParams;
       sec.append(
         row("Load case", select(LOAD_CASES, p.case, (v) => update<StructuralLoadParams>("Change load case", { case: v as LoadCase }))),
-        row(p.kind === "line" ? "Value (kN/m)" : "Value (kN)", numberInput(p.value, (v) => (v >= 0 ? update<StructuralLoadParams>("Edit load", { value: v }) : ctx.status("⚠ Loads act downwards: enter a positive value")))),
+        row(p.kind === "line" ? "Value (kN/m)" : p.kind === "area" ? "Value (kPa)" : "Value (kN)", numberInput(p.value, (v) => (v >= 0 ? update<StructuralLoadParams>("Edit load", { value: v }) : ctx.status("⚠ Loads act downwards: enter a positive value")))),
       );
       if (p.kind === "point") sec.append(row("From start (mm)", numberInput(p.at ?? 0, (v) => update<StructuralLoadParams>("Move load", { at: Math.max(0, v) }))));
-      const host = h("button", { textContent: "Select beam" });
+      const host = h("button", { textContent: p.kind === "area" ? "Select floor" : "Select beam" });
       host.onclick = () => ctx.setSelection([p.hostId]);
       sec.append(row("", host));
       break;
@@ -4105,6 +4118,23 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       );
       break;
     }
+  }
+
+  // Floors: area loads (kPa) carried to the beams under them (provisional checks).
+  if (el.category === Cat.Floor) {
+    sec.append(h("h4", {}, "Area loads"));
+    for (const l of doc.byCategory<StructuralLoadParams>(Cat.StructuralLoad).filter((x) => x.params.hostId === el.id)) {
+      const b = h("button", { textContent: `${l.params.case}  ${l.params.value} kPa`, title: "Select this load" });
+      b.onclick = () => ctx.setSelection([l.id]);
+      sec.append(row("", b));
+    }
+    const add = h("button", { textContent: "Add area load", title: "Q 1.5 kPa (NZS 1170.1 residential floors, provisional): edit it after" });
+    add.onclick = () => {
+      let id: ElementId | null = null;
+      edit(ctx, "Add area load", (tx) => void (id = createLoad(tx, doc, el.id, { case: "Q", kind: "area", value: 1.5 }).id));
+      if (id) ctx.setSelection([id]);
+    };
+    sec.append(row("", add));
   }
 
   // Concrete hosts: their reinforcement, and adding more (Revit: Structure → Reinforcement).

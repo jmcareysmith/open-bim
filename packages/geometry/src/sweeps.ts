@@ -1,6 +1,7 @@
-import { sweepProfile, wallCuts, wallDirection, wallExtent, wallLength, wallSweeps, wallThickness, type Document, type Vec2, type Wall } from "@open-bim/core";
+import earcut from "earcut";
+import { arcInfo, sweepProfile, wallCuts, wallDirection, wallExtent, wallLength, wallSweeps, wallThickness, type Document, type Vec2, type Wall } from "@open-bim/core";
 import { joinedWallFootprint } from "./joins.ts";
-import { extrudePolygon, type MeshData } from "./mesh.ts";
+import { extrudePolygon, meshVolume, type MeshData } from "./mesh.ts";
 
 // Wall sweeps and reveals as solids: each profile extruded along its wall face, over the face's
 // full joined length (so sweeps run into corners). Sweeps stop at openings they cross; reveals
@@ -12,9 +13,10 @@ const REVEAL_OVERSHOOT = 2;
 export function wallSweepSolids(doc: Document, wall: Wall): { sweeps: MeshData[]; reveals: MeshData[] } {
   const out = { sweeps: [] as MeshData[], reveals: [] as MeshData[] };
   const list = wallSweeps(doc, wall);
-  if (!list.length || wall.params.curve) return out;
+  if (!list.length) return out;
   const { bottom, top } = wallExtent(doc, wall);
   if (top <= bottom) return out;
+  if (wall.params.curve) return arcSweepSolids(doc, wall, list, bottom, top);
   const d = wallDirection(wall);
   const nl = { x: -d.y, y: d.x }; // the exterior side (left of start → end)
   const half = wallThickness(doc, wall) / 2;
@@ -81,6 +83,122 @@ export function wallSweepSolids(doc: Document, wall: Wall): { sweeps: MeshData[]
     }
   }
   return out;
+}
+
+/**
+ * Sweeps and reveals on a curved wall: the profile lofted round the arc face (a station every 2°),
+ * capped at each end; spans break at openings as on straight walls.
+ */
+function arcSweepSolids(doc: Document, wall: Wall, list: ReturnType<typeof wallSweeps>, bottom: number, top: number): { sweeps: MeshData[]; reveals: MeshData[] } {
+  const out = { sweeps: [] as MeshData[], reveals: [] as MeshData[] };
+  const { start, end, curve } = wall.params;
+  const a = arcInfo(start, end, curve!);
+  if (!a) return out;
+  const len = Math.abs(a.sweep) * a.radius;
+  const half = wallThickness(doc, wall) / 2;
+  const cuts = wallCuts(doc, wall);
+  const bow = Math.sign(curve!); // the exterior (left) face is outside the arc when it bows left
+  for (const s of list) {
+    const side = s.side === "exterior" ? 1 : -1;
+    const reveal = s.kind === "reveal";
+    const rFace = a.radius + side * half * bow;
+    const outward = side * bow * (reveal ? -1 : 1); // along the radius: +1 away from the centre
+    const u0 = Math.max(0, s.from ?? 0);
+    const u1 = Math.min(len, s.to ?? len);
+    if (u1 - u0 < 1) continue;
+    const base = s.fromTop ? top - s.height : bottom + s.height;
+    const pts = sweepProfile(s);
+    const minX = Math.min(...pts.map((q) => q.x));
+    const local: Vec2[] = pts.map((q) => ({ x: (reveal && q.x === minX ? -REVEAL_OVERSHOOT : q.x) + (s.offset ?? 0), y: q.y }));
+    const zMin = base + Math.min(...pts.map((q) => q.y));
+    const zMax = base + Math.max(...pts.map((q) => q.y));
+    if (zMax <= bottom || zMin >= top) continue;
+    let spans: [number, number][] = [[u0, u1]];
+    if (!reveal)
+      for (const c of cuts) {
+        if (c.z1 <= zMin || c.z0 >= zMax) continue;
+        spans = spans.flatMap(([p, q]): [number, number][] => (c.u1 <= p || c.u0 >= q ? [[p, q]] : ([[p, c.u0], [c.u1, q]] as [number, number][]).filter(([x, y]) => y - x > 1)));
+      }
+    for (const [p, q] of spans) (reveal ? out.reveals : out.sweeps).push(loftArc(local, a, rFace, outward, base, p, q));
+  }
+  return out;
+}
+
+/** A profile (x out from the face, y up) lofted round an arc from arc length u0 to u1. */
+function loftArc(profile: Vec2[], a: { center: Vec2; radius: number; a0: number; sweep: number }, rFace: number, outward: number, base: number, u0: number, u1: number): MeshData {
+  const dir = Math.sign(a.sweep);
+  const t0 = a.a0 + (dir * u0) / a.radius;
+  const t1 = a.a0 + (dir * u1) / a.radius;
+  const n = Math.max(1, Math.ceil(Math.abs(t1 - t0) / (Math.PI / 90)));
+  const m = profile.length;
+  const pos: number[] = [];
+  const idx: number[] = [];
+  for (let k = 0; k <= n; k++) {
+    const t = t0 + ((t1 - t0) * k) / n;
+    const c = Math.cos(t);
+    const sn = Math.sin(t);
+    for (const q of profile) {
+      const r = rFace + outward * q.x;
+      pos.push(a.center.x + r * c, a.center.y + r * sn, base + q.y);
+    }
+  }
+  for (let k = 0; k < n; k++)
+    for (let i = 0; i < m; i++) {
+      const j = (i + 1) % m;
+      const p0 = k * m + i;
+      const p1 = k * m + j;
+      const q0 = (k + 1) * m + i;
+      const q1 = (k + 1) * m + j;
+      idx.push(p0, q0, q1, p0, q1, p1);
+    }
+  // Caps: the profile triangulated at each end, wound to match the sides (the consistent choice
+  // encloses the larger volume).
+  const tris = earcut(profile.flatMap((q) => [q.x, q.y]), undefined, 2);
+  const withCaps = (flipCaps: boolean): MeshData => {
+    const all = [...idx];
+    for (let t = 0; t < tris.length; t += 3) {
+      const [i, j, k] = [tris[t]!, tris[t + 1]!, tris[t + 2]!];
+      if (flipCaps) all.push(i, j, k, n * m + i, n * m + k, n * m + j);
+      else all.push(i, k, j, n * m + i, n * m + j, n * m + k);
+    }
+    return { positions: new Float32Array(pos), normals: new Float32Array(pos.length), indices: new Uint32Array(all) };
+  };
+  const a1 = withCaps(false);
+  const a2 = withCaps(true);
+  let mesh = Math.abs(meshVolume(a1)) >= Math.abs(meshVolume(a2)) ? a1 : a2;
+  // Whatever the profile's and the arc's handedness, face outwards (positive volume).
+  if (meshVolume(mesh) < 0)
+    for (let t = 0; t < mesh.indices.length; t += 3) {
+      const k = mesh.indices[t + 1]!;
+      mesh.indices[t + 1] = mesh.indices[t + 2]!;
+      mesh.indices[t + 2] = k;
+    }
+  mesh = withFaceNormals(mesh);
+  return mesh;
+}
+
+/** Flat-shaded normals (each vertex takes the normal of a face using it — fine for thin trims). */
+function withFaceNormals(m: MeshData): MeshData {
+  const P = m.positions;
+  const N = new Float32Array(P.length);
+  for (let t = 0; t < m.indices.length; t += 3) {
+    const [i, j, k] = [m.indices[t]! * 3, m.indices[t + 1]! * 3, m.indices[t + 2]! * 3];
+    const ux = P[j]! - P[i]!, uy = P[j + 1]! - P[i + 1]!, uz = P[j + 2]! - P[i + 2]!;
+    const vx = P[k]! - P[i]!, vy = P[k + 1]! - P[i + 1]!, vz = P[k + 2]! - P[i + 2]!;
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    for (const v of [i, j, k]) {
+      N[v] = N[v]! + nx;
+      N[v + 1] = N[v + 1]! + ny;
+      N[v + 2] = N[v + 2]! + nz;
+    }
+  }
+  for (let v = 0; v < N.length; v += 3) {
+    const l = Math.hypot(N[v]!, N[v + 1]!, N[v + 2]!) || 1;
+    N[v] = N[v]! / l;
+    N[v + 1] = N[v + 1]! / l;
+    N[v + 2] = N[v + 2]! / l;
+  }
+  return { ...m, normals: N };
 }
 
 /** Edit Profile: the wall as its elevation outline through its thickness (joins don't trim it). */

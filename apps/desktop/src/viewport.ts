@@ -119,6 +119,7 @@ const COLORS: Record<string, number> = {
   [Cat.Beam]: 0x8f969d,
   [Cat.PadFooting]: 0xa7a8a6,
   [Cat.StripFooting]: 0xa7a8a6,
+  [Cat.Rebar]: 0x8a4b2a,
 };
 /** Plan styles that show the coloured model under the line work. */
 const SHADED_STYLES = new Set<string>(["shaded", "consistent", "realistic"]);

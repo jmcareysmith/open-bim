@@ -84,6 +84,7 @@ export const Cat = {
   Beam: "Beam",
   PadFooting: "PadFooting",
   StripFooting: "StripFooting",
+  Rebar: "Rebar",
   Connector: "Connector",
   MEPSystem: "MEPSystem",
   DuctType: "DuctType",

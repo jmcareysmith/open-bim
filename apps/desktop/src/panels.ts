@@ -41,6 +41,14 @@ import {
   createStackedWallType,
   stairLayout,
   type BeamParams,
+  type BarSize,
+  type Rebar,
+  type RebarParams,
+  AREA_REBAR_HOSTS,
+  BAR_SIZES,
+  CAGE_REBAR_HOSTS,
+  createRebar,
+  rebarQuantities,
   type ColumnParams,
   type PadFootingParams,
   type StripFootingParams,
@@ -1750,6 +1758,7 @@ const VG_CATEGORIES: [string, string][] = [
   [Cat.Beam, "Structural framing"],
   [Cat.PadFooting, "Foundations (pads)"],
   [Cat.StripFooting, "Foundations (strips)"],
+  [Cat.Rebar, "Structural rebar"],
   [Cat.Room, "Rooms"],
   [Cat.RoomSeparator, "Room separators"],
   [Cat.Area, "Areas"],
@@ -3979,6 +3988,69 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       });
       break;
     }
+    case Cat.Rebar: {
+      const p = el.params as RebarParams;
+      const host = doc.get(p.hostId);
+      const area = !!host && AREA_REBAR_HOSTS.has(host.category);
+      const bars = BAR_SIZES.map((b) => ({ value: b, label: `${b} (${b.startsWith("HD") ? "500E" : "300E"})` }));
+      const pos = (k: "cover" | "spacing" | "tieSpacing", label: string, v: number) =>
+        row(label, numberInput(v, (x) => (x > 0 ? update<RebarParams>("Edit rebar", { [k]: x }) : ctx.status("\u26a0 Must be positive"))));
+      sec.append(
+        row("Host", h("span", {}, host ? `${host.category} ${host.name ?? ""}` : "\u2014")),
+        row(area ? "Bar" : "Main bars", select(bars, p.bar, (v) => update<RebarParams>("Change bar size", { bar: v as BarSize }))),
+        pos("cover", "Cover", p.cover),
+      );
+      if (area) {
+        sec.append(
+          pos("spacing", "Spacing", p.spacing),
+          row(
+            "Layers",
+            select(
+              [
+                { value: "bottom", label: "Bottom mat" },
+                { value: "top", label: "Top mat" },
+                { value: "both", label: "Top and bottom" },
+              ],
+              p.layers ?? "bottom",
+              (v) => update<RebarParams>("Change rebar layers", { layers: v as "bottom" | "top" | "both" }),
+            ),
+          ),
+          row("Major direction (\u00b0)", numberInput(Math.round((((p.angle ?? 0) * 180) / Math.PI) * 100) / 100, (v) => update<RebarParams>("Rotate rebar", { angle: (v * Math.PI) / 180 }))),
+        );
+      } else {
+        sec.append(
+          row("Number of bars", numberInput(p.count ?? 4, (v) => update<RebarParams>("Edit rebar", { count: Math.max(4, Math.round(v / 2) * 2) }))),
+          row("Ties", select([{ value: "", label: "None" }, ...bars], p.tieBar ?? "", (v) => update<RebarParams>("Change ties", { tieBar: (v || null) as BarSize | null }))),
+          pos("tieSpacing", "Tie spacing", p.tieSpacing ?? 200),
+        );
+      }
+      const q = rebarQuantities(doc, el as Rebar);
+      sec.append(
+        row("Bars", h("span", {}, String(q.bars))),
+        row("Total length", h("span", {}, `${(q.length / 1000).toFixed(1)} m`)),
+        row("Mass", h("span", {}, `${q.mass.toFixed(1)} kg`)),
+      );
+      break;
+    }
+  }
+
+  // Concrete hosts: their reinforcement, and adding more (Revit: Structure → Reinforcement).
+  if (AREA_REBAR_HOSTS.has(el.category) || CAGE_REBAR_HOSTS.has(el.category)) {
+    const sets = doc.byCategory<RebarParams>(Cat.Rebar).filter((r) => r.params.hostId === el.id);
+    const add = h("button", { textContent: AREA_REBAR_HOSTS.has(el.category) ? "Add area reinforcement" : "Add rebar cage" });
+    add.onclick = () => {
+      let id: ElementId | null = null;
+      edit(ctx, "Add rebar", (tx) => void (id = createRebar(tx, doc, el.id).id));
+      if (id) ctx.setSelection([id]);
+    };
+    sec.append(h("h4", {}, "Reinforcement"));
+    for (const r of sets) {
+      const q = rebarQuantities(doc, r);
+      const b = h("button", { textContent: `${r.params.bar}${AREA_REBAR_HOSTS.has(el.category) ? ` @ ${r.params.spacing}` : ` \u00d7 ${r.params.count ?? 4}`} \u2014 ${q.mass.toFixed(0)} kg`, title: "Select this rebar set" });
+      b.onclick = () => ctx.setSelection([r.id]);
+      sec.append(row("", b));
+    }
+    sec.append(row("", add));
   }
 
   if (el.category === Cat.ProjectSettings) {

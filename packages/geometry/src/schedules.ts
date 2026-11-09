@@ -1,4 +1,4 @@
-import {
+import { rebarQuantities, type Rebar, type RebarParams,
   AREA_SCHEMES,
   Cat,
   customValue,
@@ -215,6 +215,13 @@ const runFields: FieldDef[] = [
 ];
 
 const BY_CATEGORY: Record<string, FieldDef[]> = {
+  [Cat.Rebar]: [
+    { key: "bar", label: "Bar Size", kind: "text", get: (_d, e) => (e.params as RebarParams).bar },
+    { key: "host", label: "Host", kind: "text", get: (d, e) => { const h = d.get((e.params as RebarParams).hostId); return h ? `${h.category}${h.name ? ` ${h.name}` : ""}` : ""; } },
+    { key: "quantity", label: "Quantity", kind: "total", get: (d, e) => rebarQuantities(d, e as Rebar).bars },
+    { key: "barLength", label: "Total Bar Length", kind: "length", get: (d, e) => rebarQuantities(d, e as Rebar).length },
+    { key: "mass", label: "Mass (kg)", kind: "total", get: (d, e) => Math.round(rebarQuantities(d, e as Rebar).mass * 10) / 10 },
+  ],
   [Cat.Duct]: runFields,
   [Cat.Pipe]: runFields,
   [Cat.CableTray]: runFields.filter((f) => f.key !== "system"),

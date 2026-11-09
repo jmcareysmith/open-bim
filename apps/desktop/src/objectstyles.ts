@@ -18,6 +18,7 @@ const LABELS: Record<string, string> = {
   Beam: "Structural Framing",
   PadFooting: "Pad Footings",
   StripFooting: "Strip Footings",
+  Rebar: "Structural Rebar",
   Toposolid: "Toposolid",
   BuildingPad: "Building Pads",
   Duct: "Ducts",

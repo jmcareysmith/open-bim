@@ -31,6 +31,7 @@ export * from "./curtain.ts";
 export * from "./stacked.ts";
 export * from "./site.ts";
 export * from "./structure.ts";
+export * from "./rebar.ts";
 export * from "./clash.ts";
 export * from "./symbols.ts";
 export * from "./detailcomponents.ts";

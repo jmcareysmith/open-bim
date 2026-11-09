@@ -132,3 +132,11 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Node editor and node library (selection, parameters, geometry, maths/lists, element creation)
 
 ## Phase 9 — Analysis, rebar, point clouds
+
+- [x] Rebar: area reinforcement in slabs and pad footings (mats, spacing, cover, direction), cages in
+      beams, columns and strip footings (bars + ties); NZ bar sizes (D 300E / HD 500E); mass in
+      Properties and schedules (Structural Rebar)
+- [ ] Structural analytical model: analytical lines/nodes for columns, beams, braces, walls and floors
+- [ ] Loads and load cases (point/line/area; NZS 1170 combinations, provisional)
+- [ ] Member checks: simply supported beam bending/deflection, column axial (provisional)
+- [ ] Point clouds: import XYZ/PTS/LAS, draw in 3D and clipped in plans/sections, snap to points

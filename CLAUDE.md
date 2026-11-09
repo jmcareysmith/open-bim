@@ -275,3 +275,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Automatic; values/errors under nodes. Engine: core/model/graphs.ts (+ graphnodes.ts library), see
   ARCHITECTURE.md. Next (Jeremy): back to Revit parity (arc-wall gaps, curved stairs, angular/radial
   dimensions, barge boards, elevation sketch profiles). Jeremy caps usage: 75% of weekly by Wednesday.
+- Phase 9 started (items set in ROADMAP). Rebar (core/model/rebar.ts, geometry/src/rebar.ts): floor / pad footing /
+  beam / column / strip footing Properties → Reinforcement → Add; area mats or cages laid out from the host
+  (`rebarBars`), NZ bar sizes, mass (`rebarQuantities`), schedule category Structural Rebar. Bars sit inside the
+  concrete, so in 3D they show only with the host hidden/transparent (no "view unobscured" yet).

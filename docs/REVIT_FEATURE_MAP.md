@@ -57,7 +57,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Structural columns, beams, braces (sloped: End top offset; Brace tool) | 6 | ✅ |
 | Foundations (isolated, strip, slab: Foundation → Slab) | 6 | ✅ |
 | Structural framing systems | 6 | ⬜ |
-| Rebar | 9 | ⬜ |
+| Rebar (area reinforcement, cages; host Properties → Reinforcement) | 9 | 🟨 |
 | Analytical model | 9 | ⬜ |
 
 ## 5. MEP

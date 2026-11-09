@@ -30,6 +30,7 @@ export const DEFAULT_OBJECT_STYLES: Record<string, ObjectStyle> = {
   [Cat.Beam]: { projection: { weight: 2 }, cut: { weight: 4 } },
   [Cat.PadFooting]: { projection: { weight: 1 }, cut: { weight: 4 } },
   [Cat.StripFooting]: { projection: { weight: 1 }, cut: { weight: 4 } },
+  [Cat.Rebar]: { projection: { weight: 1 }, cut: { weight: 3 } },
   [Cat.Toposolid]: { projection: { weight: 1 }, cut: { weight: 3 } },
   [Cat.BuildingPad]: { projection: { weight: 1 }, cut: { weight: 3 } },
   [Cat.Duct]: { projection: { weight: 1 }, cut: { weight: 2 } },

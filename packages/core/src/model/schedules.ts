@@ -70,6 +70,7 @@ export const SCHEDULE_CATEGORIES: [string, string][] = [
   ["ElectricalFixture", "Electrical Fixtures"],
   ["LightingFixture", "Lighting Fixtures"],
   ["ElectricalEquipment", "Electrical Equipment"],
+  [Cat.Rebar, "Structural Rebar"],
 ];
 
 /** Material takeoffs work on layered elements. */

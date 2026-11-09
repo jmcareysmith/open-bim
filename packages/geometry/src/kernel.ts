@@ -47,6 +47,7 @@ import { buildStair, buildStairLines } from "./stairs.ts";
 import { buildRailing, buildRailingLines } from "./railings.ts";
 import { buildRamp, buildRampLines } from "./ramps.ts";
 import { buildToposolid, buildToposolidLines, buildBuildingPad, buildSubregion, buildSubregionLines, buildPropertyLines } from "./site.ts";
+import { buildRebar } from "./rebar.ts";
 import { buildBeam,
   buildBeamLines, buildColumn, buildPadFooting, buildStripFooting } from "./structure.ts";
 import { buildCadImportLines } from "./dxf.ts";
@@ -278,6 +279,7 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.Beam, buildBeam],
     [Cat.PadFooting, buildPadFooting],
     [Cat.StripFooting, buildStripFooting],
+    [Cat.Rebar, buildRebar],
     [Cat.Link, (doc, el) => buildLink(doc, el, this)],
     [Cat.Floor, buildFloor],
     [Cat.Duct, buildDuct],

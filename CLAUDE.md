@@ -292,3 +292,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   steel 300 / timber SG8 / concrete f'c 30 with its rebar cage's bottom bars, SLS deflection L/250. Load arrows
   (geometry `buildLoadLines`). Floor Properties → Area loads (kPa) reach beams over their tributary width (beam
   `tributary`, else auto); column Properties → Axial check (`columnCheck`: beam reactions via the analytical model).
+- IFC export now writes columns (IfcColumn), beams (IfcBeam), braces (IfcMember BRACE) and footings (IfcFooting), plus the
+  Structural Analysis View (packages/ifc/src/structural.ts): IfcStructuralAnalysisModel with curve/surface members,
+  profiles (IfcMaterialProfileSet), point connections (pinned supports), G/Q/W load cases and actions; forces in N.
+  Checked by opening in web-ifc only (no analysis program here).

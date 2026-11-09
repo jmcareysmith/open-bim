@@ -29,6 +29,7 @@ import {
 } from "@open-bim/core";
 import { SimpleKernel, elementArea, elementVolume, roomBoundary, type GeometryKernel, type MeshData } from "@open-bim/geometry";
 import { ifcGuid } from "./guid.ts";
+import { forceUnits, writeStructuralModel } from "./structural.ts";
 import { DERIVED, StepWriter, en, real, typed, type Ref, type StepArg } from "./step.ts";
 
 // IFC4 export (Reference View style): spatial structure (project → site → building → storeys),
@@ -42,6 +43,8 @@ export interface IfcExportOptions {
   fileName?: string;
   /** ISO timestamp for the header (fixed in tests). */
   timestamp?: string;
+  /** Include the structural analysis model (default: when there are structural members). */
+  structural?: boolean;
 }
 
 /** What each Open-BIM element becomes. */
@@ -67,6 +70,16 @@ function mapping(doc: Document, el: Element): Mapping | null {
       return { entity: "IfcWindow", predefined: "WINDOW" };
     case Cat.Room:
       return { entity: "IfcSpace", predefined: "INTERNAL" };
+    case Cat.Column:
+      return { entity: "IfcColumn", predefined: "COLUMN", type: { entity: "IfcColumnType", predefined: "COLUMN" } };
+    case Cat.Beam:
+      return (el.params as { brace?: boolean }).brace
+        ? { entity: "IfcMember", predefined: "BRACE", type: { entity: "IfcMemberType", predefined: "BRACE" } }
+        : { entity: "IfcBeam", predefined: "BEAM", type: { entity: "IfcBeamType", predefined: "BEAM" } };
+    case Cat.PadFooting:
+      return { entity: "IfcFooting", predefined: "PAD_FOOTING" };
+    case Cat.StripFooting:
+      return { entity: "IfcFooting", predefined: "STRIP_FOOTING" };
     case Cat.FamilyInstance: {
       const def = familyDefs(doc).find((d) => d.id === (el.params as FamilyInstanceParams).familyId);
       const c = def?.params.category;
@@ -84,6 +97,8 @@ function mapping(doc: Document, el: Element): Mapping | null {
 function levelOf(doc: Document, el: Element): ElementId | undefined {
   const p = el.params as Record<string, unknown>;
   if (el.category === Cat.Wall) return (p as WallParams).baseLevelId;
+  if (el.category === Cat.Column) return p.baseLevelId as ElementId;
+  if (el.category === Cat.StripFooting) return doc.get<WallParams>(p.wallId as ElementId)?.params.baseLevelId;
   const host = typeof p.hostId === "string" ? doc.get<WallParams>(p.hostId) : undefined;
   if (host) return host.params.baseLevelId;
   return typeof p.levelId === "string" ? p.levelId : undefined;
@@ -110,6 +125,7 @@ export function exportIfc(doc: Document, opts: IfcExportOptions = {}): string {
     w.add("IfcSIUnit", DERIVED, en("AREAUNIT"), null, en("SQUARE_METRE")),
     w.add("IfcSIUnit", DERIVED, en("VOLUMEUNIT"), null, en("CUBIC_METRE")),
     w.add("IfcSIUnit", DERIVED, en("PLANEANGLEUNIT"), null, en("RADIAN")),
+    ...forceUnits(w),
   ]);
 
   // ---- spatial structure ------------------------------------------------------------------
@@ -242,6 +258,8 @@ export function exportIfc(doc: Document, opts: IfcExportOptions = {}): string {
   }
   for (const t of typeRefs.values()) if (t.members.length) w.add("IfcRelDefinesByType", relGuid("type"), null, null, null, t.members, t.ref);
   for (const [ls, els] of materialUse) w.add("IfcRelAssociatesMaterial", relGuid("mat"), null, null, null, els, ls);
+  // Structural Analysis View: the analytical model, its supports, load cases and loads.
+  if (opts.structural !== false) writeStructuralModel(w, doc, ctx, world, building);
 
   return w.toString({
     name: opts.fileName ?? `${projectName}.ifc`,
@@ -260,6 +278,10 @@ const DEFAULT_COLOURS: Record<string, number> = {
   IfcSpace: 0x7fb3e6,
   IfcFurniture: 0xb9a48a,
   IfcBuildingElementProxy: 0xc8c3b6,
+  IfcColumn: 0x8f969d,
+  IfcBeam: 0x8f969d,
+  IfcMember: 0x8f969d,
+  IfcFooting: 0xa7a8a6,
 };
 
 function typeLabel(el: Element, doc?: Document): string {

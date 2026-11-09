@@ -44,6 +44,11 @@ import {
   type BarSize,
   type Rebar,
   type RebarParams,
+  type StructuralLoadParams,
+  type LoadCase,
+  LOAD_CASES,
+  beamCheck,
+  createLoad,
   type PointCloudParams,
   AREA_REBAR_HOSTS,
   BAR_SIZES,
@@ -2624,6 +2629,48 @@ function projectSections(ctx: PanelContext): Record<string, HTMLElement> {
 
 // ---- Properties -----------------------------------------------------------
 
+/** Beam Properties: its loads (add line/point loads) and the provisional NZS 1170 check. */
+function beamLoadRows(ctx: PanelContext, beamId: ElementId): HTMLElement[] {
+  const doc = ctx.doc;
+  const out: HTMLElement[] = [h("h4", {}, "Loads and check (provisional)")];
+  for (const l of doc.byCategory<StructuralLoadParams>(Cat.StructuralLoad).filter((x) => x.params.hostId === beamId)) {
+    const b = h("button", { textContent: `${l.params.case}  ${l.params.value} ${l.params.kind === "line" ? "kN/m" : `kN @ ${l.params.at ?? 0}`}`, title: "Select this load" });
+    b.onclick = () => ctx.setSelection([l.id]);
+    out.push(row("", b));
+  }
+  const add = (kind: "line" | "point") => {
+    const b = h("button", { textContent: kind === "line" ? "Add line load" : "Add point load" });
+    b.onclick = () => {
+      let id: ElementId | null = null;
+      edit(ctx, "Add load", (tx) => {
+        const beam = doc.require(beamId).params as { start: Vec2; end: Vec2 };
+        const at = Math.round(Math.hypot(beam.end.x - beam.start.x, beam.end.y - beam.start.y) / 2);
+        id = createLoad(tx, doc, beamId, kind === "line" ? { case: "Q", kind, value: 1.5 } : { case: "Q", kind, value: 5, at }).id;
+      });
+      if (id) ctx.setSelection([id]);
+    };
+    return b;
+  };
+  const adds = h("span");
+  adds.style.cssText = "display:flex;gap:4px";
+  adds.append(add("line"), add("point"));
+  out.push(row("", adds));
+  const c = beamCheck(doc, beamId);
+  if (c) {
+    const f = (v: number | null, u: string) => (v === null ? "—" : `${v.toFixed(1)} ${u}`);
+    const mark = (ok: boolean) => (ok ? "✓" : "✗");
+    out.push(
+      row("Material", h("span", {}, `${c.material}, span ${(c.span / 1000).toFixed(2)} m, self-weight ${c.selfWeight.toFixed(2)} kN/m`)),
+      row("Governing", h("span", {}, c.combination)),
+      row(`${mark(c.phiM !== null && c.M <= c.phiM)} Bending`, h("span", { class: c.phiM !== null && c.M <= c.phiM ? "" : "warn" }, `M* ${f(c.M, "kNm")} / φM ${f(c.phiM, "kNm")}`)),
+      row(`${mark(c.phiV !== null && c.V <= c.phiV)} Shear`, h("span", { class: c.phiV !== null && c.V <= c.phiV ? "" : "warn" }, `V* ${f(c.V, "kN")} / φV ${f(c.phiV, "kN")}`)),
+      row(`${mark(c.deflection <= c.limit)} Deflection`, h("span", { class: c.deflection <= c.limit ? "" : "warn" }, `${c.deflection.toFixed(1)} mm / L/250 = ${c.limit.toFixed(1)} mm`)),
+    );
+    for (const n of c.notes) out.push(h("div", { class: "hint" }, n));
+  }
+  return out;
+}
+
 export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
   const { doc } = ctx;
   units = projectUnits(doc);
@@ -2872,6 +2919,19 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("End top offset", numberInput(p.endOffset ?? p.offset, (v) => update<BeamParams>("Change beam end offset", { endOffset: v }))),
         row("Length", len(Math.hypot(p.end.x - p.start.x, p.end.y - p.start.y))),
       );
+      sec.append(...beamLoadRows(ctx, el.id));
+      break;
+    }
+    case Cat.StructuralLoad: {
+      const p = el.params as StructuralLoadParams;
+      sec.append(
+        row("Load case", select(LOAD_CASES, p.case, (v) => update<StructuralLoadParams>("Change load case", { case: v as LoadCase }))),
+        row(p.kind === "line" ? "Value (kN/m)" : "Value (kN)", numberInput(p.value, (v) => (v >= 0 ? update<StructuralLoadParams>("Edit load", { value: v }) : ctx.status("⚠ Loads act downwards: enter a positive value")))),
+      );
+      if (p.kind === "point") sec.append(row("From start (mm)", numberInput(p.at ?? 0, (v) => update<StructuralLoadParams>("Move load", { at: Math.max(0, v) }))));
+      const host = h("button", { textContent: "Select beam" });
+      host.onclick = () => ctx.setSelection([p.hostId]);
+      sec.append(row("", host));
       break;
     }
     case Cat.PadFooting: {

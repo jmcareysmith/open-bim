@@ -86,6 +86,7 @@ export const Cat = {
   StripFooting: "StripFooting",
   Rebar: "Rebar",
   PointCloud: "PointCloud",
+  StructuralLoad: "StructuralLoad",
   Connector: "Connector",
   MEPSystem: "MEPSystem",
   DuctType: "DuctType",

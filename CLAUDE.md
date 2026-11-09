@@ -286,3 +286,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Analytical model (core/model/analytical.ts `analyticalModel`): derived, not stored — column axes, beam/brace centrelines
   snapped to column axes within 300, nodes merged within 300, column bases on pads or the lowest level are pinned
   supports, wall mid-surface and floor mid-depth panels. Structure → Analytical Model toggles a 3D overlay (viewport).
+- Loads and beam checks (core/model/loads.ts, PROVISIONAL figures in its header): beam Properties → Loads and check:
+  add G/Q/W line (kN/m) or point loads (kN); `beamCheck` — simply supported, NZS 1170.0 ULS combos, self-weight,
+  steel 300 / timber SG8 / concrete f'c 30 with its rebar cage's bottom bars, SLS deflection L/250. Load arrows
+  (geometry `buildLoadLines`). No area loads or column checks yet.

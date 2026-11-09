@@ -13,6 +13,7 @@ import {
   type PadFootingParams,
   type StripFootingParams,
   type StructuralSectionParams,
+  type StructuralLoadParams,
   type Vec2,
   type Wall,
 } from "@open-bim/core";
@@ -147,4 +148,45 @@ export function buildStripFooting(doc: Document, el: Element): MeshData | null {
     { x: a.x + n.x * e, y: a.y + n.y * e },
   ];
   return extrudePolygon(r, [], bottom - p.depth, bottom);
+}
+
+/**
+ * Load symbols (Revit's load arrows): line loads a row of downward arrows over the beam joined
+ * at the top, point loads one arrow; labelled with the case and value. Drawn in model space.
+ */
+export function buildLoadLines(doc: Document, el: Element): LineData | null {
+  const l = el.params as StructuralLoadParams;
+  const beam = doc.get<BeamParams>(l.hostId);
+  if (!beam) return null;
+  const p = beam.params;
+  const len = Math.hypot(p.end.x - p.start.x, p.end.y - p.start.y);
+  if (len < 1) return null;
+  const lv = doc.get<LevelParams>(p.levelId)?.params.elevation ?? 0;
+  const zAt = (u: number) => lv + p.offset + (((p.endOffset ?? p.offset) - p.offset) * u) / len + 50;
+  const at = (u: number) => ({ x: p.start.x + ((p.end.x - p.start.x) * u) / len, y: p.start.y + ((p.end.y - p.start.y) * u) / len });
+  const H = 600;
+  const seg: number[] = [];
+  const arrow = (u: number) => {
+    const q = at(u);
+    const z = zAt(u);
+    const d = { x: (p.end.x - p.start.x) / len, y: (p.end.y - p.start.y) / len };
+    seg.push(q.x, q.y, z + H, q.x, q.y, z);
+    seg.push(q.x, q.y, z, q.x - d.x * 60, q.y - d.y * 60, z + 120);
+    seg.push(q.x, q.y, z, q.x + d.x * 60, q.y + d.y * 60, z + 120);
+  };
+  let label: { u: number; text: string };
+  if (l.kind === "line") {
+    const n = Math.max(2, Math.round(len / 1000) + 1);
+    for (let i = 0; i < n; i++) arrow((len * i) / (n - 1));
+    const a = at(0);
+    const b = at(len);
+    seg.push(a.x, a.y, zAt(0) + H, b.x, b.y, zAt(len) + H);
+    label = { u: len / 2, text: `${l.case} ${l.value} kN/m` };
+  } else {
+    const u = Math.min(Math.max(l.at ?? len / 2, 0), len);
+    arrow(u);
+    label = { u, text: `${l.case} ${l.value} kN` };
+  }
+  const q = at(label.u);
+  return { segments: new Float32Array(seg), labels: [{ text: label.text, position: [q.x, q.y, zAt(label.u) + H + 150], size: 150 }], placement: "model" };
 }

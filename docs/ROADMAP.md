@@ -137,7 +137,8 @@ Each phase ends with something usable. Work one feature per session; tick items 
       beams, columns and strip footings (bars + ties); NZ bar sizes (D 300E / HD 500E); mass in
       Properties and schedules (Structural Rebar)
 - [x] Structural analytical model: members (columns, beams, braces) with auto-connected nodes and supports, wall/floor panels; Structure → Analytical Model (3D overlay)
-- [ ] Loads and load cases (point/line/area; NZS 1170 combinations, provisional)
-- [ ] Member checks: simply supported beam bending/deflection, column axial (provisional)
+- [x] Loads (G/Q/W line and point loads on beams, arrows in views) and NZS 1170.0 combinations (provisional)
+- [x] Beam checks: simply supported bending, shear, SLS deflection; steel/timber/concrete (with rebar) — provisional
+- [ ] Area loads on floors (tributary to beams), column axial checks
 - [x] Point clouds: Insert → Point Cloud (LAS, XYZ/PTS/TXT/CSV; thinned to 200k; shared coordinates or centred), drawn in 3D, move
 - [ ] Point clouds in plans/sections (clipped by the view range/crop) and snapping to points

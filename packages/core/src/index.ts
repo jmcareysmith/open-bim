@@ -39,6 +39,7 @@ export * from "./model/structure.ts";
 export * from "./model/rebar.ts";
 export * from "./model/pointclouds.ts";
 export * from "./model/analytical.ts";
+export * from "./model/loads.ts";
 export * from "./model/phases.ts";
 export * from "./model/options.ts";
 export * from "./model/settings.ts";

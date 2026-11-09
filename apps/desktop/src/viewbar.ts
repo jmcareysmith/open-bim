@@ -154,7 +154,7 @@ export class ViewBar {
     };
     const lockNote = templated ? " (set by the view template)" : "";
 
-    if (p.kind !== "3d" && p.kind !== "legend") {
+    if (p.kind !== "3d" && p.kind !== "legend" && p.kind !== "drafting") {
       const scale = selectEl(`View scale${lockNote}`, templated);
       const list = SCALES.includes(g.scale) ? SCALES : [...SCALES, g.scale].sort((a, b) => a - b);
       for (const s of list) scale.append(new Option(`1 : ${s}`, String(s), false, s === g.scale));
@@ -174,7 +174,7 @@ export class ViewBar {
     const planLike = p.kind === "floorPlan" || p.kind === "ceilingPlan" || p.kind === "callout" || p.kind === "areaPlan";
     // Every model view (plans, callouts, sections, elevations, details, 3D) has visual styles,
     // sun, shadows and lighting; legends draw no model.
-    const modelView = p.kind !== "legend";
+    const modelView = p.kind !== "legend" && p.kind !== "drafting";
     if (modelView) {
       const style = selectEl("Visual style", false);
       const current = p.visualStyle ?? (p.kind === "3d" ? "shaded" : "hiddenLine");
@@ -231,10 +231,12 @@ export class ViewBar {
 
 const KIND: Record<string, string> = {
   floorPlan: "Floor Plan",
+  ceilingPlan: "Ceiling Plan",
   "3d": "3D View",
   section: "Section",
   elevation: "Elevation",
   callout: "Callout",
   areaPlan: "Area Plan",
   legend: "Legend",
+  drafting: "Drafting View",
 };

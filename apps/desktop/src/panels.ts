@@ -44,6 +44,7 @@ import {
   type BarSize,
   type Rebar,
   type RebarParams,
+  createDraftingView,
   type StructuralLoadParams,
   type LoadCase,
   LOAD_CASES,
@@ -917,7 +918,7 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
   const { doc } = ctx;
   const p = view.params;
   const set = (name: string, patch: Partial<ViewParams>) => edit(ctx, name, (tx) => tx.update<ViewParams>(view.id, patch));
-  const title = { floorPlan: "Floor Plan", ceilingPlan: "Reflected Ceiling Plan", "3d": "3D View", section: "Section", elevation: "Elevation", callout: "Callout", areaPlan: "Area Plan", legend: "Legend" }[p.kind];
+  const title = { floorPlan: "Floor Plan", ceilingPlan: "Reflected Ceiling Plan", "3d": "3D View", section: "Section", elevation: "Elevation", callout: "Callout", areaPlan: "Area Plan", legend: "Legend", drafting: "Drafting View" }[p.kind];
   const sec = h("div", { class: "section" }, h("h3", {}, title));
   if (view.id !== ctx.activeViewId()) {
     const open = h("button", { textContent: "Open view" });
@@ -944,7 +945,7 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
   } else {
     sec.append(...graphicsRows(ctx, view.id, p));
   }
-  if (p.kind !== "legend") {
+  if (p.kind !== "legend" && p.kind !== "drafting") {
     // Phasing: which phase this view shows, through which filter.
     sec.append(
       row("Phase", select(phases(doc).map((ph) => ({ value: ph.id, label: ph.name })), viewPhase(doc, p.phase), (v) => set("Change view phase", { phase: v }))),
@@ -2120,7 +2121,7 @@ function browserDrag(div: HTMLElement, kind: "view" | "family", id: ElementId): 
 export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   if (familyInfo(ctx.doc)) return renderFamilyBrowser(root, ctx);
   const s = projectSections(ctx);
-  root.replaceChildren(s.views!, s.sheets!, s.legends!, s.schedules!, s.families!, s.groups!, s.links!);
+  root.replaceChildren(s.views!, s.sheets!, s.legends!, s.drafting!, s.schedules!, s.families!, s.groups!, s.links!);
 }
 
 /** Manage-tab dialogs: which project section each shows. */
@@ -2228,6 +2229,21 @@ function projectSections(ctx: PanelContext): Record<string, HTMLElement> {
     legendSec.append(div);
   }
   legendSec.append(row("", newLegend));
+  // Drafting views (Revit lists them under Views; they hold 2D standard details).
+  const draftSec = h("div", { class: "section" }, h("h3", {}, "Drafting Views"));
+  for (const v of allViews.filter((x) => x.params.kind === "drafting")) {
+    const div = h("div", { class: `list-item${v.id === ctx.activeViewId() ? " selected" : ""}` }, h("span", {}, v.name ?? v.id));
+    div.onclick = () => ctx.setActiveView(v.id);
+    browserDrag(div, "view", v.id);
+    draftSec.append(div);
+  }
+  const newDraft = h("button", { textContent: "New drafting view" });
+  newDraft.onclick = () =>
+    edit(ctx, "New drafting view", (tx) => {
+      const v = createDraftingView(tx, doc);
+      queueMicrotask(() => ctx.setActiveView(v.id));
+    });
+  draftSec.append(row("", newDraft));
   const views = viewsSec;
 
   const lv = h("div", { class: "section" }, h("h3", {}, "Levels"));
@@ -2611,6 +2627,7 @@ function projectSections(ctx: PanelContext): Record<string, HTMLElement> {
   return {
     views,
     legends: legendSec,
+    drafting: draftSec,
     schedules: schedSec,
     sheets: sheetsSec,
     families: fams,
@@ -2845,7 +2862,7 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
     }
     case Cat.KeynoteLegend: {
       const p = el.params as KeynoteLegendParams;
-      const vs = viewElements(doc).filter((v) => v.params.kind !== "3d" && v.params.kind !== "legend");
+      const vs = viewElements(doc).filter((v) => v.params.kind !== "3d" && v.params.kind !== "legend" && v.params.kind !== "drafting");
       sec.append(
         row(
           "Keynotes from",

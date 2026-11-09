@@ -14,7 +14,7 @@ import { addRecentFile, fileName, recentFiles, removeRecentFile } from "./recent
 import { CameraTool } from "./cameratool.ts";
 import { FloorPointTool, SlopeArrowTool } from "./slopetool.ts";
 import { WallProfileTool } from "./profiletool.ts";
-import { createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
+import { createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
   ceilingPlanFor,
   createCeilingPlan,
   Cat,
@@ -1181,6 +1181,12 @@ const commands: Record<string, () => void | Promise<void>> = {
       queueMicrotask(() => ctx.setActiveView(s.id));
     });
   },
+  newDraftingView() {
+    if (projectSession) return status("Drafting views belong to the project: close the family editor first.");
+    const v = doc.transact("New drafting view", (tx) => createDraftingView(tx, doc));
+    ctx.setActiveView(v.id);
+    status("Drafting view: draw with Annotate → Detail Line, Region, Text, Dimension and Detail Component (no model shows here).");
+  },
   newLegend() {
     edit("New legend", (tx) => {
       const v = createLegend(tx, doc);
@@ -1440,11 +1446,11 @@ function configureViewport(vp: Viewport, target: ModelElement, primary: boolean)
   const v = target as View;
   // Visual style: 3D views default to Shaded, plans to Hidden Line (line work only).
   const planLike = v.params.kind === "floorPlan" || v.params.kind === "ceilingPlan" || v.params.kind === "callout" || v.params.kind === "areaPlan";
-  vp.setVisualStyle(v.params.kind === "3d" ? (v.params.visualStyle ?? "shaded") : v.params.kind === "legend" ? "hiddenLine" : (v.params.visualStyle ?? "hiddenLine"));
+  vp.setVisualStyle(v.params.kind === "3d" ? (v.params.visualStyle ?? "shaded") : isAnnotationView(v) ? "hiddenLine" : (v.params.visualStyle ?? "hiddenLine"));
   // Sun, shadows and lighting (any model view): the true sun for the site, at the view's date and time.
-  vp.setDisplay(v.params.kind === "legend" ? {} : (v.params.display ?? {}));
+  vp.setDisplay(isAnnotationView(v) ? {} : (v.params.display ?? {}));
   vp.setSchemeView(v.params.kind === "floorPlan" || v.params.kind === "ceilingPlan" || v.params.kind === "callout" || v.params.kind === "areaPlan" ? v.id : null);
-  if (v.params.kind !== "legend") vp.setSun(viewSun(doc, v.params), !!v.params.shadows, v.params.lighting ?? {});
+  if (!isAnnotationView(v)) vp.setSun(viewSun(doc, v.params), !!v.params.shadows, v.params.lighting ?? {});
   else vp.setSun(null, false);
   if (isPlanView(v)) {
     vp.setPlanRange(viewRange(doc, v));

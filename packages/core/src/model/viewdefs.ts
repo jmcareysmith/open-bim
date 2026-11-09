@@ -8,7 +8,7 @@ import type { AppliedFilter, GraphicOverride, LinePattern } from "./graphics.ts"
 // Views are elements, as in Revit: saved with the project, listed in the browser, each with its
 // own range, scale, detail level and visibility. Sections, elevations and sheets build on this.
 
-export type ViewKind = "floorPlan" | "ceilingPlan" | "3d" | "section" | "elevation" | "callout" | "areaPlan" | "legend";
+export type ViewKind = "floorPlan" | "ceilingPlan" | "3d" | "section" | "elevation" | "callout" | "areaPlan" | "legend" | "drafting";
 export type DetailLevel = "coarse" | "medium" | "fine";
 /** Revit's visual styles (3D views). "rendered" shows the path-traced render. */
 export type VisualStyle = "wireframe" | "hiddenLine" | "shaded" | "consistent" | "realistic" | "rendered";
@@ -579,9 +579,26 @@ export function viewCrop(view: View): { min: Vec2; max: Vec2 } {
   return { min: { x: 0, y: zRange.bottom }, max: { x: w, y: zRange.top } };
 }
 
-/** Views drawn in their own 2D space rather than plan XY: sections, elevations and legends. */
+/** Views holding no model, only their own drafting: legends and drafting views. */
+export function isAnnotationView(view: { params: { kind: ViewKind } }): boolean {
+  return view.params.kind === "legend" || view.params.kind === "drafting";
+}
+
+/**
+ * Drafting view (Revit: View → Drafting View): a sheet of 2D drafting at a scale, with no model —
+ * detail lines, regions, text, dimensions and detail components (standard details).
+ */
+export function createDraftingView(tx: Transaction, doc: Document, opts: { name?: string; scale?: number } = {}): View {
+  const taken = (n: string) => doc.byCategory<ViewParams>(Cat.View).some((v) => v.params.kind === "drafting" && v.name === n);
+  let name = opts.name ?? "Drafting 1";
+  for (let i = 2; !opts.name && taken(name); i++) name = `Drafting ${i}`;
+  if (taken(name)) throw new Error(`A drafting view called "${name}" already exists`);
+  return tx.create<ViewParams>(Cat.View, { kind: "drafting", levelId: null, range: null, scale: opts.scale ?? 10, detailLevel: "fine", hiddenCategories: [] }, { name }) as View;
+}
+
+/** Views drawn in their own 2D space rather than plan XY: sections, elevations, legends and drafting views. */
 export function is2DView(view: View): boolean {
-  return isDrawingView(view) || view.params.kind === "legend";
+  return isDrawingView(view) || isAnnotationView(view);
 }
 
 /** Views drawn in their own 2D space (sections and elevations). */

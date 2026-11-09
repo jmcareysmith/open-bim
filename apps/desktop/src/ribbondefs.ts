@@ -478,6 +478,7 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
               menu: () => [{ label: "Building Elevations (N, E, S, W)", action: () => m.cmd("elevations") }],
             },
             { label: "Legend", icon: "legend", cmd: "newLegend" },
+            { label: "Drafting View", icon: "legend", cmd: "newDraftingView", title: "A 2D view for standard details: no model, drafting only" },
             { label: "Schedules", icon: "schedule", menu: () => [...scheduleMenu("schedule"), "-", ...scheduleMenu("takeoff")] },
             { label: "Sheet", icon: "sheet", cmd: "newSheet" },
           ],

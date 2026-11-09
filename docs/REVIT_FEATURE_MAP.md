@@ -88,10 +88,9 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | 3D view (orbit, pan, zoom, section box) | 0–1 | ✅ (ViewCube, orthographic {3D}, section box with face arrows) |
 | Floor plans (cut plane, view range) | 2 | ✅ |
 | Reflected ceiling plans | 8b | ✅ (View → Plan ▾ Reflected Ceiling Plan; cut 2300 looking up to the level above; ceiling grid patterns 600 × 600 / 1200 × 600; no door swings) |
-| Reflected ceiling plans | 2 | ⬜ |
 | Elevations | 2 | ✅ |
 | Sections & callouts (jogged sections: Split segment) | 2 | 🟨 |
-| Drafting views | 2 | ⬜ |
+| Drafting views | 2 | ✅ (View → Drafting View or browser; 2D drafting and detail components, no model; on sheets) |
 | Legends | 4 | ✅ |
 | Detail levels (coarse/medium/fine) | 2 | ✅ (Coarse: types' Coarse Scale Fill Pattern, hollow by default; Medium/Fine: layers) |
 | Visibility/Graphics overrides, filters | 2 | ✅ (incl. Override Graphics by element; line weights in PDF only) |
@@ -178,7 +177,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Grips, drag editing, temporary dimensions | 7a | ✅ (temp dims while drawing walls, detail lines, beams: length and angle) |
 | Ribbon, contextual tabs, options bar | 7b | ✅ |
 | File menu, Quick Access Toolbar | 7b | 🟨 (no recent files) |
-| Drag and drop from the Project Browser | 7b | ⬜ |
+| Drag and drop from the Project Browser | 7b | ✅ (views onto sheets, families into views) |
 | Dockable panels | 7b | ✅ |
 | View tabs, status bar, view control bar | 7b | 🟨 (tabs, view control bar, tiling/cascade, selection filter) |
 | Context menus, keyboard shortcuts | 7b | 🟨 (menus, VV/MV/CO…, Keyboard Shortcuts editor) |

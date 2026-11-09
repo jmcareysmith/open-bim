@@ -10,7 +10,7 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
-import { analyticalModel, pointCloudPoints, type PointCloud, type PointCloudParams,
+import { isAnnotationView, analyticalModel, pointCloudPoints, type PointCloud, type PointCloudParams,
   Cat,
   PLAN_CUT_HEIGHT,
   TemporaryVisibility,
@@ -1422,7 +1422,7 @@ void main() {
       return;
     }
     // Legends hold no model: their annotations are already in the drawing scene.
-    if (this.mode === "drawing" && this.drawingView?.params.kind === "legend") return;
+    if (this.mode === "drawing" && this.drawingView && isAnnotationView(this.drawingView)) return;
     const drawingMode = this.mode === "drawing" && this.drawingView;
     const items = [...this.meshes.entries()]
       .filter(([id]) => {
@@ -1571,7 +1571,7 @@ void main() {
       const paper = { A0: [1189, 841], A1: [841, 594], A2: [594, 420], A3: [420, 297], A4: [297, 210] }[size];
       return this.fitOrtho(this.cameraDraw, this.controlsDraw, { min: { x: 0, y: 0 }, max: { x: paper[0]!, y: paper[1]! } }, 1000);
     }
-    if (this.mode === "drawing" && this.drawingView?.params.kind === "legend") {
+    if (this.mode === "drawing" && this.drawingView && isAnnotationView(this.drawingView)) {
       const box = new THREE.Box3();
       for (const g of this.objects.values()) if (g.userData.inDrawing && g.visible) box.expandByObject(g);
       const b = box.isEmpty() ? { min: { x: 0, y: -3000 }, max: { x: 5000, y: 0 } } : { min: { x: box.min.x - 500, y: box.min.y - 500 }, max: { x: box.max.x + 500, y: box.max.y + 500 } };

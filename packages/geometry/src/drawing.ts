@@ -28,6 +28,7 @@ import {
   penWidth,
   pointCloudPoints,
   type PointCloud,
+  isAnnotationView,
 } from "@open-bim/core";
 import { GRID_BUBBLE_RADIUS, type LineData } from "./datums.ts";
 import { planLinework, planViewLinework, type PlanLinework } from "./hlr.ts";
@@ -109,8 +110,8 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
   const els = doc.all().filter(shown);
   const out = emptyDrawing();
   const section = isDrawingView(view);
-  if (view.params.kind === "legend") {
-    // Legends hold no model: only their own annotation and legend components.
+  if (isAnnotationView(view)) {
+    // Legends and drafting views hold no model: only their own annotation (and legend components).
     for (const el of els.filter((e) => annotationView(e) === view.id)) {
       const lines = kernel.buildLines(doc, el, g.scale, g.detailLevel);
       const r = elementGraphics(doc, g, el);

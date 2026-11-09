@@ -76,7 +76,7 @@ export function createDetailComponent(
   const def = doc.require(familyId);
   if (!isDetailFamily(def)) throw new Error("Detail components come from Detail Item families");
   const view = doc.require<ViewParams>(viewId);
-  if (view.category !== Cat.View || view.params.kind === "3d" || view.params.kind === "legend") throw new Error("Place detail components in plans, sections or elevations");
+  if (view.category !== Cat.View || view.params.kind === "3d" || view.params.kind === "legend") throw new Error("Place detail components in plans, sections, elevations or drafting views");
   return tx.create<DetailComponentParams>(Cat.DetailComponent, { viewId, familyId, position: { ...position }, rotation: opts.rotation ?? 0, mirrored: opts.mirrored ?? false }, { name: def.name ?? "Detail" }) as DetailComponent;
 }
 

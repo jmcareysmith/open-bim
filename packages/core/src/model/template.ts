@@ -28,20 +28,20 @@ export function applyResidentialTemplate(doc: Document): TemplateIds {
 
     // Materials: shading colour, cut pattern (plans/sections), surface pattern (elevations).
     const mats: [string, Partial<MaterialParams>][] = [
-      ["Weatherboard", { color: 0xe4e0d4, cutPattern: "timber", surfacePattern: "weatherboard" }],
-      ["Cavity Battens", { color: 0xb08a5a, cutPattern: "timber" }],
-      ["Building Wrap", { color: 0x5b6670, cutPattern: "none" }],
-      ["Timber Frame 90x45", { color: 0xc9a46b, cutPattern: "insulation" }],
-      ["Plasterboard", { color: 0xf1efe9, cutPattern: "diagonal" }],
-      ["Concrete", { color: 0xa7a8a6, cutPattern: "concrete" }],
-      ["Plywood", { color: 0xc59a5b, cutPattern: "timber" }],
-      ["Timber Joists 240x45", { color: 0xb88f55, cutPattern: "crosshatch" }],
-      ["Ceiling Battens", { color: 0xb08a5a, cutPattern: "timber" }],
-      ["Long-run Steel", { color: 0x5f6b75, cutPattern: "solid" }],
-      ["Purlins 70x45", { color: 0xb08a5a, cutPattern: "timber" }],
-      ["Rafters 140x45", { color: 0xb88f55, cutPattern: "crosshatch" }],
-      ["Glazing", { color: 0xa9cfe3, cutPattern: "none" }],
-      ["Aluminium", { color: 0x8a9199, cutPattern: "solid" }],
+      ["Weatherboard", { color: 0xe4e0d4, cutPattern: "timber", surfacePattern: "weatherboard", density: 500, conductivity: 0.13 }],
+      ["Cavity Battens", { color: 0xb08a5a, cutPattern: "timber", density: 500, conductivity: 0.12 }],
+      ["Building Wrap", { color: 0x5b6670, cutPattern: "none", density: 900, conductivity: 0.2 }],
+      ["Timber Frame 90x45", { color: 0xc9a46b, cutPattern: "insulation", density: 120, conductivity: 0.045 }],
+      ["Plasterboard", { color: 0xf1efe9, cutPattern: "diagonal", density: 700, conductivity: 0.25 }],
+      ["Concrete", { color: 0xa7a8a6, cutPattern: "concrete", density: 2400, conductivity: 1.4 }],
+      ["Plywood", { color: 0xc59a5b, cutPattern: "timber", density: 550, conductivity: 0.13 }],
+      ["Timber Joists 240x45", { color: 0xb88f55, cutPattern: "crosshatch", density: 120, conductivity: 0.045 }],
+      ["Ceiling Battens", { color: 0xb08a5a, cutPattern: "timber", density: 500, conductivity: 0.12 }],
+      ["Long-run Steel", { color: 0x5f6b75, cutPattern: "solid", density: 7850, conductivity: 50 }],
+      ["Purlins 70x45", { color: 0xb08a5a, cutPattern: "timber", density: 500, conductivity: 0.12 }],
+      ["Rafters 140x45", { color: 0xb88f55, cutPattern: "crosshatch", density: 120, conductivity: 0.05 }],
+      ["Glazing", { color: 0xa9cfe3, cutPattern: "none", density: 2500, conductivity: 1.0 }],
+      ["Aluminium", { color: 0x8a9199, cutPattern: "solid", density: 2700, conductivity: 160 }],
     ];
     const matId = new Map(mats.map(([name, p]) => [name, createMaterial(tx, doc, name, p).id]));
     const link = (layers: Layer[]): Layer[] => layers.map((l) => ({ ...l, materialId: matId.get(l.material)! }));

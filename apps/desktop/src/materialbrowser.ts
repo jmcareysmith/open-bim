@@ -100,6 +100,15 @@ export function openMaterialBrowser(doc: Document, status: (s: string) => void, 
       };
       row("Surface pattern", pat(m.params.surfacePattern, "surfacePattern"));
       row("Cut pattern", pat(m.params.cutPattern, "cutPattern"));
+      form.append(Object.assign(document.createElement("div"), { className: "ovr-sub", textContent: "Physical and thermal" }));
+      const num = (label: string, key: "density" | "conductivity", step: string) => {
+        const v = m.params[key];
+        const input = Object.assign(document.createElement("input"), { type: "number", min: "0", step, value: v === undefined || v === null ? "" : String(v), placeholder: "not set" });
+        input.onchange = () => edit(`Material ${key}`, { [key]: input.value === "" ? null : Math.max(0, Number(input.value)) });
+        row(label, input);
+      };
+      num("Density (kg/m\u00b3)", "density", "10");
+      num("Conductivity \u03bb (W/m\u00b7K)", "conductivity", "0.001");
       form.append(Object.assign(document.createElement("div"), { className: "ovr-sub", textContent: "Appearance (renders)" }));
       const slider = (label: string, key: "roughness" | "metalness" | "transparency", value: number) => {
         const r = Object.assign(document.createElement("input"), { type: "range", min: "0", max: "100", value: String(Math.round(value * 100)) });

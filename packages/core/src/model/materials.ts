@@ -36,6 +36,10 @@ export type MaterialParams = {
   /** Realistic views: an image (data URL) tiled over faces, and the real size of one tile, mm. */
   texture?: string | null;
   textureSize?: number | null;
+  /** Physical: density, kg/m³ (layer masses, self-weight). */
+  density?: number | null;
+  /** Thermal: conductivity λ, W/(m·K) (layer R-values = thickness / λ). */
+  conductivity?: number | null;
 };
 export type Material = Element<MaterialParams>;
 
@@ -54,7 +58,7 @@ export function createMaterial(tx: Transaction, doc: Document, name: string, par
   if (materialByName(doc, name)) throw new Error(`A material called "${name}" already exists`);
   return tx.create<MaterialParams>(
     Cat.Material,
-    { color: params.color ?? 0xb0b0b0, cutPattern: params.cutPattern ?? "diagonal", surfacePattern: params.surfacePattern ?? "none" },
+    { ...params, color: params.color ?? 0xb0b0b0, cutPattern: params.cutPattern ?? "diagonal", surfacePattern: params.surfacePattern ?? "none" },
     { name },
   );
 }

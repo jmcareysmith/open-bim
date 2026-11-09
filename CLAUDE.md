@@ -318,3 +318,5 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   (Coarse/Medium/Fine/Plan). Kernels' `build(doc, el, display)` passes the view's detail level and plan-ness to the family
   mesher as reserved values `__detail`/`__plan` (cached per value set; nested families inherit). Viewport rebuilds
   instances on detail-level and view-mode changes; drawings pass the view's. No front/back or left/right yet.
+- Materials have density and conductivity (Material Browser → Physical and thermal; template values provisional). H1 and
+  energy use a type's R-value if set, else `layeredR` (Σ t/λ + 0.15 surfaces; core h1.ts `constructionR`).

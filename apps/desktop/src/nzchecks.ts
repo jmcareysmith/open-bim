@@ -38,7 +38,7 @@ function nzTable(head: string[], rows: (string | Node)[][]): HTMLElement {
 function h1Body(host: NzChecksHost): Node[] {
   const r = h1Check(host.doc);
   const out: Node[] = [
-    el("p", `H1/AS1 schedule method, climate zone ${r.zone}. Construction R-values come from type properties; the zone and minimums are in Project Information. Minimums are provisional.`, "muted"),
+    el("p", `H1/AS1 schedule method, climate zone ${r.zone}. Construction R-values come from type properties, else from the layers' material conductivity (Material Browser); the zone and minimums are in Project Information. Minimums are provisional.`, "muted"),
   ];
   const head = el("p");
   head.append(el("strong", "Overall: "), verdict(r.pass));
@@ -46,7 +46,7 @@ function h1Body(host: NzChecksHost): Node[] {
   out.push(
     nzTable(
       ["Element", "Type", "Area m²", "R", "Min R", ""],
-      r.items.map((i) => [H1_CLASS_LABELS[i.cls], i.typeName, i.area.toFixed(1), i.rValue === null ? "not set" : i.rValue.toFixed(2), i.required.toFixed(2), verdict(i.pass)]),
+      r.items.map((i) => [H1_CLASS_LABELS[i.cls], i.typeName, i.area.toFixed(1), i.rValue === null ? "not set" : `${i.rValue.toFixed(2)}${i.rSource === "layers" ? " (layers)" : ""}`, i.required.toFixed(2), verdict(i.pass)]),
     ),
   );
   out.push(

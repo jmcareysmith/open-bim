@@ -42,7 +42,11 @@ describe("H1 schedule method", () => {
     expect(r.glazingArea).toBeCloseTo(1.8 * 1.2 + 1.2 * 1.2, 6);
     expect(r.glazingPass).toBe(true);
     expect(r.items.find((i) => i.cls === "slab")?.area).toBeCloseTo(80, 6);
-    expect(r.items.every((i) => i.rValue === null)).toBe(true);
+    // Layered types take their R from their materials' conductivity; windows and doors need it set.
+    const wall = r.items.find((i) => i.cls === "wall")!;
+    expect(wall.rSource).toBe("layers");
+    expect(wall.rValue).toBeCloseTo(0.15 + 0.018 / 0.13 + 0.02 / 0.12 + 0.001 / 0.2 + 0.09 / 0.045 + 0.01 / 0.25, 6);
+    expect(r.items.filter((i) => i.cls === "window" || i.cls === "door").every((i) => i.rValue === null)).toBe(true);
     expect(r.pass).toBe(false);
     expect(r.notes.some((n) => /R-value not set/.test(n))).toBe(true);
   });
@@ -81,8 +85,9 @@ describe("energy analysis (provisional)", () => {
     const wall = r.rows.find((x) => x.cls === "wall")!;
     const openings = 1.8 * 1.2 + 1.2 * 1.2 + r.rows.filter((x) => x.cls === "door").reduce((s, x) => s + x.area, 0);
     expect(wall.area).toBeCloseTo(36 * 2.7 - openings, 6);
-    // No R-values set: the H1 minimums are assumed (so the proposal equals the reference).
-    expect(r.rows.every((x) => x.assumed)).toBe(true);
+    // Windows and doors have no R-values: the H1 minimums are assumed; layered types use their layers.
+    expect(r.rows.filter((x) => x.cls === "window" || x.cls === "door").every((x) => x.assumed)).toBe(true);
+    expect(r.rows.find((x) => x.cls === "wall")!.assumed).toBe(false);
     expect(r.fabric).toBeCloseTo(r.rows.reduce((s, x) => s + x.area / x.r, 0), 9);
     // 10 x 8 slab, 2.7 m to the level above: 80 m², 216 m³.
     expect(r.floorArea).toBeCloseTo(80, 6);
@@ -91,12 +96,12 @@ describe("energy analysis (provisional)", () => {
     const c = ZONE_CLIMATE[r.zone];
     expect(r.peak).toBeCloseTo(r.total * (20 - c.design), 6);
     expect(r.annual).toBeCloseTo((r.total * c.hdd * 24) / 1000, 6);
-    expect(r.pass).toBe(true);
+    expect(r.pass).toBe(r.fabric <= r.reference + 1e-6);
     // Better walls than the minimum lower the heat loss below the reference.
     const wallType = doc.byCategory("WallType").find((t) => t.name === wall.typeName)!;
     doc.transact("R", (tx) => tx.update<ThermalTypeParams>(wallType.id, { rValue: 4 }));
     const better = energyAnalysis(doc);
     expect(better.fabric).toBeLessThan(r.fabric);
-    expect(better.pass).toBe(true);
+    expect(better.pass).toBe(better.fabric <= better.reference + 1e-6);
   });
 });

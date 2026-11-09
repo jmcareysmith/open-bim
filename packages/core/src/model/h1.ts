@@ -2,7 +2,7 @@ import type { Document, Transaction } from "../document.ts";
 import type { Element } from "../element.ts";
 import { Cat, wallExtent, wallLength, levels, type FloorParams, type LayeredTypeParams, type Wall } from "./architecture.ts";
 import { doorPlacement, windowPlacement } from "./doors.ts";
-import { layerMaterial } from "./materials.ts";
+import { layerMaterial, type MaterialParams } from "./materials.ts";
 import { ensureProjectSettings, projectSettings, type ProjectSettingsParams } from "./settings.ts";
 import { polygonArea } from "./sketch.ts";
 
@@ -96,6 +96,8 @@ export type H1Item = {
   /** m² */
   area: number;
   rValue: number | null;
+  /** Where the R-value came from: the type's property, or its layers' materials. */
+  rSource: "type" | "layers" | null;
   required: number;
   pass: boolean;
 };
@@ -114,10 +116,33 @@ export type H1Report = {
   pass: boolean;
 };
 
-const typeR = (t: Element | undefined): number | null => {
-  const r = (t?.params as ThermalTypeParams | undefined)?.rValue;
-  return typeof r === "number" && r > 0 ? r : null;
-};
+/** Inside + outside surface resistances, m²K/W (walls and roofs; NZS 4214 style, provisional). */
+export const SURFACE_R = 0.15;
+
+/**
+ * A layered type's R-value from its layers' materials (Σ thickness / λ + surface resistances), or
+ * null when any layer's material has no conductivity.
+ */
+export function layeredR(doc: Document, type: Element | undefined): number | null {
+  const layers = (type?.params as LayeredTypeParams | undefined)?.layers;
+  if (!layers?.length) return null;
+  let r = SURFACE_R;
+  for (const l of layers) {
+    if (l.thickness <= 0) continue;
+    const k = l.materialId ? doc.get<MaterialParams>(l.materialId)?.params.conductivity : undefined;
+    if (!(typeof k === "number" && k > 0)) return null;
+    r += l.thickness / 1000 / k;
+  }
+  return r;
+}
+
+/** A type's construction R-value: set on the type, else worked out from its layers, else null. */
+export function constructionR(doc: Document, t: Element | undefined): { r: number; source: "type" | "layers" } | null {
+  const set = (t?.params as ThermalTypeParams | undefined)?.rValue;
+  if (typeof set === "number" && set > 0) return { r: set, source: "type" };
+  const fromLayers = layeredR(doc, t);
+  return fromLayers !== null ? { r: fromLayers, source: "layers" } : null;
+}
 
 /** Run the H1/AS1 schedule-method check over the model. */
 export function h1Check(doc: Document): H1Report {
@@ -130,9 +155,10 @@ export function h1Check(doc: Document): H1Report {
     const key = `${cls}:${type.id}`;
     let row = rows.get(key);
     if (!row) {
-      const rValue = typeR(type);
+      const cr = constructionR(doc, type);
+      const rValue = cr?.r ?? null;
       const required = req.minR[cls][zone - 1] ?? 0;
-      row = { cls, typeId: type.id, typeName: type.name ?? type.id, count: 0, area: 0, rValue, required, pass: rValue !== null && rValue >= required - 1e-9 };
+      row = { cls, typeId: type.id, typeName: type.name ?? type.id, count: 0, area: 0, rValue, rSource: cr?.source ?? null, required, pass: rValue !== null && rValue >= required - 1e-9 };
       rows.set(key, row);
     }
     row.count++;

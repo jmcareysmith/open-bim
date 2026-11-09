@@ -30,7 +30,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Feature | Phase | Status |
 |---|---|---|
 | Basic walls (layered compound structure) | 0–1 | 🟨 (layers, priorities, join cleanup, wrapping at free ends and inserts) |
-| Curved (arc) walls | 8b | 🟨 (Wall ▾ Arc, Properties → Curve or the middle grip; doors/windows/openings square to the arc; corner joins end to end (mitred on the end tangent); no tees, layer cleanup, sweeps or curtain/stacked types on arcs yet) |
+| Curved (arc) walls | 8b | 🟨 (Wall ▾ Arc, Properties → Curve or the middle grip; doors/windows/openings square to the arc; corner joins (mitred on the end tangent) and tees; no layer cleanup, sweeps or curtain/stacked types on arcs yet) |
 | Wall joins, cleanup, wall attach top/base | 1 | ✅ (plan cleanup by layer priority; disallow join; crossing walls) |
 | Stacked walls | 6 | ✅ |
 | Wall sweeps and reveals, Edit Profile | 8b | ✅ (type and instance; built-in profiles; profile by presets/points or sketched in a section/elevation along the wall) |
@@ -126,7 +126,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 10. Materials & visualisation
 | Feature | Phase | Status |
 |---|---|---|
-| Materials (graphics, appearance, physical, thermal) | 2 | 🟨 (graphics, render appearance, textures in Realistic: image or drawn from the surface pattern; no physical properties) |
+| Materials (graphics, appearance, physical, thermal) | 2 | ✅ (graphics, render appearance, textures; density and conductivity — layered types' R-values from their layers for H1/energy) |
 | Surface / cut patterns | 2 | ✅ |
 | Realistic rendering | 7 | ✅ (path traced; no textures yet) |
 | AI render (Gemini-style) | 7 | ✅ (self-hosted SD WebUI or Gemini, user key) |
@@ -176,7 +176,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Align, offset, trim/extend, split | 7a | ✅ (plans/3D) |
 | Grips, drag editing, temporary dimensions | 7a | ✅ (temp dims while drawing walls, detail lines, beams: length and angle) |
 | Ribbon, contextual tabs, options bar | 7b | ✅ |
-| File menu, Quick Access Toolbar | 7b | 🟨 (no recent files) |
+| File menu, Quick Access Toolbar | 7b | ✅ (File menu with Recent on desktop, QAT) |
 | Drag and drop from the Project Browser | 7b | ✅ (views onto sheets, families into views) |
 | Dockable panels | 7b | ✅ |
 | View tabs, status bar, view control bar | 7b | 🟨 (tabs, view control bar, tiling/cascade, selection filter) |

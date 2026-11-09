@@ -103,7 +103,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 8. Annotation & documentation
 | Feature | Phase | Status |
 |---|---|---|
-| Dimensions (aligned, linear, angular, radial, spot) | 2 | 🟨 (aligned in plans, sections, elevations — live to walls, grids, levels; spot elevations; angular and radial in plans) |
+| Dimensions (aligned, linear, angular, radial, spot) | 2 | ✅ (aligned in plans, sections, elevations — live to walls, grids, levels; spot elevations; angular in plans and sections (drawn edges fixed, levels live); radial in plans) |
 | Text, leaders | 2 | ✅ (text notes with leaders: Properties → Add leader) |
 | Tags (by category, multi-category, material) | 4 | ✅ (Tag ▾ by category, multi-category, material; keynotes) |
 | Keynotes | 4 | ✅ |

@@ -44,4 +44,13 @@ describe("angular and radial dimensions", () => {
     const s = doc.transact("S", (tx) => createSection(tx, doc, p(0, -1000), p(1000, -1000)));
     expect(() => doc.transact("Sec", (tx) => createRadialDimension(tx, doc, s.id, w.id, p(0, 0)))).toThrow(/plans/);
   });
+  it("measure angles in sections between a drawn edge and a level", () => {
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const s = doc.transact("S", (tx) => createSection(tx, doc, p(0, -1000), p(10000, -1000)));
+    // A 30° roof slope drawn from (2000, 2700) and the First Floor level (2700).
+    const slope = { kind: "line" as const, at: p(2000, 2700), dir: { x: Math.cos(Math.PI / 6), y: Math.sin(Math.PI / 6) } };
+    const d = doc.transact("Ang", (tx) => createAngularDimension(tx, doc, s.id, { kind: "level", id: ids.levels.first, pick: p(3000, 2700) }, slope, p(3500, 3000)));
+    expect(new SimpleKernel().buildLines(doc, d, 100)!.labels[0]!.text).toBe("30.00°");
+  });
 });

@@ -821,6 +821,36 @@ void main() {
     return null;
   }
 
+  /**
+   * Sections/elevations: the drawn line segment under the cursor (model line work or annotation),
+   * in drawing coordinates, or null.
+   */
+  pickSegment(ev: { clientX: number; clientY: number }): { a: Vec2; b: Vec2 } | null {
+    if (this.mode !== "drawing") return null;
+    this.setRay(ev);
+    this.raycaster.params.Line.threshold = this.mmPerPixel() * 6;
+    const groups = [...this.drawing.values(), ...[...this.objects.values()].filter((g) => g.userData.inDrawing && g.visible), ...(this.drawExtras ? [this.drawExtras] : [])];
+    const parts = groups.flatMap((g) => {
+      const out: THREE.Object3D[] = [];
+      g.traverse((o) => {
+        if (o instanceof THREE.LineSegments) out.push(o);
+      });
+      return out;
+    });
+    for (const hit of this.raycaster.intersectObjects(parts, false)) {
+      const o = hit.object as THREE.LineSegments;
+      const pos = o.geometry.getAttribute("position");
+      const i = hit.index;
+      if (!pos || i === undefined || i === null) continue;
+      const k = i - (i % 2);
+      const a = new THREE.Vector3().fromBufferAttribute(pos, k).applyMatrix4(o.matrixWorld);
+      const b = new THREE.Vector3().fromBufferAttribute(pos, k + 1).applyMatrix4(o.matrixWorld);
+      if (a.distanceTo(b) < 1) continue;
+      return { a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y } };
+    }
+    return null;
+  }
+
   pickHit(ev: { clientX: number; clientY: number }, filter?: (id: ElementId) => boolean): { id: ElementId; point: Vec2 } | null {
     this.setRay(ev);
     // Line picking tolerance: a few pixels, in mm at the current zoom.

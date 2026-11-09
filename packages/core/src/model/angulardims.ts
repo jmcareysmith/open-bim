@@ -6,7 +6,8 @@ import { Cat, wallThickness, type Wall } from "./architecture.ts";
 import { arcInfo, type ArcInfo } from "./arcs.ts";
 import type { ViewParams } from "./viewdefs.ts";
 
-// Angular and radial dimensions (Revit: Annotate → Dimension → Angular / Radial), plans only.
+// Angular and radial dimensions (Revit: Annotate → Dimension → Angular / Radial). Angular in plans,
+// sections and elevations (there: between drawn edges picked as fixed lines, or levels); radial in plans.
 // Angular: between two line references (walls, grids, reference planes), measured on an arc
 // through `at` in the quarter where it was placed. Radial: the radius of an arc wall or grid,
 // along the line from its centre through `at`. Both stay live as their references move.
@@ -16,7 +17,7 @@ export type RadialDimensionParams = { viewId: ElementId; refId: ElementId; /** W
 export type AngularDimension = Element<AngularDimensionParams>;
 export type RadialDimension = Element<RadialDimensionParams>;
 
-const refId = (r: DimRef): ElementId[] => (r.kind === "point" ? [] : [r.id]);
+const refId = (r: DimRef): ElementId[] => (r.kind === "point" || r.kind === "line" ? [] : [r.id]);
 
 registerCategory({
   name: Cat.AngularDimension,
@@ -37,15 +38,17 @@ registerCategory({
   isType: false,
 });
 
-function requirePlan(doc: Document, viewId: ElementId): void {
+function requirePlan(doc: Document, viewId: ElementId, sectionsToo = false): void {
   const v = doc.require<ViewParams>(viewId);
-  if (v.category !== Cat.View || !["floorPlan", "callout", "areaPlan"].includes(v.params.kind)) throw new Error("Angular and radial dimensions go in plans");
+  const kinds = ["floorPlan", "callout", "areaPlan", ...(sectionsToo ? ["section", "elevation", "drafting"] : [])];
+  if (v.category !== Cat.View || !kinds.includes(v.params.kind)) throw new Error(sectionsToo ? "Angular dimensions go in plans, sections, elevations and drafting views" : "Radial dimensions go in plans");
 }
 
 /** The angle's vertex, its two arms (unit directions towards `at`'s quarter), the radius and the angle (radians). */
 export function angularLayout(doc: Document, d: AngularDimension): { o: Vec2; u: Vec2; w: Vec2; r: number; angle: number } {
-  const A = resolveRef(doc, d.params.a);
-  const B = resolveRef(doc, d.params.b);
+  // Sections: levels and grids resolve in the view's own coordinates.
+  const A = resolveRef(doc, d.params.a, d.params.viewId);
+  const B = resolveRef(doc, d.params.b, d.params.viewId);
   if (!A.dir || !B.dir) throw new Error("Angles are between lines");
   const den = A.dir.x * B.dir.y - A.dir.y * B.dir.x;
   if (Math.abs(den) < 1e-9) throw new Error("Those lines are parallel: no angle between them");
@@ -78,7 +81,7 @@ export function radialLayout(doc: Document, d: RadialDimension): { arc: ArcInfo;
 }
 
 export function createAngularDimension(tx: Transaction, doc: Document, viewId: ElementId, a: DimRef, b: DimRef, at: Vec2, size = 2.5): AngularDimension {
-  requirePlan(doc, viewId);
+  requirePlan(doc, viewId, true);
   const d = tx.create<AngularDimensionParams>(Cat.AngularDimension, { viewId, a, b, at: { ...at }, size }) as AngularDimension;
   angularLayout(doc, d);
   return d;

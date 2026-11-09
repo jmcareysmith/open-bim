@@ -358,7 +358,7 @@ function transformed(c: Ctx, el: Element): Record<string, unknown> | null {
       if (!isTranslation(t) && refs.some((r) => r.id && !set.has(r.id))) {
         throw new Error("Dimensions rotate or mirror only together with what they measure");
       }
-      p.refs = refs.map((r) => (r.kind === "point" ? { ...r, at: applyAffine(t, r.at!) } : { ...r, pick: applyAffine(t, r.pick!) }));
+      p.refs = refs.map((r) => (r.kind === "point" || r.kind === "line" ? { ...r, at: applyAffine(t, r.at!) } : { ...r, pick: applyAffine(t, r.pick!) }));
       p.dir = unit(applyLinear(t, p.dir as Vec2));
       pt("at");
       return p;

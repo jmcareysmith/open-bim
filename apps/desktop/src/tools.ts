@@ -1448,6 +1448,16 @@ export class AngleDimensionTool implements Tool {
     if (!viewId) return;
     const { doc, viewport } = this.ctx;
     const ready = this.kind === "angular" ? this.refs.length === 2 : !!this.arc;
+    if (!ready && this.kind === "angular" && viewport.viewMode === "drawing") {
+      // Sections and elevations: levels stay live; any other drawn edge is taken as a fixed line.
+      const seg = viewport.pickSegment(ev);
+      if (!seg) return this.ctx.status("Angular dimension: click a drawn edge (e.g. a roof slope) or a level.");
+      // A level line (horizontal at a level's height) stays live; anything else is a fixed line.
+      const level = Math.abs(seg.a.y - seg.b.y) < 0.5 ? levels(doc).find((l) => Math.abs((l.params as LevelParams).elevation - seg.a.y) < 0.5) : undefined;
+      if (level) this.refs.push({ kind: "level", id: level.id, pick: seg.a });
+      else this.refs.push({ kind: "line", at: seg.a, dir: { x: seg.b.x - seg.a.x, y: seg.b.y - seg.a.y } });
+      return this.ctx.status(this.refs.length === 2 ? "Angular dimension: click where the arc goes." : "Angular dimension: click the second edge.");
+    }
     if (!ready) {
       const pickable = new Set<string>(this.kind === "angular" ? [Cat.Wall, Cat.Grid, Cat.ReferencePlane] : [Cat.Wall, Cat.Grid]);
       const hit = viewport.pickHit(ev, (id) => pickable.has(doc.get(id)?.category ?? ""));
@@ -1460,7 +1470,7 @@ export class AngleDimensionTool implements Tool {
         return this.ctx.status("Radial dimension: click where it goes.");
       }
       this.refs.push(el.category === Cat.Wall ? { kind: "wallFace", id: el.id, side: "centre", pick: hit.point } : { kind: "datum", id: el.id, pick: hit.point });
-      this.ctx.setSelection(this.refs.flatMap((r) => (r.kind === "point" ? [] : [r.id])));
+      this.ctx.setSelection(this.refs.flatMap((r) => (r.kind === "point" || r.kind === "line" ? [] : [r.id])));
       return this.ctx.status(this.refs.length === 2 ? "Angular dimension: click where the arc goes." : "Angular dimension: click the second line.");
     }
     const at = viewPoint(this.ctx, ev, null);
@@ -2264,7 +2274,7 @@ export class DimensionTool implements Tool {
       } else {
         this.refs.push({ kind: "datum", id: el.id, pick: hit.point });
       }
-      this.ctx.setSelection(this.refs.flatMap((r) => (r.kind === "point" ? [] : [r.id])));
+      this.ctx.setSelection(this.refs.flatMap((r) => (r.kind === "point" || r.kind === "line" ? [] : [r.id])));
       this.ctx.status(`Dimension: ${this.refs.length} reference(s). Click more, or click empty space to place.`);
       return;
     }

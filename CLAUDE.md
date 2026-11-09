@@ -129,7 +129,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Known gaps: join cleanup is plan-only (3D solids overlap at crossings); arc walls corner-join end to end and tee (straight or curved stems stop on the arc face; no plan layer cleanup at arcs);
   floors: Pick Walls (sketch options strip: face/core/centre line + offset) and slope arrows (floor
   Properties → Add slope arrow; tail/head heights; plane top, sheared slab, 1:n arrow in plan); roofs exact for convex/L/T/U only; doors/windows parametric;
-  angular/radial dimensions are plan-only (Dimension ▾ Angular / Radial; core/model/angulardims.ts).
+  angular dimensions in plans and sections (sections: picked drawn edges become fixed `line` DimRefs, level lines stay
+  live; viewport `pickSegment`), radial plan-only (Dimension ▾ Angular / Radial; core/model/angulardims.ts).
   Screen and sheet/PDF share `lineworkDrawing` for cut/projection line work.
 - Families (Phase 3 started): family editor (Browser → Families → New family / Edit family) with
   Extrusion/Blend/Revolve/Sweep (+ Void), parameters with formulas, family types; Load into Project;

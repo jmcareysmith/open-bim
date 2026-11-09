@@ -39,7 +39,9 @@ export type DimRef =
   | { kind: "wallFace"; id: ElementId; side: "left" | "right" | "centre"; pick: Vec2 }
   | { kind: "datum"; id: ElementId; pick: Vec2 }
   | { kind: "level"; id: ElementId; pick: Vec2 }
-  | { kind: "point"; at: Vec2 };
+  | { kind: "point"; at: Vec2 }
+  /** A fixed line in the view (e.g. a drawn edge picked in a section): a point on it and its direction. */
+  | { kind: "line"; at: Vec2; dir: Vec2 };
 
 export type DimensionParams = {
   viewId: ElementId;
@@ -66,7 +68,7 @@ export const DEFAULT_TEXT_SIZE = 2.5;
 
 export const ANNOTATION_CATEGORIES = [Cat.DetailLine, Cat.FilledRegion, Cat.TextNote, Cat.Dimension, Cat.Area, Cat.AreaBoundary, Cat.Tag, Cat.LegendComponent, Cat.KeynoteLegend, Cat.RevisionCloud, Cat.CadImport, Cat.Symbol, Cat.DetailComponent, Cat.SpotElevation, Cat.ColorFillLegend, Cat.AngularDimension, Cat.RadialDimension, Cat.Insulation, Cat.ImageUnderlay] as const;
 
-const refIds = (r: DimRef): ElementId[] => (r.kind === "point" ? [] : [r.id]);
+const refIds = (r: DimRef): ElementId[] => (r.kind === "point" || r.kind === "line" ? [] : [r.id]);
 
 /** Batt insulation (Revit: Annotate → Detail → Insulation): its loops along a line, `width` thick (model mm). */
 export type InsulationParams = { viewId: ElementId; start: Vec2; end: Vec2; width: number };
@@ -171,6 +173,8 @@ export function resolveRef(doc: Document, ref: DimRef, viewId?: ElementId): Reso
   switch (ref.kind) {
     case "point":
       return { point: ref.at, dir: null };
+    case "line":
+      return { point: ref.at, dir: unit(ref.dir) };
     case "wallFace": {
       const w = doc.require<WallParams>(ref.id) as Wall;
       const d = unit({ x: w.params.end.x - w.params.start.x, y: w.params.end.y - w.params.start.y });
@@ -193,7 +197,7 @@ export function resolveRef(doc: Document, ref: DimRef, viewId?: ElementId): Reso
 /** The measured point of a reference: its pick projected onto where the reference is now. */
 export function refPoint(doc: Document, ref: DimRef, viewId?: ElementId): Vec2 {
   const r = resolveRef(doc, ref, viewId);
-  if (!r.dir || ref.kind === "point") return r.point;
+  if (!r.dir || ref.kind === "point" || ref.kind === "line") return r.point;
   const t = (ref.pick.x - r.point.x) * r.dir.x + (ref.pick.y - r.point.y) * r.dir.y;
   return { x: r.point.x + r.dir.x * t, y: r.point.y + r.dir.y * t };
 }

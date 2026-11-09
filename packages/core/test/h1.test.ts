@@ -7,6 +7,9 @@ import {
   createWall,
   createWindow,
   h1Check,
+  energyAnalysis,
+  ZONE_CLIMATE,
+  AIR_CHANGES,
   setH1Settings,
   type ThermalTypeParams,
 } from "../src/index.ts";
@@ -67,5 +70,33 @@ describe("H1 schedule method", () => {
     const r = h1Check(doc);
     expect(r.glazingRatio).toBeGreaterThan(0.3);
     expect(r.glazingPass).toBe(false);
+  });
+});
+
+describe("energy analysis (provisional)", () => {
+  it("adds up fabric and ventilation heat loss, peak load and annual heating, against the H1 reference", () => {
+    const { doc } = house();
+    const r = energyAnalysis(doc);
+    // Walls are net of the two windows and the door.
+    const wall = r.rows.find((x) => x.cls === "wall")!;
+    const openings = 1.8 * 1.2 + 1.2 * 1.2 + r.rows.filter((x) => x.cls === "door").reduce((s, x) => s + x.area, 0);
+    expect(wall.area).toBeCloseTo(36 * 2.7 - openings, 6);
+    // No R-values set: the H1 minimums are assumed (so the proposal equals the reference).
+    expect(r.rows.every((x) => x.assumed)).toBe(true);
+    expect(r.fabric).toBeCloseTo(r.rows.reduce((s, x) => s + x.area / x.r, 0), 9);
+    // 10 x 8 slab, 2.7 m to the level above: 80 m², 216 m³.
+    expect(r.floorArea).toBeCloseTo(80, 6);
+    expect(r.volume).toBeCloseTo(216, 6);
+    expect(r.ventilation).toBeCloseTo(0.33 * AIR_CHANGES * 216, 6);
+    const c = ZONE_CLIMATE[r.zone];
+    expect(r.peak).toBeCloseTo(r.total * (20 - c.design), 6);
+    expect(r.annual).toBeCloseTo((r.total * c.hdd * 24) / 1000, 6);
+    expect(r.pass).toBe(true);
+    // Better walls than the minimum lower the heat loss below the reference.
+    const wallType = doc.byCategory("WallType").find((t) => t.name === wall.typeName)!;
+    doc.transact("R", (tx) => tx.update<ThermalTypeParams>(wallType.id, { rValue: 4 }));
+    const better = energyAnalysis(doc);
+    expect(better.fabric).toBeLessThan(r.fabric);
+    expect(better.pass).toBe(true);
   });
 });

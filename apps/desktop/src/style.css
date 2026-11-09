@@ -294,7 +294,7 @@ input.invalid { outline: 1px solid var(--danger); }
 .console-line.err { color: #c62828; }
 .console-in { border: 0; border-top: 1px solid var(--line); background: #fafbfc; color: inherit; font: inherit; padding: 6px 8px; resize: none; outline: none; }
 .warn { color: #c62828; }
-#clash-pane, #collab-pane, #nz-pane { position: absolute; top: 0; right: 0; bottom: 0; width: min(520px, 60%); overflow: auto; background: var(--panel); color: var(--text); border-left: 1px solid var(--line); padding: 10px 12px; z-index: 3; font-size: 12px; }
+#clash-pane, #collab-pane, #nz-pane { position: absolute; top: 0; right: 0; bottom: 0; width: min(520px, 60%); overflow: auto; background: var(--panel); color: var(--text); border-left: 1px solid var(--line); padding: 10px 12px; z-index: 7; font-size: 12px; }
 #clash-pane[hidden], #collab-pane[hidden], #nz-pane[hidden] { display: none; }
 #clash-pane h2 { font-size: 13px; margin: 0 0 8px; }
 #clash-pane .cats { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; margin-bottom: 8px; }

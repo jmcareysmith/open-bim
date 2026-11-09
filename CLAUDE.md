@@ -296,3 +296,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Structural Analysis View (packages/ifc/src/structural.ts): IfcStructuralAnalysisModel with curve/surface members,
   profiles (IfcMaterialProfileSet), point connections (pinned supports), G/Q/W load cases and actions; forces in N.
   Checked by opening in web-ifc only (no analysis program here).
+- Energy analysis (core/model/energy.ts `energyAnalysis`, NZ Checks → Energy analysis): fabric UA from the H1 take-off (walls
+  net of openings; unset R-values take the H1 minimum), ventilation 0.5 ach, peak load at the zone design temperature,
+  annual heating by degree-days (no gains), H1 calculation-method reference comparison. Zone figures provisional.
+  Analyse panes (NZ Checks, Clashes, Collaborate) sit above the ViewCube (z-index 7).

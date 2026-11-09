@@ -1,4 +1,4 @@
-import { H1_CLASS_LABELS, bracingCheck, bracingSettings, drainageCheck, fallLabel, h1Check, setBracingSettings, type Document } from "@open-bim/core";
+import { H1_CLASS_LABELS, ZONE_CLIMATE, AIR_CHANGES, INDOOR_TEMP, energyAnalysis, bracingCheck, bracingSettings, drainageCheck, fallLabel, h1Check, setBracingSettings, type Document } from "@open-bim/core";
 
 // NZ Checks pane: H1 energy (schedule method), NZS 3604 bracing and G13 drainage, run over the open model.
 
@@ -7,7 +7,7 @@ export interface NzChecksHost {
   select(ids: string[]): void;
 }
 
-let tab: "h1" | "bracing" | "drainage" = "h1";
+let tab: "h1" | "energy" | "bracing" | "drainage" = "h1";
 
 export const el = (tag: string, text = "", cls = ""): HTMLElement => {
   const e = document.createElement(tag);
@@ -64,6 +64,43 @@ function h1Body(host: NzChecksHost): Node[] {
     for (const n of r.notes) ul.append(el("li", n));
     out.push(ul);
   }
+  return out;
+}
+
+function energyBody(host: NzChecksHost): Node[] {
+  const r = energyAnalysis(host.doc);
+  const c = ZONE_CLIMATE[r.zone];
+  const out: Node[] = [
+    el(
+      "p",
+      `Steady-state heat loss on the H1 envelope, climate zone ${r.zone} (${c.label}): ${c.hdd} heating degree-days, design ${c.design} \u00b0C outdoors, ${INDOOR_TEMP} \u00b0C indoors, ${AIR_CHANGES} air changes an hour. Provisional figures.`,
+      "muted",
+    ),
+  ];
+  const head = el("p");
+  head.append(el("strong", "H1 calculation method (fabric heat loss within the reference building): "), verdict(r.pass));
+  out.push(head);
+  out.push(
+    nzTable(
+      ["Element", "Type", "Area m\u00b2", "R", "UA W/K"],
+      r.rows.map((x) => [x.label, x.typeName, x.area.toFixed(1), `${x.r.toFixed(2)}${x.assumed ? " (min)" : ""}`, x.ua.toFixed(1)]),
+    ),
+  );
+  out.push(
+    nzTable(
+      ["Result", "", ""],
+      [
+        ["Fabric heat loss", `${r.fabric.toFixed(1)} W/K`, `reference ${r.reference.toFixed(1)} W/K`],
+        ["Ventilation", `${r.ventilation.toFixed(1)} W/K`, `${r.volume.toFixed(0)} m\u00b3`],
+        ["Total heat loss", `${r.total.toFixed(1)} W/K`, ""],
+        ["Peak heating load", `${(r.peak / 1000).toFixed(1)} kW`, `at ${c.design} \u00b0C`],
+        ["Annual heating (no gains)", `${Math.round(r.annual).toLocaleString()} kWh`, r.floorArea ? `${r.intensity.toFixed(0)} kWh/m\u00b2 over ${r.floorArea.toFixed(0)} m\u00b2` : ""],
+      ],
+    ),
+  );
+  const ul = el("ul");
+  for (const n of r.notes) ul.append(el("li", n));
+  out.push(ul);
   return out;
 }
 
@@ -174,7 +211,7 @@ export function renderNzChecks(pane: HTMLElement, host: NzChecksHost): void {
     };
     return b;
   };
-  tabs.append(mk("h1", "H1 energy"), mk("bracing", "NZS 3604 bracing"), mk("drainage", "G13 drainage"));
+  tabs.append(mk("h1", "H1 energy"), mk("energy", "Energy analysis"), mk("bracing", "NZS 3604 bracing"), mk("drainage", "G13 drainage"));
   const rerun = el("button", "Re-run") as HTMLButtonElement;
   rerun.onclick = () => renderNzChecks(pane, host);
   const close = el("button", "Close") as HTMLButtonElement;
@@ -182,7 +219,7 @@ export function renderNzChecks(pane: HTMLElement, host: NzChecksHost): void {
   tabs.append(rerun, close);
   let body: Node[];
   try {
-    body = tab === "h1" ? h1Body(host) : tab === "bracing" ? bracingBody(host) : drainageBody(host);
+    body = tab === "h1" ? h1Body(host) : tab === "energy" ? energyBody(host) : tab === "bracing" ? bracingBody(host) : drainageBody(host);
   } catch (err) {
     body = [el("p", `⚠ ${(err as Error).message}`)];
   }

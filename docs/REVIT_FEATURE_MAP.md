@@ -156,7 +156,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 13. Analysis
 | Feature | Phase | Status |
 |---|---|---|
-| Energy analysis | 9 | ⬜ |
+| Energy analysis | 9 | 🟨 (NZ Checks → Energy analysis: steady-state heat loss, peak load, annual heating by degree-days, H1 reference comparison; provisional) |
 | NZ H1 compliance (R-values, schedule method) | 7 | ✅ (provisional minimums) |
 | NZS 3604 bracing | 7 | ✅ (provisional demand; tabulated override) |
 | Structural analysis export | 9 | ✅ (IFC4 Structural Analysis View in Export IFC: members, profiles, supports, load cases, loads) |

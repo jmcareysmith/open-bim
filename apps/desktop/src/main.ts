@@ -1014,8 +1014,20 @@ const commands: Record<string, () => void | Promise<void>> = {
     const v = activeViewId ? doc.get<ViewParams>(activeViewId) : undefined;
     if (!v || v.category !== Cat.View || v.params.kind === "3d") return status("Insert Image: open a plan, section, elevation, legend or drafting view first.");
     try {
-      const file = await openBytes({ name: "Image", extensions: ["png", "jpg", "jpeg", "gif", "bmp", "webp"] });
+      const file = await openBytes({ name: "Image or PDF", extensions: ["png", "jpg", "jpeg", "gif", "bmp", "webp", "pdf"] });
       if (!file) return;
+      if (/\.pdf$/i.test(file.name)) {
+        // PDF: page 1 rendered to an image, at its paper size times the view's scale (true size for a
+        // drawing at the same scale).
+        status(`Reading ${file.name}…`);
+        const { renderPdfPage } = await import("./pdfunderlay.ts");
+        const r = await renderPdfPage(file.bytes);
+        const jpeg = r.canvas.toDataURL("image/jpeg", 0.9).split(",")[1]!;
+        const width = r.widthMm * v.params.scale;
+        const im = doc.transact(`Insert ${file.name}`, (tx) => createImageUnderlay(tx, doc, v.id, { jpeg, pixels: { w: r.canvas.width, h: r.canvas.height } }, { name: file.name, width }));
+        ctx.setSelection([im.id]);
+        return status(`Inserted page 1${r.pages > 1 ? ` of ${r.pages}` : ""} of ${file.name} at 1:${v.params.scale} (${Math.round(r.widthMm)} × ${Math.round(r.heightMm)} mm paper). Move it with MV.`);
+      }
       // Re-encode as JPEG (sheets and PDFs embed it as is), at most 4000 px a side, on white.
       const bmp = await createImageBitmap(new Blob([file.bytes as BlobPart]));
       const k = Math.min(1, 4000 / Math.max(bmp.width, bmp.height));

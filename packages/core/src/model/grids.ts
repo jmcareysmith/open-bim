@@ -12,10 +12,12 @@ export type GridParams = {
   end: Vec2;
   /** Curved grids: the arc's sagitta, mm (see model/arcs.ts). */
   curve?: number | null;
+  /** Scope box limiting the grid's extent in views (straight grids; model/scopeboxes.ts). */
+  scopeBoxId?: ElementId | null;
 };
 export type Grid = Element<GridParams>;
 
-registerCategory({ name: Cat.Grid, dependencies: () => [], cascadeDelete: false, isType: false });
+registerCategory({ name: Cat.Grid, dependencies: (el) => ((el.params as GridParams).scopeBoxId ? [(el.params as GridParams).scopeBoxId!] : []), cascadeDelete: false, isType: false });
 
 /** Letters skip I and O so labels can't be confused with 1 and 0 (common drafting practice). */
 const LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ";

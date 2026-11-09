@@ -3467,6 +3467,14 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename grid", (tx) => renameGrid(tx, doc, el.id, v)))),
         row("Length", len(arcLength(start, end, (el.params as GridParams).curve))),
         row("Curve", numberInput((el.params as GridParams).curve ?? 0, (v) => edit(ctx, v ? "Curve grid" : "Straighten grid", (tx) => setGridCurve(tx, doc, el.id, v || null)))),
+        row(
+          "Scope box",
+          select(
+            [{ value: "", label: "None" }, ...doc.byCategory(Cat.ScopeBox).map((b) => ({ value: b.id, label: b.name ?? b.id }))],
+            (el.params as GridParams).scopeBoxId ?? "",
+            (v) => update<GridParams>("Grid scope box", { scopeBoxId: v || null }),
+          ),
+        ),
       );
       break;
     }

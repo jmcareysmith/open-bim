@@ -14,6 +14,7 @@ import { tangentLine, arcPoints,
   type Vec2,
   type Wall,
   type ScopeBoxParams,
+  datumExtent,
 } from "@open-bim/core";
 
 /** Line work for datums and annotation, model mm, Z up. */
@@ -46,9 +47,10 @@ const BUBBLE_SEGMENTS = 32;
  * Grids span every level, so the view places them at the level it shows.
  */
 /** Grid: sizes are for 1:100 and scale with the view (`scale` = n of 1:n), as Revit's do. */
-export function buildGridLines(_doc: Document, el: Element, scale = 100): LineData {
+export function buildGridLines(doc: Document, el: Element, scale = 100): LineData {
   const g = el as Grid;
-  const { start, end } = g.params;
+  // A scope box limits the grid to its extent.
+  const { start, end } = datumExtent(doc, g);
   // Along the grid (straight, or its arc): distance → point, by the path's cumulative length.
   const path = arcPoints(start, end, g.params.curve, Math.PI / 90);
   const cum = [0];

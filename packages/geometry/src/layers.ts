@@ -1,3 +1,4 @@
+import polygonClipping from "polygon-clipping";
 import {
   Cat,
   ceilingExtent,
@@ -16,6 +17,7 @@ import {
   type Vec2,
   type ViewFrame,
   type Wall,
+  arcInfo,
 } from "@open-bim/core";
 
 // Split an element's cut regions into its type's layers, so each layer can be drawn with its
@@ -107,7 +109,38 @@ export function layerRegions(doc: Document, el: Element, loops: Vec2[][], frame:
   const c = dotv(s.n, frame.origin);
   if (Math.hypot(a, b) < 1e-6) return loops.map((loop) => ({ loop, materialId: firstMaterial }));
   const value = (p: Vec2) => c + a * p.x + b * p.y;
+  // Curved walls in plan: layers are bands round the arc, so measure each point's offset to the
+  // wall's left (exterior) radially rather than across the chord.
+  const w = el as Wall;
+  const arc = el.category === Cat.Wall && w.params.curve && frame.up[1] === 1 && frame.dir[2] === -1 ? arcInfo(w.params.start, w.params.end, w.params.curve) : null;
   const out: LayerRegion[] = [];
+  if (arc) {
+    // Each layer is an annular sector between its two offsets (a straight-line clip would cut the
+    // curved boundaries as chords), intersected with the cut loop (which carries the joined ends).
+    const sign = arc.sweep > 0 ? 1 : -1; // turning left (anticlockwise): the left is towards the centre
+    const c0 = s.n[0] * w.params.start.x + s.n[1] * w.params.start.y; // the location line on the bounds' scale
+    const radiusAt = (b2: number) => arc.radius - sign * (b2 - c0);
+    const margin = 2000 / arc.radius;
+    const a0 = arc.a0 - Math.sign(arc.sweep) * margin;
+    const a1 = arc.a0 + arc.sweep + Math.sign(arc.sweep) * margin;
+    const n = Math.max(8, Math.ceil(Math.abs(a1 - a0) / (Math.PI / 90)));
+    const ring = (pts: Vec2[]): [number, number][] => [...pts.map((q): [number, number] => [q.x, q.y]), [pts[0]!.x, pts[0]!.y]];
+    const at = (r: number, t: number): Vec2 => ({ x: arc.center.x + r * Math.cos(t), y: arc.center.y + r * Math.sin(t) });
+    for (const loop of loops) {
+      for (let i = 0; i < s.materials.length; i++) {
+        const r0 = radiusAt(s.bounds[i]!);
+        const r1 = radiusAt(s.bounds[i + 1]!);
+        const band: Vec2[] = [];
+        for (let k = 0; k <= n; k++) band.push(at(r0, a0 + ((a1 - a0) * k) / n));
+        for (let k = n; k >= 0; k--) band.push(at(r1, a0 + ((a1 - a0) * k) / n));
+        for (const poly of polygonClipping.intersection([ring(loop)], [ring(band)])) {
+          const pts = poly[0]!.slice(0, -1).map(([x, y]) => ({ x, y }));
+          if (pts.length >= 3 && Math.abs(area(pts)) > 1e-3) out.push({ loop: pts, materialId: s.materials[i], function: s.functions[i] });
+        }
+      }
+    }
+    return out;
+  }
   for (const loop of loops) {
     for (let i = 0; i < s.materials.length; i++) {
       const hi = Math.max(s.bounds[i]!, s.bounds[i + 1]!);

@@ -58,7 +58,8 @@ export function isCurved(el: Element): boolean {
  */
 export function arcBand(start: Vec2, end: Vec2, curve: number, half: number, step?: number): Vec2[] {
   const a = arcInfo(start, end, curve)!;
-  const pts = arcPoints(start, end, curve, step);
+  // Finer than arcPoints' default: thin finish layers show at 1:20 (2° facets).
+  const pts = arcPoints(start, end, curve, step ?? Math.PI / 90);
   // Left of travel: away from the centre when the arc bows left, towards it when it bows right.
   const leftR = a.radius + half * Math.sign(curve);
   const rightR = a.radius - half * Math.sign(curve);

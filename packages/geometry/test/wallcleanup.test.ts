@@ -6,6 +6,8 @@ import {
   createMaterial,
   createWall,
   createWallOpening,
+  arcInfo,
+  setWallCurve,
   flipWall,
   splitElement,
   wallJoins,
@@ -14,7 +16,7 @@ import {
   type Wall,
   type WallParams,
 } from "@open-bim/core";
-import { cleanCuts, joinedWallFootprint, planFrame, signedArea, subtractCoincident, type PlanLinework } from "../src/index.ts";
+import { cleanCuts, joinedWallFootprint, layerRegions, planFrame, signedArea, subtractCoincident, type PlanLinework } from "../src/index.ts";
 
 const p = (x: number, y: number): Vec2 => ({ x, y });
 
@@ -189,6 +191,23 @@ describe("disallow join", () => {
     expect(regionAt(p(1030, 20))!.materialId).toBe(types.timber);
     // A plan cut above the head doesn't pass through the opening: no wrap.
     expect(regionAt(p(1045, 20), 2300)!.materialId).toBe(types.timber);
+  });
+
+  it("splits curved walls into layers round the arc", () => {
+    const { doc, wall, types } = setup();
+    const w = wall(p(-3000, 0), p(3000, 0));
+    doc.transact("Curve", (tx) => setWallCurve(tx, doc, w.id, 1500));
+    const cw = doc.require(w.id) as Wall;
+    const regions = layerRegions(doc, cw, [joinedWallFootprint(doc, cw)], planFrame(1200));
+    const a = arcInfo(cw.params.start, cw.params.end, cw.params.curve!)!;
+    const theta = Math.abs(a.sweep);
+    const gib = regions.filter((r) => r.materialId === types.gib).reduce((s2, r) => s2 + area(r.loop), 0);
+    const timber = regions.filter((r) => r.materialId === types.timber).reduce((s2, r) => s2 + area(r.loop), 0);
+    // Two 10 mm linings round the arc: 2·θ·R·10; the 90 mm frame θ·R·90 (annulus sectors) — within
+    // the 2° faceting of the cut, and adding up to the footprint.
+    expect(Math.abs(gib / (2 * theta * a.radius * 10) - 1)).toBeLessThan(0.03);
+    expect(Math.abs(timber / (theta * a.radius * 90) - 1)).toBeLessThan(0.03);
+    expect(Math.abs((gib + timber) / area(joinedWallFootprint(doc, cw)) - 1)).toBeLessThan(0.005);
   });
 });
 

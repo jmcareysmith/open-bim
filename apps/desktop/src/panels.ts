@@ -44,6 +44,7 @@ import {
   type BarSize,
   type Rebar,
   type RebarParams,
+  canReinforce,
   type BeamSystemParams,
   systemBeams,
   type FormVisibility,
@@ -489,7 +490,7 @@ function curtainPartRows(ctx: PanelContext, w: Wall, key: string): HTMLElement[]
   }
   // Mullion segment "v:k:j" / "h:k:i": its line is everything sharing "v:k:".
   const [axis, line] = key.split(":");
-  const { u: us, z: zs } = curtainGridLines(wallLength(w), wallExtent(doc, w).bottom, wallExtent(doc, w).top, grid, ed);
+  const { u: us, z: zs } = curtainGridLines(arcLength(w.params.start, w.params.end, w.params.curve), wallExtent(doc, w).bottom, wallExtent(doc, w).top, grid, ed);
   const lastLine = axis === "v" ? us.length - 1 : zs.length - 1;
   const segments = axis === "v" ? zs.length - 1 : us.length - 1;
   const edge = Number(line) === 0 || Number(line) === lastLine;
@@ -531,7 +532,7 @@ const PANEL_FILL: Record<CurtainPanelKind, string> = { glass: "#bcdcec", solid: 
 function curtainRows(ctx: PanelContext, w: Wall): HTMLElement[] {
   const { doc } = ctx;
   const grid = curtainOf(doc, w)!;
-  const len = wallLength(w);
+  const len = arcLength(w.params.start, w.params.end, w.params.curve);
   const { bottom, top } = wallExtent(doc, w);
   const ed: CurtainEdits = w.params.curtainEdits ?? {};
   const { u: us, z: zs } = curtainGridLines(len, bottom, top, grid, ed);
@@ -4374,7 +4375,7 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
   }
 
   // Concrete hosts: their reinforcement, and adding more (Revit: Structure → Reinforcement).
-  if (AREA_REBAR_HOSTS.has(el.category) || CAGE_REBAR_HOSTS.has(el.category)) {
+  if (canReinforce(doc, el)) {
     const sets = doc.byCategory<RebarParams>(Cat.Rebar).filter((r) => r.params.hostId === el.id);
     const add = h("button", { textContent: AREA_REBAR_HOSTS.has(el.category) ? "Add area reinforcement" : "Add rebar cage" });
     add.onclick = () => {

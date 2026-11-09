@@ -1,4 +1,4 @@
-import { mullionProfile, wallExtent, wallLength, type CurtainEdits, type CurtainGrid, type CurtainPanelKind, type Document, type MaterialParams, type Vec2, type Wall } from "@open-bim/core";
+import { arcLength, mullionProfile, tangentLine, wallExtent, wallLength, type CurtainEdits, type CurtainGrid, type CurtainPanelKind, type Document, type MaterialParams, type Vec2, type Wall } from "@open-bim/core";
 import { extrudePolygon } from "./mesh.ts";
 import type { MeshData } from "./mesh.ts";
 
@@ -33,12 +33,17 @@ const SOLID = rgb(0xc9ccd0);
 const DOOR_FRAME = 50;
 
 export function buildCurtainWall(doc: Document, wall: Wall, grid: CurtainGrid): MeshData | null {
-  const len = wallLength(wall);
+  const { start, end, curve } = wall.params;
+  // Curved: the grid runs along the arc; panels and horizontals are flat between grid lines
+  // (every part only has vertices on grid lines, so mapping them onto the arc keeps them flat).
+  const len = curve ? arcLength(start, end, curve) : wallLength(wall);
   const { bottom, top } = wallExtent(doc, wall);
   if (len <= 0 || top <= bottom) return null;
-  const { start, end } = wall.params;
-  const dir = { x: (end.x - start.x) / len, y: (end.y - start.y) / len };
-  const nrm = { x: -dir.y, y: dir.x };
+  /** Along / across directions at `u` (the arc's tangent there, or the wall's line). */
+  const frameAt = (u: number) => {
+    const t = tangentLine(wall, u);
+    return { o: { x: t.start.x + t.dir.x * u, y: t.start.y + t.dir.y * u }, dir: t.dir, nrm: { x: -t.dir.y, y: t.dir.x } };
+  };
   const glass = rgb((grid.panelMaterialId ? doc.get<MaterialParams>(grid.panelMaterialId)?.params.color : undefined) ?? 0xa9cfe3);
   const metal = rgb((grid.mullionMaterialId ? doc.get<MaterialParams>(grid.mullionMaterialId)?.params.color : undefined) ?? 0x8a9199);
   const edits = wall.params.curtainEdits ?? null;
@@ -47,10 +52,15 @@ export function buildCurtainWall(doc: Document, wall: Wall, grid: CurtainGrid): 
   const nor: number[] = [];
   const col: number[] = [];
   const idx: number[] = [];
-  const world = (u: number, v: number, z: number): [number, number, number] => [start.x + dir.x * u + nrm.x * v, start.y + dir.y * u + nrm.y * v, z];
+  const world = (u: number, v: number, z: number): [number, number, number] => {
+    const f = frameAt(u);
+    return [f.o.x + f.nrm.x * v, f.o.y + f.nrm.y * v, z];
+  };
   const quad = (q: [number, number, number][], n: [number, number, number], c: [number, number, number]) => {
     const base = pos.length / 3;
-    const wn = [dir.x * n[0] + nrm.x * n[1], dir.y * n[0] + nrm.y * n[1], n[2]];
+    // Normals in the frame at the quad's middle (flat panels on a curve face their chord's normal).
+    const f = frameAt(q.reduce((s2, x) => s2 + x[0], 0) / q.length);
+    const wn = [f.dir.x * n[0] + f.nrm.x * n[1], f.dir.y * n[0] + f.nrm.y * n[1], n[2]];
     for (const [u, v, z] of q) {
       pos.push(...world(u, v, z));
       nor.push(...wn);
@@ -84,7 +94,8 @@ export function buildCurtainWall(doc: Document, wall: Wall, grid: CurtainGrid): 
       const [u, v, z] = axis === "z" ? [cu + x, y, a] : [a, y, cz + x];
       const [nu, nv, nz] = axis === "z" ? [nx, ny, na] : [na, ny, nx];
       pos.push(...world(u, v, z));
-      nor.push(dir.x * nu + nrm.x * nv, dir.y * nu + nrm.y * nv, nz);
+      const f = frameAt(u);
+      nor.push(f.dir.x * nu + f.nrm.x * nv, f.dir.y * nu + f.nrm.y * nv, nz);
       col.push(...c);
     }
     // (x, y, a) → (z, v, u) mirrors: swap the winding back for horizontals.

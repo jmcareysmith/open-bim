@@ -266,7 +266,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   hook), bottom flat. Slab edge (thickening/rebated/nosing profiles) along the outline.
 - Curved walls and grids (core/model/arcs.ts: `curve` = sagitta, + left): Wall ▾ Arc (start, end, bow) or
   Properties → Curve, or drag the arc's middle grip; arc walls' footprint is the band along the arc, mitred
-  at corner joins on the end tangents; tees into or out of arcs; layers in plan are annular bands (geometry layers.ts), sweeps lofted round the arc (sweeps.ts `loftArc`) (no join cleanup, edit profile, curtain/stacked yet). Doors/windows/openings/hosted families sit square to the
+  at corner joins on the end tangents; tees into or out of arcs; layers in plan are annular bands (geometry layers.ts), sweeps lofted round the arc (sweeps.ts `loftArc`) (plan join cleanup included — tee core extension, crossings and wrapping are straight-only; curtain walls bend their
+  straight-built grid onto the arc (curtain.ts `frameAt`), stacked walls narrow radially; no edit profile, curtain/stacked yet). Doors/windows/openings/hosted families sit square to the
   arc (core `tangentLine`, `alongArc`); flipping keeps the arc. Grids draw along the arc (not in sections or
   dimensions). Length label shows the arc length.
 - Phase 8b is done (2026-11-09).

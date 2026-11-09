@@ -52,11 +52,20 @@ registerCategory({ name: Cat.Rebar, dependencies: (el) => [(el.params as RebarPa
 export const AREA_REBAR_HOSTS = new Set<string>([Cat.Floor, Cat.PadFooting, Cat.Wall]);
 export const CAGE_REBAR_HOSTS = new Set<string>([Cat.Beam, Cat.Column, Cat.StripFooting]);
 
+/** Can this element take rebar (curtain and stacked walls can't)? */
+export function canReinforce(doc: Document, el: Element): boolean {
+  if (!AREA_REBAR_HOSTS.has(el.category) && !CAGE_REBAR_HOSTS.has(el.category)) return false;
+  if (el.category !== Cat.Wall || !el.typeId) return true;
+  const t = doc.get(el.typeId)?.params as { curtain?: unknown; stack?: unknown[] } | undefined;
+  return !t?.curtain && !t?.stack?.length;
+}
+
 export function createRebar(tx: Transaction, doc: Document, hostId: ElementId, opts: Partial<Omit<RebarParams, "hostId">> = {}): Rebar {
   const host = doc.get(hostId);
   if (!host) throw new Error("Pick an element to reinforce");
   const area = AREA_REBAR_HOSTS.has(host.category);
   if (!area && !CAGE_REBAR_HOSTS.has(host.category)) throw new Error("Rebar goes in floors, walls, footings, beams and columns");
+  if (!canReinforce(doc, host)) throw new Error("Curtain and stacked walls don't take rebar");
   const base: RebarParams = area
     ? host.category === Cat.Wall
       ? { hostId, bar: "HD12", cover: 40, spacing: 400, layers: "both", angle: 0 }

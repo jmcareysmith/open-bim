@@ -1,6 +1,6 @@
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
-import { Cat, type LayeredTypeParams, type WallParams } from "./architecture.ts";
+import { Cat, type WallParams } from "./architecture.ts";
 
 // Arcs for curved walls and grids (Revit: Start-End-Radius Arc). An arc runs from `start` to `end`
 // and bows out by `curve`: the sagitta, mm — how far its middle stands off the straight line
@@ -77,14 +77,12 @@ function validCurve(start: Vec2, end: Vec2, curve: number): void {
   if (Math.abs(curve) > c / 2 + 1e-6) throw new Error("A curve can bow out at most half its length (a semicircle)");
 }
 
-/** Bow a wall into an arc (0 / null: straight). Curtain and stacked walls stay straight. */
+/** Bow a wall into an arc (0 / null: straight); curtain walls facet between grid lines. */
 export function setWallCurve(tx: Transaction, doc: Document, id: ElementId, curve: number | null): void {
   const w = doc.require<WallParams>(id);
   if (w.category !== Cat.Wall) throw new Error("Only walls and grids curve");
   if (curve) {
     validCurve(w.params.start, w.params.end, curve);
-    const t = w.typeId ? doc.get<LayeredTypeParams>(w.typeId)?.params : undefined;
-    if (t?.curtain || t?.stack?.length) throw new Error("Curtain and stacked walls are straight for now");
   }
   tx.update<WallParams>(id, { curve: curve || null });
 }

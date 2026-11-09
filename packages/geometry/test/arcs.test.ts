@@ -18,6 +18,7 @@ import {
   setWallCurve,
   type Vec2,
   type Wall,
+  createStackedWallType,
 } from "@open-bim/core";
 import { OcctKernel, SimpleKernel, boundingBox, joinedWallFootprint, meshVolume } from "../src/index.ts";
 
@@ -55,7 +56,35 @@ describe("curved walls and grids", () => {
     doc.transact("Straight", (tx) => setWallCurve(tx, doc, w.id, null));
     expect(boundingBox(new SimpleKernel().build(doc, doc.require(w.id))!).max[1]).toBeCloseTo(T / 2);
     const cw = doc.transact("CW", (tx) => createWall(tx, ids.wallTypes.curtain, p(0, 5000), p(4000, 5000), ids.levels.ground, { height: 2400 }));
-    expect(() => doc.transact("Curve CW", (tx) => setWallCurve(tx, doc, cw.id, 500))).toThrow(/straight for now/);
+    // Curtain walls curve too: the grid runs along the arc, panels flat between grid lines.
+    doc.transact("Curve CW", (tx) => setWallCurve(tx, doc, cw.id, 1000));
+    const cm = new SimpleKernel().build(doc, doc.require(cw.id))!;
+    const arc = arcInfo(p(0, 5000), p(4000, 5000), 1000)!;
+    const P = cm.positions;
+    let maxOff = 0;
+    for (let i = 0; i < P.length; i += 3) maxOff = Math.max(maxOff, Math.abs(Math.hypot(P[i]! - arc.center.x, P[i + 1]! - arc.center.y) - arc.radius));
+    // Every vertex within the mullion depth of the arc (nothing left on the chord).
+    expect(maxOff).toBeLessThan(120);
+    expect(boundingBox(cm).max[1]).toBeGreaterThan(5000 + 900);
+  });
+
+  it("stacked walls curve: each segment narrowed radially about the arc", () => {
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const st = doc.transact("Type", (tx) => createStackedWallType(tx, doc, "Stack", [{ typeId: ids.wallTypes.exterior, height: 1000 }, { typeId: ids.wallTypes.interior, height: 0 }]));
+    const w = doc.transact("W", (tx) => createWall(tx, st.id, p(0, 0), p(4000, 0), ids.levels.ground, { height: 2400 }));
+    doc.transact("C", (tx) => setWallCurve(tx, doc, w.id, 800));
+    const m = new SimpleKernel().build(doc, doc.require(w.id))!;
+    const arc = arcInfo(p(0, 0), p(4000, 0), 800)!;
+    const P = m.positions;
+    // Below 1000 the exterior type (139), above it the interior (110): radial spread per band.
+    const all = (z0: number, z1: number) => {
+      const rs: number[] = [];
+      for (let i = 0; i < P.length; i += 3) if (P[i + 2]! >= z0 - 0.5 && P[i + 2]! <= z1 + 0.5) rs.push(Math.hypot(P[i]! - arc.center.x, P[i + 1]! - arc.center.y));
+      return Math.max(...rs) - Math.min(...rs);
+    };
+    expect(all(0, 1000)).toBeCloseTo(139, 0);
+    expect(all(2400, 2400)).toBeCloseTo(110, 0);
   });
 
   it("curved walls host openings square to the arc; clicks project onto it; flips keep the shape; the bow grip bends it", async () => {

@@ -312,7 +312,7 @@ export function setCurtainEdits(tx: Transaction, doc: Document, id: ElementId, e
   const wall = doc.require<WallParams>(id) as Wall;
   if (wall.category !== Cat.Wall || !curtainOf(doc, wall)) throw new Error("Only curtain walls have grid lines and panels");
   if (edits) {
-    const len = wallLength(wall);
+    const len = wallRunLength(wall);
     const { bottom, top } = wallExtent(doc, wall);
     const check = (xs: number[] | null | undefined, max: number, what: string) => {
       for (const x of xs ?? []) if (!(x > 0 && x < max)) throw new Error(`${what} grid lines must be inside the wall`);
@@ -371,6 +371,15 @@ export function wallThickness(doc: Document, wall: Wall): number {
 export function wallLength(wall: Wall): number {
   const { start, end } = wall.params;
   return Math.hypot(end.x - start.x, end.y - start.y);
+}
+
+/** Length along the wall: the arc's for curved walls (from the chord and sagitta), else the line's. */
+export function wallRunLength(wall: Wall): number {
+  const c = wallLength(wall);
+  const s = Math.abs(wall.params.curve ?? 0);
+  if (s < 1e-6 || c < 1e-6) return c;
+  const r = (c * c) / (8 * s) + s / 2;
+  return r * 2 * Math.asin(Math.min(1, c / (2 * r)));
 }
 
 type WallAttachHook = (doc: Document, wall: Wall, ext: { bottom: number; top: number }) => { bottom: number; top: number };

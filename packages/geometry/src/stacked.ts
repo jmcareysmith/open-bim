@@ -1,4 +1,4 @@
-import { totalThickness, wallLength, type Document, type ElementId, type LayeredTypeParams, type MaterialParams, type Vec2, type Wall } from "@open-bim/core";
+import { arcInfo, totalThickness, wallLength, type Document, type ElementId, type LayeredTypeParams, type MaterialParams, type Vec2, type Wall } from "@open-bim/core";
 import { joinedWallFootprint } from "./joins.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
 
@@ -29,7 +29,16 @@ export function buildStackedWall(doc: Document, wall: Wall, segments: Segment[])
   const idx: number[] = [];
   for (const s of segments) {
     const k = T > 0 ? s.thickness / T : 1;
-    const loop: Vec2[] = local.map(({ u, v }) => {
+    const arc = wall.params.curve ? arcInfo(start, end, wall.params.curve) : null;
+    // Curved: narrow radially about the arc's centre (each point keeps its angle).
+    const loop: Vec2[] = arc
+      ? full.map((p) => {
+          const r = Math.hypot(p.x - arc.center.x, p.y - arc.center.y);
+          const t = Math.atan2(p.y - arc.center.y, p.x - arc.center.x);
+          const r2 = arc.radius + (r - arc.radius) * k;
+          return { x: arc.center.x + r2 * Math.cos(t), y: arc.center.y + r2 * Math.sin(t) };
+        })
+      : local.map(({ u, v }) => {
       const uu = u < 0 ? u * k : u > len ? len + (u - len) * k : u;
       return { x: start.x + dir.x * uu + nrm.x * v * k, y: start.y + dir.y * uu + nrm.y * v * k };
     });

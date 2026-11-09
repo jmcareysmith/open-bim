@@ -1,4 +1,4 @@
-import { Cat, scaleBarLayout, symbolAngle, symbolScale, type AnnotationSymbol, type Document, type Element, type Vec2 } from "@open-bim/core";
+import { Cat, scaleBarLayout, symbolCoordinates, symbolAngle, symbolScale, type AnnotationSymbol, type Document, type Element, type Vec2 } from "@open-bim/core";
 import type { LineData } from "./datums.ts";
 
 // Annotation symbols in their view's 2D space, sized on paper × the view scale:
@@ -59,6 +59,22 @@ export function buildSymbolLines(doc: Document, el: Element): LineData | null {
         const p = at(x0 + i * step, -TEXT * k * 1.1);
         labels.push({ text, position: [p.x, p.y, 0], size: TEXT * k });
       }
+      break;
+    }
+    case "coordinates": {
+      // A survey/base point mark: circle with a cross, labelled with its NZTM coordinates.
+      const r = size / 2;
+      const ring = Array.from({ length: 32 }, (_, i) => at(r * Math.cos((i / 32) * 2 * Math.PI), r * Math.sin((i / 32) * 2 * Math.PI)));
+      poly(ring);
+      line(at(-r * 1.4, 0), at(r * 1.4, 0));
+      line(at(0, -r * 1.4), at(0, r * 1.4));
+      fills.push([at(0, 0), at(r, 0), ...ring.slice(0, 9).map((q) => q), at(0, r)]);
+      const c = symbolCoordinates(doc, s);
+      const f = (v: number) => v.toFixed(3);
+      [`E ${f(c.e)}`, `N ${f(c.n)}`, `RL ${f(c.h)}`].forEach((t, i) => {
+        const q = at(r * 1.8, r - i * TEXT * k * 1.5);
+        labels.push({ text: t, position: [q.x, q.y, 0], size: TEXT * k, align: "left" });
+      });
       break;
     }
     case "breakLine": {

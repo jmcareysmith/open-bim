@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Document, applyFamilyTemplate, applyResidentialTemplate, createDetailComponent, createDetailLine, createSheet, createSymbol, loadFamily, views, type SymbolParams } from "@open-bim/core";
+import { Document, applyFamilyTemplate, applyResidentialTemplate, createDetailComponent, createDetailLine, createSheet, createSymbol, ensureProjectSettings, floorPlanFor, loadFamily, views, type ProjectSettingsParams, type SymbolParams } from "@open-bim/core";
 import { SimpleKernel, buildDetailComponentLines, buildSymbolLines, viewDrawing } from "../src/index.ts";
 
 function setup() {
@@ -59,5 +59,18 @@ describe("symbol line work", () => {
     expect(seg[3]).toBeCloseTo(1000);
     expect(seg[4]).toBeCloseTo(1100);
     expect(viewDrawing(doc, new SimpleKernel(), plan).strokes.some((s) => s.id === d.id)).toBe(true);
+  });
+  it("coordinate points label their spot with NZTM eastings, northings and height", () => {
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    doc.transact("Location", (tx) => {
+      const st = ensureProjectSettings(tx, doc);
+      tx.update<ProjectSettingsParams>(st.id, { location: { epsg: 2193, eastings: 1748735, northings: 5428000, height: 12.5, rotation: 0 } });
+    });
+    const plan = floorPlanFor(doc, ids.levels.first)!;
+    const sym = doc.transact("C", (tx) => createSymbol(tx, doc, plan.id, "coordinates", { x: 1000, y: 2000 }));
+    const texts = new SimpleKernel().buildLines(doc, sym, 100)!.labels.map((l) => l.text);
+    // First Floor is at 2700: RL 12.5 + 2.7.
+    expect(texts).toEqual(["E 1748736.000", "N 5428002.000", "RL 15.200"]);
   });
 });

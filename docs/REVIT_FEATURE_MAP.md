@@ -108,7 +108,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Tags (by category, multi-category, material) | 4 | ✅ (Tag ▾ by category, multi-category, material; keynotes) |
 | Keynotes | 4 | ✅ |
 | Detail lines, filled regions, detail components, insulation | 2 | ✅ (detail components, repeating details along a line, batt insulation) |
-| Symbols, north arrow, section/elevation heads | 2 | 🟨 (north arrow, scale bar, break line; view markers drawn) |
+| Symbols, north arrow, section/elevation heads | 2 | ✅ (north arrow, scale bar, break line, coordinate point (NZTM E/N/RL); view markers and families) |
 | Revision clouds & revisions | 4 | ✅ |
 | Sheets, title blocks, viewports | 2 | ✅ (built-in strip or Title Block families with {label} text; library A1 title block) |
 | Print / PDF export (vector) | 2 | ✅ |

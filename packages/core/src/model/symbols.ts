@@ -1,8 +1,8 @@
 import { registerCategory } from "../categories.ts";
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
-import { Cat } from "./architecture.ts";
-import { projectSettings } from "./settings.ts";
+import { Cat, type LevelParams } from "./architecture.ts";
+import { projectLocation, projectSettings, toShared } from "./settings.ts";
 import type { ViewParams } from "./viewdefs.ts";
 
 // Annotation symbols (Revit: Annotate → Symbol): built-in north arrow, graphic scale bar and break
@@ -10,12 +10,13 @@ import type { ViewParams } from "./viewdefs.ts";
 // so it reads the same at any view scale. A north arrow can follow true north (from the project's
 // shared coordinates) instead of the drawing's up direction.
 
-export type SymbolKind = "northArrow" | "scaleBar" | "breakLine";
+export type SymbolKind = "northArrow" | "scaleBar" | "breakLine" | "coordinates";
 
 export const SYMBOL_KINDS: { value: SymbolKind; label: string }[] = [
   { value: "northArrow", label: "North Arrow" },
   { value: "scaleBar", label: "Scale Bar" },
   { value: "breakLine", label: "Break Line" },
+  { value: "coordinates", label: "Coordinate Point (NZTM)" },
 ];
 
 export type SymbolParams = {
@@ -31,7 +32,24 @@ export type SymbolParams = {
 };
 export type AnnotationSymbol = Element<SymbolParams>;
 
-export const DEFAULT_SYMBOL_SIZE: Record<SymbolKind, number> = { northArrow: 15, scaleBar: 50, breakLine: 20 };
+export const DEFAULT_SYMBOL_SIZE: Record<SymbolKind, number> = { northArrow: 15, scaleBar: 50, breakLine: 20, coordinates: 4 };
+
+/**
+ * Coordinate Point (Revit: Spot Coordinate / survey point): the shared (map) coordinates of a
+ * symbol's position — plans at their level, sections and elevations at the drawing point.
+ */
+export function symbolCoordinates(doc: Document, s: AnnotationSymbol): { e: number; n: number; h: number } {
+  const v = doc.get<ViewParams>(s.params.viewId);
+  const p = s.params.position;
+  const loc = projectLocation(doc);
+  if (v?.params.line && (v.params.kind === "section" || v.params.kind === "elevation")) {
+    const l = v.params.line;
+    const len = Math.hypot(l.end.x - l.start.x, l.end.y - l.start.y) || 1;
+    return toShared(loc, { x: l.start.x + ((l.end.x - l.start.x) * p.x) / len, y: l.start.y + ((l.end.y - l.start.y) * p.x) / len, z: p.y });
+  }
+  const z = v?.params.levelId ? (doc.get<LevelParams>(v.params.levelId)?.params.elevation ?? 0) : 0;
+  return toShared(loc, { x: p.x, y: p.y, z });
+}
 
 registerCategory({
   name: Cat.Symbol,

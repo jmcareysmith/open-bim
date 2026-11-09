@@ -154,6 +154,7 @@ export function sheetDrawing(doc: Document, kernel: GeometryKernel, sheet: Sheet
     if (!view || view.category !== Cat.View) return;
     const i = n++;
     const d = viewportDrawing(doc, kernel, vp);
+    if (d.images?.length) (out.images ??= []).push(...d.images.map((im) => ({ ...im, id: vp.id })));
     out.strokes.push(...d.strokes.map((s) => ({ ...s, id: vp.id })));
     out.fills.push(...d.fills.map((f) => ({ ...f, id: vp.id })));
     out.texts.push(...d.texts);

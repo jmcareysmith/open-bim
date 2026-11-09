@@ -10,7 +10,7 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
-import { isAnnotationView, analyticalModel, pointCloudPoints, type PointCloud, type PointCloudParams,
+import { type ImageUnderlayParams, isAnnotationView, analyticalModel, pointCloudPoints, type PointCloud, type PointCloudParams,
   Cat,
   PLAN_CUT_HEIGHT,
   TemporaryVisibility,
@@ -131,7 +131,7 @@ const REVEALED = 0xd0389c;
 const SELECTED = 0x3d8bfd;
 const VOID_COLOR = 0xff8c1a;
 /** Large surfaces that lose picks to line work drawn over them. */
-const BACKGROUND_CATEGORIES = new Set<string>([Cat.Floor, Cat.Ceiling, Cat.Roof, Cat.FilledRegion, Cat.Room, Cat.Area]);
+const BACKGROUND_CATEGORIES = new Set<string>([Cat.Floor, Cat.Ceiling, Cat.Roof, Cat.FilledRegion, Cat.Room, Cat.Area, Cat.ImageUnderlay]);
 /** Halftone fades colours towards the (white) background. */
 const HALFTONE_TOWARD = 0xffffff;
 /** Backgrounds: white for plans, sections, elevations (Revit default); very light grey for 3D. */
@@ -302,6 +302,8 @@ export class Viewport {
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setClearColor(BG_3D);
     container.appendChild(this.renderer.domElement);
+    // Textures that finish loading later (image underlays) ask for a redraw.
+    window.addEventListener("openbim:redraw", () => (this.needsRender = true));
 
     this.camera3d = new THREE.PerspectiveCamera(45, 1, 50, 2_000_000);
     this.camera3d.position.set(-12000, -16000, 11000);
@@ -420,6 +422,22 @@ export class Viewport {
     const el = this.doc.get(id);
     if (!el) return;
     let group: THREE.Group;
+    if (el.category === Cat.ImageUnderlay) {
+      // Image underlays: a textured rectangle under the view's line work.
+      const p = el.params as ImageUnderlayParams;
+      group = new THREE.Group();
+      group.add(imagePlane(p.jpeg, p.position.x, p.position.y, p.width, p.height, p.opacity ?? 1));
+      const owner = this.doc.get<ViewParams>(p.viewId);
+      if (owner && is2DView(owner as View)) group.userData.inDrawing = true;
+      else group.position.z = this.workPlaneZ + 5; // just above the level, inside the plan's view range
+      group.userData.elementId = id;
+      group.userData.baseColor = 0xffffff; // untinted (selection tints it)
+      group.visible = this.isShown(el);
+      this.objects.set(id, group);
+      (group.userData.inDrawing ? this.drawScene : this.scene).add(group);
+      this.applyHighlight(id);
+      return;
+    }
     if (el.category === Cat.PointCloud) {
       // Point clouds: GL points in their scanned colours (or slate grey).
       const pc = pointCloudPoints(el as PointCloud);
@@ -1409,6 +1427,8 @@ void main() {
         return;
       }
       const paper = renderPaper(d);
+      // Images placed in the views on the sheet sit under the paper's line work.
+      for (const im of d.images ?? []) paper.add(imagePlane(im.jpeg, im.x, im.y, im.width, im.height, 1));
       this.drawExtras = paper;
       this.drawScene.add(paper);
       // Each viewport's linework is its own pickable group.
@@ -2154,4 +2174,21 @@ function renderPaper(d: Drawing & { width: number; height: number; viewports: { 
 /** sRGB channel (0–1) → linear, for vertex colours. */
 function srgbToLinear(c: number): number {
   return c < 0.04045 ? c * 0.0773993808 : Math.pow(c * 0.9478672986 + 0.0521327014, 2.4);
+}
+
+/** A JPEG on a rectangle (x, y bottom-left; mm), drawn first and not depth-tested. */
+function imagePlane(jpeg: string, x: number, y: number, width: number, height: number, opacity: number): THREE.Mesh {
+  const img = new Image();
+  const tex = new THREE.Texture(img);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  img.onload = () => {
+    tex.needsUpdate = true;
+    window.dispatchEvent(new Event("openbim:redraw"));
+  };
+  img.src = `data:image/jpeg;base64,${jpeg}`;
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: opacity < 1, opacity, depthWrite: false, side: THREE.DoubleSide });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(width, height), mat);
+  m.position.set(x + width / 2, y + height / 2, -3);
+  m.renderOrder = -20;
+  return m;
 }

@@ -88,6 +88,7 @@ export const Cat = {
   PointCloud: "PointCloud",
   StructuralLoad: "StructuralLoad",
   ScopeBox: "ScopeBox",
+  ImageUnderlay: "ImageUnderlay",
   Connector: "Connector",
   MEPSystem: "MEPSystem",
   DuctType: "DuctType",

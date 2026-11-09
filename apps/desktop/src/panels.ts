@@ -44,6 +44,7 @@ import {
   type BarSize,
   type Rebar,
   type RebarParams,
+  type ImageUnderlayParams,
   type ScopeBoxParams,
   scopeBoxViews,
   createDraftingView,
@@ -4099,6 +4100,20 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
           row("", numberInput(layer.thickness, (v) => setLayer("Edit layer thickness", { thickness: Math.max(0, v) }))),
         );
       });
+      break;
+    }
+    case Cat.ImageUnderlay: {
+      const p = el.params as ImageUnderlayParams;
+      const ratio = p.pixels.h / p.pixels.w;
+      sec.append(
+        row("Name", textInput(el.name ?? "", (v) => v && edit(ctx, "Rename image", (tx) => tx.setName(el.id, v)))),
+        row("Width", numberInput(Math.round(p.width), (v) => (v > 0 ? update<ImageUnderlayParams>("Resize image", { width: v, height: v * ratio }) : ctx.status("\u26a0 Must be positive")))),
+        row("Height", h("span", {}, `${Math.round(p.height)} mm`)),
+        row("Left (x)", numberInput(Math.round(p.position.x), (v) => update<ImageUnderlayParams>("Move image", { position: { ...p.position, x: v } }))),
+        row("Bottom (y)", numberInput(Math.round(p.position.y), (v) => update<ImageUnderlayParams>("Move image", { position: { ...p.position, y: v } }))),
+        row("Opacity (%)", numberInput(Math.round((p.opacity ?? 1) * 100), (v) => update<ImageUnderlayParams>("Image opacity", { opacity: Math.min(1, Math.max(0.05, v / 100)) }))),
+        row("Pixels", h("span", {}, `${p.pixels.w} \u00d7 ${p.pixels.h}`)),
+      );
       break;
     }
     case Cat.ScopeBox: {

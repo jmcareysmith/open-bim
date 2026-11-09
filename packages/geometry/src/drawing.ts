@@ -30,6 +30,7 @@ import {
   type PointCloud,
   isAnnotationView,
   planCrop,
+  type ImageUnderlayParams,
 } from "@open-bim/core";
 import { GRID_BUBBLE_RADIUS, type LineData } from "./datums.ts";
 import { planLinework, planViewLinework, type PlanLinework } from "./hlr.ts";
@@ -79,11 +80,25 @@ export interface Text {
   align: "center" | "left";
 }
 
+/** A raster on a drawing (image underlays): JPEG bytes placed in a rectangle. */
+export interface DrawingImage {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  /** base64 JPEG and its pixel size. */
+  jpeg: string;
+  pixels: { w: number; h: number };
+  id?: ElementId;
+}
+
 export interface Drawing {
   strokes: Stroke[];
   fills: Fill[];
   texts: Text[];
   bounds: Rect;
+  /** Rasters under everything else (image underlays). */
+  images?: DrawingImage[];
 }
 
 /** Plan symbols drawn instead of cut/projection (like Revit door and window families). */
@@ -110,6 +125,12 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
   };
   const els = doc.all().filter(shown);
   const out = emptyDrawing();
+  // Image underlays in this view.
+  for (const el of els) {
+    if (el.category !== Cat.ImageUnderlay) continue;
+    const p = el.params as ImageUnderlayParams;
+    (out.images ??= []).push({ x: p.position.x, y: p.position.y, width: p.width, height: p.height, jpeg: p.jpeg, pixels: p.pixels, id: el.id });
+  }
   const section = isDrawingView(view);
   if (isAnnotationView(view)) {
     // Legends and drafting views hold no model: only their own annotation (and legend components).
@@ -380,6 +401,7 @@ export function transformDrawing(d: Drawing, a: number, bx: number, by: number):
     strokes: d.strokes.map((s) => ({ ...s, segments: s.segments.map((v, i) => (i % 2 ? ty(v) : tx(v))) })),
     fills: d.fills.map((f) => ({ ...f, loops: f.loops.map((l) => l.map((p) => ({ x: tx(p.x), y: ty(p.y) }))) })),
     texts: d.texts.map((t) => ({ ...t, x: tx(t.x), y: ty(t.y), size: t.size * a })),
+    images: (d.images ?? []).map((im) => ({ ...im, x: tx(im.x), y: ty(im.y), width: im.width * a, height: im.height * a })),
     bounds: { min: { x: tx(d.bounds.min.x), y: ty(d.bounds.min.y) }, max: { x: tx(d.bounds.max.x), y: ty(d.bounds.max.y) } },
   };
 }

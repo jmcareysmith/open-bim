@@ -121,7 +121,7 @@ const MOVABLE = new Set<string>([
   Cat.FamilyInstance, Cat.Room, Cat.RoomSeparator, Cat.Area, Cat.AreaBoundary, Cat.DetailLine, Cat.FilledRegion,
   Cat.TextNote, Cat.Dimension, Cat.Tag, Cat.RevisionCloud, Cat.LegendComponent, Cat.KeynoteLegend, Cat.DirectShape,
   Cat.CadImport, Cat.Link, Cat.Stair, Cat.Ramp, Cat.Railing, Cat.Toposolid, Cat.Column, Cat.Beam, Cat.PadFooting,
-  Cat.StripFooting, Cat.Viewport, Cat.View, Cat.Group, Cat.Symbol, Cat.DetailComponent, Cat.PointCloud, Cat.ScopeBox,
+  Cat.StripFooting, Cat.Viewport, Cat.View, Cat.Group, Cat.Symbol, Cat.DetailComponent, Cat.PointCloud, Cat.ScopeBox, Cat.ImageUnderlay,
 ]);
 
 /** Can this element be moved/copied with the modify tools? */
@@ -239,6 +239,12 @@ function transformed(c: Ctx, el: Element): Record<string, unknown> | null {
       pt("position");
       if (typeof p.rotation === "number") p.rotation = mapAngle(t, p.rotation);
       return p;
+    case Cat.ImageUnderlay: {
+      // Images move (their corner); they don't rotate or mirror.
+      if (Math.abs(t.xx - 1) > 1e-9 || Math.abs(t.yy - 1) > 1e-9 || Math.abs(t.xy) > 1e-9 || Math.abs(t.yx) > 1e-9) throw new Error("Images can only be moved");
+      pt("position");
+      return p;
+    }
     case Cat.ScopeBox: {
       // Boxes stay square to the axes: they take the bounds of their moved corners.
       const a = applyAffine(t, p.min as Vec2);

@@ -46,10 +46,12 @@ function pdfString(s: string): string {
   return out;
 }
 
-/** Content stream for one page. */
+/** Content stream for one page; `images` names its image XObjects in order (/Im0, /Im1…). */
 function pageContent(p: PdfPage): string {
   const ops: string[] = ["1 J 1 j"]; // round caps and joins
   const X = (x: number) => f(x * PT);
+  // Rasters first, under the line work.
+  (p.drawing.images ?? []).forEach((im, i) => ops.push(`q ${X(im.width)} 0 0 ${X(im.height)} ${X(im.x)} ${X(im.y)} cm /Im${i} Do Q`));
   for (const fill of p.drawing.fills) {
     const grey = fill.color !== undefined ? rgb(fill.color) : fill.kind === "poche" ? "0.55 0.55 0.55" : fill.kind === "solid" ? "0.2 0.2 0.2" : rgb(0xbbbbbb);
     const tris = fillLoops(fill.loops);
@@ -78,7 +80,7 @@ function pageContent(p: PdfPage): string {
   return ops.join("\n");
 }
 
-/** Build a PDF file. Returns its bytes (ASCII-only, so string length = byte length). */
+/** Build a PDF file. Returns its bytes (one char per byte: image streams are binary). */
 export function writePdf(pages: PdfPage[], title = "Open-BIM"): Uint8Array {
   const objects: string[] = [];
   const add = (body: string) => {
@@ -93,10 +95,17 @@ export function writePdf(pages: PdfPage[], title = "Open-BIM"): Uint8Array {
   for (const p of pages) {
     const content = pageContent(p);
     const stream = add(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`);
+    // JPEG images as DCTDecode XObjects (the bytes go in as is: one char per byte).
+    const xobjects = (p.drawing.images ?? []).map((im, i) => {
+      const bin = atob(im.jpeg);
+      const obj = add(`<< /Type /XObject /Subtype /Image /Width ${im.pixels.w} /Height ${im.pixels.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${bin.length} >>\nstream\n${bin}\nendstream`);
+      return `/Im${i} ${obj} 0 R`;
+    });
+    const xo = xobjects.length ? ` /XObject << ${xobjects.join(" ")} >>` : "";
     kids.push(
       add(
         `<< /Type /Page /Parent ${pagesObj} 0 R /MediaBox [0 0 ${f(p.width * PT)} ${f(p.height * PT)}] ` +
-          `/Resources << /Font << /F1 ${font} 0 R >> >> /Contents ${stream} 0 R >>`,
+          `/Resources << /Font << /F1 ${font} 0 R >>${xo} >> /Contents ${stream} 0 R >>`,
       ),
     );
   }

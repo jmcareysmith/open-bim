@@ -14,7 +14,7 @@ import { addRecentFile, fileName, recentFiles, removeRecentFile } from "./recent
 import { CameraTool } from "./cameratool.ts";
 import { FloorPointTool, SlopeArrowTool } from "./slopetool.ts";
 import { WallProfileTool } from "./profiletool.ts";
-import { planCrop, createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
+import { createImageUnderlay, planCrop, createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
   ceilingPlanFor,
   createCeilingPlan,
   Cat,
@@ -703,6 +703,8 @@ let ribbon: Ribbon | undefined = new Ribbon(
       { heading: "Import" },
       { label: "IFC\u2026", action: () => void commands.importIfc?.() },
       { label: "DXF/DWG into this view\u2026", action: () => void commands.importDxf?.() },
+      { label: "Image into this view\u2026", action: () => void commands.importImage?.() },
+      { label: "Point cloud\u2026", action: () => void commands.importPointCloud?.() },
       { label: "Link project\u2026", action: () => void commands.linkProject?.() },
       "-",
       { label: "Keyboard Shortcuts\u2026", hint: "KS", action: () => void commands.keyboardShortcuts?.() },
@@ -991,6 +993,30 @@ const commands: Record<string, () => void | Promise<void>> = {
     if (!cats.length) return status("Isolate category: select something first.");
     viewport.visibility.isolateCategories(cats);
     afterVisibility(`Isolated ${cats.join(", ")}`);
+  },
+  async importImage() {
+    const v = activeViewId ? doc.get<ViewParams>(activeViewId) : undefined;
+    if (!v || v.category !== Cat.View || v.params.kind === "3d") return status("Insert Image: open a plan, section, elevation, legend or drafting view first.");
+    try {
+      const file = await openBytes({ name: "Image", extensions: ["png", "jpg", "jpeg", "gif", "bmp", "webp"] });
+      if (!file) return;
+      // Re-encode as JPEG (sheets and PDFs embed it as is), at most 4000 px a side, on white.
+      const bmp = await createImageBitmap(new Blob([file.bytes as BlobPart]));
+      const k = Math.min(1, 4000 / Math.max(bmp.width, bmp.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(bmp.width * k));
+      canvas.height = Math.max(1, Math.round(bmp.height * k));
+      const g = canvas.getContext("2d")!;
+      g.fillStyle = "#fff";
+      g.fillRect(0, 0, canvas.width, canvas.height);
+      g.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+      const jpeg = canvas.toDataURL("image/jpeg", 0.88).split(",")[1]!;
+      const im = doc.transact(`Insert ${file.name}`, (tx) => createImageUnderlay(tx, doc, v.id, { jpeg, pixels: { w: canvas.width, h: canvas.height } }, { name: file.name }));
+      ctx.setSelection([im.id]);
+      status(`Inserted ${file.name} (${canvas.width} \u00d7 ${canvas.height} px) at the view's origin. Set its width in Properties; move it with MV.`);
+    } catch (err) {
+      status(`\u26a0 Image failed: ${(err as Error).message}`);
+    }
   },
   async importPointCloud() {
     if (projectSession) return status("Point cloud: close the family editor first.");
@@ -1581,7 +1607,9 @@ function contextLabel(): string | null {
   if (!cats.length) return null;
   if (cats.length > 1) return "Multi-Select";
   const c = cats[0]!;
-  return c.endsWith("y") ? `${c.slice(0, -1)}ies` : c.endsWith("s") ? c : `${c}s`;
+  const named: Record<string, string> = { ImageUnderlay: "Images", PointCloud: "Point Clouds", ScopeBox: "Scope Boxes", StructuralLoad: "Loads", Rebar: "Structural Rebar" };
+  if (named[c]) return named[c];
+  return /[^aeiou]y$/.test(c) ? `${c.slice(0, -1)}ies` : c.endsWith("s") ? c : `${c}s`;
 }
 
 /** Elements like `el`: same type (or family type), else same category. */

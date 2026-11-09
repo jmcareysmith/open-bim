@@ -139,7 +139,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | IFC export (IFC4 / IFC4x3) | 5 | 🟨 |
 | IFC import | 5 | 🟨 |
 | DWG/DXF import & export | 5 | ✅ (DWG via installed ODA/LibreDWG converter, desktop) |
-| PDF / image underlays | 5 | ⬜ |
+| PDF / image underlays | 5 | 🟨 (Insert → Image into a view: PNG/JPEG… as JPEG, on sheets and in PDF; PDF files not yet) |
 | Point clouds (Insert → Point Cloud: LAS/XYZ/PTS; 3D, plans, sections, sheets/PDF, snapping) | 9 | ✅ |
 | glTF / OBJ export | 5 | ✅ |
 | Revit .rvt import | — | Not feasible (closed format); use IFC |

@@ -303,3 +303,6 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Scope boxes (core/model/scopeboxes.ts): View → Scope Box (two corners in a plan); plan Properties → Scope box sets the
   crop (`planCrop` used by drawings and the viewport); box Properties edit bounds/heights; movable. Grids/levels aren't
   limited by them yet.
+- Image underlays (core/model/images.ts, view-owned like CAD imports): Insert → Image re-encodes to JPEG (≤4000 px,
+  on white), 200 mm paper width by default; Properties: width, position, opacity; move only. Drawings carry
+  `images` (transformDrawing/sheets), the PDF writer embeds them as DCTDecode XObjects; viewport `imagePlane`.

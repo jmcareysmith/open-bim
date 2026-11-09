@@ -228,6 +228,7 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
           ],
         },
         { title: "Point Cloud", items: [{ label: "Point Cloud", icon: "cloud", cmd: "importPointCloud", large: true, title: "Insert a laser scan: LAS, XYZ, PTS, TXT or CSV (metres)" }] },
+        { title: "Image", items: [{ label: "Image", icon: "import", cmd: "importImage", large: true, title: "Insert an image (PNG, JPEG\u2026) into this view as an underlay" }] },
         {
           title: "Load from Library",
           items: [

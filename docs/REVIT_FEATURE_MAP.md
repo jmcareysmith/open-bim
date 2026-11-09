@@ -29,7 +29,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 3. Architectural modelling
 | Feature | Phase | Status |
 |---|---|---|
-| Basic walls (layered compound structure) | 0–1 | 🟨 (layers, priorities, join cleanup, wrapping at free ends; no wrapping at inserts) |
+| Basic walls (layered compound structure) | 0–1 | 🟨 (layers, priorities, join cleanup, wrapping at free ends and inserts) |
 | Curved (arc) walls | 8b | 🟨 (Wall ▾ Arc, Properties → Curve or the middle grip; doors/windows/openings square to the arc; corner joins end to end (mitred on the end tangent); no tees, layer cleanup, sweeps or curtain/stacked types on arcs yet) |
 | Wall joins, cleanup, wall attach top/base | 1 | ✅ (plan cleanup by layer priority; disallow join; crossing walls) |
 | Stacked walls | 6 | ✅ |

@@ -148,6 +148,11 @@ export type LayeredTypeParams = {
    * the corner across the end. Default none.
    */
   wrapEnds?: "none" | "exterior" | "interior" | null;
+  /**
+   * Wall types only: Wrapping at Inserts (Revit) — at doors, windows and openings the finish layers
+   * of this side (or both) turn into the jambs, in plans cut through the opening. Default none.
+   */
+  wrapInserts?: "none" | "exterior" | "interior" | "both" | null;
   /** Wall types only: sweeps and reveals on every wall of the type (Edit Assembly). */
   sweeps?: WallSweep[] | null;
 };

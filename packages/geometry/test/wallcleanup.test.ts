@@ -5,6 +5,7 @@ import {
   applyResidentialTemplate,
   createMaterial,
   createWall,
+  createWallOpening,
   flipWall,
   splitElement,
   wallJoins,
@@ -170,6 +171,24 @@ describe("disallow join", () => {
     expect(regionAt(p(5, 0))!.materialId).toBe(types.gib);
     expect(regionAt(p(15, 0))!.materialId).toBe(types.timber);
     expect(regionAt(p(1995, 0))!.materialId).toBe(types.gib);
+  });
+
+  it("wraps the finish layers into door jambs when the plan cuts the door", () => {
+    const { doc, wall, types } = setup();
+    const w = wall(p(0, 0), p(3000, 0));
+    doc.transact("Opening", (tx) => createWallOpening(tx, doc, w.id, 1500, { width: 900, sillHeight: 0, height: 2100 }));
+    const regionAt = (q: Vec2, cut = 1200) => {
+      const cuts = cleanCuts(doc, linework(doc, [doc.require(w.id) as Wall]), planFrame(cut), true, true);
+      return cuts.get(w.id)!.regions!.find((r) => pointIn(q, r.loop));
+    };
+    doc.transact("Wrap", (tx) => tx.update<LayeredTypeParams>(types.lined, { wrapInserts: "exterior" }));
+    // Jamb at u = 1050: the exterior half (+y) is lining 10 deep; the interior half stays framing.
+    expect(regionAt(p(1045, 20))!.materialId).toBe(types.gib);
+    expect(regionAt(p(1045, -20))!.materialId).toBe(types.timber);
+    expect(regionAt(p(1955, 20))!.materialId).toBe(types.gib);
+    expect(regionAt(p(1030, 20))!.materialId).toBe(types.timber);
+    // A plan cut above the head doesn't pass through the opening: no wrap.
+    expect(regionAt(p(1045, 20), 2300)!.materialId).toBe(types.timber);
   });
 });
 

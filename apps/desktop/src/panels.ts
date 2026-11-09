@@ -3880,6 +3880,19 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
                   (v) => edit(ctx, "Wrapping at ends", (tx) => tx.update<LayeredTypeParams>(t.id, { wrapEnds: v === "none" ? null : (v as "exterior" | "interior") })),
                 ),
               ),
+              row(
+                "Wrapping at inserts",
+                select(
+                  [
+                    { value: "none", label: "Do not wrap" },
+                    { value: "exterior", label: "Exterior" },
+                    { value: "interior", label: "Interior" },
+                    { value: "both", label: "Both" },
+                  ],
+                  t.params.wrapInserts ?? "none",
+                  (v) => edit(ctx, "Wrapping at inserts", (tx) => tx.update<LayeredTypeParams>(t.id, { wrapInserts: v === "none" ? null : (v as "exterior" | "interior" | "both") })),
+                ),
+              ),
             ]
           : []),
         ...(el.category === Cat.WallType && !t.params.stack && !t.params.curtain ? sweepRows(ctx, el) : []),

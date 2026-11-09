@@ -124,8 +124,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   detail level, visual style for 3D, temporary hide/isolate, reveal hidden in magenta).
 - Wall join cleanup in plans (`geometry/src/wallcleanup.ts`): layers give way by priority (structure
   first), tee stems' cores run to the through wall's core, crossing walls clean (thicker wins), no
-  lines between joined walls of the same material. Wrapping at ends (wall type Properties): the exterior/
-  interior finish layers carry round free ends at Medium/Fine. Disallow Join per end (Properties / right-click).
+  lines between joined walls of the same material. Wrapping at ends and at inserts (wall type Properties): the exterior/
+  interior finish layers carry round free ends, and into door/window/opening jambs the plan cuts (exterior/interior/both halves), at Medium/Fine. Disallow Join per end (Properties / right-click).
 - Known gaps: join cleanup is plan-only (3D solids overlap at crossings); arc walls corner-join end to end only (no tees or layer cleanup);
   floors: Pick Walls (sketch options strip: face/core/centre line + offset) and slope arrows (floor
   Properties → Add slope arrow; tail/head heights; plane top, sheared slab, 1:n arrow in plan); roofs exact for convex/L/T/U only; doors/windows parametric;

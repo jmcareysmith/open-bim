@@ -187,6 +187,7 @@ import { ribbonTabs } from "./ribbondefs.ts";
 import { openFindReplace, openSpelling } from "./textdialogs.ts";
 import { SymbolTool } from "./symboltool.ts";
 import { openOverrideDialog } from "./overridedialog.ts";
+import { clearAutosave, readAutosave, startAutosave } from "./autosave.ts";
 import { DetailComponentTool, RepeatingDetailTool } from "./detailtool.ts";
 import { AttachTool } from "./attachtool.ts";
 import { ElevationTool } from "./elevationtool.ts";
@@ -915,6 +916,7 @@ const commands: Record<string, () => void | Promise<void>> = {
         if (isTauri()) addRecentFile(path);
         filePath = path;
         dirty = false;
+        void clearAutosave();
         status(`Saved ${path}`);
         updateTitle();
       }
@@ -2479,3 +2481,18 @@ mountConsole(
 // Scripts and plugins can reach the API from the browser devtools too.
 (globalThis as { openBim?: unknown }).openBim = plugins.api;
 void plugins.restore();
+
+// Autosave (every few minutes while there are unsaved changes; not while editing a family) and,
+// at start-up, recovery of work that was never saved.
+startAutosave(() => (projectSession ? null : { dirty, json: () => doc.toJSON(), path: filePath }));
+void (async () => {
+  const a = await readAutosave();
+  if (!a) return;
+  const when = new Date(a.time).toLocaleString("en-NZ");
+  if (confirm(`Open-BIM found unsaved work${a.path ? ` in ${a.path}` : ""} from ${when}. Recover it?`)) {
+    loadInto(a.json, a.path);
+    dirty = true;
+    updateTitle();
+    status(`Recovered unsaved work from ${when}. Save to keep it.`);
+  } else void clearAutosave();
+})();

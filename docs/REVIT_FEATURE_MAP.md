@@ -135,7 +135,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 11. Interoperability
 | Feature | Phase | Status |
 |---|---|---|
-| Native project file (.obim) save/open | 0–1 | 🟨 |
+| Native project file (.obim) save/open | 0–1 | ✅ (open JSON, Recent files, autosave every 3 min with recovery at start-up) |
 | IFC export (IFC4 / IFC4x3) | 5 | 🟨 |
 | IFC import | 5 | 🟨 |
 | DWG/DXF import & export | 5 | ✅ (DWG via installed ODA/LibreDWG converter, desktop) |

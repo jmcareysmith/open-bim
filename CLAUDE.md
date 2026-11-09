@@ -329,3 +329,5 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   energy use a type's R-value if set, else `layeredR` (Σ t/λ + 0.15 surfaces; core h1.ts `constructionR`).
 - Rebar sets get bar marks (S/W/B/C/F + n), optional cogged ends on slab/pad mats (12d towards the other face), and laps:
   runs over the stock length (12 m default) split into pieces lapping 40d (`rebarBars` → `lapped`; provisional).
+- Autosave (apps/desktop/src/autosave.ts): every 3 min while dirty (not in the family editor) the project goes to IndexedDB;
+  Save clears it; at start-up a leftover autosave prompts "Recover it?" (loads it, marked unsaved).

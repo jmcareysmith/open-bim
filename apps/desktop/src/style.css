@@ -439,3 +439,6 @@ body.pane-dragging canvas { pointer-events: none; }
 .ge-out, .ge-watch, .ge-error { padding: 2px 8px 4px; color: #4a5560; font-size: 11px; border-top: 1px dashed #e0e4e8; max-width: 260px; overflow-wrap: anywhere; }
 .ge-watch { background: #f6f9fd; color: #1d3f6e; }
 .ge-error { color: #c0392b; }
+.key-table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.key-table th, .key-table td { border-bottom: 1px solid var(--line); padding: 2px; text-align: left; }
+.key-table input { width: 100%; box-sizing: border-box; }

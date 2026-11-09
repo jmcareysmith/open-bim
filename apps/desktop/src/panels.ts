@@ -44,6 +44,12 @@ import {
   type BarSize,
   type Rebar,
   type RebarParams,
+  type KeyScheduleParams,
+  type KeySchedule,
+  keySchedules,
+  createKeySchedule,
+  keyedBy,
+  keyUsers,
   type ImageUnderlayParams,
   type ScopeBoxParams,
   scopeBoxViews,
@@ -1635,7 +1641,13 @@ function parameterSections(ctx: PanelContext, el: Element): HTMLElement[] {
       const v = customValue(doc, el, name);
       const set = (val: string | number | boolean) => edit(ctx, `Set ${name}`, (tx) => setCustomValue(tx, doc, el, name, val));
       let control: HTMLElement;
-      if (p.params.dataType === "yesno") {
+      const keyFor = keySchedules(doc, el.category).find((k) => k.params.keyName === name);
+      const keyedFrom = keyedBy(doc, el, name);
+      if (keyFor) {
+        control = select([{ value: "", label: "(none)" }, ...keyFor.params.rows.map((r) => ({ value: r.key, label: r.key }))], typeof v === "string" ? v : "", (k) => set(k));
+      } else if (keyedFrom) {
+        control = h("span", { title: `Set by ${keyedFrom.params.keyName} (key schedule)` }, `${v === undefined ? "\u2014" : String(v)} (by ${keyedFrom.params.keyName})`);
+      } else if (p.params.dataType === "yesno") {
         const cb = h("input", { type: "checkbox", checked: v === true });
         cb.onchange = () => set(cb.checked);
         control = cb;
@@ -2545,6 +2557,27 @@ function projectSections(ctx: PanelContext): Record<string, HTMLElement> {
       },
     );
   schedSec.append(row("New schedule", newSchedule("schedule")), row("New takeoff", newSchedule("takeoff")));
+  // Key schedules (select one to edit its keys in Properties).
+  for (const k of keySchedules(doc)) {
+    const div = h("div", { class: `list-item${ctx.selection().includes(k.id) ? " selected" : ""}` }, h("span", {}, k.name ?? k.params.keyName));
+    div.onclick = () => ctx.setSelection([k.id]);
+    schedSec.append(div);
+  }
+  schedSec.append(
+    row(
+      "New key schedule",
+      select([{ value: "", label: "Category\u2026" }, ...SCHEDULE_CATEGORIES.map(([v, l]) => ({ value: v, label: l }))], "", (v) => {
+        if (!v) return;
+        const label = SCHEDULE_CATEGORIES.find(([c]) => c === v)?.[1] ?? v;
+        const singular = label.replace(/ies$/, "y").replace(/s$/, "");
+        let name = `${singular} Style`;
+        for (let i = 2; keySchedules(doc).some((k) => k.params.keyName === name); i++) name = `${singular} Style ${i}`;
+        let id: ElementId | null = null;
+        edit(ctx, "New key schedule", (tx) => void (id = createKeySchedule(tx, doc, v, name).id));
+        if (id) ctx.setSelection([id]);
+      }),
+    ),
+  );
 
   // Project, shared and global parameters.
   const paramsSec = h("div", { class: "section" }, h("h3", {}, "Parameters"));
@@ -4100,6 +4133,54 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
           row("", numberInput(layer.thickness, (v) => setLayer("Edit layer thickness", { thickness: Math.max(0, v) }))),
         );
       });
+      break;
+    }
+    case Cat.KeySchedule: {
+      const p = el.params as KeyScheduleParams;
+      const setKs = (name: string, patch: Partial<KeyScheduleParams>) => edit(ctx, name, (tx) => tx.update<KeyScheduleParams>(el.id, patch));
+      const label = SCHEDULE_CATEGORIES.find(([c]) => c === p.category)?.[1] ?? p.category;
+      sec.append(row("Category", h("span", {}, label)), row("Key parameter", h("span", {}, p.keyName)));
+      // Fields: the category's other project parameters.
+      const params = parametersFor(doc, p.category).filter((x) => x.name !== p.keyName && x.params.binding === "instance");
+      sec.append(h("h4", {}, "Fields (set by the key)"));
+      if (!params.length) sec.append(h("div", { class: "hint" }, `Add project parameters for ${label} (Manage \u2192 Project Parameters) to key them.`));
+      for (const x of params) {
+        const cb = h("input", { type: "checkbox", checked: p.fields.includes(x.name ?? "") });
+        cb.onchange = () => setKs("Key schedule fields", { fields: cb.checked ? [...p.fields, x.name ?? ""] : p.fields.filter((f) => f !== x.name) });
+        sec.append(row(x.name ?? "", cb));
+      }
+      // Rows: one per key, with a value per field.
+      sec.append(h("h4", {}, "Keys"));
+      const table = h("table", { class: "key-table" });
+      const head = h("tr");
+      for (const t of ["Key", ...p.fields, ""]) head.append(h("th", {}, t));
+      table.append(head);
+      p.rows.forEach((r, i) => {
+        const tr = h("tr");
+        const setRow = (row2: KeyScheduleParams["rows"][number]) => setKs("Edit key", { rows: p.rows.map((q, k) => (k === i ? row2 : q)) });
+        const keyIn = textInput(r.key, (v) => {
+          if (!v.trim()) return ctx.status("\u26a0 Keys need a name");
+          if (p.rows.some((q, k) => k !== i && q.key === v)) return ctx.status(`\u26a0 There is already a "${v}" key`);
+          setRow({ ...r, key: v });
+        });
+        tr.append(h("td", {}, keyIn));
+        for (const f of p.fields) {
+          const cur = r.values[f];
+          tr.append(h("td", {}, textInput(cur === undefined || cur === null ? "" : String(cur), (v) => setRow({ ...r, values: { ...r.values, [f]: v } }))));
+        }
+        const del = h("button", { textContent: "\u00d7", title: `Remove (${keyUsers(doc, el as KeySchedule, r.key).length} using it)` });
+        del.onclick = () => setKs("Remove key", { rows: p.rows.filter((_, k) => k !== i) });
+        tr.append(h("td", {}, del));
+        table.append(tr);
+      });
+      sec.append(table);
+      const add = h("button", { textContent: "Add key" });
+      add.onclick = () => {
+        let n = p.rows.length + 1;
+        while (p.rows.some((q) => q.key === `Key ${n}`)) n++;
+        setKs("Add key", { rows: [...p.rows, { key: `Key ${n}`, values: {} }] });
+      };
+      sec.append(row("", add));
       break;
     }
     case Cat.ImageUnderlay: {

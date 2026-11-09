@@ -1607,7 +1607,7 @@ function contextLabel(): string | null {
   if (!cats.length) return null;
   if (cats.length > 1) return "Multi-Select";
   const c = cats[0]!;
-  const named: Record<string, string> = { ImageUnderlay: "Images", PointCloud: "Point Clouds", ScopeBox: "Scope Boxes", StructuralLoad: "Loads", Rebar: "Structural Rebar" };
+  const named: Record<string, string> = { ImageUnderlay: "Images", PointCloud: "Point Clouds", ScopeBox: "Scope Boxes", StructuralLoad: "Loads", Rebar: "Structural Rebar", KeySchedule: "Key Schedules" };
   if (named[c]) return named[c];
   return /[^aeiou]y$/.test(c) ? `${c.slice(0, -1)}ies` : c.endsWith("s") ? c : `${c}s`;
 }

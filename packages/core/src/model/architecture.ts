@@ -89,6 +89,7 @@ export const Cat = {
   StructuralLoad: "StructuralLoad",
   ScopeBox: "ScopeBox",
   ImageUnderlay: "ImageUnderlay",
+  KeySchedule: "KeySchedule",
   Connector: "Connector",
   MEPSystem: "MEPSystem",
   DuctType: "DuctType",

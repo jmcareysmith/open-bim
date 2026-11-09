@@ -306,3 +306,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Image underlays (core/model/images.ts, view-owned like CAD imports): Insert → Image re-encodes to JPEG (≤4000 px,
   on white), 200 mm paper width by default; Properties: width, position, opacity; move only. Drawings carry
   `images` (transformDrawing/sheets), the PDF writer embeds them as DCTDecode XObjects; viewport `imagePlane`.
+- Key schedules (core/model/keyschedules.ts): browser → Schedules → New key schedule (category); creates the key text
+  project parameter ("Room Style"); its Properties pick fields (the category's project parameters) and edit key rows.
+  Elements choose a key (select in Project parameters); keyed parameters read from the row (`customValue` →
+  `keyedValue` in parameters.ts) and are read-only on the element.

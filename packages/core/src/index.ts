@@ -50,6 +50,7 @@ export * from "./model/h1.ts";
 export * from "./model/energy.ts";
 export * from "./model/scopeboxes.ts";
 export * from "./model/images.ts";
+export * from "./model/keyschedules.ts";
 export * from "./model/bracing.ts";
 export * from "./model/modify.ts";
 export * from "./model/edits.ts";

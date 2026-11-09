@@ -81,6 +81,8 @@ function holder(doc: Document, el: Element, p: ProjectParameter): Element | unde
 export function customValue(doc: Document, el: Element, name: string): ParamValue | undefined {
   const p = projectParameters(doc).find((x) => x.name === name);
   if (!p || !p.params.categories.includes(el.category)) return undefined;
+  const keyed = keyedValue(doc, el, name);
+  if (keyed !== undefined) return keyed;
   const h = holder(doc, el, p);
   const custom = h?.params[CUSTOM] as Record<string, ParamValue> | undefined;
   return custom?.[name];
@@ -100,10 +102,27 @@ function coerce(p: ProjectParameter, v: ParamValue): ParamValue {
   }
 }
 
+/**
+ * Key schedules (model/keyschedules.ts): a parameter a key schedule sets reads from the row of the
+ * element's key. Undefined when no key applies.
+ */
+function keyedValue(doc: Document, el: Element, name: string): ParamValue | undefined {
+  type KeyRows = { category: string; keyName: string; fields: string[]; rows: { key: string; values: Record<string, ParamValue> }[] };
+  for (const ks of doc.byCategory<KeyRows>(Cat.KeySchedule)) {
+    if (ks.params.category !== el.category || !ks.params.fields.includes(name)) continue;
+    const key = (el.params[CUSTOM] as Record<string, ParamValue> | undefined)?.[ks.params.keyName];
+    const row = typeof key === "string" && key ? ks.params.rows.find((r) => r.key === key) : undefined;
+    if (row && name in row.values) return row.values[name];
+  }
+  return undefined;
+}
+
 /** Set a project parameter's value on an element (or on its type, for type bindings). */
 export function setCustomValue(tx: Transaction, doc: Document, el: Element, name: string, value: ParamValue): void {
   const p = projectParameters(doc).find((x) => x.name === name);
   if (!p) throw new Error(`No project parameter called "${name}"`);
+  if (doc.byCategory<{ category: string; fields: string[]; keyName: string }>(Cat.KeySchedule).some((k) => k.params.category === el.category && k.params.fields.includes(name)))
+    throw new Error(`${name} is set by a key schedule: change the element's key, or the key's row`);
   if (!p.params.categories.includes(el.category)) throw new Error(`${name} doesn't apply to ${el.category}`);
   const h = holder(doc, el, p);
   if (!h) throw new Error(`${name} is a type parameter and this element has no type`);

@@ -120,7 +120,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Calculated fields | 4 | ✅ |
 | Schedules on sheets | 4 | ✅ |
 | Material takeoffs | 4 | ✅ |
-| Key schedules | 4 | ⬜ |
+| Key schedules | 4 | ✅ (Schedules → New key schedule; keys set project parameters; elements pick a key; keyed values flow into schedules) |
 | Schedule export (CSV / XLSX) | 4 | ✅ |
 
 ## 10. Materials & visualisation

@@ -26,6 +26,8 @@ import {
   graphicsCategory,
   MASS_CATEGORY,
   penWidth,
+  pointCloudPoints,
+  type PointCloud,
 } from "@open-bim/core";
 import { GRID_BUBBLE_RADIUS, type LineData } from "./datums.ts";
 import { planLinework, planViewLinework, type PlanLinework } from "./hlr.ts";
@@ -35,7 +37,7 @@ import { cleanCuts } from "./wallcleanup.ts";
 import { viewSchemeFill } from "./rooms.ts";
 import { ductPlanLevel, isRunCategory } from "./ducts.ts";
 import { hatch, patternFamilies } from "./patterns.ts";
-import { sectionAnnotations, sectionLinework, type Rect } from "./sections.ts";
+import { sectionAnnotations, sectionLinework, sectionPoints, type Rect } from "./sections.ts";
 
 // A view as 2D vector primitives (mm, in the view's own drawing coordinates). Used for sheets and
 // PDF export; strokes carry a semantic `kind` so each output picks its own colours and line weights.
@@ -136,6 +138,9 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
   const lw = lineworkDrawing(doc, (el) => elementGraphics(doc, g, el), linework, frame, { detailed: g.detailLevel !== "coarse", plan: !section, scale: g.scale });
   out.strokes.push(...lw.strokes);
   out.fills.push(...lw.fills);
+  for (const pc of els.filter((e) => e.category === Cat.PointCloud)) {
+    out.fills.push(...pointCloudFills(pc as PointCloud, section ? view : null, range, g.scale));
+  }
 
   // Line work: datums, plan symbols, view markers, annotations.
   const lineEls = els.filter((el) => !NOT_ON_DRAWINGS.has(el.category));
@@ -172,6 +177,48 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
   }
   if (crop && !section) clipDrawing(out, crop);
   return out;
+}
+
+/** Most points a drawing shows of one cloud (thinned evenly beyond this, to keep PDFs light). */
+const MAX_DRAWN_POINTS = 60_000;
+
+/**
+ * A point cloud on a drawing: each point a small square (0.5 mm on paper), grouped into solid
+ * fills by colour (quantised to 16 levels a channel). Plans take the points between the view
+ * depth and the cut plane; sections and elevations those between the cut and the far clip.
+ */
+export function pointCloudFills(pc: PointCloud, section: View | null, range: { bottom: number; cut: number; up?: boolean } | null, scale: number): Fill[] {
+  const { positions, colors } = pointCloudPoints(pc);
+  const xy: number[] = [];
+  const idx: number[] = [];
+  if (section) {
+    const r = sectionPoints(positions, section);
+    xy.push(...r.xy);
+    idx.push(...r.keep);
+  } else if (range && !range.up) {
+    for (let i = 0; i < positions.length / 3; i++) {
+      const z = positions[i * 3 + 2]!;
+      if (z < range.bottom || z > range.cut) continue;
+      xy.push(positions[i * 3]!, positions[i * 3 + 1]!);
+      idx.push(i);
+    }
+  }
+  const n = idx.length;
+  if (!n) return [];
+  const stride = Math.max(1, Math.ceil(n / MAX_DRAWN_POINTS));
+  const h = 0.25 * scale;
+  const groups = new Map<number, Vec2[][]>();
+  for (let k = 0; k < n; k += stride) {
+    const i = idx[k]!;
+    const q = (c: number) => Math.round(c * 15) * 17;
+    const color = colors ? (q(colors[i * 3]!) << 16) | (q(colors[i * 3 + 1]!) << 8) | q(colors[i * 3 + 2]!) : 0x6a7b8c;
+    const x = xy[k * 2]!;
+    const y = xy[k * 2 + 1]!;
+    const loops = groups.get(color) ?? [];
+    loops.push([{ x: x - h, y: y - h }, { x: x + h, y: y - h }, { x: x + h, y: y + h }, { x: x - h, y: y + h }]);
+    groups.set(color, loops);
+  }
+  return [...groups].map(([color, loops]) => ({ kind: "solid" as const, loops, color, id: pc.id }));
 }
 
 /**

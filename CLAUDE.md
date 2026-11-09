@@ -283,7 +283,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   in metres, thinned to 200k points, stored base64 float32 in the element; map coordinates (>10 km) go through the
   shared coordinates, else centred on the origin. Viewport draws THREE.Points (scan colours, sRGB→linear); move only;
   plans clip them by the view range, sections draw `sectionPoints` (geometry); tools snap to scan points on the storey.
-  Not on sheets/PDF yet.
+  Sheets/PDF: geometry `pointCloudFills` (0.5 mm squares grouped by colour, max 60k per view).
 - Analytical model (core/model/analytical.ts `analyticalModel`): derived, not stored — column axes, beam/brace centrelines
   snapped to column axes within 300, nodes merged within 300, column bases on pads or the lowest level are pinned
   supports, wall mid-surface and floor mid-depth panels. Structure → Analytical Model toggles a 3D overlay (viewport).

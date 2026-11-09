@@ -200,6 +200,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   (PI); DN sizes; types by material/use (PE-X, copper, uPVC sanitary/stormwater); drainage falls
   as drawn (minimum 1:40 ≤DN65, 1:60 DN80–100, 1:100 above — provisional, Jeremy's go-ahead to use
   own figures); `pipeFallChecks`. Fittings: elbow/transition/tee/cross, as for ducts.
+- Model In-Place (Architecture → Model In-Place ▾ category; main.ts `modelInPlace`, `inPlacePending`: Load into Project places it at the level origin). Long menus scroll.
 - Massing (Phase 8a): Mass family category; Massing & Site → Show Mass (session toggle; masses
   translucent blue, not on sheets/PDF), In-Place Mass (family editor; Load into Project places it
   at the origin), Place Mass (library Mass - Box/Cylinder/Gable). V/G category "Mass".

@@ -260,6 +260,16 @@ const activeTypeId = (cat: string): ElementId | undefined => {
   return id && doc.has(id) ? id : doc.byCategory(cat)[0]?.id;
 };
 let filePath: string | null = null;
+/** Model In-Place is open: Load into Project places the new family at the level origin. */
+let inPlacePending = false;
+
+/** Model In-Place (Revit): a one-off family of `category`, modelled in the family editor. */
+function modelInPlace(category: FamilyCategory): void {
+  if (projectSession) return status("Finish the family you're editing first (Load into Project).");
+  inPlacePending = true;
+  ctx.newFamily(category);
+  status(`Model In-Place (${category.replace(/([a-z])([A-Z])/g, "$1 $2")}): model it with Extrusion / Blend / Revolve / Sweep, then Load into Project — it's placed where you modelled it.`);
+}
 let dirty = false;
 
 // Project Browser and Properties: dockable left/right, tabbed or floating.
@@ -855,14 +865,20 @@ const commands: Record<string, () => void | Promise<void>> = {
     try {
       const def = doc.transact(`Load family ${name}`, (tx) => loadFamily(tx, doc, fam, name));
       activeComponentKey = undefined;
-      // A new mass (In-Place Mass) goes where it was modelled: at the origin of the active level.
-      if (def.params.category === "Mass" && !doc.byCategory<FamilyInstanceParams>(Cat.FamilyInstance).some((i) => i.params.familyId === def.id)) {
+      // A new in-place family (Model In-Place / In-Place Mass) goes where it was modelled: at the
+      // origin of the active level.
+      const inPlace = inPlacePending;
+      inPlacePending = false;
+      if ((inPlace || def.params.category === "Mass") && !doc.byCategory<FamilyInstanceParams>(Cat.FamilyInstance).some((i) => i.params.familyId === def.id)) {
         const inst = doc.transact(`Place ${name}`, (tx) =>
           placeFamilyInstance(tx, doc, def.id, familyTypeNames(def)[0] ?? "Default", { levelId: activeLevelId, position: { x: 0, y: 0 } }),
         );
-        viewport.setShowMass(true);
         ctx.setSelection([inst.id]);
-        return status(`${name} placed. Show Mass is on (Massing & Site); edit it with Edit family.`);
+        if (def.params.category === "Mass") {
+          viewport.setShowMass(true);
+          return status(`${name} placed. Show Mass is on (Massing & Site); edit it with Edit family.`);
+        }
+        return status(`${name} placed where it was modelled. Double-click it (or Edit family) to change it.`);
       }
       status(`Loaded ${name}. ${placeHint(def.params.category)}`);
     } catch (err) {
@@ -1240,9 +1256,13 @@ const commands: Record<string, () => void | Promise<void>> = {
     ribbon?.markTool();
     status(viewport.showMass ? "Show Mass on: conceptual masses show in every view." : "Show Mass off.");
   },
+  inPlaceGeneric: () => modelInPlace("GenericModel"),
+  inPlaceFurniture: () => modelInPlace("Furniture"),
+  inPlaceCasework: () => modelInPlace("Casework"),
   inPlaceMass() {
     // Revit's In-Place Mass: a new mass family, placed where it was modelled when you finish.
     viewport.setShowMass(true);
+    inPlacePending = true;
     ctx.newFamily("Mass");
     status("In-Place Mass: model it with Extrusion / Blend / Revolve / Sweep, then Load into Project to place it.");
   },

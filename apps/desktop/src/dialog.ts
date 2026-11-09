@@ -40,7 +40,8 @@ export function showContextMenu(x: number, y: number, items: MenuItem[]): void {
   // Keep it on screen.
   const r = menu.getBoundingClientRect();
   menu.style.left = `${Math.min(x, window.innerWidth - r.width - 4)}px`;
-  menu.style.top = `${Math.min(y, window.innerHeight - r.height - 4)}px`;
+  // Long menus (the family library) scroll within the window rather than run off its top.
+  menu.style.top = `${Math.max(4, Math.min(y, window.innerHeight - r.height - 4))}px`;
   openMenu = menu;
 }
 

@@ -99,7 +99,26 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
             },
             { label: "Door", icon: "door", tool: "door", large: true, title: "Door (D)" },
             { label: "Window", icon: "window", tool: "window", large: true, title: "Window (N)" },
-            { label: "Component", icon: "component", tool: "component", large: true, title: "Place a loaded family (C)", menu: libraryMenu },
+            {
+              label: "Component",
+              icon: "component",
+              tool: "component",
+              large: true,
+              title: "Place a loaded family (C); ▾ load from the library",
+              menu: libraryMenu,
+            },
+            {
+              label: "Model In-Place",
+              icon: "extrusion",
+              cmd: "inPlaceGeneric",
+              title: "Model In-Place: a one-off family modelled here (▾ category)",
+              menu: () => [
+                { heading: "Model In-Place" },
+                { label: "Generic Model", action: () => m.cmd("inPlaceGeneric") },
+                { label: "Furniture", action: () => m.cmd("inPlaceFurniture") },
+                { label: "Casework", action: () => m.cmd("inPlaceCasework") },
+              ],
+            },
             {
               label: "Roof",
               icon: "roof",

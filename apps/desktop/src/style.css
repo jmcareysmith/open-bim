@@ -156,6 +156,7 @@ aside h2 {
 #tool-options[hidden] { display: none; }
 .context-menu {
   position: fixed; z-index: 50; min-width: 230px; padding: 4px 0; background: var(--panel);
+  max-height: calc(100vh - 8px); overflow-y: auto;
   border: 1px solid var(--line); border-radius: 5px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.18);
 }
 .context-menu button {

@@ -121,7 +121,7 @@ const MOVABLE = new Set<string>([
   Cat.FamilyInstance, Cat.Room, Cat.RoomSeparator, Cat.Area, Cat.AreaBoundary, Cat.DetailLine, Cat.FilledRegion,
   Cat.TextNote, Cat.Dimension, Cat.Tag, Cat.RevisionCloud, Cat.LegendComponent, Cat.KeynoteLegend, Cat.DirectShape,
   Cat.CadImport, Cat.Link, Cat.Stair, Cat.Ramp, Cat.Railing, Cat.Toposolid, Cat.Column, Cat.Beam, Cat.PadFooting,
-  Cat.StripFooting, Cat.Viewport, Cat.View, Cat.Group, Cat.Symbol, Cat.DetailComponent,
+  Cat.StripFooting, Cat.Viewport, Cat.View, Cat.Group, Cat.Symbol, Cat.DetailComponent, Cat.PointCloud,
 ]);
 
 /** Can this element be moved/copied with the modify tools? */
@@ -239,6 +239,13 @@ function transformed(c: Ctx, el: Element): Record<string, unknown> | null {
       pt("position");
       if (typeof p.rotation === "number") p.rotation = mapAngle(t, p.rotation);
       return p;
+    case Cat.PointCloud: {
+      // Clouds move as a whole (their points are stored relative to the origin); no rotate/mirror.
+      if (Math.abs(t.xx - 1) > 1e-9 || Math.abs(t.yy - 1) > 1e-9 || Math.abs(t.xy) > 1e-9 || Math.abs(t.yx) > 1e-9) throw new Error("Point clouds can only be moved");
+      const o = p.origin as { x: number; y: number; z: number };
+      p.origin = { ...o, x: o.x + t.tx, y: o.y + t.ty };
+      return p;
+    }
     case Cat.Stair:
     case Cat.Ramp:
       p.runs = (p.runs as { start: Vec2; end: Vec2 }[]).map((r) => ({ ...r, start: applyAffine(t, r.start), end: applyAffine(t, r.end) }));

@@ -225,6 +225,7 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
             { label: "Import DXF/DWG", icon: "import", cmd: "importDxf", large: true, title: "Import CAD into this view" },
           ],
         },
+        { title: "Point Cloud", items: [{ label: "Point Cloud", icon: "cloud", cmd: "importPointCloud", large: true, title: "Insert a laser scan: LAS, XYZ, PTS, TXT or CSV (metres)" }] },
         {
           title: "Load from Library",
           items: [

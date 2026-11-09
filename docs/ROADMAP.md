@@ -139,4 +139,5 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [ ] Structural analytical model: analytical lines/nodes for columns, beams, braces, walls and floors
 - [ ] Loads and load cases (point/line/area; NZS 1170 combinations, provisional)
 - [ ] Member checks: simply supported beam bending/deflection, column axial (provisional)
-- [ ] Point clouds: import XYZ/PTS/LAS, draw in 3D and clipped in plans/sections, snap to points
+- [x] Point clouds: Insert → Point Cloud (LAS, XYZ/PTS/TXT/CSV; thinned to 200k; shared coordinates or centred), drawn in 3D, move
+- [ ] Point clouds in plans/sections (clipped by the view range/crop) and snapping to points

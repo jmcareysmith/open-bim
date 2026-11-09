@@ -10,7 +10,7 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
-import {
+import { pointCloudPoints, type PointCloud, type PointCloudParams,
   Cat,
   PLAN_CUT_HEIGHT,
   TemporaryVisibility,
@@ -418,6 +418,26 @@ export class Viewport {
     const el = this.doc.get(id);
     if (!el) return;
     let group: THREE.Group;
+    if (el.category === Cat.PointCloud) {
+      // Point clouds: GL points in their scanned colours (or slate grey).
+      const pc = pointCloudPoints(el as PointCloud);
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute("position", new THREE.BufferAttribute(pc.positions, 3));
+      if (pc.colors) geom.setAttribute("color", new THREE.BufferAttribute(pc.colors, 3));
+      geom.computeBoundingSphere();
+      const size = (el.params as PointCloudParams).pointSize ?? 2;
+      const base = pc.colors ? 0xffffff : 0x6a7b8c;
+      const pts = new THREE.Points(geom, new THREE.PointsMaterial({ size, sizeAttenuation: false, vertexColors: !!pc.colors, color: base }));
+      group = new THREE.Group();
+      group.add(pts);
+      group.userData.baseColor = base;
+      group.userData.elementId = id;
+      group.visible = this.isShown(el);
+      this.objects.set(id, group);
+      this.scene.add(group);
+      this.applyHighlight(id);
+      return;
+    }
     try {
       const mesh = this.kernel.build(this.doc, el);
       let lines = this.kernel.buildLines(this.doc, el, this.graphics.scale, this.graphics.detailLevel);
@@ -783,6 +803,7 @@ void main() {
     this.setRay(ev);
     // Line picking tolerance: a few pixels, in mm at the current zoom.
     this.raycaster.params.Line.threshold = this.mmPerPixel() * 6;
+    this.raycaster.params.Points.threshold = this.mmPerPixel() * 4;
     if (this.mode === "drawing") {
       // Sections/elevations: pick the drawn linework and annotations. `point` is in drawing coordinates.
       const annotations = [...this.objects.entries()].filter(([, g]) => g.userData.inDrawing && g.visible);

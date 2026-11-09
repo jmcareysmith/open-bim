@@ -44,6 +44,7 @@ import {
   type BarSize,
   type Rebar,
   type RebarParams,
+  type PointCloudParams,
   AREA_REBAR_HOSTS,
   BAR_SIZES,
   CAGE_REBAR_HOSTS,
@@ -1759,6 +1760,7 @@ const VG_CATEGORIES: [string, string][] = [
   [Cat.PadFooting, "Foundations (pads)"],
   [Cat.StripFooting, "Foundations (strips)"],
   [Cat.Rebar, "Structural rebar"],
+  [Cat.PointCloud, "Point clouds"],
   [Cat.Room, "Rooms"],
   [Cat.RoomSeparator, "Room separators"],
   [Cat.Area, "Areas"],
@@ -3986,6 +3988,17 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
           row("", numberInput(layer.thickness, (v) => setLayer("Edit layer thickness", { thickness: Math.max(0, v) }))),
         );
       });
+      break;
+    }
+    case Cat.PointCloud: {
+      const p = el.params as PointCloudParams;
+      sec.append(
+        row("Name", textInput(el.name ?? "", (v) => v && edit(ctx, "Rename point cloud", (tx) => tx.setName(el.id, v)))),
+        row("Points", h("span", {}, `${p.count.toLocaleString()}${p.sourceCount > p.count ? ` of ${p.sourceCount.toLocaleString()}` : ""}`)),
+        row("Colour", h("span", {}, p.colors ? "Scanned (RGB)" : "None")),
+        row("Point size (px)", numberInput(p.pointSize ?? 2, (v) => update<PointCloudParams>("Point size", { pointSize: Math.min(10, Math.max(1, v)) }))),
+        row("Elevation offset", numberInput(Math.round(p.origin.z), (v) => update<PointCloudParams>("Move point cloud", { origin: { ...p.origin, z: v } }))),
+      );
       break;
     }
     case Cat.Rebar: {

@@ -37,6 +37,7 @@ export * from "./model/ramps.ts";
 export * from "./model/site.ts";
 export * from "./model/structure.ts";
 export * from "./model/rebar.ts";
+export * from "./model/pointclouds.ts";
 export * from "./model/phases.ts";
 export * from "./model/options.ts";
 export * from "./model/settings.ts";

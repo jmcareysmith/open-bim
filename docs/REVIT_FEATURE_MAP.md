@@ -141,7 +141,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | IFC import | 5 | 🟨 |
 | DWG/DXF import & export | 5 | ✅ (DWG via installed ODA/LibreDWG converter, desktop) |
 | PDF / image underlays | 5 | ⬜ |
-| Point clouds | 9 | ⬜ |
+| Point clouds (Insert → Point Cloud: LAS/XYZ/PTS; 3D only so far) | 9 | 🟨 |
 | glTF / OBJ export | 5 | ✅ |
 | Revit .rvt import | — | Not feasible (closed format); use IFC |
 

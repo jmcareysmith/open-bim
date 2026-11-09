@@ -14,7 +14,7 @@ import { addRecentFile, fileName, recentFiles, removeRecentFile } from "./recent
 import { CameraTool } from "./cameratool.ts";
 import { FloorPointTool, SlopeArrowTool } from "./slopetool.ts";
 import { WallProfileTool } from "./profiletool.ts";
-import { ensureFoundationSlabType,
+import { createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
   ceilingPlanFor,
   createCeilingPlan,
   Cat,
@@ -986,6 +986,27 @@ const commands: Record<string, () => void | Promise<void>> = {
     if (!cats.length) return status("Isolate category: select something first.");
     viewport.visibility.isolateCategories(cats);
     afterVisibility(`Isolated ${cats.join(", ")}`);
+  },
+  async importPointCloud() {
+    if (projectSession) return status("Point cloud: close the family editor first.");
+    try {
+      const file = await openBytes({ name: "Point cloud", extensions: ["las", "xyz", "pts", "txt", "csv"] });
+      if (!file) return;
+      status(`Reading ${file.name}…`);
+      const raw = /\.las$/i.test(file.name)
+        ? parseLas(file.bytes.buffer.slice(file.bytes.byteOffset, file.bytes.byteOffset + file.bytes.byteLength) as ArrayBuffer)
+        : parseAsciiPoints(new TextDecoder().decode(file.bytes));
+      // Map coordinates (NZTM is millions of metres) go through the project's shared coordinates;
+      // local scans are centred on the project origin.
+      const shared = raw.xyz.length >= 3 && (Math.abs(raw.xyz[0]!) > 10_000 || Math.abs(raw.xyz[1]!) > 10_000);
+      const pc = doc.transact(`Insert ${file.name}`, (tx) => createPointCloud(tx, doc, raw, file.name, shared ? "shared" : "centre"));
+      ctx.setSelection([pc.id]);
+      viewport.zoomToFit();
+      const thinned = raw.total > raw.xyz.length / 3 ? ` (thinned from ${raw.total.toLocaleString()})` : "";
+      status(`Inserted ${(raw.xyz.length / 3).toLocaleString()} points${thinned}, ${shared ? "by shared coordinates" : "centred on the origin"}. Move it with MV.`);
+    } catch (err) {
+      status(`⚠ Point cloud failed: ${(err as Error).message}`);
+    }
   },
   async importIfc() {
     if (projectSession) return status("Import IFC: close the family editor first.");

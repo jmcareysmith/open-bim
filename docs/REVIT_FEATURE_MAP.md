@@ -137,7 +137,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 |---|---|---|
 | Native project file (.obim) save/open | 0–1 | ✅ (open JSON, Recent files, autosave every 3 min with recovery at start-up) |
 | IFC export (IFC4 / IFC4x3) | 5 | ✅ (IFC4 or IFC4X3_ADD2: spatial structure, elements, types, layered materials, psets, quantities, georeference, structural analysis view) |
-| IFC import | 5 | 🟨 |
+| IFC import | 5 | 🟨 (elements as direct shapes on matching levels, with IFC class, GlobalId, properties; V/G and Object Styles by their class's category; not converted to native walls/floors) |
 | DWG/DXF import & export | 5 | ✅ (DWG via installed ODA/LibreDWG converter, desktop) |
 | PDF / image underlays | 5 | ✅ (Insert → Image: PNG/JPEG… or a PDF page (pdf.js, at paper size × view scale); on sheets and in PDF) |
 | Point clouds (Insert → Point Cloud: LAS/XYZ/PTS; 3D, plans, sections, sheets/PDF, snapping) | 9 | ✅ |

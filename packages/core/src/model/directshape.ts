@@ -32,3 +32,31 @@ export function createDirectShape(tx: Transaction, p: DirectShapeParams, name?: 
   if (p.indices.length % 3 || p.positions.length % 3) throw new Error("Direct shape mesh must be triangles");
   return tx.create<DirectShapeParams>(Cat.DirectShape, p, name ? { name } : {}) as DirectShape;
 }
+
+/** Imported IFC shapes (DirectShapes) show and style as the category their IFC class means. */
+const IFC_CLASS_CATEGORY: Record<string, string> = {
+  IfcWall: Cat.Wall,
+  IfcWallStandardCase: Cat.Wall,
+  IfcCurtainWall: Cat.Wall,
+  IfcSlab: Cat.Floor,
+  IfcRoof: Cat.Roof,
+  IfcCovering: Cat.Ceiling,
+  IfcDoor: Cat.Door,
+  IfcWindow: Cat.Window,
+  IfcColumn: Cat.Column,
+  IfcBeam: Cat.Beam,
+  IfcMember: Cat.Beam,
+  IfcFooting: Cat.PadFooting,
+  IfcStair: Cat.Stair,
+  IfcStairFlight: Cat.Stair,
+  IfcRailing: Cat.Railing,
+  IfcRamp: Cat.Ramp,
+  IfcRampFlight: Cat.Ramp,
+  IfcFurniture: "Furniture",
+  IfcFurnishingElement: "Furniture",
+  IfcBuildingElementProxy: "GenericModel",
+};
+
+export function ifcClassCategory(ifcClass: string): string | undefined {
+  return IFC_CLASS_CATEGORY[ifcClass];
+}

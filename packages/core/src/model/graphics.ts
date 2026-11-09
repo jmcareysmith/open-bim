@@ -5,6 +5,7 @@ import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, ParamValue } from "../element.ts";
 import { Cat } from "./architecture.ts";
 import { objectStyle, styleCategory } from "./objectstyles.ts";
+import { ifcClassCategory } from "./directshape.ts";
 import type { DetailLevel, ViewParams } from "./viewdefs.ts";
 import { customValue } from "./parameters.ts";
 
@@ -257,6 +258,7 @@ function layer(r: ResolvedGraphics, o: GraphicOverride): void {
 /** The category V/G uses for an element: masses (family instances of Mass families) are "Mass". */
 export function graphicsCategory(doc: Document, el: Element): string {
   if (el.category === Cat.MassFloor) return MASS_CATEGORY;
+  if (el.category === Cat.DirectShape) return ifcClassCategory((el.params as { ifcClass?: string }).ifcClass ?? "") ?? el.category;
   if (el.category === Cat.FamilyInstance) {
     const def = doc.get((el.params as { familyId?: string }).familyId ?? "");
     if ((def?.params as { category?: string } | undefined)?.category === "Mass") return MASS_CATEGORY;

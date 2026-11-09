@@ -155,7 +155,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Revisions (browser → Revisions; Cloud tool; sheet revision schedule) and model groups (Group /
   Ctrl+G; Place copy; Apply to other instances; Ungroup) and detail groups (view drafting).
 - Plugins + scripting console (toolbar Console or `; docs/PLUGINS.md, examples/plugins).
-- IFC: Export IFC (File → Export → IFC4 or IFC4X3, packages/ifc `schema` option) and Import IFC (web-ifc → DirectShapes on matching levels).
+- IFC: Export IFC (File → Export → IFC4 or IFC4X3, packages/ifc `schema` option) and Import IFC (web-ifc → DirectShapes on matching levels;
+  they show/style as their IFC class's category — core `ifcClassCategory`).
 - DXF/DWG: Export DXF/DWG (open view/sheet) and Import DXF/DWG (into the open view as a CadImport).
   DWG is desktop-only via an installed ODA File Converter or LibreDWG (src-tauri/src/cad.rs);
   not tested with a real converter (none installed here).

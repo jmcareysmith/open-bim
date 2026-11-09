@@ -2,6 +2,7 @@ import { registerCategory } from "../categories.ts";
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId } from "../element.ts";
 import { Cat } from "./architecture.ts";
+import { ifcClassCategory } from "./directshape.ts";
 import type { LinePattern } from "./graphics.ts";
 
 // Object Styles (Revit: Manage → Object Styles) and Line Weights (Manage → Additional Settings →
@@ -84,6 +85,7 @@ export function objectStylesElement(doc: Document): Element<ObjectStylesParams> 
 
 /** The category Object Styles use for an element: a family instance takes its family's category. */
 export function styleCategory(doc: Document, el: Element): string {
+  if (el.category === Cat.DirectShape) return ifcClassCategory((el.params as { ifcClass?: string }).ifcClass ?? "") ?? el.category;
   if (el.category === Cat.FamilyInstance) {
     const def = doc.get((el.params as { familyId?: ElementId }).familyId ?? "");
     const c = (def?.params as { category?: string } | undefined)?.category;

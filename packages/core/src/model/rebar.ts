@@ -43,7 +43,19 @@ export type RebarParams = {
   /** Cages: ties (null: none). */
   tieBar?: BarSize | null;
   tieSpacing?: number | null;
+  /** Area reinforcement: turn each bar's ends towards the other face (cogs, 12d or the depth available). */
+  cogs?: boolean | null;
+  /** Longest bar supplied, mm (NZ stock 12 m); longer runs are lapped. */
+  stockLength?: number | null;
+  /** Bar mark for schedules and tags (e.g. "S1"); set on creation. */
+  mark?: string | null;
 };
+
+/** Lap length for a bar, mm: 40 bar diameters (provisional, Jeremy: our own figures). */
+export function lapLength(bar: BarSize): number {
+  return 40 * barDiameter(bar);
+}
+export const STOCK_LENGTH = 12_000;
 export type Rebar = Element<RebarParams>;
 
 registerCategory({ name: Cat.Rebar, dependencies: (el) => [(el.params as RebarParams).hostId], cascadeDelete: true, isType: false });
@@ -71,7 +83,12 @@ export function createRebar(tx: Transaction, doc: Document, hostId: ElementId, o
       ? { hostId, bar: "HD12", cover: 40, spacing: 400, layers: "both", angle: 0 }
       : { hostId, bar: "HD12", cover: 50, spacing: 300, layers: "bottom", angle: 0 }
     : { hostId, bar: "HD16", cover: 40, spacing: 0, count: 4, tieBar: "D10", tieSpacing: 200 };
-  return tx.create<RebarParams>(Cat.Rebar, { ...base, ...opts });
+  // Bar marks by host kind: S slabs/pads, W walls, B beams, C columns, F strip footings.
+  const prefix = { [Cat.Floor]: "S", [Cat.PadFooting]: "S", [Cat.Wall]: "W", [Cat.Beam]: "B", [Cat.Column]: "C", [Cat.StripFooting]: "F" }[host.category] ?? "R";
+  const used = new Set(doc.byCategory<RebarParams>(Cat.Rebar).map((r) => r.params.mark));
+  let n = 1;
+  while (used.has(`${prefix}${n}`)) n++;
+  return tx.create<RebarParams>(Cat.Rebar, { ...base, mark: `${prefix}${n}`, ...opts });
 }
 
 type V3 = [number, number, number];
@@ -85,6 +102,52 @@ export interface RebarBar {
 
 /** The bars of a rebar set, laid out in its host now. Empty when the host can't take them. */
 export function rebarBars(doc: Document, rebar: Rebar): RebarBar[] {
+  return lapped(hostBars(doc, rebar), rebar.params);
+}
+
+/**
+ * Straight runs longer than the stock length become bars of at most that length, each lapping the
+ * next by the lap length (cogs stay on the end pieces).
+ */
+function lapped(bars: RebarBar[], p: RebarParams): RebarBar[] {
+  const stock = Math.max(1000, p.stockLength ?? STOCK_LENGTH);
+  const out: RebarBar[] = [];
+  for (const b of bars) {
+    const pts = b.points;
+    // The main straight run: the longest segment of an open bar.
+    let k = -1;
+    let best = 0;
+    if (!b.closed)
+      for (let i = 0; i + 1 < pts.length; i++) {
+        const l = Math.hypot(pts[i + 1]![0] - pts[i]![0], pts[i + 1]![1] - pts[i]![1], pts[i + 1]![2] - pts[i]![2]);
+        if (l > best) [best, k] = [l, i];
+      }
+    if (k < 0 || best <= stock) {
+      out.push(b);
+      continue;
+    }
+    const lap = lapLength(b.bar);
+    const a = pts[k]!;
+    const z = pts[k + 1]!;
+    const along = (t: number): V3 => [a[0] + ((z[0] - a[0]) * t) / best, a[1] + ((z[1] - a[1]) * t) / best, a[2] + ((z[2] - a[2]) * t) / best];
+    // Pieces of `stock` advancing by stock − lap; the last runs to the end.
+    const starts: number[] = [];
+    for (let t = 0; t < best - 1e-6; t += stock - lap) {
+      starts.push(t);
+      if (t + stock >= best) break;
+    }
+    starts.forEach((t, i) => {
+      const t1 = Math.min(best, t + stock);
+      const run: V3[] = [along(t), along(t1)];
+      const head = i === 0 ? pts.slice(0, k) : [];
+      const tail = i === starts.length - 1 ? pts.slice(k + 2) : [];
+      out.push({ ...b, points: [...head, ...run, ...tail] });
+    });
+  }
+  return out;
+}
+
+function hostBars(doc: Document, rebar: Rebar): RebarBar[] {
   const host = doc.get(rebar.params.hostId);
   if (!host) return [];
   const p = rebar.params;
@@ -235,7 +298,13 @@ function areaBars(p: RebarParams, rings: Vec2[][], bottom: number, top: number):
         if (a1 - a0 < 100) continue;
         const pa = toW({ x: a0, y });
         const pb = toW({ x: a1, y });
-        out.push({ points: [[pa.x, pa.y, m.z], [pb.x, pb.y, m.z]], closed: false, diameter: d, bar: p.bar });
+        if (p.cogs) {
+          // Cogs turn towards the other face: up from the bottom mats, down from the top.
+          const down = m.z > (bottom + top) / 2 ? -1 : 1;
+          const leg = Math.min(12 * d, top - bottom - 2 * p.cover - 2 * d);
+          const z2 = m.z + down * leg;
+          out.push({ points: [[pa.x, pa.y, z2], [pa.x, pa.y, m.z], [pb.x, pb.y, m.z], [pb.x, pb.y, z2]], closed: false, diameter: d, bar: p.bar });
+        } else out.push({ points: [[pa.x, pa.y, m.z], [pb.x, pb.y, m.z]], closed: false, diameter: d, bar: p.bar });
       }
     }
   }

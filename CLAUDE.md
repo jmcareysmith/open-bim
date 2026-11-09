@@ -324,3 +324,5 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   view direction against the instance's axes (`viewDir` in the display).
 - Materials have density and conductivity (Material Browser → Physical and thermal; template values provisional). H1 and
   energy use a type's R-value if set, else `layeredR` (Σ t/λ + 0.15 surfaces; core h1.ts `constructionR`).
+- Rebar sets get bar marks (S/W/B/C/F + n), optional cogged ends on slab/pad mats (12d towards the other face), and laps:
+  runs over the stock length (12 m default) split into pieces lapping 40d (`rebarBars` → `lapped`; provisional).

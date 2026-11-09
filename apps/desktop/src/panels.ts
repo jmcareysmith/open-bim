@@ -44,6 +44,8 @@ import {
   type BarSize,
   type Rebar,
   type RebarParams,
+  STOCK_LENGTH,
+  lapLength,
   canReinforce,
   type BeamSystemParams,
   systemBeams,
@@ -4316,7 +4318,18 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Host", h("span", {}, host ? `${host.category} ${host.name ?? ""}` : "\u2014")),
         row(area ? "Bar" : "Main bars", select(bars, p.bar, (v) => update<RebarParams>("Change bar size", { bar: v as BarSize }))),
         pos("cover", "Cover", p.cover),
+        row("Bar mark", textInput(p.mark ?? "", (v) => update<RebarParams>("Bar mark", { mark: v.trim() || null }))),
+        row(
+          "Stock length",
+          numberInput(p.stockLength ?? STOCK_LENGTH, (v) => (v >= 1000 ? update<RebarParams>("Stock length", { stockLength: v }) : ctx.status("⚠ At least 1000 mm"))),
+        ),
+        row("Lap", h("span", {}, `${lapLength(p.bar)} mm (40d, provisional)`)),
       );
+      if (host && host.category !== Cat.Wall && AREA_REBAR_HOSTS.has(host.category)) {
+        const cb = h("input", { type: "checkbox", checked: !!p.cogs });
+        cb.onchange = () => update<RebarParams>("Cogged ends", { cogs: cb.checked });
+        sec.append(row("Cogged ends", cb));
+      }
       if (area) {
         sec.append(
           pos("spacing", "Spacing", p.spacing),

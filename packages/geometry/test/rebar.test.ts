@@ -12,6 +12,8 @@ import {
   ensureStructuralTypes,
   rebarBars,
   rebarQuantities,
+  lapLength,
+  type RebarParams,
   type StructuralSectionParams,
   type Vec2,
 } from "@open-bim/core";
@@ -112,5 +114,27 @@ describe("rebar", () => {
     // Exterior face (+y), verticals outermost.
     expect(Math.min(...vertical.map((b) => b.points[0]![1]))).toBeGreaterThan(Math.max(...horizontal.map((b) => b.points[0]![1])));
     expect(vertical.every((b) => b.points[0]![2] === 20 && b.points[1]![2] === 2380)).toBe(true);
+  });
+  it("cogs turn slab bar ends to the other face; long runs lap at stock length; sets get marks", () => {
+    const { doc, ids } = setup();
+    const slabType = doc.transact("T", (tx) => ensureFoundationSlabType(tx, doc));
+    const f = doc.transact("F", (tx) => createFloor(tx, slabType, ids.levels.ground, [p(0, 0), p(20000, 0), p(20000, 3000), p(0, 3000)]));
+    const r = doc.transact("R", (tx) => createRebar(tx, doc, f.id, { bar: "HD12", spacing: 300, cover: 50 }));
+    expect(r.params.mark).toBe("S1");
+    expect(doc.transact("R2", (tx) => createRebar(tx, doc, f.id)).params.mark).toBe("S2");
+    // 20 m bars along x (19.9 m long inside the cover) lap: 12 m stock, 480 mm laps → 2 pieces.
+    const along = (bars: ReturnType<typeof rebarBars>) => bars.filter((b) => Math.abs(b.points[0]![1] - b.points.at(-1)![1]) < 1 && b.points[0]![2] < 100);
+    const runs = along(rebarBars(doc, r));
+    const ys = new Set(runs.map((b) => Math.round(b.points[0]![1])));
+    expect(runs.length).toBe(ys.size * 2);
+    const first = runs.find((b) => b.points[0]![0] < 100)!;
+    const second = runs.find((b) => Math.round(b.points[0]![1]) === Math.round(first.points[0]![1]) && b !== first)!;
+    expect(first.points.at(-1)![0] - second.points[0]![0]).toBeCloseTo(lapLength("HD12"));
+    // Cogs: each bar gains a 144 mm leg up from the bottom mat at both ends.
+    doc.transact("Cogs", (tx) => tx.update<RebarParams>(r.id, { cogs: true, stockLength: 30000 }));
+    const cogged = along(rebarBars(doc, doc.require(r.id) as never));
+    const b = cogged[0]!;
+    expect(b.points).toHaveLength(4);
+    expect(b.points[0]![2] - b.points[1]![2]).toBeCloseTo(144);
   });
 });

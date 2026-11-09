@@ -10,7 +10,7 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
-import { pointCloudPoints, type PointCloud, type PointCloudParams,
+import { analyticalModel, pointCloudPoints, type PointCloud, type PointCloudParams,
   Cat,
   PLAN_CUT_HEIGHT,
   TemporaryVisibility,
@@ -399,6 +399,7 @@ export class Viewport {
     if (schemeChanged || cats.has(Cat.Room) || cats.has(Cat.Area) || cats.has(Cat.Wall) || cats.has(Cat.RoomSeparator))
       for (const el of this.doc.byCategory(Cat.ColorFillLegend)) if (!c.regenerate.includes(el.id)) this.rebuild(el.id);
     for (const id of [...this.selected]) if (!this.doc.has(id)) this.selected.delete(id);
+    if (this.showAnalytical) this.refreshAnalytical();
     this.drawingDirty = true;
     this.needsRender = true;
   }
@@ -979,6 +980,52 @@ void main() {
     m.resolution.set(size.x, size.y);
     this.fatMaterials.add(m);
     m.addEventListener("dispose", () => this.fatMaterials.delete(m));
+  }
+
+  /** Analytical Model (Revit: the analytical display toggle): members, nodes and panels in 3D. */
+  showAnalytical = false;
+  private analyticalGroup: THREE.Group | null = null;
+
+  setShowAnalytical(on: boolean): void {
+    this.showAnalytical = on;
+    this.refreshAnalytical();
+  }
+
+  private refreshAnalytical(): void {
+    if (this.analyticalGroup) {
+      this.analyticalGroup.removeFromParent();
+      disposeGroup(this.analyticalGroup);
+      this.analyticalGroup = null;
+    }
+    if (this.showAnalytical) {
+      const m = analyticalModel(this.doc);
+      const g = new THREE.Group();
+      const lines = (pts: number[], color: number) => {
+        if (!pts.length) return;
+        const geom = new THREE.BufferGeometry();
+        geom.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+        const l = new THREE.LineSegments(geom, new THREE.LineBasicMaterial({ color, depthTest: false }));
+        l.renderOrder = 10;
+        g.add(l);
+      };
+      // Revit's colours: columns blue, beams orange, braces green; panels purple.
+      for (const [kind, color] of [["column", 0x1f6fd1], ["beam", 0xd9480f], ["brace", 0x2f9e44]] as const) {
+        lines(m.members.filter((x) => x.kind === kind).flatMap((x) => [...m.nodes[x.a]!.p, ...m.nodes[x.b]!.p]), color);
+      }
+      lines(m.panels.flatMap((pn) => pn.loop.flatMap((q, i) => [...q, ...pn.loop[(i + 1) % pn.loop.length]!])), 0x8a5cf6);
+      for (const support of [false, true]) {
+        const ns = m.nodes.filter((n) => n.support === support);
+        if (!ns.length) continue;
+        const geom = new THREE.BufferGeometry();
+        geom.setAttribute("position", new THREE.Float32BufferAttribute(ns.flatMap((n) => n.p), 3));
+        const pts = new THREE.Points(geom, new THREE.PointsMaterial({ color: support ? 0xc92a2a : 0x222222, size: support ? 9 : 6, sizeAttenuation: false, depthTest: false }));
+        pts.renderOrder = 11;
+        g.add(pts);
+      }
+      this.scene.add(g);
+      this.analyticalGroup = g;
+    }
+    this.needsRender = true;
   }
 
   /** Show Mass (Revit's session toggle): conceptual masses only show while it's on. */

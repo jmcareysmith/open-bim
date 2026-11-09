@@ -1194,6 +1194,10 @@ const commands: Record<string, () => void | Promise<void>> = {
     });
     status("New revision: edit it in Properties (Project Browser \u2192 Revisions lists them).");
   },
+  analyticalModel() {
+    viewport.setShowAnalytical(!viewport.showAnalytical);
+    status(viewport.showAnalytical ? "Analytical model on (3D): columns blue, beams orange, braces green, panels purple, supports red." : "Analytical model off.");
+  },
   showMass() {
     viewport.setShowMass(!viewport.showMass);
     ribbon?.markTool();

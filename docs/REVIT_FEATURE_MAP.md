@@ -58,7 +58,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Foundations (isolated, strip, slab: Foundation → Slab) | 6 | ✅ |
 | Structural framing systems | 6 | ⬜ |
 | Rebar (area reinforcement, cages; host Properties → Reinforcement) | 9 | 🟨 |
-| Analytical model | 9 | ⬜ |
+| Analytical model (members, nodes, supports, panels; 3D overlay) | 9 | 🟨 |
 
 ## 5. MEP
 | Feature | Phase | Status |

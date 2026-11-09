@@ -1,7 +1,9 @@
 import { tangentLine,
   DISPLAY_DETAIL,
   DISPLAY_PLAN,
+  DISPLAY_SIDE,
   type DetailLevel,
+  type Vec2,
   Cat,
   familyDocument,
   instanceValues,
@@ -24,6 +26,8 @@ import type { MeshData } from "./mesh.ts";
 export interface FamilyDisplay {
   detail: DetailLevel;
   plan: boolean;
+  /** Sections/elevations: the direction the view looks, in plan (front/back vs left/right forms). */
+  viewDir?: Vec2 | null;
 }
 
 export function displayValues(d: FamilyDisplay): Values {
@@ -32,8 +36,7 @@ export function displayValues(d: FamilyDisplay): Values {
 
 function pickDisplay(v: Values): Values {
   const out: Values = {};
-  if (DISPLAY_DETAIL in v) out[DISPLAY_DETAIL] = v[DISPLAY_DETAIL]!;
-  if (DISPLAY_PLAN in v) out[DISPLAY_PLAN] = v[DISPLAY_PLAN]!;
+  for (const k of [DISPLAY_DETAIL, DISPLAY_PLAN, DISPLAY_SIDE]) if (k in v) out[k] = v[k]!;
   return out;
 }
 
@@ -100,6 +103,13 @@ export function buildFamilyInstance(doc: Document, el: Element, mesher: FamilyMe
   const def = doc.require(inst.params.familyId) as FamilyDef;
   // The view's detail level and plan-ness ride along as reserved values (nested families inherit them).
   const shown = display ? displayValues(display) : hostValues ? pickDisplay(hostValues) : {};
+  if (display?.viewDir) {
+    // Looking along the family's Y (at its front or back), or along its X (at a side).
+    const x = instancePlacement(doc, inst).x;
+    const alongX = Math.abs(display.viewDir.x * x.x + display.viewDir.y * x.y);
+    const alongY = Math.abs(display.viewDir.x * -x.y + display.viewDir.y * x.x);
+    shown[DISPLAY_SIDE] = alongY >= alongX ? 1 : 2;
+  }
   const local = familyMeshCached(def, { ...instanceValues(doc, inst, hostValues), ...shown }, mesher);
   return local ? placeMeshData(local, instancePlacement(doc, inst)) : null;
 }

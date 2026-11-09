@@ -44,6 +44,13 @@ describe("family instance geometry", () => {
     expect(vol({ detail: "medium", plan: false })).toBeCloseTo(2);
     expect(vol({ detail: "medium", plan: true })).toBeCloseTo(1);
     expect(vol({ detail: "fine", plan: true })).toBeCloseTo(2);
+    // Front/back only forms: hidden when a section looks at a side (along the family's X).
+    fam.transact("V2", (tx) => tx.update(notPlan.id, { visibility: { leftRight: false } }));
+    const def2 = project.transact("Load2", (tx) => loadFamily(tx, project, fam, "Thing 2"));
+    const inst2 = project.transact("Place2", (tx) => placeFamilyInstance(tx, project, def2.id, "Default", { levelId: ids.levels.ground, position: { x: 0, y: 0 } }));
+    const side = (viewDir: { x: number; y: number }) => meshVolume(k.build(project, inst2, { detail: "fine", plan: false, viewDir })!) / 1e6;
+    expect(side({ x: 0, y: 1 })).toBeCloseTo(3); // looking at its front
+    expect(side({ x: 1, y: 0 })).toBeCloseTo(2); // looking at its side
   });
 
   it("places the family mesh on its level, rotated", () => {

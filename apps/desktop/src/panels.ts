@@ -1399,11 +1399,11 @@ function formRows(ctx: PanelContext, el: Element): HTMLElement[] {
     const vis = (p.visibility ?? {}) as FormVisibility;
     const box = h("span");
     box.style.cssText = "display:flex;gap:8px;flex-wrap:wrap";
-    for (const [key, label] of [["coarse", "Coarse"], ["medium", "Medium"], ["fine", "Fine"], ["plan", "Plan/RCP"]] as const) {
+    for (const [key, label] of [["coarse", "Coarse"], ["medium", "Medium"], ["fine", "Fine"], ["plan", "Plan/RCP"], ["frontBack", "Front/Back"], ["leftRight", "Left/Right"]] as const) {
       const cb = h("input", { type: "checkbox", checked: vis[key] !== false });
       cb.onchange = () => {
         const next = { ...vis, [key]: cb.checked };
-        const all = (["coarse", "medium", "fine", "plan"] as const).every((k) => next[k] !== false);
+        const all = (["coarse", "medium", "fine", "plan", "frontBack", "leftRight"] as const).every((k) => next[k] !== false);
         update("Form visibility", { visibility: all ? null : next });
       };
       box.append(h("label", {}, cb, ` ${label}`));

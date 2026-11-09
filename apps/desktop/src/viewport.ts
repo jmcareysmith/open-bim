@@ -460,7 +460,8 @@ export class Viewport {
       return;
     }
     try {
-      const mesh = this.kernel.build(this.doc, el, { detail: this.graphics.detailLevel, plan: this.mode === "plan" });
+      const vf = this.mode === "drawing" && this.drawingView && isDrawingView(this.drawingView) ? viewFrame(this.drawingView) : null;
+      const mesh = this.kernel.build(this.doc, el, { detail: this.graphics.detailLevel, plan: this.mode === "plan", viewDir: vf ? { x: vf.dir[0], y: vf.dir[1] } : null });
       let lines = this.kernel.buildLines(this.doc, el, this.graphics.scale, this.graphics.detailLevel);
       // Rooms and areas take the open plan's colour scheme fill (none: not drawn, still pickable).
       if (lines?.fill && (el.category === Cat.Room || el.category === Cat.Area)) {
@@ -1268,10 +1269,14 @@ void main() {
   /** Show a section/elevation (drawing mode). */
   setDrawingView(view: View): void {
     const reframe = this.drawingView?.id !== view.id || this.sheet !== null;
+    const turned = this.drawingView?.id !== view.id;
     this.drawingView = view;
     this.sheet = null;
     this.applyBackground();
+    const wasDrawing = this.mode === "drawing";
     this.setViewMode("drawing");
+    // Another section/elevation looks another way: family forms shown by side may change.
+    if (wasDrawing && turned) for (const el of this.doc.byCategory(Cat.FamilyInstance)) this.rebuild(el.id);
     this.drawingDirty = true;
     if (reframe) this.zoomToFit();
   }

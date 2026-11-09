@@ -75,7 +75,7 @@ export type WorkPlane = { kind: "XY" | "XZ" | "YZ"; offset: Num };
  * it shows in plan and reflected ceiling plan views (e.g. a fine-only handle, a 3D-only sweep with
  * plan symbol lines instead). Unset = shown everywhere.
  */
-export type FormVisibility = { coarse?: boolean; medium?: boolean; fine?: boolean; plan?: boolean };
+export type FormVisibility = { coarse?: boolean; medium?: boolean; fine?: boolean; plan?: boolean; frontBack?: boolean; leftRight?: boolean };
 type FormBase = { isVoid: boolean; plane: WorkPlane; visibility?: FormVisibility | null };
 
 /**
@@ -84,6 +84,8 @@ type FormBase = { isVoid: boolean; plane: WorkPlane; visibility?: FormVisibility
  */
 export const DISPLAY_DETAIL = "__detail";
 export const DISPLAY_PLAN = "__plan";
+/** Sections/elevations: 1 when looking at the family's front or back (along its Y), 2 its sides (along X). */
+export const DISPLAY_SIDE = "__side";
 
 /** Does a form show for these display values? */
 export function formShown(params: { visibility?: FormVisibility | null }, values: Record<string, number>): boolean {
@@ -92,6 +94,8 @@ export function formShown(params: { visibility?: FormVisibility | null }, values
   const d = values[DISPLAY_DETAIL];
   if (d !== undefined && v[(["coarse", "medium", "fine"] as const)[d] ?? "medium"] === false) return false;
   if (values[DISPLAY_PLAN] === 1 && v.plan === false) return false;
+  if (values[DISPLAY_SIDE] === 1 && v.frontBack === false) return false;
+  if (values[DISPLAY_SIDE] === 2 && v.leftRight === false) return false;
   return true;
 }
 

@@ -45,6 +45,11 @@ export interface IfcExportOptions {
   timestamp?: string;
   /** Include the structural analysis model (default: when there are structural members). */
   structural?: boolean;
+  /**
+   * Schema: IFC4 (default) or IFC4X3 (ADD2). The entities written are the same in both (IFC4X3
+   * keeps the IFC4 building elements, spatial structure and georeferencing used here).
+   */
+  schema?: "IFC4" | "IFC4X3_ADD2";
 }
 
 /** What each Open-BIM element becomes. */
@@ -263,8 +268,9 @@ export function exportIfc(doc: Document, opts: IfcExportOptions = {}): string {
 
   return w.toString({
     name: opts.fileName ?? `${projectName}.ifc`,
-    description: "ViewDefinition [ReferenceView_V1.2]",
+    description: opts.schema === "IFC4X3_ADD2" ? "ViewDefinition [Reference View]" : "ViewDefinition [ReferenceView_V1.2]",
     timestamp: opts.timestamp ?? new Date().toISOString().slice(0, 19),
+    schema: opts.schema ?? "IFC4",
   });
 }
 

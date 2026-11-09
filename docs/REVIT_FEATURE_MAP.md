@@ -6,11 +6,11 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 1. Core model
 | Feature | Phase | Status |
 |---|---|---|
-| Element database with stable IDs | 0 | 🟨 |
-| Element categories (Walls, Floors, Doors…) | 0 | 🟨 |
-| Types vs instances (type parameters / instance parameters) | 0 | 🟨 |
-| Transactions, undo/redo | 0 | 🟨 |
-| Regeneration (change a level → hosted elements update) | 0–1 | 🟨 |
+| Element database with stable IDs | 0 | ✅ (UUIDs, JSON documents, Yjs sync) |
+| Element categories (Walls, Floors, Doors…) | 0 | ✅ (registered categories with dependencies; V/G and Object Styles per category) |
+| Types vs instances (type parameters / instance parameters) | 0 | ✅ |
+| Transactions, undo/redo | 0 | ✅ (named transactions, commit hooks, undo/redo) |
+| Regeneration (change a level → hosted elements update) | 0–1 | ✅ (dependency graph, cascade delete) |
 | Project units & settings | 1 | ✅ |
 | Shared coordinates, project base point, survey point, true north | 5 | 🟨 |
 | Phasing (existing / new / demolished, phase filters) | 6 | ✅ |
@@ -21,7 +21,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 2. Datums
 | Feature | Phase | Status |
 |---|---|---|
-| Levels | 0 | 🟨 |
+| Levels | 0 | ✅ (plans per level, heads in sections/elevations) |
 | Grids | 1 | ✅ (straight or arc; arc grids not in sections or dimensions yet) |
 | Reference planes | 1 | ✅ |
 | Scope boxes | 2 | ✅ (View → Scope Box; plans crop to it; grids set to it are limited to it) |
@@ -136,7 +136,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Feature | Phase | Status |
 |---|---|---|
 | Native project file (.obim) save/open | 0–1 | ✅ (open JSON, Recent files, autosave every 3 min with recovery at start-up) |
-| IFC export (IFC4 / IFC4x3) | 5 | 🟨 |
+| IFC export (IFC4 / IFC4x3) | 5 | ✅ (IFC4 or IFC4X3_ADD2: spatial structure, elements, types, layered materials, psets, quantities, georeference, structural analysis view) |
 | IFC import | 5 | 🟨 |
 | DWG/DXF import & export | 5 | ✅ (DWG via installed ODA/LibreDWG converter, desktop) |
 | PDF / image underlays | 5 | ✅ (Insert → Image: PNG/JPEG… or a PDF page (pdf.js, at paper size × view scale); on sheets and in PDF) |
@@ -179,5 +179,5 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | File menu, Quick Access Toolbar | 7b | ✅ (File menu with Recent on desktop, QAT) |
 | Drag and drop from the Project Browser | 7b | ✅ (views onto sheets, families into views) |
 | Dockable panels | 7b | ✅ |
-| View tabs, status bar, view control bar | 7b | 🟨 (tabs, view control bar, tiling/cascade, selection filter) |
-| Context menus, keyboard shortcuts | 7b | 🟨 (menus, VV/MV/CO…, Keyboard Shortcuts editor) |
+| View tabs, status bar, view control bar | 7b | ✅ (tabs, view control bar, tiling/cascade, selection filter) |
+| Context menus, keyboard shortcuts | 7b | ✅ (menus, VV/MV/CO…, Keyboard Shortcuts editor) |

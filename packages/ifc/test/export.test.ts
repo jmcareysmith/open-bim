@@ -87,6 +87,18 @@ describe("IFC export", () => {
     api.CloseModel(model);
   });
 
+  it("can write IFC4X3, which web-ifc reads with the same elements", () => {
+    const { doc } = house();
+    const text = exportIfc(doc, { timestamp: "2026-11-10T00:00:00", schema: "IFC4X3_ADD2" });
+    expect(text).toContain("FILE_SCHEMA(('IFC4X3_ADD2'));");
+    const model = api.OpenModel(new TextEncoder().encode(text));
+    expect(api.GetModelSchema(model)).toMatch(/IFC4X3/);
+    expect(count(model, WebIFC.IFCWALL)).toBe(4);
+    expect(count(model, WebIFC.IFCSLAB)).toBe(1);
+    expect(count(model, WebIFC.IFCBUILDINGSTOREY)).toBe(3);
+    api.CloseModel(model);
+  });
+
   it("writes property sets, quantities and layered materials", () => {
     const { doc } = house();
     const text = exportIfc(doc, { timestamp: "2026-10-12T00:00:00" });

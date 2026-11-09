@@ -265,6 +265,19 @@ let filePath: string | null = null;
 /** Model In-Place is open: Load into Project places the new family at the level origin. */
 let inPlacePending = false;
 
+/** Export IFC in a schema (IFC4 or IFC4X3), named after the project file. */
+async function exportIfcFile(schema: "IFC4" | "IFC4X3_ADD2"): Promise<void> {
+  if (projectSession) return status("Export IFC: close the family editor first.");
+  try {
+    const name = (filePath?.split(/[\\/]/).pop() ?? "Untitled").replace(/\.obim$/i, "");
+    const text = exportIfc(doc, { kernel: viewport.geometryKernel, fileName: `${name}.ifc`, schema });
+    const path = await saveText(text, `${name}.ifc`, { name: "IFC", extensions: ["ifc"] });
+    if (path) status(`IFC (${schema === "IFC4" ? "IFC4" : "IFC4X3"}) exported to ${path}`);
+  } catch (err) {
+    status(`⚠ IFC export failed: ${(err as Error).message}`);
+  }
+}
+
 /** Model In-Place (Revit): a one-off family of `category`, modelled in the family editor. */
 function modelInPlace(category: FamilyCategory): void {
   if (projectSession) return status("Finish the family you're editing first (Load into Project).");
@@ -711,7 +724,8 @@ let ribbon: Ribbon | undefined = new Ribbon(
       "-",
       { heading: "Export" },
       { label: "PDF (all sheets)\u2026", action: () => void commands.exportPdf?.() },
-      { label: "IFC\u2026", action: () => void commands.exportIfc?.() },
+      { label: "IFC (IFC4)\u2026", action: () => void commands.exportIfc?.() },
+      { label: "IFC (IFC4X3)\u2026", action: () => void commands.exportIfc4x3?.() },
       { label: "DXF/DWG (this view)\u2026", action: () => void commands.exportDxf?.() },
       { label: "glTF (.glb)\u2026", action: () => void commands.exportGlb?.() },
       { label: "OBJ\u2026", action: () => void commands.exportObj?.() },
@@ -1156,17 +1170,8 @@ const commands: Record<string, () => void | Promise<void>> = {
       status(`⚠ OBJ export failed: ${(err as Error).message}`);
     }
   },
-  async exportIfc() {
-    if (projectSession) return status("Export IFC: close the family editor first.");
-    try {
-      const name = (filePath?.split(/[\\/]/).pop() ?? "Untitled").replace(/\.obim$/i, "");
-      const text = exportIfc(doc, { kernel: viewport.geometryKernel, fileName: `${name}.ifc` });
-      const path = await saveText(text, `${name}.ifc`, { name: "IFC", extensions: ["ifc"] });
-      if (path) status(`IFC exported to ${path}`);
-    } catch (err) {
-      status(`⚠ IFC export failed: ${(err as Error).message}`);
-    }
-  },
+  exportIfc: () => exportIfcFile("IFC4"),
+  exportIfc4x3: () => exportIfcFile("IFC4X3_ADD2"),
   async exportPdf() {
     const all = sheets(doc);
     if (!all.length) return status("Export PDF: create a sheet first (Project Browser \u2192 Sheets \u2192 New sheet).");

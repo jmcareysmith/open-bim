@@ -15,6 +15,8 @@ import {
   loadFamily,
   placeFamilyInstance,
   sizeDucts,
+  systemPressure,
+  frictionFactor,
   type Duct,
   type DuctFittingParams,
   type DuctParams,
@@ -107,5 +109,43 @@ describe("duct sizing", () => {
     // 200 L/s at 5 m/s needs Ø226 → 250; 100 L/s needs Ø160 → 175.
     expect((doc.require(main.id) as Duct).params.diameter).toBe(250);
     expect(ducts(doc).map((d) => d.params.diameter).sort((a, b) => a - b)).toEqual([175, 175, 250]);
+  });
+});
+
+describe("pressure loss", () => {
+  it("adds friction along the critical path and joint losses, by Darcy–Weisbach", () => {
+    const { doc, ids, duct } = setup();
+    const fam = (name: string, flowDirection: "in" | "out", flow: number) => {
+      const f = new Document();
+      applyFamilyTemplate(f, name === "FCU" ? "MechanicalEquipment" : "AirTerminal", name);
+      f.transact("C", (tx) => createConnector(tx, { classification: "supplyAir", flowDirection, flow }));
+      return doc.transact("Load", (tx) => loadFamily(tx, doc, f, name)).id;
+    };
+    const place = (id: string, x: number, y: number) =>
+      doc.transact("P", (tx) => placeFamilyInstance(tx, doc, id, "Default", { levelId: ids.levels.ground, position: { x, y }, offset: 2700 })) as FamilyInstance;
+    const unit = place(fam("FCU", "out", 200), 0, 0);
+    const diff = fam("Diffuser", "in", 100);
+    const near = place(diff, 4000, 0);
+    const far = place(diff, 2000, 3000);
+    const main = duct(p(0, 0), p(4000, 0), { diameter: 250 });
+    duct(p(2000, 0), p(2000, 3000), { diameter: 200 });
+    const sys = doc.transact("S", (tx) => createSystem(tx, doc, "supplyAir", [unit.id, near.id, far.id]));
+    const r = systemPressure(doc, doc.require(sys.id) as MEPSystem);
+    expect(r.domain).toBe("duct");
+    // The first piece of the main: 200 L/s in Ø250 over 2 m.
+    const first = r.runs.find((x) => x.id === main.id)!;
+    const A = (Math.PI * 0.25 ** 2) / 4;
+    const v = 0.2 / A;
+    expect(first.velocity).toBeCloseTo(v, 6);
+    const f = frictionFactor((v * 0.25) / 1.5e-5, 0.00009 / 0.25);
+    expect(first.friction).toBeCloseTo(((f / 0.25) * 1.2 * v * v) / 2, 6);
+    expect(first.length).toBeCloseTo(2, 6);
+    // Worst path: through the tee up the 3 m branch (longer, smaller, with the branch K 0.6).
+    expect(r.critical.terminal).toBe(far.id);
+    expect(r.critical.path).toHaveLength(2);
+    const branch = r.runs.find((x) => x.id === r.critical.path[1])!;
+    const vp = (1.2 * branch.velocity ** 2) / 2;
+    expect(r.critical.loss).toBeCloseTo(first.friction * 2 + branch.friction * 3 + (0.6 + 0.1) * vp, 3);
+    expect(frictionFactor(1000, 0)).toBeCloseTo(0.064);
   });
 });

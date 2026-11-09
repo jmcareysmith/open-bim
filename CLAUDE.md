@@ -310,3 +310,6 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   project parameter ("Room Style"); its Properties pick fields (the category's project parameters) and edit key rows.
   Elements choose a key (select in Project parameters); keyed parameters read from the row (`customValue` →
   `keyedValue` in parameters.ts) and are read-only on the element.
+- Pressure loss (core/model/mepcalcs.ts `systemPressure`): duct/pipe system Properties → Pressure loss — flows from the
+  equipment, Darcy–Weisbach (Swamee–Jain) per run, joint K (elbow by angle, tee 0.2/0.6, size change 0.1), critical
+  path to the worst terminal (Select critical path). Fluid/roughness figures provisional; drainage defers to G13.

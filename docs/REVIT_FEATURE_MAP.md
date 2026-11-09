@@ -67,7 +67,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Systems (supply, return, sanitary…) | 8 | ✅ (connectors in families; systems with flow/load totals; system browser) |
 | Electrical circuits, panels, cable trays, conduit | 8 | ✅ (circuits on switchboards, schedules with loads; cable tray and conduit with fittings) |
 | Fixtures & equipment | 8 | 🟨 (MEP family categories with connectors; HVAC library: diffusers, grilles, exhaust fan, heat pump units) |
-| Sizing & pressure-loss calcs | 9 | ⬜ |
+| Sizing & pressure-loss calcs | 9 | 🟨 (duct sizing by velocity; system Properties → pressure loss: Darcy–Weisbach + fitting K, critical path; provisional) |
 
 ## 6. Families & parameters
 | Feature | Phase | Status |

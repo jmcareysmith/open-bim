@@ -44,6 +44,7 @@ import {
   type BarSize,
   type Rebar,
   type RebarParams,
+  systemPressure,
   type KeyScheduleParams,
   type KeySchedule,
   keySchedules,
@@ -3643,6 +3644,29 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
           if (n) ctx.status(`Sized ${n} duct(s) for ${vel.value} m/s.`);
         };
         sec.append(row("Duct sizing (m/s)", h("div", { class: "buttons" }, vel, size)));
+      }
+      if (info.domain === "duct" || info.domain === "pipe") {
+        // Pressure loss along the worst path from the equipment (provisional figures).
+        try {
+          const pr = systemPressure(doc, sys);
+          if (pr.critical.terminal) {
+            const term = doc.get(pr.critical.terminal);
+            const crit = h("button", { textContent: "Select critical path" });
+            crit.onclick = () => ctx.setSelection([...pr.critical.path, pr.critical.terminal!]);
+            const maxV = Math.max(0, ...pr.runs.map((r) => r.velocity));
+            const maxF = Math.max(0, ...pr.runs.map((r) => r.friction));
+            sec.append(
+              h("h4", {}, "Pressure loss (provisional)"),
+              row("Critical path", h("span", {}, `${pr.critical.loss.toFixed(1)} Pa to ${term?.name ?? doc.get((term?.params as { familyId?: string } | undefined)?.familyId ?? "")?.name ?? "terminal"}`)),
+              row("Highest velocity", h("span", {}, `${maxV.toFixed(2)} m/s`)),
+              row("Highest friction", h("span", {}, `${maxF.toFixed(2)} Pa/m`)),
+              row("", crit),
+            );
+          }
+          for (const n of pr.notes) sec.append(h("div", { class: "hint" }, n));
+        } catch (err) {
+          sec.append(h("div", { class: "hint" }, (err as Error).message));
+        }
       }
       sec.append(
         row("Name", textInput(el.name ?? "", (v) => v.trim() && edit(ctx, "Rename system", (tx) => tx.setName(el.id, v.trim())))),

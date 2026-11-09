@@ -7,6 +7,7 @@ import {
   createFloor,
   createPadFooting,
   createRebar,
+  createWall,
   ensureFoundationSlabType,
   ensureStructuralTypes,
   rebarBars,
@@ -96,5 +97,20 @@ describe("rebar", () => {
     // Ties every 200 within the length.
     expect(ties.length).toBe(Math.floor((4000 - 80 - 50) / 200) + 1);
     expect(ties[1]!.points[0]![0] - ties[0]!.points[0]![0]).toBeCloseTo(200);
+  });
+  it("walls take vertical and horizontal bars on each face, inside the cover", () => {
+    const { doc, ids } = setup();
+    const t = doc.byCategory("WallType")[0]!.id;
+    const w = doc.transact("W", (tx) => createWall(tx, t, { x: 0, y: 0 }, { x: 4000, y: 0 }, ids.levels.ground, { height: 2400 }));
+    const r = doc.transact("R", (tx) => createRebar(tx, doc, w.id, { bar: "HD12", spacing: 400, cover: 20, layers: "top" }));
+    const bars = rebarBars(doc, r);
+    const vertical = bars.filter((b) => b.points[0]![0] === b.points[1]![0]);
+    const horizontal = bars.filter((b) => b.points[0]![2] === b.points[1]![2]);
+    // (4000 − 2·26) / 400 → 10 spaces → 10 verticals; (2400 − 52) / 400 → 5 spaces → 6 horizontals.
+    expect(vertical).toHaveLength(10);
+    expect(horizontal).toHaveLength(6);
+    // Exterior face (+y), verticals outermost.
+    expect(Math.min(...vertical.map((b) => b.points[0]![1]))).toBeGreaterThan(Math.max(...horizontal.map((b) => b.points[0]![1])));
+    expect(vertical.every((b) => b.points[0]![2] === 20 && b.points[1]![2] === 2380)).toBe(true);
   });
 });

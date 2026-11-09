@@ -1,7 +1,7 @@
 import { registerCategory } from "../categories.ts";
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
-import { Cat, floorExtent, wallExtent, wallLength, type Floor, type LevelParams, type Wall } from "./architecture.ts";
+import { Cat, floorExtent, wallExtent, wallLength, wallThickness, type Floor, type LevelParams, type Wall } from "./architecture.ts";
 import { columnExtent, type BeamParams, type Column, type PadFootingParams, type StripFootingParams, type StructuralSectionParams } from "./structure.ts";
 
 // Reinforcement (Revit: Rebar, Area Reinforcement). A rebar set lives in a concrete host and is
@@ -49,16 +49,18 @@ export type Rebar = Element<RebarParams>;
 registerCategory({ name: Cat.Rebar, dependencies: (el) => [(el.params as RebarParams).hostId], cascadeDelete: true, isType: false });
 
 /** Hosts taking area reinforcement, and hosts taking cages. */
-export const AREA_REBAR_HOSTS = new Set<string>([Cat.Floor, Cat.PadFooting]);
+export const AREA_REBAR_HOSTS = new Set<string>([Cat.Floor, Cat.PadFooting, Cat.Wall]);
 export const CAGE_REBAR_HOSTS = new Set<string>([Cat.Beam, Cat.Column, Cat.StripFooting]);
 
 export function createRebar(tx: Transaction, doc: Document, hostId: ElementId, opts: Partial<Omit<RebarParams, "hostId">> = {}): Rebar {
   const host = doc.get(hostId);
   if (!host) throw new Error("Pick an element to reinforce");
   const area = AREA_REBAR_HOSTS.has(host.category);
-  if (!area && !CAGE_REBAR_HOSTS.has(host.category)) throw new Error("Rebar goes in floors, footings, beams and columns");
+  if (!area && !CAGE_REBAR_HOSTS.has(host.category)) throw new Error("Rebar goes in floors, walls, footings, beams and columns");
   const base: RebarParams = area
-    ? { hostId, bar: "HD12", cover: 50, spacing: 300, layers: "bottom", angle: 0 }
+    ? host.category === Cat.Wall
+      ? { hostId, bar: "HD12", cover: 40, spacing: 400, layers: "both", angle: 0 }
+      : { hostId, bar: "HD12", cover: 50, spacing: 300, layers: "bottom", angle: 0 }
     : { hostId, bar: "HD16", cover: 40, spacing: 0, count: 4, tieBar: "D10", tieSpacing: 200 };
   return tx.create<RebarParams>(Cat.Rebar, { ...base, ...opts });
 }
@@ -78,6 +80,14 @@ export function rebarBars(doc: Document, rebar: Rebar): RebarBar[] {
   if (!host) return [];
   const p = rebar.params;
   switch (host.category) {
+    case Cat.Wall: {
+      // Walls: vertical and horizontal bars on a face (layers: "bottom" = interior face, "top" =
+      // exterior, "both"), vertical bars outermost, inside the cover. Straight walls only.
+      const w = host as Wall;
+      if (w.params.curve) return [];
+      const { bottom, top } = wallExtent(doc, w);
+      return wallBars(p, w, wallThickness(doc, w), bottom, top);
+    }
     case Cat.Floor: {
       const f = host as Floor;
       const { bottom, top } = floorExtent(doc, f);
@@ -219,6 +229,38 @@ function areaBars(p: RebarParams, rings: Vec2[][], bottom: number, top: number):
         out.push({ points: [[pa.x, pa.y, m.z], [pb.x, pb.y, m.z]], closed: false, diameter: d, bar: p.bar });
       }
     }
+  }
+  return out;
+}
+
+/** Wall mats: verticals at the spacing along the wall, horizontals up it, on each face asked for. */
+function wallBars(p: RebarParams, w: Wall, thickness: number, bottom: number, top: number): RebarBar[] {
+  const d = barDiameter(p.bar);
+  const len = wallLength(w);
+  const out: RebarBar[] = [];
+  const spacing = Math.max(50, p.spacing);
+  if (thickness < 2 * p.cover + 2 * d || len <= 2 * p.cover || top - bottom <= 2 * p.cover) return [];
+  const faces: number[] = [];
+  const layers = p.layers ?? "bottom";
+  // Across the wall: + is the exterior (left of start → end).
+  if (layers !== "top") faces.push(-1);
+  if (layers !== "bottom") faces.push(1);
+  const spread = (lo: number, hi: number) => {
+    const n = Math.floor((hi - lo) / spacing + 1e-6);
+    const first = lo + (hi - lo - n * spacing) / 2;
+    return Array.from({ length: n + 1 }, (_, i) => first + i * spacing);
+  };
+  const at = (u: number, v: number, z: number): V3 => {
+    const l = len || 1;
+    const dx = (w.params.end.x - w.params.start.x) / l;
+    const dy = (w.params.end.y - w.params.start.y) / l;
+    return [w.params.start.x + dx * u - dy * v, w.params.start.y + dy * u + dx * v, z];
+  };
+  for (const f of faces) {
+    const vOut = f * (thickness / 2 - p.cover - d / 2);
+    const vIn = f * (thickness / 2 - p.cover - (3 * d) / 2);
+    for (const u of spread(p.cover + d / 2, len - p.cover - d / 2)) out.push({ points: [at(u, vOut, bottom + p.cover), at(u, vOut, top - p.cover)], closed: false, diameter: d, bar: p.bar });
+    for (const z of spread(bottom + p.cover + d / 2, top - p.cover - d / 2)) out.push({ points: [at(p.cover, vIn, z), at(len - p.cover, vIn, z)], closed: false, diameter: d, bar: p.bar });
   }
   return out;
 }

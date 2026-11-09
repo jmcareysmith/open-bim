@@ -4322,11 +4322,17 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
           row(
             "Layers",
             select(
-              [
-                { value: "bottom", label: "Bottom mat" },
-                { value: "top", label: "Top mat" },
-                { value: "both", label: "Top and bottom" },
-              ],
+              host?.category === Cat.Wall
+                ? [
+                    { value: "bottom", label: "Interior face" },
+                    { value: "top", label: "Exterior face" },
+                    { value: "both", label: "Both faces" },
+                  ]
+                : [
+                    { value: "bottom", label: "Bottom mat" },
+                    { value: "top", label: "Top mat" },
+                    { value: "both", label: "Top and bottom" },
+                  ],
               p.layers ?? "bottom",
               (v) => update<RebarParams>("Change rebar layers", { layers: v as "bottom" | "top" | "both" }),
             ),

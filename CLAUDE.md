@@ -46,7 +46,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   ceilings between base/top levels via polygon difference — core/model/shafts.ts, kernel `extrudeCut`), grids (G), reference planes (R), project units + info.
 - Kernels: SimpleKernel (extrusions) and OcctKernel (OpenCascade via replicad-opencascadejs, async load;
   boolean wall openings).
-- Views are elements: floor plans per level, drafting views (kind `drafting`, core `createDraftingView`, `isAnnotationView` with legends), jogged sections (section Properties → Split segment; `jogs`, core `sectionSegments`; shaded underlay not jogged), reflected ceiling plans (View → Plan ▾; kind `ceilingPlan`, cut 2300
+- Views are elements: floor plans per level, detail callouts of sections/elevations (View → Callout in a section: a section
+  with `parentId` on the same cut, trimmed to the box; boxed with a bubble in the parent, not in plans), drafting views (kind `drafting`, core `createDraftingView`, `isAnnotationView` with legends), jogged sections (section Properties → Split segment; `jogs`, core `sectionSegments`; shaded underlay not jogged), reflected ceiling plans (View → Plan ▾; kind `ceilingPlan`, cut 2300
   looking up — geometry `planViewLinework` mirrors meshes in Z), callouts, sections (S), building elevations, {3D}. Plans and
   sections are true 2D drawings from mesh hidden-line removal (`geometry/src/hlr.ts`), with layer cut
   patterns at Medium/Fine and material surface patterns. V/G per view, rule filters, view templates.

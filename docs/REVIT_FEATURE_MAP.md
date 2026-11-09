@@ -89,7 +89,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Floor plans (cut plane, view range) | 2 | ✅ |
 | Reflected ceiling plans | 8b | ✅ (View → Plan ▾ Reflected Ceiling Plan; cut 2300 looking up to the level above; ceiling grid patterns 600 × 600 / 1200 × 600; no door swings) |
 | Elevations | 2 | ✅ |
-| Sections & callouts (jogged sections: Split segment) | 2 | 🟨 |
+| Sections & callouts (jogged sections: Split segment) | 2 | ✅ (sections, jogs, callouts of plans and of sections/elevations — detail sections boxed in their parent) |
 | Drafting views | 2 | ✅ (View → Drafting View or browser; 2D drafting and detail components, no model; on sheets) |
 | Legends | 4 | ✅ |
 | Detail levels (coarse/medium/fine) | 2 | ✅ (Coarse: types' Coarse Scale Fill Pattern, hollow by default; Medium/Fine: layers) |

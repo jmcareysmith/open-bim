@@ -592,7 +592,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   elevation: new ElevationTool(ctx),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
-const DRAWING_TOOLS = new Set(["select", "symbol", "detailcomponent", "repeatingdetail", "placegroup", "attach", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution", "angulardim"]);
+const DRAWING_TOOLS = new Set(["select", "symbol", "detailcomponent", "repeatingdetail", "placegroup", "attach", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution", "angulardim", "callout"]);
 let tool: Tool = tools.select!;
 /** Grips and temporary dimensions for the selection (Select tool only). */
 let grips: GripLayer | undefined = new GripLayer(ctx, $("#viewport"));
@@ -757,8 +757,8 @@ function setTool(name: string): void {
     status("That tool works in plan and 3D views. Open a floor plan or the 3D view to use it.");
     name = "select";
   }
-  if (name === "callout" && activeView()?.params.kind !== "floorPlan") {
-    status("Callouts are drawn on floor plans. Open a floor plan first.");
+  if (name === "callout" && !["floorPlan", "section", "elevation"].includes(activeView()?.params.kind ?? "")) {
+    status("Callouts are drawn on floor plans, sections and elevations. Open one first.");
     name = "select";
   }
   tool.deactivate?.();

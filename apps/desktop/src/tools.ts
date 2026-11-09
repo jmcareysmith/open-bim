@@ -2082,6 +2082,8 @@ export class CalloutTool implements Tool {
   }
 
   private point(ev: PointerEvent): Vec2 | null {
+    // Sections/elevations: a detail callout box in the drawing.
+    if (this.ctx.viewport.viewMode === "drawing") return this.ctx.viewport.pickDrawing(ev);
     const elevation = this.ctx.doc.require<LevelParams>(this.ctx.activeLevelId()).params.elevation;
     const p = this.ctx.viewport.pickPlane(ev, elevation);
     return p && snapPoint(this.ctx, p, null, true).p;
@@ -2112,7 +2114,7 @@ export class CalloutTool implements Tool {
     this.start = null;
     this.ctx.viewport.setPreviewLines(null);
     try {
-      if (!parent) throw new Error("Open a floor plan first");
+      if (!parent) throw new Error("Open a floor plan, section or elevation first");
       const v = doc.transact("Create callout", (tx) => createCallout(tx, doc, parent, start, p));
       this.ctx.setSelection([v.id]);
       this.ctx.status(`${v.name} created \u2014 open it from the project browser.`);

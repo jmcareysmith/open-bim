@@ -496,10 +496,35 @@ export function createCallout(
   opts: { name?: string; scale?: number } = {},
 ): View {
   const parent = doc.require<ViewParams>(parentId);
-  if (parent.category !== Cat.View || parent.params.kind !== "floorPlan") throw new Error("Callouts are drawn on floor plans");
   const min = { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y) };
   const max = { x: Math.max(a.x, b.x), y: Math.max(a.y, b.y) };
   if (max.x - min.x < 100 || max.y - min.y < 100) throw new Error("Callout must be at least 100 mm each way");
+  if (parent.category === Cat.View && (parent.params.kind === "section" || parent.params.kind === "elevation") && parent.params.line) {
+    // A detail callout of a section/elevation: a section on the same cut, trimmed to the box
+    // (x along the parent's line, y = height), at a larger scale.
+    const l = parent.params.line;
+    const len = Math.hypot(l.end.x - l.start.x, l.end.y - l.start.y) || 1;
+    const d = { x: (l.end.x - l.start.x) / len, y: (l.end.y - l.start.y) / len };
+    const name = opts.name ?? uniqueNumbered(doc, "section", "Detail");
+    return tx.create<ViewParams>(
+      Cat.View,
+      {
+        kind: "section",
+        levelId: null,
+        range: null,
+        scale: opts.scale ?? 10,
+        detailLevel: "fine",
+        hiddenCategories: [...parent.params.hiddenCategories],
+        line: { start: { x: l.start.x + d.x * min.x, y: l.start.y + d.y * min.x }, end: { x: l.start.x + d.x * max.x, y: l.start.y + d.y * max.x } },
+        farClip: parent.params.farClip ?? null,
+        zRange: { bottom: min.y, top: max.y },
+        parentId,
+        crop: null,
+      },
+      { name },
+    ) as View;
+  }
+  if (parent.category !== Cat.View || parent.params.kind !== "floorPlan") throw new Error("Callouts are drawn on floor plans, sections and elevations");
   const name = opts.name ?? uniqueNumbered(doc, "callout", `Callout of ${parent.name ?? "plan"}`);
   if (nameInUse(doc, "callout", name)) throw new Error(`Another callout is already called "${name}"`);
   return tx.create<ViewParams>(

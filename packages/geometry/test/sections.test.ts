@@ -3,6 +3,8 @@ import {
   Document,
   applyResidentialTemplate,
   createCallout,
+  viewCrop,
+  type View,
   createGrid,
   createSection,
   createWall,
@@ -10,7 +12,7 @@ import {
   type Vec2,
   type ViewParams,
 } from "@open-bim/core";
-import { SimpleKernel, cropLinework, sectionAnnotations, sectionLinework, sectionPoints } from "../src/index.ts";
+import { SimpleKernel, buildViewMarker, cropLinework, sectionAnnotations, sectionLinework, sectionPoints } from "../src/index.ts";
 
 const p = (x: number, y: number): Vec2 => ({ x, y });
 const loopArea = (l: Vec2[]) => Math.abs(l.reduce((s, q, i) => s + q.x * l[(i + 1) % l.length]!.y - l[(i + 1) % l.length]!.x * q.y, 0) / 2);
@@ -127,5 +129,22 @@ describe("view markers in plan", () => {
     const half = k.buildLines(doc, s, 50)!.fill!.loops[1]!;
     expect(Math.max(...half.map((q) => q.y))).toBeCloseTo(4300);
     expect(k.buildLines(doc, floorPlanFor(doc, ids.levels.ground)!)).toBeNull();
+  });
+  it("detail callouts of a section are sections on the same cut, boxed in their parent", () => {
+    const { doc } = model();
+    const s = doc.transact("S", (tx) => createSection(tx, doc, p(0, 4000), p(10000, 4000)));
+    // Box from 2000..4000 along, 2000..3200 high.
+    const c = doc.transact("C", (tx) => createCallout(tx, doc, s.id, p(4000, 3200), p(2000, 2000))) as View;
+    expect(c.params.kind).toBe("section");
+    expect(c.params.parentId).toBe(s.id);
+    expect(c.params.line).toEqual({ start: p(2000, 4000), end: p(4000, 4000) });
+    expect(viewCrop(c)).toEqual({ min: p(0, 2000), max: p(2000, 3200) });
+    // The parent draws the box; plans don't show the callout.
+    const a = sectionAnnotations(doc, doc.require(s.id) as View);
+    const segs = Array.from(a.segments);
+    let found = false;
+    for (let i = 0; i < segs.length; i += 6) if (segs[i] === 2000 && segs[i + 1] === 2000 && segs[i + 3] === 4000 && segs[i + 4] === 2000) found = true;
+    expect(found).toBe(true);
+    expect(buildViewMarker(doc, c)).toBeNull();
   });
 });

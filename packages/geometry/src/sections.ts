@@ -146,16 +146,18 @@ function clipSegment(x0: number, y0: number, x1: number, y1: number, r: Rect): n
 /** Level lines (with names) and grid lines (with bubbles) for a section/elevation, in drawing coords. */
 export function sectionAnnotations(doc: Document, view: View): LineData {
   const crop = viewCrop(view);
+  // Sized for 1:100; level heads and grid bubbles scale with the view (paper size × 1:n).
+  const k = (view.params.scale ?? 100) / 100;
   const seg: number[] = [];
   const labels: LineData["labels"] = [];
   const line = (a: Vec2, b: Vec2) => seg.push(a.x, a.y, 0, b.x, b.y, 0);
   for (const l of levels(doc)) {
     const y = l.params.elevation;
     if (y < crop.min.y || y > crop.max.y) continue;
-    line({ x: crop.min.x - 300, y }, { x: crop.max.x + 300, y });
-    labels.push({ text: `${l.name ?? "Level"}  ${Math.round(y)}`, position: [crop.max.x + 400, y + 250, 0], size: 250, align: "left" });
+    line({ x: crop.min.x - 300 * k, y }, { x: crop.max.x + 300 * k, y });
+    labels.push({ text: `${l.name ?? "Level"}  ${Math.round(y)}`, position: [crop.max.x + 400 * k, y + 250 * k, 0], size: 250 * k, align: "left" });
   }
-  const r = GRID_BUBBLE_RADIUS;
+  const r = GRID_BUBBLE_RADIUS * k;
   for (const g of doc.byCategory<GridParams>(Cat.Grid)) {
     if (g.params.curve) continue; // curved grids: not in sections yet
     const x = crossing(view, g.params.start, g.params.end);
@@ -167,7 +169,32 @@ export function sectionAnnotations(doc: Document, view: View): LineData {
       const a1 = ((i + 1) / 32) * 2 * Math.PI;
       line({ x: x + r * Math.cos(a0), y: cy + r * Math.sin(a0) }, { x: x + r * Math.cos(a1), y: cy + r * Math.sin(a1) });
     }
-    labels.push({ text: g.name ?? "", position: [x, cy, 0] });
+    labels.push({ text: g.name ?? "", position: [x, cy, 0], ...(k !== 1 ? { size: r * 0.75 } : {}) });
+  }
+  // Detail callouts drawn from this view: their box (on the same cut) and a numbered bubble.
+  const pl = view.params.line;
+  if (pl) {
+    const L = Math.hypot(pl.end.x - pl.start.x, pl.end.y - pl.start.y) || 1;
+    const d = { x: (pl.end.x - pl.start.x) / L, y: (pl.end.y - pl.start.y) / L };
+    for (const c of doc.byCategory<ViewParams>(Cat.View)) {
+      const cp = c.params;
+      if (cp.parentId !== view.id || cp.kind !== "section" || !cp.line || !cp.zRange) continue;
+      const x0 = (cp.line.start.x - pl.start.x) * d.x + (cp.line.start.y - pl.start.y) * d.y;
+      const x1 = (cp.line.end.x - pl.start.x) * d.x + (cp.line.end.y - pl.start.y) * d.y;
+      const [lo, hi] = [Math.min(x0, x1), Math.max(x0, x1)];
+      const { bottom, top } = cp.zRange;
+      const box = [{ x: lo, y: bottom }, { x: hi, y: bottom }, { x: hi, y: top }, { x: lo, y: top }];
+      box.forEach((q, i) => line(q, box[(i + 1) % 4]!));
+      const br = r * 0.75;
+      const c0 = { x: hi + br * 1.6, y: top + br * 1.6 };
+      line({ x: hi, y: top }, { x: c0.x - br * 0.7, y: c0.y - br * 0.7 });
+      for (let i = 0; i < 32; i++) {
+        const a0 = (i / 32) * 2 * Math.PI;
+        const a1 = ((i + 1) / 32) * 2 * Math.PI;
+        line({ x: c0.x + br * Math.cos(a0), y: c0.y + br * Math.sin(a0) }, { x: c0.x + br * Math.cos(a1), y: c0.y + br * Math.sin(a1) });
+      }
+      labels.push({ text: viewNumber(c.name ?? ""), position: [c0.x, c0.y, 0], size: br * 0.75 });
+    }
   }
   return { segments: new Float32Array(seg), labels };
 }
@@ -269,6 +296,8 @@ export function buildViewMarker(doc: Document, el: Element, scale = 100): LineDa
     labels.push({ text: name, position: [c.x, c.y, 0], size: TEXT });
   };
 
+  // Detail callouts of sections show in their parent section, not in plans.
+  if (p.kind === "section" && p.parentId) return null;
   if ((p.kind === "section" || p.kind === "elevation") && p.line) {
     const { start, end } = p.line;
     const f = viewFrame(v);

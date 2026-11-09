@@ -44,6 +44,8 @@ export type BeamParams = {
   brace?: boolean | null;
   /** Beam systems: the system's name, shared by its beams (Revit: Structural Beam System). */
   system?: string | null;
+  /** The beam system that owns this beam (it re-lays its beams; deleting it deletes them). */
+  systemId?: ElementId | null;
   /** Tributary width for floor area loads, mm (unset: worked out from neighbouring beams). */
   tributary?: number | null;
 };
@@ -71,7 +73,12 @@ registerCategory({
   cascadeDelete: true,
   isType: false,
 });
-registerCategory({ name: Cat.Beam, dependencies: (el) => [(el.params as BeamParams).levelId, ...typeDeps(el)], cascadeDelete: true, isType: false });
+registerCategory({
+  name: Cat.Beam,
+  dependencies: (el) => [(el.params as BeamParams).levelId, ...typeDeps(el), ...((el.params as BeamParams).systemId ? [(el.params as BeamParams).systemId!] : [])],
+  cascadeDelete: true,
+  isType: false,
+});
 registerCategory({ name: Cat.PadFooting, dependencies: (el) => [(el.params as PadFootingParams).levelId], cascadeDelete: true, isType: false });
 registerCategory({ name: Cat.StripFooting, dependencies: (el) => [(el.params as StripFootingParams).wallId], cascadeDelete: true, isType: false });
 
@@ -164,19 +171,71 @@ export function beamSystemLayout(doc: Document, floorId: ElementId, opts: BeamSy
   return out;
 }
 
-/** Create a beam system's beams (named "Beam System n"), tops at the floor's underside. */
+/** A beam system: the floor it holds up, the section, spacing and direction; it owns its beams. */
+export type BeamSystemParams = { floorId: ElementId; typeId: ElementId; spacing: number; direction: "short" | "long" };
+export type BeamSystem = Element<BeamSystemParams>;
+
+registerCategory({
+  name: Cat.BeamSystem,
+  dependencies: (el) => [(el.params as BeamSystemParams).floorId, (el.params as BeamSystemParams).typeId],
+  cascadeDelete: true,
+  isType: false,
+});
+
+/**
+ * Create a beam system (named "Beam System n") and its beams, tops at the floor's underside. The
+ * beams follow the floor and the system's settings from then on (`enableBeamSystems`).
+ */
 export function createBeamSystem(tx: Transaction, doc: Document, typeId: ElementId, floorId: ElementId, opts: BeamSystemOptions): Beam[] {
   requireSection(doc, typeId);
-  const f = doc.require(floorId) as Floor;
-  const lines = beamSystemLayout(doc, floorId, opts);
-  if (!lines.length) throw new Error("The floor is too small for beams at that spacing");
-  const level = doc.require<LevelParams>(f.params.levelId);
-  const offset = floorExtent(doc, f).bottom - level.params.elevation;
-  const taken = new Set(doc.byCategory<BeamParams>(Cat.Beam).map((b) => b.params.system).filter(Boolean));
+  if (!beamSystemLayout(doc, floorId, opts).length) throw new Error("The floor is too small for beams at that spacing");
+  const taken = new Set(doc.byCategory(Cat.BeamSystem).map((s) => s.name));
   let k = 1;
   while (taken.has(`Beam System ${k}`)) k++;
-  const system = `Beam System ${k}`;
-  return lines.map((l) => tx.create<BeamParams>(Cat.Beam, { levelId: level.id, offset, start: l.start, end: l.end, system }, { typeId }) as Beam);
+  const sys = tx.create<BeamSystemParams>(Cat.BeamSystem, { floorId, typeId, spacing: opts.spacing, direction: opts.direction ?? "short" }, { name: `Beam System ${k}` }) as BeamSystem;
+  return syncBeamSystem(tx, doc, sys);
+}
+
+/** Beams of a system. */
+export function systemBeams(doc: Document, systemId: ElementId): Beam[] {
+  return doc.byCategory<BeamParams>(Cat.Beam).filter((b) => b.params.systemId === systemId) as Beam[];
+}
+
+/** Bring a system's beams in line with its floor and settings (re-laying them only when they differ). */
+export function syncBeamSystem(tx: Transaction, doc: Document, sys: BeamSystem): Beam[] {
+  const p = sys.params;
+  const f = doc.get(p.floorId) as Floor | undefined;
+  const existing = systemBeams(doc, sys.id);
+  let lines: { start: Vec2; end: Vec2 }[] = [];
+  try {
+    if (f && doc.get(p.typeId)) lines = beamSystemLayout(doc, p.floorId, { spacing: p.spacing, direction: p.direction });
+  } catch {
+    lines = [];
+  }
+  const level = f ? doc.get<LevelParams>(f.params.levelId) : undefined;
+  if (!f || !level) return existing;
+  const offset = floorExtent(doc, f).bottom - level.params.elevation;
+  const near = (a: Vec2, b: Vec2) => Math.abs(a.x - b.x) < 0.5 && Math.abs(a.y - b.y) < 0.5;
+  const same =
+    existing.length === lines.length &&
+    existing.every(
+      (b, i) =>
+        b.typeId === p.typeId &&
+        b.params.levelId === level.id &&
+        Math.abs(b.params.offset - offset) < 0.5 &&
+        near(b.params.start, lines[i]!.start) &&
+        near(b.params.end, lines[i]!.end),
+    );
+  if (same) return existing;
+  for (const b of existing) tx.delete(b.id);
+  return lines.map((l) => tx.create<BeamParams>(Cat.Beam, { levelId: level.id, offset, start: l.start, end: l.end, system: sys.name ?? null, systemId: sys.id }, { typeId: p.typeId }) as Beam);
+}
+
+/** Keep beam systems' beams up to date after every edit (floor reshaped, spacing changed…). */
+export function enableBeamSystems(doc: Document): () => void {
+  return doc.addCommitHook((tx) => {
+    for (const s of doc.byCategory<BeamSystemParams>(Cat.BeamSystem)) syncBeamSystem(tx, doc, s as BeamSystem);
+  });
 }
 
 /**

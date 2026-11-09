@@ -90,6 +90,7 @@ export const Cat = {
   ScopeBox: "ScopeBox",
   ImageUnderlay: "ImageUnderlay",
   KeySchedule: "KeySchedule",
+  BeamSystem: "BeamSystem",
   Connector: "Connector",
   MEPSystem: "MEPSystem",
   DuctType: "DuctType",

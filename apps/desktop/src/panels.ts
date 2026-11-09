@@ -44,6 +44,8 @@ import {
   type BarSize,
   type Rebar,
   type RebarParams,
+  type BeamSystemParams,
+  systemBeams,
   type FormVisibility,
   systemPressure,
   type KeyScheduleParams,
@@ -3014,11 +3016,10 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("End top offset", numberInput(p.endOffset ?? p.offset, (v) => update<BeamParams>("Change beam end offset", { endOffset: v }))),
         row("Length", len(Math.hypot(p.end.x - p.start.x, p.end.y - p.start.y))),
       );
-      if (p.system) {
-        const all = doc.byCategory<BeamParams>(Cat.Beam).filter((b) => b.params.system === p.system);
-        const selAll = h("button", { textContent: `Select all ${all.length}` });
-        selAll.onclick = () => ctx.setSelection(all.map((b) => b.id));
-        sec.append(row(p.system, selAll));
+      if (p.systemId && doc.get(p.systemId)) {
+        const edit2 = h("button", { textContent: `Edit ${doc.get(p.systemId)!.name ?? "beam system"}` });
+        edit2.onclick = () => ctx.setSelection([p.systemId!]);
+        sec.append(row("Beam system", edit2));
       }
       sec.append(row("Tributary width", numberInput(p.tributary ?? 0, (v) => update<BeamParams>("Tributary width", { tributary: v > 0 ? v : null }))));
       sec.append(h("div", { class: "hint" }, "Tributary width 0: worked out from neighbouring beams and the floor's edge."));
@@ -4182,6 +4183,31 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
           row("", numberInput(layer.thickness, (v) => setLayer("Edit layer thickness", { thickness: Math.max(0, v) }))),
         );
       });
+      break;
+    }
+    case Cat.BeamSystem: {
+      const p = el.params as BeamSystemParams;
+      const beams = systemBeams(doc, el.id);
+      const selAll = h("button", { textContent: `Select its ${beams.length} beams` });
+      selAll.onclick = () => ctx.setSelection(beams.map((b) => b.id));
+      sec.append(
+        row("Name", textInput(el.name ?? "", (v) => v && edit(ctx, "Rename beam system", (tx) => tx.setName(el.id, v)))),
+        row("Beam type", select(typeOpts(Cat.StructuralType), p.typeId, (v) => update<BeamSystemParams>("Beam system type", { typeId: v }))),
+        row("Spacing", numberInput(p.spacing, (v) => (v >= 100 ? update<BeamSystemParams>("Beam spacing", { spacing: v }) : ctx.status("\u26a0 At least 100 mm")))),
+        row(
+          "Direction",
+          select(
+            [
+              { value: "short", label: "Span the short way" },
+              { value: "long", label: "Span the long way" },
+            ],
+            p.direction,
+            (v) => update<BeamSystemParams>("Beam direction", { direction: v as "short" | "long" }),
+          ),
+        ),
+        row("", selAll),
+        h("div", { class: "hint" }, "The beams follow the floor's outline and these settings. Delete the system to remove them."),
+      );
       break;
     }
     case Cat.KeySchedule: {

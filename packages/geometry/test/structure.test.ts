@@ -5,6 +5,10 @@ import {
   createBeam,
   createBrace,
   createBeamSystem,
+  enableBeamSystems,
+  systemBeams,
+  type BeamSystemParams,
+  type FloorParams,
   createFloor,
   floorExtent,
   type Floor,
@@ -49,6 +53,25 @@ describe("structure", () => {
     const again = doc.transact("S", (tx) => createBeamSystem(tx, doc, byName("Timber 190x45 SG8"), f.id, { spacing: 1200, direction: "long" }));
     expect(again[0]!.params.system).toBe("Beam System 2");
     expect(again[0]!.params.start.y).toBe(again[0]!.params.end.y); // long way: along x
+  });
+
+  it("beam systems follow their floor and settings, and take their beams with them when deleted", () => {
+    const { doc, ids, byName } = setup();
+    enableBeamSystems(doc);
+    const slab = doc.byCategory("FloorType")[0]!.id;
+    const f = doc.transact("F", (tx) => createFloor(tx, slab, ids.levels.first, [{ x: 0, y: 0 }, { x: 6000, y: 0 }, { x: 6000, y: 4000 }, { x: 0, y: 4000 }]));
+    const first = doc.transact("S", (tx) => createBeamSystem(tx, doc, byName("Timber 190x45 SG8"), f.id, { spacing: 600 }));
+    const sysId = first[0]!.params.systemId!;
+    expect(systemBeams(doc, sysId)).toHaveLength(10);
+    // Widen the floor to 9 m: more beams.
+    doc.transact("Grow", (tx) => tx.update<FloorParams>(f.id, { boundary: [{ x: 0, y: 0 }, { x: 9000, y: 0 }, { x: 9000, y: 4000 }, { x: 0, y: 4000 }] }));
+    expect(systemBeams(doc, sysId)).toHaveLength(15);
+    // Wider spacing: fewer.
+    doc.transact("Space", (tx) => tx.update<BeamSystemParams>(sysId, { spacing: 1200 }));
+    expect(systemBeams(doc, sysId)).toHaveLength(8);
+    // Delete the system: its beams go too.
+    doc.transact("Del", (tx) => tx.delete(sysId));
+    expect(systemBeams(doc, sysId)).toHaveLength(0);
   });
 
   it("braces slope from the level up to the level above, section square to the axis", () => {

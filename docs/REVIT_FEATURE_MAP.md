@@ -72,7 +72,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 6. Families & parameters
 | Feature | Phase | Status |
 |---|---|---|
-| System families (walls, floors, roofs) | 1 | ⬜ |
+| System families (walls, floors, roofs) | 1 | ✅ (layered wall/floor/ceiling/roof types, stacked and curtain walls, duct/pipe types) |
 | Loadable family editor (sketch, extrude, revolve, sweep, blend, void) | 3 | 🟨 |
 | Reference planes + dimension constraints (parametric solver) | 3 | 🟨 |
 | Formulas & conditionals in parameters | 3 | ✅ |

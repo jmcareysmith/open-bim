@@ -2857,7 +2857,8 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       sec.append(
         row("Type", select(typeOpts(Cat.StructuralType), el.typeId ?? "", (v) => edit(ctx, "Change section", (tx) => tx.setType(el.id, v)))),
         row("Reference level", select(levelOpts, p.levelId, (v) => update<BeamParams>("Change beam level", { levelId: v }))),
-        row("Top offset", numberInput(p.offset, (v) => update<BeamParams>("Change beam offset", { offset: v }))),
+        row(p.endOffset != null ? "Start top offset" : "Top offset", numberInput(p.offset, (v) => update<BeamParams>("Change beam offset", { offset: v }))),
+        row("End top offset", numberInput(p.endOffset ?? p.offset, (v) => update<BeamParams>("Change beam end offset", { endOffset: v }))),
         row("Length", len(Math.hypot(p.end.x - p.start.x, p.end.y - p.start.y))),
       );
       break;

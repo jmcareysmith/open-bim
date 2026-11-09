@@ -167,9 +167,16 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
           items: [
             { label: "Beam", icon: "beam", tool: "beam", large: true },
             { label: "Column", icon: "column", tool: "column", large: true },
+            { label: "Brace", icon: "beam", tool: "brace", title: "Brace: bottom end on this level, top end at the level above" },
           ],
         },
-        { title: "Foundation", items: [{ label: "Footing", icon: "footing", tool: "footing", large: true, title: "Footing: strip (click a wall) or pad (click a point)" }] },
+        {
+          title: "Foundation",
+          items: [
+            { label: "Footing", icon: "footing", tool: "footing", large: true, title: "Footing: strip (click a wall) or pad (click a point)" },
+            { label: "Slab", icon: "floor", cmd: "foundationSlab", title: "Foundation slab: sketch a 300 concrete slab" },
+          ],
+        },
       ],
     },
     {

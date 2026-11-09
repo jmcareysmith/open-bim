@@ -70,7 +70,37 @@ export function buildBeam(doc: Document, el: Element): MeshData | null {
   const { outer, holes } = sectionProfile(s);
   // Section hangs below the top: shift so its top edge is at 0.
   const shift = (q: Vec2) => ({ x: q.x, y: q.y - s.d / 2 });
+  const rise = (p.endOffset ?? p.offset) - p.offset;
+  if (Math.abs(rise) > 0.5) return sweepSloped(outer, holes, s.d, p.start, dir, len, zTop, rise);
   return extrudeAlong(outer.map(shift), holes.map((h) => h.map(shift)), p.start, dir, len, zTop);
+}
+
+/**
+ * A sloped member: the section square to its axis, which runs from the top-centre line at the
+ * start (`zTop`) to `rise` higher at the end. Local (across, up, along) map by a rotation.
+ */
+function sweepSloped(outer: Vec2[], holes: Vec2[][], d: number, start: Vec2, dir: Vec2, len: number, zTop: number, rise: number): MeshData {
+  const L = Math.hypot(len, rise);
+  const m = extrudePolygon(outer, holes, 0, L);
+  const ax = { x: (dir.x * len) / L, y: (dir.y * len) / L, z: rise / L };
+  const nrm = { x: -dir.y, y: dir.x, z: 0 };
+  // up = ax x nrm... chosen so it points upwards (perpendicular to the axis in its vertical plane).
+  const up = { x: -(dir.x * rise) / L, y: -(dir.y * rise) / L, z: len / L };
+  // The axis runs through the section's centre: half its depth below the top line.
+  const o = { x: start.x - up.x * (d / 2), y: start.y - up.y * (d / 2), z: zTop - up.z * (d / 2) };
+  const pos = new Float32Array(m.positions.length);
+  const nor = new Float32Array(m.normals.length);
+  for (let i = 0; i < m.positions.length; i += 3) {
+    const v = m.positions[i]!;
+    const w = m.positions[i + 1]!;
+    const u = m.positions[i + 2]!;
+    pos.set([o.x + nrm.x * v + up.x * w + ax.x * u, o.y + nrm.y * v + up.y * w + ax.y * u, o.z + up.z * w + ax.z * u], i);
+    const nv = m.normals[i]!;
+    const nw = m.normals[i + 1]!;
+    const nu = m.normals[i + 2]!;
+    nor.set([nrm.x * nv + up.x * nw + ax.x * nu, nrm.y * nv + up.y * nw + ax.y * nu, up.z * nw + ax.z * nu], i);
+  }
+  return { positions: pos, normals: nor, indices: m.indices };
 }
 
 /**

@@ -171,7 +171,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   mesh `parts`, viewport pickPart/setPartHighlight) → Properties: profile (segment or whole line), remove, panel kind.
 - Stacked walls: browser Types → New stacked wall type (segments in its properties).
 - Toposolids: Toposolid tool (sketch boundary) + Import survey CSV (E,N,RL m) in Properties; contours.
-- Structure: Column / Beam / Footing tools; sections (NZ timber/steel/concrete) as Structural types.
+- Structure: Column / Beam / Brace (sloped beam, `endOffset`, `brace`; core `createBrace`) / Footing / Foundation Slab (floor of type "Foundation Slab - 300 Concrete", core `ensureFoundationSlabType`) tools; sections (NZ timber/steel/concrete) as Structural types.
   Beams show a dashed centreline in plans of their level (plus their cut where the view range cuts them).
 - Phasing (view Phase / Phase filter; element Phase created/demolished; Demolish tool), design options
   (browser → Design Options; element Design option; per-view option), Clashes panel (OCCT volumes).

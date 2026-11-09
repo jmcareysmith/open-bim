@@ -3,6 +3,8 @@ import {
   Document,
   applyResidentialTemplate,
   createBeam,
+  createBrace,
+  ensureFoundationSlabType,
   createColumn,
   createPadFooting,
   createStripFooting,
@@ -22,6 +24,32 @@ function setup() {
 }
 
 describe("structure", () => {
+  it("braces slope from the level up to the level above, section square to the axis", () => {
+    const { doc, ids, byName } = setup();
+    const t = byName("Steel SHS 100x100x4");
+    const b = doc.transact("B", (tx) => createBrace(tx, doc, t, ids.levels.ground, { x: 0, y: 0 }, { x: 2700, y: 0 }));
+    expect(b.params.brace).toBe(true);
+    expect(b.params.endOffset).toBe(2700);
+    const m = new SimpleKernel().build(doc, b)!;
+    const bb = boundingBox(m);
+    // Top of section from 100 (bottom on the level) at the start to 2700 at the end; the section
+    // is square to the axis, so its bottom edge at the start dips below 100 - d by the slope.
+    const L = Math.hypot(2700, 2600);
+    expect(bb.min[2]).toBeCloseTo(100 - (100 * 2700) / L, 0);
+    expect(bb.max[2]).toBeCloseTo(2700, 0);
+    // Volume: section area x axis length.
+    const area = 100 * 100 - 92 * 92;
+    expect(meshVolume(m)).toBeCloseTo(area * L, -3);
+  });
+
+  it("foundation slab type is added once, 300 concrete", () => {
+    const { doc } = setup();
+    const a = doc.transact("T", (tx) => ensureFoundationSlabType(tx, doc));
+    const b = doc.transact("T", (tx) => ensureFoundationSlabType(tx, doc));
+    expect(a).toBe(b);
+    expect((doc.require(a).params as { layers: { thickness: number }[] }).layers[0]!.thickness).toBe(300);
+  });
+
   it("beams show as a dashed centreline in plans of their level only", () => {
     const { doc, ids, byName } = setup();
     const b = doc.transact("B", (tx) => createBeam(tx, doc, byName("Steel 200UB25"), ids.levels.first, { x: 0, y: 0 }, { x: 0, y: 5000 }));

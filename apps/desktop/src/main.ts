@@ -14,7 +14,7 @@ import { addRecentFile, fileName, recentFiles, removeRecentFile } from "./recent
 import { CameraTool } from "./cameratool.ts";
 import { FloorPointTool, SlopeArrowTool } from "./slopetool.ts";
 import { WallProfileTool } from "./profiletool.ts";
-import {
+import { ensureFoundationSlabType,
   ceilingPlanFor,
   createCeilingPlan,
   Cat,
@@ -250,6 +250,7 @@ const TOOL_TYPES: Record<string, string> = {
   ramp: Cat.RampType,
   column: Cat.StructuralType,
   beam: Cat.StructuralType,
+  brace: Cat.StructuralType,
 };
 const activeTypeId = (cat: string): ElementId | undefined => {
   const id = activeTypes.get(cat);
@@ -521,6 +522,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   ramp: new StairTool(ctx, "ramp"),
   column: new ColumnTool(ctx),
   beam: new BeamTool(ctx),
+  brace: new BeamTool(ctx, true),
   footing: new FootingTool(ctx),
   demolish: new DemolishTool(ctx),
   railing: new RailingTool(ctx),
@@ -811,6 +813,13 @@ canvas.addEventListener("contextmenu", (ev) => {
 // ---- commands -------------------------------------------------------------
 
 const commands: Record<string, () => void | Promise<void>> = {
+  // Structure → Foundation → Slab: sketch a floor of the foundation slab type (added on first use).
+  foundationSlab: () => {
+    const id = doc.transact("Load foundation slab type", (tx) => ensureFoundationSlabType(tx, doc));
+    activeTypes.set(Cat.FloorType, id);
+    setTool("floor");
+    status("Foundation slab: sketch its outline (top at this level), then Finish.");
+  },
   new() {
     if (dirty && !confirm("Discard unsaved changes?")) return;
     leaveCollab();

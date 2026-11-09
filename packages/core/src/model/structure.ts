@@ -38,6 +38,10 @@ export type BeamParams = {
   offset: number;
   start: Vec2;
   end: Vec2;
+  /** Top of beam at the end, relative to the level (sloped beams and braces); default = offset. */
+  endOffset?: number | null;
+  /** Structural brace (Revit: Brace): drawn in plan as a dashed line with its slope. */
+  brace?: boolean | null;
 };
 export type Beam = Element<BeamParams>;
 
@@ -101,6 +105,33 @@ export function createBeam(tx: Transaction, doc: Document, typeId: ElementId, le
   requireSection(doc, typeId);
   if (Math.hypot(end.x - start.x, end.y - start.y) < 1) throw new Error("A beam needs a length");
   return tx.create<BeamParams>(Cat.Beam, { levelId, offset: 0, start: { ...start }, end: { ...end } }, { typeId }) as Beam;
+}
+
+/**
+ * Brace: a sloped member from the level at `start` (bottom of section on the level) up to the
+ * level above at `end` (top of section at it), or `rise` mm when given or there is no level above.
+ */
+export function createBrace(tx: Transaction, doc: Document, typeId: ElementId, levelId: ElementId, start: Vec2, end: Vec2, rise?: number): Beam {
+  requireSection(doc, typeId);
+  const lv = doc.get<LevelParams>(levelId);
+  if (lv?.category !== Cat.Level) throw new Error("Braces start on a level");
+  const above = doc
+    .byCategory<LevelParams>(Cat.Level)
+    .map((l) => l.params.elevation)
+    .filter((e) => e > lv.params.elevation)
+    .sort((a, b) => a - b)[0];
+  const d = doc.get<StructuralSectionParams>(typeId)!.params.d;
+  const top = rise ?? (above !== undefined ? above - lv.params.elevation : 2700);
+  return tx.create<BeamParams>(Cat.Beam, { levelId, offset: d, endOffset: top, start: { ...start }, end: { ...end }, brace: true }, { typeId }) as Beam;
+}
+
+/** Foundation slab type (Revit: Structural Foundation: Slab), added on first use. */
+export const FOUNDATION_SLAB_TYPE = "Foundation Slab - 300 Concrete";
+export function ensureFoundationSlabType(tx: Transaction, doc: Document): ElementId {
+  const have = doc.byCategory(Cat.FloorType).find((t) => t.name === FOUNDATION_SLAB_TYPE);
+  if (have) return have.id;
+  const concrete = doc.byCategory(Cat.Material).find((m) => m.name === "Concrete")?.id ?? null;
+  return tx.create(Cat.FloorType, { layers: [{ function: "structure", materialId: concrete, thickness: 300 }] }, { name: FOUNDATION_SLAB_TYPE }).id;
 }
 
 export function createPadFooting(tx: Transaction, doc: Document, levelId: ElementId, position: Vec2, opts: Partial<Omit<PadFootingParams, "levelId" | "position">> = {}): Element<PadFootingParams> {

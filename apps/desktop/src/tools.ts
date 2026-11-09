@@ -68,6 +68,7 @@ import {
   phases,
   viewPhase,
   createBeam,
+  createBrace,
   createColumn,
   createPadFooting,
   createStripFooting,
@@ -1344,14 +1345,23 @@ export class ColumnTool implements Tool {
 
 /** Beam: click start and end (chains until Esc); top of beam at the active level. */
 export class BeamTool implements Tool {
-  readonly name = "beam";
+  readonly name: string;
   private start: Vec2 | null = null;
-  constructor(private ctx: ToolContext) {}
+  constructor(
+    private ctx: ToolContext,
+    private brace = false,
+  ) {
+    this.name = brace ? "brace" : "beam";
+  }
 
   activate(): void {
     this.start = null;
     if (!this.ctx.doc.byCategory(Cat.StructuralType).length) this.ctx.doc.transact("Load structural sections", (tx) => ensureStructuralTypes(tx, this.ctx.doc));
-    this.ctx.status("Beam: click start, then end; beams chain until Esc. Top of beam at this level.");
+    this.ctx.status(
+      this.brace
+        ? "Brace: click the bottom end (on this level), then the top end (at the level above; change in Properties)."
+        : "Beam: click start, then end; beams chain until Esc. Top of beam at this level.",
+    );
   }
 
   deactivate(): void {
@@ -1374,6 +1384,12 @@ export class BeamTool implements Tool {
     const { doc } = this.ctx;
     const a = this.start;
     try {
+      if (this.brace) {
+        const b = doc.transact("Create brace", (tx) => createBrace(tx, doc, sectionType(this.ctx, (n) => n.includes("SHS")), this.ctx.activeLevelId(), a, p));
+        this.ctx.setSelection([b.id]);
+        this.start = null;
+        return;
+      }
       const b = doc.transact("Create beam", (tx) => createBeam(tx, doc, sectionType(this.ctx, (n) => n.includes("UB") || n.includes("190x45")), this.ctx.activeLevelId(), a, p));
       this.ctx.setSelection([b.id]);
       this.start = p;

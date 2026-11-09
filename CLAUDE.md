@@ -70,8 +70,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Ribbon (apps/desktop/src/ribbon.ts + ribbondefs.ts, icons.ts): File menu (with Recent, desktop
   only, local storage; untested in the Tauri app), QAT, Revit-order tabs;
   Annotate: Dimension, Detail (line, region, cloud), Text (+ Check Spelling, Find/Replace), Tag (+
-  Keynote ▾ load/export keynote files), Revisions, Groups. Symbol ▾ places a north arrow, coordinate point (E/N/RL from shared coordinates; core `symbolCoordinates`)
-  (true north option), scale bar or break line. Detail → Component ▾ places Detail Item
+  Keynote ▾ load/export keynote files), Revisions, Groups. Symbol ▾ places a north arrow
+  (true north option), scale bar, break line or coordinate point (E/N/RL from shared coordinates; core `symbolCoordinates`). Detail → Component ▾ places Detail Item
   families (library or your own: New family → Detail Item, draw detail lines/regions); Component ▾ Repeating detail repeats one
   along a line at its width (`repeat` on the component, core `detailCopies`). Detail Group (or
   Ctrl+G on one view's drafting) makes a detail group; Place Group puts copies in the open view. Options bar under the ribbon holds Level/Type.

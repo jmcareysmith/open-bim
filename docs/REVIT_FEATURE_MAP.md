@@ -29,7 +29,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 ## 3. Architectural modelling
 | Feature | Phase | Status |
 |---|---|---|
-| Basic walls (layered compound structure) | 0–1 | 🟨 (layers, priorities, join cleanup, wrapping at free ends and inserts) |
+| Basic walls (layered compound structure) | 0–1 | ✅ (layers, priorities, plan join cleanup incl. curved walls, wrapping at ends and inserts, sweeps/reveals, edit profile) |
 | Curved (arc) walls | 8b | ✅ (Wall ▾ Arc, Properties → Curve or the middle grip; doors/windows/openings square to the arc; corner joins and tees; layers as bands round the arc with plan join cleanup; sweeps/reveals follow it; curtain walls facet between grid lines; stacked walls narrow radially) |
 | Wall joins, cleanup, wall attach top/base | 1 | ✅ (plan cleanup by layer priority; disallow join; crossing walls) |
 | Stacked walls | 6 | ✅ |
@@ -38,8 +38,8 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Floors (sketch-based, layered, slope arrows) | 1 | ✅ (Pick Walls for floors/ceilings/roofs; slope arrows; shape editing points (falls to drains, variable thickness); slab edges) |
 | Roofs (footprint, extrusion, slopes, fascia/gutter) | 1 | ✅ (footprint: exact for convex/L/T/U; extrusion: gable/mono/curved/points profile; fascia, gutter, soffit on eaves; barge boards on gable rakes) |
 | Ceilings | 1 | ✅ (Automatic Ceiling by clicking inside walls, or sketched; grid patterns; reflected ceiling plans) |
-| Doors & windows (hosted, cut openings) | 1 | 🟨 (parametric types with architraves, handles, sashes, mullion, sill; loadable door/window families) |
-| Openings (shaft, wall, vertical) | 1 | 🟨 (wall openings; shaft openings cut floors/ceilings between levels; vertical openings in footprint roofs; floors via sketch holes) |
+| Doors & windows (hosted, cut openings) | 1 | ✅ (parametric types with architraves, handles, sashes, mullion, sill; loadable door/window families; square to curved walls) |
+| Openings (shaft, wall, vertical) | 1 | ✅ (wall openings; shaft openings cut floors/ceilings between levels; vertical openings in roofs; floors via sketch holes) |
 | Stairs (run, landing, sketch) & railings | 6 | ✅ (multi-run L/U with landings; winders at square turns (2–4); curved runs (per-run curve)) |
 | Ramps | 6 | ✅ |
 | Components / furniture (loadable families) | 3 | ✅ |
@@ -73,7 +73,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Feature | Phase | Status |
 |---|---|---|
 | System families (walls, floors, roofs) | 1 | ✅ (layered wall/floor/ceiling/roof types, stacked and curtain walls, duct/pipe types) |
-| Loadable family editor (sketch, extrude, revolve, sweep, blend, void) | 3 | 🟨 |
+| Loadable family editor (sketch, extrude, revolve, sweep, blend, void) | 3 | ✅ (extrusion, blend, revolve, sweep, swept blend, voids, work planes, visibility, parameters, types, catalogs) |
 | Reference planes + dimension constraints (parametric solver) | 3 | 🟨 |
 | Formulas & conditionals in parameters | 3 | ✅ |
 | Nested & shared families | 3 | 🟨 |

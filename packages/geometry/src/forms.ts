@@ -198,7 +198,14 @@ export function revolutionMesh(p: RevolutionParams, values: Values): MeshData {
 
 export function sweepMesh(p: SweepParams, values: Values): MeshData {
   const path = evalPts(p.path, values, "Path");
-  const profile = ccw(evalPts(p.profile, values, "Profile"));
+  let profile = ccw(evalPts(p.profile, values, "Profile"));
+  // Swept Blend: an end profile morphs from the start one along the path (same point count).
+  let endProfile = p.endProfile?.length ? ccw(evalPts(p.endProfile, values, "End profile")) : null;
+  if (endProfile && endProfile.length !== profile.length) {
+    const n = Math.max(profile.length, endProfile.length);
+    profile = resample(profile, n);
+    endProfile = resample(endProfile, n);
+  }
   const f = planeFrame(p.plane, values);
   const n = path.length;
   const dirs = path.slice(1).map((q, i) => {
@@ -220,10 +227,19 @@ export function sweepMesh(p: SweepParams, values: Values): MeshData {
     const mu = { x: m.x / l, y: m.y / l };
     return { m: mu, s: 1 / Math.max(0.2, mu.x * a.x + mu.y * a.y) };
   });
+  // Distance along the path at each vertex, as a fraction (for the blend).
+  const cum = [0];
+  for (let i = 1; i < n; i++) cum.push(cum[i - 1]! + Math.hypot(path[i]!.x - path[i - 1]!.x, path[i]!.y - path[i - 1]!.y));
+  const L = cum[n - 1]! || 1;
+  const section = (i: number): Vec2[] => {
+    if (!endProfile) return profile;
+    const t = cum[i]! / L;
+    return profile.map((q, k) => ({ x: q.x + (endProfile![k]!.x - q.x) * t, y: q.y + (endProfile![k]!.y - q.y) * t }));
+  };
   const ring = (i: number): V3[] => {
     const { m, s } = mitres[i]!;
     const c = path[i]!;
-    return profile.map((q) => at(f, c.x + m.x * q.x * s, c.y + m.y * q.x * s, q.y));
+    return section(i).map((q) => at(f, c.x + m.x * q.x * s, c.y + m.y * q.x * s, q.y));
   };
   const rings = path.map((_, i) => ring(i));
   const t = new TriMesh();
@@ -234,7 +250,7 @@ export function sweepMesh(p: SweepParams, values: Values): MeshData {
     }
   }
   const capAt = (i: number, reverse: boolean) => {
-    const idx = earcut(profile.flatMap((q) => [q.x, q.y]));
+    const idx = earcut(section(i).flatMap((q) => [q.x, q.y]));
     for (let j = 0; j < idx.length; j += 3) {
       const [a, b, c] = [rings[i]![idx[j]!]!, rings[i]![idx[j + 1]!]!, rings[i]![idx[j + 2]!]!];
       if (reverse) t.tri(a, c, b);

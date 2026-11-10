@@ -106,4 +106,18 @@ describe("family voids (OCCT)", () => {
     // Without OCCT, voids are skipped.
     expect(meshVolume(new SimpleKernel().familyMesh(doc, familyValues(doc))!)).toBeCloseTo(1000 * 1000 * 500, -3);
   });
+  it("swept blends morph the profile along the path (a tapering square: a frustum)", () => {
+    const fam = new Document();
+    applyFamilyTemplate(fam, "GenericModel");
+    const sw = fam.transact("S", (tx) => createSweep(tx, [{ x: 0, y: 0 }, { x: 1000, y: 0 }], rect(-100, 0, 100, 200)));
+    fam.transact("B", (tx) => tx.update(sw.id, { endProfile: rect(-50, 50, 50, 150) }));
+    const m = new SimpleKernel().build(fam, fam.require(sw.id))!;
+    // Frustum of square sections 200 → 100 over 1000: L/3 (A1 + A2 + √(A1·A2)).
+    const A1 = 200 * 200;
+    const A2 = 100 * 100;
+    expect(meshVolume(m)).toBeCloseTo((1000 / 3) * (A1 + A2 + Math.sqrt(A1 * A2)), -3);
+    // A triangle end profile against the square: resampled to match, still closed.
+    fam.transact("T", (tx) => tx.update(sw.id, { endProfile: [{ x: -50, y: 0 }, { x: 50, y: 0 }, { x: 0, y: 100 }] }));
+    expect(meshVolume(new SimpleKernel().build(fam, fam.require(sw.id))!)).toBeGreaterThan(0);
+  });
 });

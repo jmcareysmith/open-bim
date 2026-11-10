@@ -105,7 +105,12 @@ export type BlendParams = FormBase & { bottom: NumPt[]; top: NumPt[]; start: Num
 /** Profile in the plane revolved about a line parallel to the plane's v axis at u = `axis`. */
 export type RevolutionParams = FormBase & { profile: NumPt[]; axis: Num; startAngle: Num; endAngle: Num };
 /** Profile (u across, v up) swept along a path in the plane. */
-export type SweepParams = FormBase & { path: NumPt[]; profile: NumPt[] };
+export type SweepParams = FormBase & {
+  path: NumPt[];
+  profile: NumPt[];
+  /** Swept Blend (Revit): the profile at the path's end; the section morphs along the path. */
+  endProfile?: NumPt[] | null;
+};
 
 export const FORM_CATEGORIES = [Cat.Extrusion, Cat.Blend, Cat.Revolution, Cat.Sweep] as const;
 

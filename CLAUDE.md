@@ -135,7 +135,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   live; viewport `pickSegment`), radial plan-only (Dimension ▾ Angular / Radial; core/model/angulardims.ts).
   Screen and sheet/PDF share `lineworkDrawing` for cut/projection line work.
 - Families (Phase 3 started): family editor (Browser → Families → New family / Edit family) with
-  Extrusion/Blend/Revolve/Sweep (+ Void), parameters with formulas, family types; Load into Project;
+  Extrusion/Blend/Revolve/Sweep (+ Swept Blend: sweep Properties → Make swept blend, `endProfile`) (+ Void), parameters with formulas, family types; Load into Project;
   Component tool (C) places them (free-standing, or in walls for Door/Window families).
 - Family constraints: label a dimension between reference planes with a parameter, or set EQ;
   planes flex (PlaneGCS) on every edit; forms use plane names in formulas (e.g. x = Left).

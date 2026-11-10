@@ -1442,10 +1442,22 @@ function formRows(ctx: PanelContext, el: Element): HTMLElement[] {
       field("endAngle", "End angle (\u00b0)");
       pts("profile", "Profile (u, v)");
       break;
-    case Cat.Sweep:
+    case Cat.Sweep: {
       pts("path", "Path (x, y)");
       pts("profile", "Profile (across, up)");
+      // Swept Blend: a second profile at the path's end.
+      if (Array.isArray(p.endProfile) && (p.endProfile as unknown[]).length) {
+        pts("endProfile", "End profile (swept blend)");
+        const off = h("button", { textContent: "Plain sweep" });
+        off.onclick = () => update("Plain sweep", { endProfile: null });
+        rows.push(row("", off));
+      } else {
+        const on = h("button", { textContent: "Make swept blend" });
+        on.onclick = () => update("Swept blend", { endProfile: (p.profile as NumPt[]).map((q) => ({ ...q })) });
+        rows.push(row("", on));
+      }
       break;
+    }
   }
   return rows;
 }

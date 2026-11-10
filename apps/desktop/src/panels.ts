@@ -3278,6 +3278,7 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
             (v) => update<LinkParams>("Change link positioning", { positioning: v as LinkParams["positioning"] }),
           ),
         ),
+        row("Own material colours", checkbox(!!p.materialColours, (v) => update<LinkParams>("Link colours", { materialColours: v }))),
         row("Offset X", numberInput(p.offset.x, (v) => update<LinkParams>("Move link", { offset: { ...p.offset, x: v } }))),
         row("Offset Y", numberInput(p.offset.y, (v) => update<LinkParams>("Move link", { offset: { ...p.offset, y: v } }))),
         row("Offset Z", numberInput(p.offset.z, (v) => update<LinkParams>("Move link", { offset: { ...p.offset, z: v } }))),

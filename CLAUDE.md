@@ -162,7 +162,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   DWG is desktop-only via an installed ODA File Converter or LibreDWG (src-tauri/src/cad.rs);
   not tested with a real converter (none installed here).
 - Shared coordinates (Project Information & Units → Location; NZTM2000) and links (browser → Links →
-  Link project…; by shared coordinates or origin; Reload). Links draw in one colour, aren't scheduled.
+  Link project…; by shared coordinates or origin; Reload). Links draw in one colour or their own material colours (link Properties), aren't scheduled.
 - glTF (.glb) and OBJ (+MTL, zipped) export.
 - Stairs (Stair tool: run ends, Enter; D1/AS1 checks), ramps (1:12 check), railings (sketched or
   on stairs/ramps, F4/AS1 gap). Runs are straight; L/U by drawing runs; stair Properties → Turns: landings or 2–4 winders per square turn

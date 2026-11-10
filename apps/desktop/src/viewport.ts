@@ -574,6 +574,9 @@ export class Viewport {
     mat.opacity = baseOpacity * (1 - t);
     mat.depthWrite = t < 0.5;
     mat.color.setHex(flat ? 0x000000 : color);
+    // Vertex-coloured meshes (doors, curtain panels, coloured links) carry their own colours: don't
+    // tint them with the element's base colour (overrides and selection still do).
+    if (!flat && color === base && mesh.geometry.getAttribute("color")) mat.color.setHex(0xffffff);
     // Realistic: the material's texture (it carries the colour; overrides and selection still tint it).
     const material = style === "realistic" && !mesh.geometry.getAttribute("color") ? elementMaterial(this.doc, el) : undefined;
     const tex = material ? materialTexture(material, () => (this.needsRender = true)) : null;

@@ -19,6 +19,8 @@ export type LinkParams = {
   /** Extra move after positioning, mm, and rotation about the host origin, radians. */
   offset: { x: number; y: number; z: number };
   rotation: number;
+  /** Show the linked model in its own material colours (default: one link colour). */
+  materialColours?: boolean | null;
 };
 export type Link = Element<LinkParams>;
 

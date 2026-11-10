@@ -58,4 +58,18 @@ describe("links", () => {
     expect(linkDocument(host.require(link.id) as Link).byCategory("Wall")).toHaveLength(2);
     expect(() => host.transact("Bad", (tx) => createLink(tx, { format: "x" } as never, "x"))).toThrow(/Open-BIM project/);
   });
+  it("draws in one link colour, or the linked model's own material colours", () => {
+    const host = new Document();
+    applyResidentialTemplate(host);
+    const link = host.transact("Link", (tx) => createLink(tx, neighbour({ e: 0, n: 0 }).toJSON(), "n.obim"));
+    const k = new SimpleKernel();
+    expect(k.build(host, link)!.colors).toBeUndefined();
+    host.transact("Colours", (tx) => tx.update<LinkParams>(link.id, { materialColours: true }));
+    const m = k.build(host, host.require(link.id))!;
+    expect(m.colors).toBeDefined();
+    expect(m.colors!.length).toBe(m.positions.length);
+    // The weatherboard wall's colour (0xe4e0d4) is among them.
+    const c = Array.from(m.colors!.slice(0, 3)).map((v) => Math.round(v * 255));
+    expect(c).toEqual([0xe4, 0xe0, 0xd4]);
+  });
 });

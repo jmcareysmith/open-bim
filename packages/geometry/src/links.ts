@@ -1,4 +1,4 @@
-import { linkDocument, linkTransform, type Document, type Element, type Link } from "@open-bim/core";
+import { elementMaterial, linkDocument, linkTransform, type Document, type Element, type Link } from "@open-bim/core";
 import type { GeometryKernel } from "./kernel.ts";
 import { mergeMeshes } from "./doors.ts";
 import type { MeshData } from "./mesh.ts";
@@ -18,7 +18,7 @@ function linkedMesh(kernel: GeometryKernel, link: Link): MeshData | null {
   for (const el of ld.all()) {
     try {
       const m = kernel.build(ld, el);
-      if (m && m.indices.length) parts.push(m);
+      if (m && m.indices.length) parts.push(m.colors ? m : paint(m, elementMaterial(ld, el)?.params.color ?? 0xc4c8cc));
     } catch {
       // Elements that fail to build are left out of the link.
     }
@@ -26,6 +26,14 @@ function linkedMesh(kernel: GeometryKernel, link: Link): MeshData | null {
   const merged = parts.length ? mergeMeshes(parts) : null;
   byJson.set(link.params.json, merged);
   return merged;
+}
+
+/** Every vertex of a mesh in one colour (0xRRGGBB), for merging with coloured parts. */
+function paint(m: MeshData, c: number): MeshData {
+  const colors = new Float32Array(m.positions.length);
+  const rgb = [((c >> 16) & 255) / 255, ((c >> 8) & 255) / 255, (c & 255) / 255];
+  for (let i = 0; i < colors.length; i += 3) colors.set(rgb, i);
+  return { ...m, colors };
 }
 
 export function buildLink(doc: Document, el: Element, kernel: GeometryKernel): MeshData | null {
@@ -43,5 +51,6 @@ export function buildLink(doc: Document, el: Element, kernel: GeometryKernel): M
     const q = xf([m.normals[i]!, m.normals[i + 1]!, m.normals[i + 2]!]);
     nor.set([q[0] - o[0], q[1] - o[1], q[2] - o[2]], i);
   }
-  return { positions: pos, normals: nor, indices: m.indices };
+  // One link colour unless the link asks for the linked model's own material colours.
+  return link.params.materialColours && m.colors ? { positions: pos, normals: nor, indices: m.indices, colors: m.colors } : { positions: pos, normals: nor, indices: m.indices };
 }

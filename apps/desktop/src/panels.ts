@@ -1,4 +1,4 @@
-import { areaBoundary, curtainGridLines, areaLoopsFromWalls, massFloorArea, massTotals, roomBoundary, scheduleFields, scheduleTable } from "@open-bim/geometry";
+import { convertDirectShapes, convertible, areaBoundary, curtainGridLines, areaLoopsFromWalls, massFloorArea, massTotals, roomBoundary, scheduleFields, scheduleTable } from "@open-bim/geometry";
 import { openColorSchemes } from "./colorschemes.ts";
 import { curtainPart, partLabel, setCurtainPart } from "./curtainpart.ts";
 import {
@@ -3354,6 +3354,19 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         sec.append(h("h3", {}, "IFC properties"));
         for (const [k, v] of props) sec.append(row(k, v));
       }
+      // Imported walls and slabs can become native ones (doors/windows in them open them up).
+      const convert = (targets: ElementId[], name: string) =>
+        edit(ctx, name, (tx) => {
+          const r = convertDirectShapes(tx, doc, targets);
+          ctx.status(`${r.created.length} native element${r.created.length === 1 ? "" : "s"} made; ${r.skipped.length} left as imported shape${r.skipped.length === 1 ? "" : "s"}.`);
+        });
+      const sel = ctx.selection().filter((id) => doc.get(id)?.category === Cat.DirectShape);
+      const one = h("button", { textContent: sel.length > 1 ? `Convert ${sel.length} to native` : "Convert to native", title: "Straight IfcWall boxes become walls, IfcSlabs floors" });
+      one.onclick = () => convert(sel.length ? sel : [el.id], "Convert to native");
+      const everyone = doc.byCategory(Cat.DirectShape).filter((d) => convertible(d)).map((d) => d.id);
+      const all = h("button", { textContent: `Convert all (${everyone.length})`, disabled: !everyone.length, title: "Every imported IfcWall and IfcSlab" });
+      all.onclick = () => convert(everyone, "Convert imported IFC");
+      sec.append(row("", h("div", { class: "buttons wrap" }, ...(convertible(el) ? [one] : []), all)));
       break;
     }
     case Cat.Group: {

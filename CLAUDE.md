@@ -160,7 +160,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Plugins + scripting console (toolbar Console or `; docs/PLUGINS.md, examples/plugins); Manage → Add-ins (Add-in Manager:
   on/off — off ones stay installed but don't load at start-up, remove, load; plugins.ts `installed`/`setEnabled`).
 - IFC: Export IFC (File → Export → IFC4 or IFC4X3, packages/ifc `schema` option) and Import IFC (web-ifc → DirectShapes on matching levels;
-  they show/style as their IFC class's category — core `ifcClassCategory`).
+  they show/style as their IFC class's category — core `ifcClassCategory`). DirectShape Properties → Convert to native / Convert all
+  (geometry/ifcnative.ts `convertDirectShapes`: boxy IfcWall → Wall by min-area rectangle, IfcSlab → Floor from its top faces,
+  types matched by thickness or "Imported Wall/Floor <t>"; IfcDoor/IfcWindow shapes in them become WallOpenings).
 - DXF/DWG: Export DXF/DWG (open view/sheet) and Import DXF/DWG (into the open view as a CadImport).
   DWG is desktop-only via an installed ODA File Converter or LibreDWG (src-tauri/src/cad.rs);
   not tested with a real converter (none installed here).

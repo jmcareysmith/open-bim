@@ -10,7 +10,7 @@ import {
   type DirectShapeParams,
   type Vec2,
 } from "@open-bim/core";
-import { SimpleKernel, boundingBox } from "@open-bim/geometry";
+import { SimpleKernel, boundingBox, convertDirectShapes } from "@open-bim/geometry";
 import { createIfcApi, exportIfc, importIfc, type IfcApi } from "../src/index.ts";
 
 let api: IfcApi;
@@ -73,5 +73,19 @@ describe("IFC import", () => {
     const r = await importIfc(doc, new TextEncoder().encode(text), api);
     expect(r.levelsCreated).toBe(2);
     expect(levels(doc).map((l) => l.name)).toEqual(["GF", "First Floor", "Roof"]);
+  });
+});
+
+describe("IFC import to native", () => {
+  it("round-trips walls and the door's opening as native elements", async () => {
+    const text = exportIfc(source(), { timestamp: "t" });
+    const doc = new Document();
+    await importIfc(doc, new TextEncoder().encode(text), api);
+    const shapes = doc.byCategory<DirectShapeParams>(Cat.DirectShape).map((s) => s.id);
+    const r = doc.transact("Convert", (tx) => convertDirectShapes(tx, doc, shapes));
+    const walls = doc.byCategory(Cat.Wall);
+    expect(walls).toHaveLength(5);
+    expect(doc.byCategory(Cat.WallOpening)).toHaveLength(1);
+    expect(r.skipped.length).toBe(shapes.length - 5);
   });
 });

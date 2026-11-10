@@ -1031,6 +1031,9 @@ function viewSection(ctx: PanelContext, view: View): HTMLElement {
       row("Crop top", numberInput(z.top, (v) => setZ("top", v))),
     );
   }
+  if ((p.kind === "floorPlan" || p.kind === "ceilingPlan" || p.kind === "areaPlan" || p.kind === "callout") && !template) {
+    sec.append(row("Base and survey points", checkbox(!!p.showBasePoints, (v) => set("Show base points", { showBasePoints: v }))));
+  }
   if ((p.kind === "floorPlan" || p.kind === "ceilingPlan" || p.kind === "areaPlan") && !template) {
     const boxes = doc.byCategory<ScopeBoxParams>(Cat.ScopeBox);
     sec.append(
@@ -2045,6 +2048,8 @@ function settingsSections(ctx: PanelContext, id: ElementId, p: ProjectSettingsPa
       metres(Math.round(((loc.rotation * 180) / Math.PI) * 1e4) / 1e4, (v) => setLoc({ rotation: (v * Math.PI) / 180 })),
     ),
     row("DXF plans in shared coordinates", checkbox(loc.dxfShared === true, (v) => setLoc({ dxfShared: v }))),
+    row("Survey point x (project mm)", metres(loc.surveyPoint?.x ?? 0, (v) => setLoc({ surveyPoint: { x: v, y: loc.surveyPoint?.y ?? 0 } }))),
+    row("Survey point y (project mm)", metres(loc.surveyPoint?.y ?? 0, (v) => setLoc({ surveyPoint: { x: loc.surveyPoint?.x ?? 0, y: v } }))),
     row("", h("span", { class: "muted" }, "Project origin's map position; project north turned anticlockwise from grid north. Written to IFC as IfcMapConversion.")),
   );
   // Phases, in order.

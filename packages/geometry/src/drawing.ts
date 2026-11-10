@@ -31,8 +31,9 @@ import {
   isAnnotationView,
   planCrop,
   type ImageUnderlayParams,
+  type LevelParams,
 } from "@open-bim/core";
-import { GRID_BUBBLE_RADIUS, type LineData } from "./datums.ts";
+import { GRID_BUBBLE_RADIUS, basePointMarks, type LineData } from "./datums.ts";
 import { planLinework, planViewLinework, type PlanLinework } from "./hlr.ts";
 import type { GeometryKernel } from "./kernel.ts";
 import { planFrame } from "./layers.ts";
@@ -190,6 +191,12 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
     addLineData(out, lines, owner ? "annotation" : el.category === Cat.Grid || el.category === Cat.ReferencePlane ? "datum" : "symbol", lineStyle(r, r.projection, el.id, g.scale));
   }
   if (section) addLineData(out, sectionAnnotations(doc, view), "datum", {});
+  // Plans: Project Base Point and Survey Point when the view shows them.
+  if (!section && (view.params as ViewParams).showBasePoints) {
+    const lvl = (view.params as ViewParams).levelId;
+    const z = lvl ? (doc.get<LevelParams>(lvl)?.params.elevation ?? 0) : 0;
+    addLineData(out, basePointMarks(doc, z, g.scale), "datum", {});
+  }
 
   // Bounds: the view's crop when it has one, else everything drawn.
   const crop = section ? viewCrop(view) : planCrop(doc, view);

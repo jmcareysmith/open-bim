@@ -56,6 +56,8 @@ export type SiteLocation = {
   rotation: number;
   /** Export DXF plans in these map coordinates (metres) rather than project mm. */
   dxfShared?: boolean;
+  /** Survey Point (Revit): where the site's survey mark sits in project mm (default the origin). */
+  surveyPoint?: { x: number; y: number } | null;
 };
 
 export const DEFAULT_LOCATION: SiteLocation = { epsg: 2193, eastings: 0, northings: 0, height: 0, rotation: 0 };

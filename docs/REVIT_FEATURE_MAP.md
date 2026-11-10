@@ -12,7 +12,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Transactions, undo/redo | 0 | ✅ (named transactions, commit hooks, undo/redo) |
 | Regeneration (change a level → hosted elements update) | 0–1 | ✅ (dependency graph, cascade delete) |
 | Project units & settings | 1 | ✅ |
-| Shared coordinates, project base point, survey point, true north | 5 | 🟨 |
+| Shared coordinates, project base point, survey point, true north | 5 | ✅ (NZTM location, true north, base and survey points in plans (Properties), coordinate point symbol, IFC map conversion, DXF in map coordinates) |
 | Phasing (existing / new / demolished, phase filters) | 6 | ✅ |
 | Design options | 6 | ✅ |
 | Groups (model & detail) | 4 | ✅ |

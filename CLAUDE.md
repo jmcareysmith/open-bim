@@ -161,7 +161,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - DXF/DWG: Export DXF/DWG (open view/sheet) and Import DXF/DWG (into the open view as a CadImport).
   DWG is desktop-only via an installed ODA File Converter or LibreDWG (src-tauri/src/cad.rs);
   not tested with a real converter (none installed here).
-- Shared coordinates (Project Information & Units → Location; NZTM2000) and links (browser → Links →
+- Shared coordinates (Project Information & Units → Location; NZTM2000; survey point position; plan Properties → Base and
+  survey points shows both marks with E/N/RL — geometry `basePointMarks`) and links (browser → Links →
   Link project…; by shared coordinates or origin; Reload). Links draw in one colour or their own material colours (link Properties), aren't scheduled.
 - glTF (.glb) and OBJ (+MTL, zipped) export.
 - Stairs (Stair tool: run ends, Enter; D1/AS1 checks), ramps (1:12 check), railings (sketched or

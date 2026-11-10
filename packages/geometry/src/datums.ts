@@ -15,6 +15,8 @@ import { tangentLine, arcPoints,
   type Wall,
   type ScopeBoxParams,
   datumExtent,
+  projectLocation,
+  toShared,
 } from "@open-bim/core";
 
 /** Line work for datums and annotation, model mm, Z up. */
@@ -208,4 +210,49 @@ export function buildScopeBoxLines(_doc: Document, el: Element, scale = 100): Li
     dashed: true,
     planOnly: true,
   };
+}
+
+/**
+ * Project Base Point (circle with a cross, at the project origin) and Survey Point (triangle, at
+ * the location's survey mark), each labelled with its shared (map) coordinates, sized for the scale.
+ * Drawn in plans whose view asks for them.
+ */
+export function basePointMarks(doc: Document, level: number, scale = 100): LineData {
+  const loc = projectLocation(doc);
+  const k = scale / 100;
+  const r = 250 * k;
+  const seg: number[] = [];
+  const labels: LineData["labels"] = [];
+  const line = (a: Vec2, b: Vec2) => seg.push(a.x, a.y, 0, b.x, b.y, 0);
+  const label = (at: Vec2, lines: string[]) =>
+    lines.forEach((t, i) => labels.push({ text: t, position: [at.x + r * 1.6, at.y + r * 0.6 - i * 230 * k, 0], size: 180 * k, align: "left" }));
+  const coords = (p: Vec2) => {
+    const c = toShared(loc, { x: p.x, y: p.y, z: level });
+    return [`E ${c.e.toFixed(3)}`, `N ${c.n.toFixed(3)}`, `RL ${c.h.toFixed(3)}`];
+  };
+  // Project Base Point.
+  const o = { x: 0, y: 0 };
+  for (let i = 0; i < 32; i++) {
+    const a0 = (i / 32) * 2 * Math.PI;
+    const a1 = ((i + 1) / 32) * 2 * Math.PI;
+    line({ x: r * Math.cos(a0), y: r * Math.sin(a0) }, { x: r * Math.cos(a1), y: r * Math.sin(a1) });
+  }
+  const d = r * Math.SQRT1_2;
+  line({ x: -d, y: -d }, { x: d, y: d });
+  line({ x: -d, y: d }, { x: d, y: -d });
+  label(o, ["Project Base Point", ...coords(o)]);
+  // Survey Point.
+  const sp = loc.surveyPoint ?? o;
+  const tri = [
+    { x: sp.x, y: sp.y + r * 1.2 },
+    { x: sp.x - r * 1.05, y: sp.y - r * 0.6 },
+    { x: sp.x + r * 1.05, y: sp.y - r * 0.6 },
+  ];
+  tri.forEach((a, i) => line(a, tri[(i + 1) % 3]!));
+  line({ x: sp.x - r * 0.4, y: sp.y }, { x: sp.x + r * 0.4, y: sp.y });
+  line({ x: sp.x, y: sp.y - r * 0.4 }, { x: sp.x, y: sp.y + r * 0.4 });
+  // When they coincide, the survey label sits below the base point's.
+  const spLabel = Math.hypot(sp.x, sp.y) < r * 4 ? { x: sp.x, y: sp.y - 1000 * k } : sp;
+  label(spLabel, ["Survey Point", ...coords(sp)]);
+  return { segments: new Float32Array(seg), labels, placement: "model", planOnly: true };
 }

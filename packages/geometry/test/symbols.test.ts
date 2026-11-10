@@ -73,4 +73,23 @@ describe("symbol line work", () => {
     // First Floor is at 2700: RL 12.5 + 2.7.
     expect(texts).toEqual(["E 1748736.000", "N 5428002.000", "RL 15.200"]);
   });
+  it("plans can show the Project Base Point and Survey Point with their map coordinates", () => {
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    doc.transact("Location", (tx) => {
+      const st = ensureProjectSettings(tx, doc);
+      tx.update<ProjectSettingsParams>(st.id, { location: { epsg: 2193, eastings: 1748735, northings: 5428000, height: 12.5, rotation: 0, surveyPoint: { x: 10000, y: -5000 } } });
+    });
+    const plan = floorPlanFor(doc, ids.levels.ground)!;
+    const k = new SimpleKernel();
+    expect(viewDrawing(doc, k, plan).texts.some((t) => t.text === "Project Base Point")).toBe(false);
+    doc.transact("Show", (tx) => tx.update(plan.id, { showBasePoints: true }));
+    const texts = viewDrawing(doc, k, doc.require(plan.id) as never).texts.map((t) => t.text);
+    expect(texts).toContain("Project Base Point");
+    expect(texts).toContain("Survey Point");
+    expect(texts).toContain("E 1748735.000");
+    // The survey mark 10 m east, 5 m south of the origin.
+    expect(texts).toContain("E 1748745.000");
+    expect(texts).toContain("N 5427995.000");
+  });
 });

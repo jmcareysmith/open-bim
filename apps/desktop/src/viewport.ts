@@ -10,7 +10,7 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
-import { type ImageUnderlayParams, isAnnotationView, analyticalModel, pointCloudPoints, type PointCloud, type PointCloudParams,
+import { type LevelParams, type ImageUnderlayParams, isAnnotationView, analyticalModel, pointCloudPoints, type PointCloud, type PointCloudParams,
   Cat,
   PLAN_CUT_HEIGHT,
   TemporaryVisibility,
@@ -50,6 +50,7 @@ import { planViewLinework, viewSchemeFill,
   planFrame,
   planLinework,
   sectionAnnotations,
+  basePointMarks,
   sectionLinework,
   sectionPoints,
   sheetDrawing,
@@ -1519,6 +1520,18 @@ void main() {
       this.drawing.set(lw.id, g);
       target.add(g);
       this.applyHighlight(lw.id);
+    }
+    if (!drawingMode) {
+      // Plans: Project Base Point and Survey Point when the open plan shows them.
+      const pv = this.schemeView ? this.doc.get<ViewParams>(this.schemeView) : undefined;
+      if (pv?.params.showBasePoints) {
+        const lvl = pv.params.levelId ? this.doc.get<LevelParams>(pv.params.levelId)?.params.elevation ?? 0 : 0;
+        const extras = makeLineGroup(basePointMarks(this.doc, lvl, this.graphics.scale), 0x4a5560);
+        extras.position.z = this.workPlaneZ; // at the level, like grids (lines are lifted a little)
+        this.applyPlanOnly(extras);
+        this.drawExtras = extras;
+        this.scene.add(extras);
+      }
     }
     if (drawingMode) {
       const view = this.drawingView!;

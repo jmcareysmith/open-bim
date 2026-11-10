@@ -574,6 +574,14 @@ export class Viewport {
     mat.transparent = t > 0 || baseOpacity < 1;
     mat.opacity = baseOpacity * (1 - t);
     mat.depthWrite = t < 0.5;
+    // Rebar unobscured: bars draw over their concrete (and everything else).
+    const unobscured = el.category === Cat.Rebar && !!this.display.rebarUnobscured;
+    if (mat.depthTest === unobscured) {
+      mat.depthTest = !unobscured;
+      mat.needsUpdate = true;
+    }
+    if (unobscured) mesh.renderOrder = 12;
+    else if (mesh.renderOrder === 12) mesh.renderOrder = 0;
     mat.color.setHex(flat ? 0x000000 : color);
     // Vertex-coloured meshes (doors, curtain panels, coloured links) carry their own colours: don't
     // tint them with the element's base colour (overrides and selection still do).

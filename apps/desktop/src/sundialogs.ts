@@ -245,6 +245,9 @@ export function openShadowSettings(host: ViewBarHost, view: View): void {
   for (let i = 1; i <= 16; i++) sil.append(new Option(`Pen ${i}`, String(i), false, display.silhouettes === i));
   sil.onchange = () => ((display.silhouettes = sil.value ? Number(sil.value) : null), update());
   field(form, "Silhouettes", sil);
+  const rebar = input("checkbox", "", { checked: !!display.rebarUnobscured });
+  rebar.onchange = () => ((display.rebarUnobscured = rebar.checked), update());
+  field(form, "Rebar unobscured", rebar);
 
   form.append(Object.assign(document.createElement("div"), { className: "ovr-sub", textContent: "Shadows" }));
   const cast = input("checkbox", "", { checked: shadows });

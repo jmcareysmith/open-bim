@@ -306,7 +306,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Phase 9 started (items set in ROADMAP). Rebar (core/model/rebar.ts, geometry/src/rebar.ts): floor / wall (face mats) / pad footing /
   beam / column / strip footing Properties → Reinforcement → Add; area mats or cages laid out from the host
   (`rebarBars`), NZ bar sizes, mass (`rebarQuantities`), schedule category Structural Rebar. Bars sit inside the
-  concrete, so in 3D they show only with the host hidden/transparent (no "view unobscured" yet).
+  concrete; Graphic Display Options → Rebar unobscured (view `display.rebarUnobscured`) draws them over everything.
 - Point clouds (core/model/pointclouds.ts): Insert → Point Cloud (or File → Import): LAS 1.0–1.4 and ASCII XYZ/PTS/TXT/CSV
   in metres, thinned to 200k points, stored base64 float32 in the element; map coordinates (>10 km) go through the
   shared coordinates, else centred on the origin. Viewport draws THREE.Points (scan colours, sRGB→linear); move only;

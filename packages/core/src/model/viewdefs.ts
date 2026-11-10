@@ -435,6 +435,8 @@ export type ViewDisplay = {
   transparency?: number;
   /** Silhouette edges: the pen (1–16) for outlines against the background and other objects; none when unset. */
   silhouettes?: number | null;
+  /** Reinforcement shows through its host (Revit: rebar View Visibility States → View unobscured). */
+  rebarUnobscured?: boolean;
 };
 
 /** Whether a visual style shows face edges under the view's display options. */

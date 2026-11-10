@@ -49,6 +49,8 @@ export type DuctParams = {
   width: number;
   height: number;
   classification: SystemClassification;
+  /** Insulation (Revit: Add Insulation) thickness, mm; wraps the run and its fittings. */
+  insulation?: number | null;
 };
 export type Duct = Element<DuctParams>;
 

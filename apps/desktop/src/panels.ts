@@ -3666,6 +3666,7 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("End elevation", numberInput(p.end.z, (v) => set("Duct end elevation", { end: { ...p.end, z: v } }))),
         row("Length", len(ductLength(d))),
         row("Size", ductSizeLabel(doc, d)),
+        row("Insulation (mm)", numberInput(p.insulation ?? 0, (v) => set(v > 0 ? "Add duct insulation" : "Remove duct insulation", { insulation: v > 0 ? v : null }))),
         ...(flow !== undefined ? [row("Flow", `${flow.toFixed(0)} L/s`)] : []),
       );
       break;
@@ -3685,6 +3686,7 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("End elevation", numberInput(p.end.z, (v) => set("Pipe end elevation", { end: { ...p.end, z: v } }))),
         row("Length", len(pipeLength(pp))),
         row("Fall", fallLabel(fall)),
+        row("Insulation (mm)", numberInput(p.insulation ?? 0, (v) => set(v > 0 ? "Add pipe insulation" : "Remove pipe insulation", { insulation: v > 0 ? v : null }))),
         ...(p.classification === "sanitary"
           ? (() => {
               const d = drainageCheck(doc).pipes.find((x) => x.pipeId === pp.id);

@@ -105,11 +105,20 @@ function tube(m: MeshBuilder, rings: P3[][]): void {
   cap(rings.at(-1)!, false);
 }
 
-function section(doc: Document, d: Duct): Section {
+/** Insulation thickness on a duct or pipe (0 for none, and for trays and conduit). */
+export function insulationOf(d: { category: string; params: unknown }): number {
+  if (d.category !== Cat.Duct && d.category !== Cat.Pipe) return 0;
+  const t = (d.params as { insulation?: number | null }).insulation;
+  return t && t > 0 ? t : 0;
+}
+
+/** The run's section; `insulated` adds its insulation all round. */
+function section(doc: Document, d: Duct, insulated = false): Section {
+  const t = insulated ? insulationOf(d) : 0;
   // Pipes are round at their nominal size.
-  if (d.category === Cat.Pipe || d.category === Cat.Conduit) return { shape: "round", d: d.params.diameter, w: 0, h: 0 };
+  if (d.category === Cat.Pipe || d.category === Cat.Conduit) return { shape: "round", d: d.params.diameter + 2 * t, w: 0, h: 0 };
   if (d.category === Cat.CableTray) return { shape: "rectangular", d: 0, w: d.params.width, h: d.params.height };
-  return { shape: ductShape(doc, d), d: d.params.diameter, w: d.params.width, h: d.params.height };
+  return { shape: ductShape(doc, d), d: d.params.diameter + 2 * t, w: d.params.width + 2 * t, h: d.params.height + 2 * t };
 }
 
 /** How far each end of a duct is taken back for fittings there. */
@@ -120,18 +129,19 @@ function trims(doc: Document, d: Duct): { start: number; end: number } {
 }
 
 /** The section rings a duct's tube runs through (trimmed for fittings), or null if nothing's left. */
-function ductRings(doc: Document, d: Duct): P3[][] | null {
+function ductRings(doc: Document, d: Duct, insulated = false): P3[][] | null {
   const { start, end } = ductEnds(doc, d);
   const t = unit(sub(end, start));
   const L = Math.hypot(end.x - start.x, end.y - start.y, end.z - start.z);
   const tr = trims(doc, d);
   if (tr.start + tr.end >= L - 1) return null;
-  const s = section(doc, d);
+  const s = section(doc, d, insulated);
   return [ring(add(start, mul(t, tr.start)), t, s), ring(sub(end, mul(t, tr.end)), t, s)];
 }
 
 export function buildDuct(doc: Document, el: Element): MeshData | null {
-  const rings = ductRings(doc, el as Duct);
+  // Insulated runs show their insulation's outside (Revit draws the insulation over the duct).
+  const rings = ductRings(doc, el as Duct, true);
   if (!rings) return null;
   const m = new MeshBuilder();
   tube(m, rings);
@@ -139,7 +149,7 @@ export function buildDuct(doc: Document, el: Element): MeshData | null {
 }
 
 export function buildDuctFitting(doc: Document, el: Element): MeshData | null {
-  const tubes = fittingTubes(doc, el as DuctFitting);
+  const tubes = fittingTubes(doc, el as DuctFitting, true);
   if (!tubes) return null;
   const m = new MeshBuilder();
   for (const t of tubes) tube(m, t);
@@ -147,13 +157,13 @@ export function buildDuctFitting(doc: Document, el: Element): MeshData | null {
 }
 
 /** The fitting's tubes as rings: one swept tube (elbow, transition) or a stub per duct (tee, cross). */
-function fittingTubes(doc: Document, f: DuctFitting): P3[][][] | null {
+function fittingTubes(doc: Document, f: DuctFitting, insulated = false): P3[][][] | null {
   const J = f.params.point;
   const ends = f.params.ends.flatMap((e) => {
     const d = doc.get(e.ductId) as Duct | undefined;
     if (!d || !RUN_CATEGORIES.has(d.category)) return [];
     const inward = ductInward(doc, d, e.end);
-    return [{ s: section(doc, d), inward, p: add(J, mul(inward, fittingTrim(doc, f, d.id))) }];
+    return [{ s: section(doc, d, insulated), inward, p: add(J, mul(inward, fittingTrim(doc, f, d.id))) }];
   });
   if (ends.length < 2) return null;
   if (f.params.kind === "elbow" || f.params.kind === "transition") {
@@ -231,7 +241,10 @@ export function buildDuctLines(doc: Document, el: Element, _scale = 100, detail:
   }
   const rings = ductRings(doc, d);
   if (!rings) return null;
-  return { segments: new Float32Array(planOutline([rings], levelZ(doc, d))), labels: [], planOnly: true, placement: "model" };
+  const z = levelZ(doc, d);
+  // Insulation: its outline round the run's.
+  const outer = insulationOf(d) ? ductRings(doc, d, true) : null;
+  return { segments: new Float32Array([...planOutline([rings], z), ...(outer ? planOutline([outer], z) : [])]), labels: [], planOnly: true, placement: "model" };
 }
 
 export function buildDuctFittingLines(doc: Document, el: Element, _scale = 100, detail: DetailLevel = "medium"): LineData | null {
@@ -240,7 +253,13 @@ export function buildDuctFittingLines(doc: Document, el: Element, _scale = 100, 
   const tubes = fittingTubes(doc, f);
   const first = doc.get(f.params.ends[0]?.ductId ?? "") as Duct | undefined;
   if (!tubes || !first) return null;
-  return { segments: new Float32Array(planOutline(tubes, levelZ(doc, first))), labels: [], planOnly: true, placement: "model" };
+  const z = levelZ(doc, first);
+  const insulated = f.params.ends.some((e) => {
+    const d = doc.get(e.ductId);
+    return !!d && insulationOf(d) > 0;
+  });
+  const outer = insulated ? fittingTubes(doc, f, true) : null;
+  return { segments: new Float32Array([...planOutline(tubes, z), ...(outer ? planOutline(outer, z) : [])]), labels: [], planOnly: true, placement: "model" };
 }
 
 /** Runs and their fittings (ducts, pipes, trays, conduit): single-line at Coarse. */

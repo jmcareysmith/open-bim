@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Cat, Document, applyResidentialTemplate, createDuct, enableDuctFittings, ensureDuctTypes, floorPlanFor, type P3 } from "@open-bim/core";
-import { SimpleKernel, boundingBox, meshVolume, viewDrawing } from "../src/index.ts";
+import { SimpleKernel, boundingBox, buildDuctLines, meshVolume, viewDrawing } from "../src/index.ts";
 
 const p = (x: number, y: number, z = 2700): P3 => ({ x, y, z });
 
@@ -49,5 +49,25 @@ describe("duct solids", () => {
     expect(k.buildLines(doc, doc.require(a.id), 100, "coarse")!.segments.length).toBe(6);
     expect(k.buildLines(doc, doc.byCategory(Cat.DuctFitting)[0]!, 100, "coarse")).toBeNull();
     expect(k.buildLines(doc, doc.require(a.id), 100, "medium")!.segments.length).toBeGreaterThan(6);
+  });
+});
+
+describe("insulation", () => {
+  it("wraps the run and its fittings, and draws a second outline in plan", () => {
+    const { doc, ids, rect } = setup();
+    const k = new SimpleKernel();
+    const d = doc.transact("D", (tx) => createDuct(tx, doc, rect, ids.levels.ground, p(0, 0, 1000), p(2000, 0, 1000), { width: 400, height: 250 }));
+    doc.transact("D2", (tx) => createDuct(tx, doc, rect, ids.levels.ground, p(2000, 0, 1000), p(2000, 2000, 1000), { width: 400, height: 250 }));
+    const before = buildDuctLines(doc, doc.require(d.id))!.segments.length;
+    const elbow = doc.byCategory(Cat.DuctFitting)[0]!;
+    const elbowBefore = boundingBox(k.build(doc, elbow)!);
+    doc.transact("I", (tx) => tx.update(d.id, { insulation: 25 }));
+    const bb = boundingBox(k.build(doc, doc.require(d.id))!);
+    expect(bb.max[1] - bb.min[1]).toBeCloseTo(450);
+    expect(bb.max[2] - bb.min[2]).toBeCloseTo(300);
+    expect(buildDuctLines(doc, doc.require(d.id))!.segments.length).toBe(before * 2);
+    // The elbow's end on the insulated duct grows too.
+    const eb = boundingBox(k.build(doc, doc.byCategory(Cat.DuctFitting)[0]!)!);
+    expect(eb.max[2] - eb.min[2]).toBeGreaterThan(elbowBefore.max[2] - elbowBefore.min[2] + 20);
   });
 });

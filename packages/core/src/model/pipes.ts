@@ -23,6 +23,8 @@ export type PipeParams = {
   /** Nominal diameter (DN), mm. */
   diameter: number;
   classification: SystemClassification;
+  /** Insulation thickness, mm (lagging); wraps the run and its fittings. */
+  insulation?: number | null;
 };
 export type Pipe = Element<PipeParams>;
 export type PipeFitting = Fitting;

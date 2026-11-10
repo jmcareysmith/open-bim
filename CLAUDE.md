@@ -211,7 +211,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Plans show duct outlines on their level. System Properties → Size ducts (velocity method).
 - Pipes (core/model/pipes.ts; routing shared with ducts in core/model/runs.ts): Systems → Pipe
   (PI); DN sizes; types by material/use (PE-X, copper, uPVC sanitary/stormwater); drainage falls
-  as drawn (minimum 1:40 ≤DN65, 1:60 DN80–100, 1:100 above — provisional, Jeremy's go-ahead to use
+  as drawn; Insulation (mm) in duct/pipe Properties wraps runs and fittings (3D outer shell, second plan outline,
+  schedule field; geometry ducts.ts `insulationOf`) (minimum 1:40 ≤DN65, 1:60 DN80–100, 1:100 above — provisional, Jeremy's go-ahead to use
   own figures); `pipeFallChecks`. Fittings: elbow/transition/tee/cross, as for ducts.
 - Model In-Place (Architecture → Model In-Place ▾ category; main.ts `modelInPlace`, `inPlacePending`: Load into Project places it at the level origin). Long menus scroll.
 - Massing (Phase 8a): Mass family category; Massing & Site → Show Mass (session toggle; masses

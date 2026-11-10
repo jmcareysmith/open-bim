@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { elementMaterial, sunDirection, type Document } from "@open-bim/core";
 import type { MeshData } from "@open-bim/geometry";
+import { materialTexture } from "./textures.ts";
 import { toGeometry, type Viewport } from "./viewport.ts";
 import { DEFAULT_GEMINI_MODEL, DEFAULT_LOCAL, aiRender, type AiProvider } from "./airender.ts";
 
@@ -69,13 +70,28 @@ export async function openRender(host: RenderHost): Promise<() => void> {
   scene.add(world);
   const materials: THREE.Material[] = [];
   const box = new THREE.Box3();
+  // Textures as the Realistic view shows them (the material's image, or one drawn from its colour and
+  // surface pattern), mapped by world position: the path tracer needs real UVs, made per mesh below.
+  const pending: Promise<void>[] = [];
+  const textured = new Map<MeshData, number>();
   for (const { id, mesh, color } of viewport.renderMeshes()) {
-    const m = elementMaterial(doc, doc.require(id))?.params;
+    const mat = elementMaterial(doc, doc.require(id));
+    const m = mat?.params;
     const transparency = m?.transparency ?? 0;
+    let map: THREE.Texture | null = null;
+    if (mat && !mesh.colors && transparency <= 0) {
+      let done: () => void = () => {};
+      const loaded = new Promise<void>((res) => (done = res));
+      const t = materialTexture(mat, () => done());
+      map = t.tex;
+      textured.set(mesh, t.size);
+      const img = map.image as { complete?: boolean; width?: number } | undefined;
+      if (img && img.complete === false) pending.push(Promise.race([loaded, new Promise<void>((res) => setTimeout(res, 5000))]));
+    }
     const surface =
       transparency > 0
         ? new THREE.MeshPhysicalMaterial({ color, transmission: transparency, roughness: m?.roughness ?? 0.05, ior: 1.5, thickness: 5 })
-        : new THREE.MeshStandardMaterial({ color: mesh.colors ? 0xffffff : color, vertexColors: !!mesh.colors, roughness: m?.roughness ?? 0.85, metalness: m?.metalness ?? 0 });
+        : new THREE.MeshStandardMaterial({ color: mesh.colors || map ? 0xffffff : color, map, vertexColors: !!mesh.colors, roughness: m?.roughness ?? 0.85, metalness: m?.metalness ?? 0 });
     materials.push(surface);
     // Glazing becomes its own mesh (the path tracer is happiest with one material per mesh).
     const parts: [MeshData, THREE.Material][] = [];
@@ -91,6 +107,8 @@ export async function openRender(host: RenderHost): Promise<() => void> {
     } else parts.push([mesh, surface]);
     for (const [m2, mat] of parts) {
       const geom = toGeometry(m2);
+      const tile = textured.get(mesh);
+      if (tile && (mat as THREE.MeshStandardMaterial).map) geom.setAttribute("uv", worldUvs(m2, tile));
       world.add(new THREE.Mesh(geom, mat));
       geom.computeBoundingBox();
       box.union(geom.boundingBox!);
@@ -157,6 +175,8 @@ export async function openRender(host: RenderHost): Promise<() => void> {
 
   applySun();
   scene.updateMatrixWorld(true);
+  // Image textures still loading are waited for (the tracer copies them once, at setScene).
+  if (pending.length) await Promise.all(pending);
   tracer.setScene(scene, camera);
   resize();
 
@@ -356,4 +376,21 @@ function showResult(canvasHost: HTMLElement, png: Uint8Array, host: RenderHost):
   bar.append(save, back);
   wrap.append(img, bar);
   canvasHost.append(wrap);
+}
+
+/**
+ * Texture coordinates from world position (as the Realistic view's triplanar mapping): plan faces
+ * by x/y, walls by whichever of x/y they face along, in tiles of `tile` mm.
+ */
+function worldUvs(m: MeshData, tile: number): THREE.BufferAttribute {
+  const n = m.positions.length / 3;
+  const uv = new Float32Array(n * 2);
+  for (let i = 0; i < n; i++) {
+    const [x, y, z] = [m.positions[i * 3]!, m.positions[i * 3 + 1]!, m.positions[i * 3 + 2]!];
+    const [nx, ny, nz] = [Math.abs(m.normals[i * 3]!), Math.abs(m.normals[i * 3 + 1]!), Math.abs(m.normals[i * 3 + 2]!)];
+    const [u, v] = nz > 0.5 ? [x, y] : nx > ny ? [y, z] : [x, z];
+    uv[i * 2] = u / tile;
+    uv[i * 2 + 1] = v / tile;
+  }
+  return new THREE.BufferAttribute(uv, 2);
 }

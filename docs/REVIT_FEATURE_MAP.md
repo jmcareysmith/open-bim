@@ -128,7 +128,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 |---|---|---|
 | Materials (graphics, appearance, physical, thermal) | 2 | ✅ (graphics, render appearance, textures; density and conductivity — layered types' R-values from their layers for H1/energy) |
 | Surface / cut patterns | 2 | ✅ |
-| Realistic rendering | 7 | ✅ (path traced; no textures yet) |
+| Realistic rendering | 7 | ✅ (path traced; material textures (image or drawn from colour + surface pattern) mapped by world position) |
 | AI render (Gemini-style) | 7 | ✅ (self-hosted SD WebUI or Gemini, user key) |
 | Sun & shadow studies | 7 | ✅ (still/single-day/multi-day studies with preview playback, Lighting angles; brightness, shadow intensity, ambient shadows, depth cueing; no video export) |
 

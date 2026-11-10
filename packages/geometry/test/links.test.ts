@@ -8,9 +8,13 @@ import {
   linkDocument,
   reloadLink,
   type Link,
+  bindLink,
+  createSchedule,
+  createDoor,
+  type WallParams,
   type LinkParams,
 } from "@open-bim/core";
-import { SimpleKernel, boundingBox } from "../src/index.ts";
+import { SimpleKernel, boundingBox, scheduleTable } from "../src/index.ts";
 
 function neighbour(at: { e: number; n: number }) {
   const doc = new Document();
@@ -73,3 +77,45 @@ describe("links", () => {
     expect(c).toEqual([0xe4, 0xe0, 0xd4]);
   });
 });
+
+describe("links in schedules and Bind Link", () => {
+  it("schedules include linked elements when asked", () => {
+    const host = new Document();
+    const ids = applyResidentialTemplate(host);
+    host.transact("W", (tx) => createWall(tx, ids.wallTypes.exterior, { x: 0, y: 5000 }, { x: 3000, y: 5000 }, ids.levels.ground, { topLevelId: ids.levels.first }));
+    host.transact("Link", (tx) => createLink(tx, neighbour({ e: 0, n: 0 }).toJSON(), "n.obim"));
+    const s = host.transact("S", (tx) => createSchedule(tx, host, "Wall"));
+    expect(scheduleTable(host, s).rows.length).toBe(1);
+    host.transact("Inc", (tx) => tx.update(s.id, { includeLinks: true }));
+    expect(scheduleTable(host, host.require(s.id) as typeof s).rows.length).toBe(2);
+  });
+
+  it("binds a link: its walls and doors become the project's, moved, on matching levels, sharing types by name", () => {
+    const n = neighbour({ e: 0, n: 0 });
+    const wall = n.byCategory<WallParams>("Wall")[0]!;
+    const doorType = n.byCategory("DoorType")[0]!;
+    n.transact("D", (tx) => createDoor(tx, n, doorType.id, wall.id, 2000));
+    const host = new Document();
+    const ids = applyResidentialTemplate(host);
+    const link = host.transact("Link", (tx) => createLink(tx, n.toJSON(), "n.obim"));
+    host.transact("Move", (tx) => tx.update<LinkParams>(link.id, { offset: { x: 10000, y: 0, z: 0 }, rotation: Math.PI / 2 }));
+    const before = host.all().length;
+    const nLevels = host.byCategory("Level").length;
+    const box = boundingBox(new SimpleKernel().build(host, host.require(link.id))!);
+    host.transact("Bind", (tx) => bindLink(tx, host, host.require(link.id) as Link));
+    expect(host.get(link.id)).toBeUndefined();
+    const walls = host.byCategory<WallParams>("Wall");
+    expect(walls).toHaveLength(1);
+    expect(walls[0]!.params.end.x).toBeCloseTo(10000);
+    expect(walls[0]!.params.end.y).toBeCloseTo(4000);
+    expect(walls[0]!.params.baseLevelId).toBe(ids.levels.ground);
+    expect(walls[0]!.typeId).toBe(ids.wallTypes.exterior);
+    expect(host.byCategory("Door")).toHaveLength(1);
+    expect(host.byCategory("Level")).toHaveLength(nLevels);
+    // Wall + door; no duplicate types or materials.
+    expect(host.all().length).toBe(before - 1 + 2);
+    const after = boundingBox(new SimpleKernel().build(host, walls[0]!)!);
+    expect(after.min[1]).toBeCloseTo(box.min[1], 0);
+  });
+});
+

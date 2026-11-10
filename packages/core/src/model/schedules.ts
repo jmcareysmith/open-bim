@@ -32,6 +32,8 @@ export type ScheduleParams = {
   grandTotals: boolean;
   /** Calculated fields (Revit's Calculated Value): add `calc:<name>` to `fields` to show one. */
   calculated?: CalculatedField[] | null;
+  /** Revit's "Include elements in links": linked models' elements of the category get rows too. */
+  includeLinks?: boolean | null;
 };
 export type Schedule = Element<ScheduleParams>;
 

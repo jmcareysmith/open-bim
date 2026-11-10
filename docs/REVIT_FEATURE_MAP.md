@@ -16,7 +16,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Phasing (existing / new / demolished, phase filters) | 6 | ✅ |
 | Design options | 6 | ✅ |
 | Groups (model & detail) | 4 | ✅ |
-| Links (linked models) | 5 | 🟨 (link by shared coordinates or origin, offset/rotation, reload, one colour or own material colours; not scheduled, no bind) |
+| Links (linked models) | 5 | ✅ (link by shared coordinates or origin, offset/rotation, reload, one colour or own material colours; schedules: Include elements in links; Bind Link copies the model in) |
 
 ## 2. Datums
 | Feature | Phase | Status |

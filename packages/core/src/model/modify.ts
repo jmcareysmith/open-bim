@@ -369,6 +369,14 @@ function transformed(c: Ctx, el: Element): Record<string, unknown> | null {
   throw new Error(`${el.category} can't be moved this way`);
 }
 
+/**
+ * An element's params under a plan transform, as Move would set them (null: it rides on a host
+ * in `set`). Throws for categories the modify tools don't move.
+ */
+export function transformParams(doc: Document, el: Element, t: Affine, set: Set<ElementId>): Record<string, unknown> | null {
+  return transformed({ doc, t, mirror: isMirror(t), set }, el);
+}
+
 /** Wall ends (of walls not being moved) joined to the moved walls follow them. */
 function dragJoinedWalls(tx: Transaction, doc: Document, t: Affine, moved: Wall[], set: Set<ElementId>): void {
   const others = (doc.byCategory<WallParams>(Cat.Wall) as Wall[]).filter((w) => !set.has(w.id));

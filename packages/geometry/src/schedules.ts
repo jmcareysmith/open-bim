@@ -1,4 +1,4 @@
-import { rebarQuantities, type Rebar, type RebarParams,
+import { links, linkDocument, rebarQuantities, type Rebar, type RebarParams,
   AREA_SCHEMES,
   Cat,
   customValue,
@@ -360,19 +360,25 @@ export function scheduleTable(doc: Document, schedule: Schedule): ScheduleTable 
   const col = new Map(keys.map((k, i) => [k, i]));
 
   let items: Item[] = [];
-  for (const el of scheduleElements(doc, s.category)) {
-    const layers: (TakeoffLayer | undefined)[] = s.kind === "takeoff" ? takeoffLayers(doc, el) : [undefined];
-    for (const layer of layers) {
-      items.push({
-        ids: [el.id],
-        values: keys.map((k) => {
-          try {
-            return byKey.get(k)!.get(doc, el, layer);
-          } catch {
-            return undefined;
-          }
-        }),
-      });
+  // The project's elements, then (when asked) each linked model's, read in their own document.
+  const sources: { doc: Document; id?: string }[] = [{ doc }];
+  if (s.includeLinks) for (const l of links(doc)) sources.push({ doc: linkDocument(l), id: l.id });
+  for (const src of sources) {
+    for (const el of scheduleElements(src.doc, s.category)) {
+      const layers: (TakeoffLayer | undefined)[] = s.kind === "takeoff" ? takeoffLayers(src.doc, el) : [undefined];
+      for (const layer of layers) {
+        items.push({
+          // Linked rows select the link.
+          ids: [src.id ?? el.id],
+          values: keys.map((k) => {
+            try {
+              return byKey.get(k)!.get(src.doc, el, layer);
+            } catch {
+              return undefined;
+            }
+          }),
+        });
+      }
     }
   }
 

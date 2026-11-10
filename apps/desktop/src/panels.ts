@@ -91,6 +91,7 @@ import {
   type StairTypeParams,
   links,
   linkDocument,
+  bindLink,
   type Link,
   type LinkParams,
   CRS_OPTIONS,
@@ -1212,6 +1213,7 @@ function scheduleSections(ctx: PanelContext, s: Schedule): HTMLElement[] {
     row("Category", SCHEDULE_CATEGORIES.find(([c]) => c === p.category)?.[1] ?? p.category),
     row("Itemise every instance", checkbox(p.itemize, (v) => set("Itemise", { itemize: v }))),
     row("Grand totals", checkbox(p.grandTotals, (v) => set("Grand totals", { grandTotals: v }))),
+    row("Include elements in links", checkbox(p.includeLinks === true, (v) => set("Include links", { includeLinks: v }))),
     row("", h("div", { class: "buttons wrap" }, csv, xlsx)),
   );
 
@@ -3313,6 +3315,15 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Rotation (\u00b0)", numberInput(Math.round(((p.rotation * 180) / Math.PI) * 100) / 100, (v) => update<LinkParams>("Rotate link", { rotation: (v * Math.PI) / 180 }))),
         row("", reload),
       );
+      const bind = h("button", { textContent: "Bind Link", title: "Copy the linked model's elements into this project and remove the link" });
+      bind.onclick = () => {
+        if (!confirm(`Bind ${l.name ?? "the link"}? Its model elements become this project's own (views and annotation stay behind) and the link is removed.`)) return;
+        edit(ctx, "Bind link", (tx) => {
+          const ids = bindLink(tx, doc, l);
+          ctx.status(`Bound ${ids.length} element${ids.length === 1 ? "" : "s"} from ${l.name ?? "the link"}.`);
+        });
+      };
+      sec.append(row("", bind));
       break;
     }
     case Cat.CadImport: {

@@ -31,6 +31,7 @@ export * from "./model/groups.ts";
 export * from "./model/directshape.ts";
 export * from "./model/cadimport.ts";
 export * from "./model/links.ts";
+export * from "./model/bind.ts";
 export * from "./model/stairs.ts";
 export * from "./model/railings.ts";
 export * from "./model/ramps.ts";

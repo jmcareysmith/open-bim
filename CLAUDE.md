@@ -165,7 +165,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   not tested with a real converter (none installed here).
 - Shared coordinates (Project Information & Units → Location; NZTM2000; survey point position; plan Properties → Base and
   survey points shows both marks with E/N/RL — geometry `basePointMarks`) and links (browser → Links →
-  Link project…; by shared coordinates or origin; Reload). Links draw in one colour or their own material colours (link Properties), aren't scheduled.
+  Link project…; by shared coordinates or origin; Reload). Links draw in one colour or their own material colours (link Properties); schedules can Include elements in links
+  (`includeLinks`); link Properties → Bind Link (core/model/bind.ts: model elements copied in, types/materials/families
+  shared by name, levels matched by elevation, views/annotation left behind; uses modify `transformParams`).
 - glTF (.glb) and OBJ (+MTL, zipped) export.
 - Stairs (Stair tool: run ends, Enter; D1/AS1 checks), ramps (1:12 check), railings (sketched or
   on stairs/ramps, F4/AS1 gap). Runs are straight; L/U by drawing runs; stair Properties → Turns: landings or 2–4 winders per square turn

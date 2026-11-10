@@ -126,6 +126,31 @@ def({
   run: (i, _c, n) => ({ result: evaluate(String(n.values?.formula ?? "a"), { a: asNum(i.a), b: asNum(i.b), c: asNum(i.c), d: asNum(i.d) }) }),
 });
 
+/**
+ * Script (Dynamo's Python Script node, in JavaScript): the code sees `IN` (the four inputs as a
+ * list), `doc` (to read the model) and returns the output, e.g. `return IN[0] * 2`. It runs with
+ * the app's own rights, like plugins and the scripting console: only run scripts you trust.
+ */
+def({
+  type: "script",
+  label: "Script (JavaScript)",
+  category: "Maths",
+  inputs: ["IN0", "IN1", "IN2", "IN3"].map((name) => ({ name, type: "any" as const, list: true, default: null })),
+  outputs: [out("OUT", "any")],
+  settings: [{ name: "code", type: "text" }],
+  volatile: true,
+  run: (i, ctx, n) => {
+    const code = String(n.values?.code ?? "return IN[0];");
+    let fn: (IN: unknown[], doc: Document) => unknown;
+    try {
+      fn = new Function("IN", "doc", code) as typeof fn;
+    } catch (err) {
+      throw new Error(`Script: ${(err as Error).message}`);
+    }
+    return { OUT: fn([i.IN0, i.IN1, i.IN2, i.IN3], ctx.doc) ?? null };
+  },
+});
+
 // ---- Lists ----
 def({
   type: "listCreate",

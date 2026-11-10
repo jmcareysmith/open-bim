@@ -306,8 +306,15 @@ export function openGraphEditor(host: GraphEditorHost): void {
       // Settings (slider range, formula, category…).
       for (const s of d?.settings ?? []) {
         const cur2 = n.values?.[s.name];
-        let input: HTMLInputElement | HTMLSelectElement;
-        if (s.type === "select") {
+        let input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+        if (s.type === "text") {
+          // Code: several lines.
+          input = el("textarea");
+          input.rows = 4;
+          input.spellcheck = false;
+          input.value = cur2 === undefined || cur2 === null ? "" : String(cur2);
+          input.onpointerdown = (e) => e.stopPropagation();
+        } else if (s.type === "select") {
           input = el("select");
           for (const o of s.options ?? []) input.append(new Option(o, o, false, o === cur2));
         } else {

@@ -78,7 +78,7 @@ export type NodeDef = {
   /** Makes or changes elements. */
   effect?: boolean;
   /** Settings shown on the node (not ports), e.g. a slider's range: names of `values` keys. */
-  settings?: { name: string; type: "number" | "string" | "boolean" | "select"; options?: string[] }[];
+  settings?: { name: string; type: "number" | "string" | "text" | "boolean" | "select"; options?: string[] }[];
   run(inputs: Record<string, unknown>, ctx: NodeContext, node: GraphNode): Record<string, unknown>;
 };
 

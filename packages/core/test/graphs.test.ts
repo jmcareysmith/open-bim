@@ -207,3 +207,17 @@ describe("custom nodes", () => {
     expect(walls().map((w) => w.id).sort()).toEqual(ids);
   });
 });
+
+describe("script node", () => {
+  it("runs JavaScript over its inputs and reports errors on the node", () => {
+    const t = setup();
+    t.node("a", "number", { value: 21 });
+    t.node("s", "script", { code: "return IN[0] * 2 + doc.byCategory('Level').length * 0;" });
+    t.link("a", "value", "s", "IN0");
+    t.node("bad", "script", { code: "return (" });
+    t.save();
+    const r = runGraph(t.doc, t.g.id);
+    expect(r.get("s")!.outputs.OUT).toBe(42);
+    expect(r.get("bad")!.error).toMatch(/^Script:/);
+  });
+});

@@ -301,8 +301,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   (`nodeDef(type, doc)`, `runCustom`; its elements bind to the calling node's slots). Next (Jeremy): back to Revit parity (arc-wall gaps, curved stairs, angular/radial
   dimensions, barge boards, elevation sketch profiles). Jeremy caps usage: 75% of weekly by Wednesday.
 - 2026-11-10: every REVIT_FEATURE_MAP row is ✅ except the three that rest on provisional figures (MEP sizing,
-  energy, loads: waiting on Jeremy's standards). Not done: a script node in visual programming (a JavaScript
-  `new Function` node was refused by the tool permissions; Python would need Pyodide) — ask Jeremy.
+  energy, loads: waiting on Jeremy's standards). Visual programming has a Script (JavaScript) node (Jeremy's go-ahead,
+  2026-11-11; `IN` list + `doc`, runs with app rights like the console); Python would need Pyodide.
 - Phase 9 started (items set in ROADMAP). Rebar (core/model/rebar.ts, geometry/src/rebar.ts): floor / wall (face mats) / pad footing /
   beam / column / strip footing Properties → Reinforcement → Add; area mats or cages laid out from the host
   (`rebarBars`), NZ bar sizes, mass (`rebarQuantities`), schedule category Structural Rebar. Bars sit inside the

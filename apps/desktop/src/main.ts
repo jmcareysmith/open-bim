@@ -1,5 +1,6 @@
 import { openObjectStyles } from "./objectstyles.ts";
 import { ContainmentTool } from "./containtool.ts";
+import { FlexDuctTool } from "./flextool.ts";
 import { FaceTool } from "./facetool.ts";
 import { openColorSchemes } from "./colorschemes.ts";
 import { openGraphEditor } from "./grapheditor.ts";
@@ -600,6 +601,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   pipe: new RunTool(ctx, "pipe"),
   tray: new ContainmentTool(ctx, "tray"),
   conduit: new ContainmentTool(ctx, "conduit"),
+  flexduct: new FlexDuctTool(ctx),
   camera: new CameraTool(ctx, (id) => {
     setTool("select");
     ctx.setActiveView(id);

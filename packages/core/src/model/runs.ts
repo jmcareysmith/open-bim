@@ -67,17 +67,34 @@ export function runEnds(doc: Document, run: Run): { start: P3; end: P3 } {
 
 export function runLength(run: Run): number {
   const { start: a, end: b } = run.params;
-  return Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+  const via = (run.params as { flex?: boolean | null; via?: P3[] | null }).flex ? ((run.params as { via?: P3[] | null }).via ?? []) : [];
+  if (!via.length) return Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z);
+  // Flex: along its points (the curve through them is a touch longer).
+  const pts = [a, ...via, b];
+  let L = 0;
+  for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i]!.x - pts[i - 1]!.x, pts[i]!.y - pts[i - 1]!.y, pts[i]!.z - pts[i - 1]!.z);
+  return L;
 }
 
-/** Unit vector from a run's end into the run. */
+/** Flex runs join what they meet directly: no fittings, no splitting. */
+const isFlex = (r: { params: unknown }) => !!(r.params as { flex?: boolean | null }).flex;
+
+/** Unit vector from a run's end into the run (a flex run: towards its first/last via point). */
 export function runInward(doc: Document, run: Run, end: "start" | "end"): P3 {
   const { start, end: e } = runEnds(doc, run);
+  const via = isFlex(run) ? ((run.params as { via?: P3[] | null }).via ?? []) : [];
+  if (via.length) {
+    const z0 = doc.get<LevelParams>(run.params.levelId)?.params.elevation ?? 0;
+    const v = end === "start" ? via[0]! : via[via.length - 1]!;
+    const q = { x: v.x, y: v.y, z: v.z + z0 };
+    return end === "start" ? unit(sub(q, start)) : unit(sub(q, e));
+  }
   return end === "start" ? unit(sub(e, start)) : unit(sub(start, e));
 }
 
+/** Runs that take part in fittings (flex runs don't). */
 export function runsOf(doc: Document, kind: RunKind): Run[] {
-  return doc.byCategory<RunParams>(kind.category) as Run[];
+  return (doc.byCategory<RunParams>(kind.category) as Run[]).filter((r) => !isFlex(r));
 }
 
 export function fittingsOfRun(doc: Document, run: Run): Fitting[] {

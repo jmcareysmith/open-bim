@@ -208,7 +208,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   middle elevation/size/system in the options strip, change elevation between clicks for a riser,
   click a connector to join it. Fittings (elbow, transition, tee, cross) are elements kept by a
   commit hook (`enableDuctFittings`); a run ending on another's side splits it for a tee.
-  Plans show duct outlines on their level. System Properties → Size ducts (velocity method).
+  Plans show duct outlines on their level. Flex Duct (FD; apps/desktop/src/flextool.ts): click points, Enter or a connector;
+  duct `flex`/`via`, core `createFlexDuct`/`ductPath` (Catmull-Rom), excluded from fittings (`runsOf`). System Properties → Size ducts (velocity method).
 - Pipes (core/model/pipes.ts; routing shared with ducts in core/model/runs.ts): Systems → Pipe
   (PI); DN sizes; types by material/use (PE-X, copper, uPVC sanitary/stormwater); drainage falls
   as drawn; Insulation (mm) in duct/pipe Properties wraps runs and fittings (3D outer shell, second plan outline,

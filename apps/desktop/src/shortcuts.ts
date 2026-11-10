@@ -32,6 +32,7 @@ export const COMMANDS: Command[] = [
   { action: "tool:duct", label: "Duct", keys: "DT" },
   { action: "tool:pipe", label: "Pipe", keys: "PI" },
   { action: "tool:tray", label: "Cable Tray", keys: "CT" },
+  { action: "tool:flexduct", label: "Flex Duct", keys: "FD" },
   { action: "tool:conduit", label: "Conduit", keys: "CN" },
   { action: "tool:beam", label: "Beam", keys: "" },
   { action: "tool:footing", label: "Footing", keys: "" },

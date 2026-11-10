@@ -1,4 +1,5 @@
 import {
+  ductPath,
   Cat,
   ductEnds,
   ductInward,
@@ -118,7 +119,8 @@ function section(doc: Document, d: Duct, insulated = false): Section {
   // Pipes are round at their nominal size.
   if (d.category === Cat.Pipe || d.category === Cat.Conduit) return { shape: "round", d: d.params.diameter + 2 * t, w: 0, h: 0 };
   if (d.category === Cat.CableTray) return { shape: "rectangular", d: 0, w: d.params.width, h: d.params.height };
-  return { shape: ductShape(doc, d), d: d.params.diameter + 2 * t, w: d.params.width + 2 * t, h: d.params.height + 2 * t };
+  const shape = d.params.flex ? "round" : ductShape(doc, d);
+  return { shape, d: d.params.diameter + 2 * t, w: d.params.width + 2 * t, h: d.params.height + 2 * t };
 }
 
 /** How far each end of a duct is taken back for fittings there. */
@@ -130,6 +132,13 @@ function trims(doc: Document, d: Duct): { start: number; end: number } {
 
 /** The section rings a duct's tube runs through (trimmed for fittings), or null if nothing's left. */
 function ductRings(doc: Document, d: Duct, insulated = false): P3[][] | null {
+  if (d.params.flex && d.params.via?.length) {
+    // Flex: rings along its smooth path (no fittings to trim for).
+    const z0 = (doc.get<LevelParams>(d.params.levelId)?.params.elevation ?? 0);
+    const path = ductPath(d).map((q) => ({ x: q.x, y: q.y, z: q.z + z0 }));
+    const s = section(doc, d, insulated);
+    return path.map((q, i) => ring(q, sub(path[Math.min(i + 1, path.length - 1)]!, path[Math.max(i - 1, 0)]!), s));
+  }
   const { start, end } = ductEnds(doc, d);
   const t = unit(sub(end, start));
   const L = Math.hypot(end.x - start.x, end.y - start.y, end.z - start.z);
@@ -235,8 +244,14 @@ export function buildDuctLines(doc: Document, el: Element, _scale = 100, detail:
   const d = el as Duct;
   if (detail === "coarse") {
     // Coarse: one line down the middle of the run (Revit's single-line ducts and pipes).
-    const { start, end } = ductEnds(doc, d);
     const z = levelZ(doc, d);
+    if (d.params.flex && d.params.via?.length) {
+      const path = ductPath(d);
+      const seg: number[] = [];
+      for (let i = 1; i < path.length; i++) seg.push(path[i - 1]!.x, path[i - 1]!.y, z, path[i]!.x, path[i]!.y, z);
+      return { segments: new Float32Array(seg), labels: [], planOnly: true, placement: "model" };
+    }
+    const { start, end } = ductEnds(doc, d);
     return { segments: new Float32Array([start.x, start.y, z, end.x, end.y, z]), labels: [], planOnly: true, placement: "model" };
   }
   const rings = ductRings(doc, d);

@@ -51,6 +51,12 @@ export type DuctParams = {
   classification: SystemClassification;
   /** Insulation (Revit: Add Insulation) thickness, mm; wraps the run and its fittings. */
   insulation?: number | null;
+  /**
+   * Flex duct (Revit: Flex Duct): round, curving smoothly through `via` (points between the ends,
+   * z above the level like the ends). Joins terminals directly: no fittings are made at its ends.
+   */
+  flex?: boolean | null;
+  via?: P3[] | null;
 };
 export type Duct = Element<DuctParams>;
 
@@ -109,6 +115,38 @@ export function ductSizeLabel(doc: Document, duct: Duct): string {
 export const ductEnds = (doc: Document, duct: Duct): { start: P3; end: P3 } => runEnds(doc, duct as unknown as Run);
 
 export const ductLength = (duct: Duct): number => runLength(duct as unknown as Run);
+
+/** A flex duct from `start` through `via` to `end` (round; no fittings at its ends). */
+export function createFlexDuct(tx: Transaction, doc: Document, typeId: ElementId, levelId: ElementId, points: P3[], opts: Partial<Pick<DuctParams, "diameter" | "classification">> = {}): Duct {
+  if (points.length < 2) throw new Error("A flex duct needs a start and an end");
+  const d = createDuct(tx, doc, typeId, levelId, points[0]!, points[points.length - 1]!, opts);
+  tx.update<DuctParams>(d.id, { flex: true, via: points.slice(1, -1).map((p) => ({ ...p })) });
+  return doc.require<DuctParams>(d.id) as Duct;
+}
+
+/** The centreline a duct follows, level-relative z: straight, or a flex duct's smooth curve. */
+export function ductPath(d: { params: Pick<DuctParams, "start" | "end" | "flex" | "via"> }, step = 100): P3[] {
+  const { start, end, flex, via } = d.params;
+  const pts = [start, ...(flex ? (via ?? []) : []), end];
+  if (pts.length === 2) return [{ ...start }, { ...end }];
+  // Centripetal-free uniform Catmull-Rom through the points (ends repeated).
+  const out: P3[] = [{ ...start }];
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const p0 = pts[Math.max(0, i - 1)]!;
+    const p1 = pts[i]!;
+    const p2 = pts[i + 1]!;
+    const p3 = pts[Math.min(pts.length - 1, i + 2)]!;
+    const n = Math.max(2, Math.ceil(Math.hypot(p2.x - p1.x, p2.y - p1.y, p2.z - p1.z) / step));
+    for (let k = 1; k <= n; k++) {
+      const t = k / n;
+      const t2 = t * t;
+      const t3 = t2 * t;
+      const f = (a: number, b: number, c: number, e: number) => 0.5 * (2 * b + (-a + c) * t + (2 * a - 5 * b + 4 * c - e) * t2 + (-a + 3 * b - 3 * c + e) * t3);
+      out.push({ x: f(p0.x, p1.x, p2.x, p3.x), y: f(p0.y, p1.y, p2.y, p3.y), z: f(p0.z, p1.z, p2.z, p3.z) });
+    }
+  }
+  return out;
+}
 
 export function createDuct(
   tx: Transaction,

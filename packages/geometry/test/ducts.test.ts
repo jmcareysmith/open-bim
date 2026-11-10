@@ -71,3 +71,23 @@ describe("insulation", () => {
     expect(eb.max[2] - eb.min[2]).toBeGreaterThan(elbowBefore.max[2] - elbowBefore.min[2] + 20);
   });
 });
+
+describe("flex ducts", () => {
+  it("curve smoothly through their points, make no fittings, and draw along the curve", async () => {
+    const { doc, ids, round } = setup();
+    const { createFlexDuct, ductPath } = await import("@open-bim/core");
+    const main = doc.transact("D", (tx) => createDuct(tx, doc, round, ids.levels.ground, p(0, 0), p(3000, 0), { diameter: 300 }));
+    const flex = doc.transact("F", (tx) => createFlexDuct(tx, doc, round, ids.levels.ground, [p(3000, 0), p(3600, 600), p(3600, 1500, 2400)], { diameter: 200 }));
+    expect(doc.byCategory(Cat.DuctFitting)).toHaveLength(0);
+    expect(doc.require(main.id)).toBeDefined();
+    const path = ductPath(doc.require(flex.id) as never);
+    expect(path.length).toBeGreaterThan(10);
+    // Passes through its middle point.
+    expect(path.some((q) => Math.hypot(q.x - 3600, q.y - 600) < 1)).toBe(true);
+    const m = new SimpleKernel().build(doc, doc.require(flex.id))!;
+    const bb = boundingBox(m);
+    expect(bb.max[0]).toBeGreaterThan(3600 + 90);
+    expect(bb.min[2]).toBeLessThan(2400 - 90 + 1);
+    expect(meshVolume(m)).toBeGreaterThan(0);
+  });
+});

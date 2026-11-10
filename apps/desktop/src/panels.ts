@@ -270,6 +270,7 @@ import {
   renameReferencePlane,
   totalThickness,
   wallLength,
+  wallRunLength,
   wallThickness,
   type Document,
   type Element,
@@ -703,7 +704,8 @@ function extrusionRoofRows(ctx: PanelContext, r: Roof): HTMLElement[] {
 /** Edit Profile: the wall's elevation outline — presets and its points (along, up from base). */
 function profileRows(ctx: PanelContext, w: Wall): HTMLElement[] {
   const { doc } = ctx;
-  const len = wallLength(w);
+  // Along the location line: the arc's length on curved walls.
+  const len = wallRunLength(w);
   const { bottom, top } = wallExtent(doc, w);
   const height = top - bottom;
   const prof = w.params.profile ?? null;

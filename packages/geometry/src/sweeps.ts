@@ -1,4 +1,5 @@
 import earcut from "earcut";
+import polygonClipping from "polygon-clipping";
 import { arcInfo, sweepProfile, wallCuts, wallDirection, wallExtent, wallLength, wallSweeps, wallThickness, type Document, type Vec2, type Wall } from "@open-bim/core";
 import { joinedWallFootprint } from "./joins.ts";
 import { extrudePolygon, meshVolume, type MeshData } from "./mesh.ts";
@@ -204,7 +205,8 @@ function withFaceNormals(m: MeshData): MeshData {
 /** Edit Profile: the wall as its elevation outline through its thickness (joins don't trim it). */
 export function wallProfileMesh(doc: Document, wall: Wall): MeshData | null {
   const prof = wall.params.profile;
-  if (!prof || prof.length < 3 || wall.params.curve) return null;
+  if (!prof || prof.length < 3) return null;
+  if (wall.params.curve) return arcProfileMesh(doc, wall, prof);
   const { bottom } = wallExtent(doc, wall);
   const d = wallDirection(wall);
   const nl = { x: -d.y, y: d.x };
@@ -234,6 +236,112 @@ export function wallProfileMesh(doc: Document, wall: Wall): MeshData | null {
     m.indices[t + 2] = k;
   }
   return m;
+}
+
+/**
+ * Edit Profile on a curved wall: the outline (u = distance along the arc, z) cut into thin strips
+ * across u, so the faces follow the arc; the outline's edges become the wall's ends and top.
+ */
+function arcProfileMesh(doc: Document, wall: Wall, prof: Vec2[]): MeshData | null {
+  const a = arcInfo(wall.params.start, wall.params.end, wall.params.curve!);
+  if (!a) return null;
+  const { bottom } = wallExtent(doc, wall);
+  const half = wallThickness(doc, wall) / 2;
+  const s = Math.sign(a.sweep);
+  const step = a.radius * (Math.PI / 90);
+  // (u, v, z) → world; v is to the left of travel.
+  const at = (u: number, v: number, z: number): [number, number, number] => {
+    const t = a.a0 + (s * u) / a.radius;
+    const r = a.radius - s * v;
+    return [a.center.x + r * Math.cos(t), a.center.y + r * Math.sin(t), bottom + z];
+  };
+  const pos: number[] = [];
+  const nrm: number[] = [];
+  const idx: number[] = [];
+  /** A triangle facing along `out` (flipped if it doesn't). */
+  const tri = (p0: [number, number, number], p1: [number, number, number], p2: [number, number, number], out: [number, number, number]) => {
+    const ux = p1[0] - p0[0], uy = p1[1] - p0[1], uz = p1[2] - p0[2];
+    const vx = p2[0] - p0[0], vy = p2[1] - p0[1], vz = p2[2] - p0[2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const l = Math.hypot(nx, ny, nz);
+    if (l < 1e-9) return;
+    nx /= l; ny /= l; nz /= l;
+    if (nx * out[0] + ny * out[1] + nz * out[2] < 0) {
+      [p1, p2] = [p2, p1];
+      nx = -nx; ny = -ny; nz = -nz;
+    }
+    const base = pos.length / 3;
+    pos.push(...p0, ...p1, ...p2);
+    for (let k = 0; k < 3; k++) nrm.push(nx, ny, nz);
+    idx.push(base, base + 1, base + 2);
+  };
+  // Counter-clockwise outline in (u, z).
+  let outline = prof.map((q) => ({ ...q }));
+  let area = 0;
+  outline.forEach((q, i) => {
+    const r = outline[(i + 1) % outline.length]!;
+    area += q.x * r.y - r.x * q.y;
+  });
+  if (area < 0) outline = outline.reverse();
+  const u0 = Math.min(...outline.map((q) => q.x));
+  const u1 = Math.max(...outline.map((q) => q.x));
+  const z0 = Math.min(...outline.map((q) => q.y)) - 1;
+  const z1 = Math.max(...outline.map((q) => q.y)) + 1;
+  const ring = outline.map((q): [number, number] => [q.x, q.y]);
+  ring.push(ring[0]!);
+  const cuts: number[] = [];
+  for (let u = Math.ceil(u0 / step) * step; u < u1; u += step) if (u > u0 + 1e-6) cuts.push(u);
+  const bounds = [u0, ...cuts, u1];
+  // Faces: each strip of the outline triangulated, on the left (+v) and right (−v) faces.
+  for (let i = 0; i + 1 < bounds.length; i++) {
+    const box: [number, number][] = [[bounds[i]!, z0], [bounds[i + 1]!, z0], [bounds[i + 1]!, z1], [bounds[i]!, z1], [bounds[i]!, z0]];
+    for (const poly of polygonClipping.intersection([ring], [box])) {
+      const flat = poly.flatMap((r) => r.slice(0, -1).flatMap(([x, y]) => [x, y]));
+      const holes: number[] = [];
+      let n = 0;
+      poly.forEach((r, k) => {
+        if (k > 0) holes.push(n);
+        n += r.length - 1;
+      });
+      const t = earcut(flat, holes);
+      const P = (k: number, v: number) => at(flat[k * 2]!, v, flat[k * 2 + 1]!);
+      for (let k = 0; k < t.length; k += 3) {
+        const c = P(t[k]!, 0);
+        const L = at(flat[t[k]! * 2]!, 1, flat[t[k]! * 2 + 1]!);
+        const left: [number, number, number] = [L[0] - c[0], L[1] - c[1], 0];
+        const right: [number, number, number] = [-left[0], -left[1], 0];
+        tri(P(t[k]!, half), P(t[k + 1]!, half), P(t[k + 2]!, half), left);
+        tri(P(t[k]!, -half), P(t[k + 1]!, -half), P(t[k + 2]!, -half), right);
+      }
+    }
+  }
+  // Ends and top: the outline's edges, split where they cross the strips, across the thickness.
+  for (let i = 0; i < outline.length; i++) {
+    const p0 = outline[i]!;
+    const p1 = outline[(i + 1) % outline.length]!;
+    const ts = [0, 1];
+    for (const c of cuts) {
+      const den = p1.x - p0.x;
+      if (Math.abs(den) < 1e-9) continue;
+      const t = (c - p0.x) / den;
+      if (t > 1e-9 && t < 1 - 1e-9) ts.push(t);
+    }
+    ts.sort((x, y) => x - y);
+    for (let k = 0; k + 1 < ts.length; k++) {
+      const A = { x: p0.x + (p1.x - p0.x) * ts[k]!, y: p0.y + (p1.y - p0.y) * ts[k]! };
+      const B = { x: p0.x + (p1.x - p0.x) * ts[k + 1]!, y: p0.y + (p1.y - p0.y) * ts[k + 1]! };
+      const aL = at(A.x, half, A.y), bL = at(B.x, half, B.y), aR = at(A.x, -half, A.y), bR = at(B.x, -half, B.y);
+      // Outward in (u, z) for a counter-clockwise outline: right of A → B, i.e. (Δz, −Δu), in world terms.
+      const du = B.x - A.x;
+      const dz = B.y - A.y;
+      const m0 = at((A.x + B.x) / 2, 0, (A.y + B.y) / 2);
+      const m1 = at((A.x + B.x) / 2 + dz * 1e-3, 0, (A.y + B.y) / 2 - du * 1e-3);
+      const out: [number, number, number] = [m1[0] - m0[0], m1[1] - m0[1], m1[2] - m0[2]];
+      tri(aR, bR, bL, out);
+      tri(aR, bL, aL, out);
+    }
+  }
+  return { positions: new Float32Array(pos), normals: new Float32Array(nrm), indices: new Uint32Array(idx) };
 }
 
 /**

@@ -1,5 +1,9 @@
 import polygonClipping, { type Polygon, type Ring } from "polygon-clipping";
-import { wallCuts, type Layer, 
+import { wallCuts, type Layer,
+  arcInfo,
+  arcLength,
+  arcPoints,
+  tangentLine,
   Cat,
   wallDirection,
   wallEndPoint,
@@ -158,7 +162,7 @@ export function cleanCuts(doc: Document, linework: PlanLinework[], frame: ViewFr
  */
 function wrapLayers(doc: Document, wall: Wall, regions: Region[], cutZ: number): Region[] {
   const t = wall.typeId ? doc.get<LayeredTypeParams>(wall.typeId)?.params : undefined;
-  if (!t || !t.layers.length || wall.params.curve) return regions; // straight walls only
+  if (!t || !t.layers.length) return regions;
   const ends = t.wrapEnds && t.wrapEnds !== "none" ? t.wrapEnds : null;
   const inserts = t.wrapInserts && t.wrapInserts !== "none" ? t.wrapInserts : null;
   if (!ends && !inserts) return regions;
@@ -169,12 +173,10 @@ function wrapLayers(doc: Document, wall: Wall, regions: Region[], cutZ: number):
     const wrap = layers.slice(0, core < 0 ? 1 : core);
     return { outer: wrap[0], depth: wrap.reduce((s, l) => s + l.thickness, 0) };
   };
-  const d = wallDirection(wall);
-  const n = { x: -d.y, y: d.x };
-  const len = Math.hypot(wall.params.end.x - wall.params.start.x, wall.params.end.y - wall.params.start.y);
+  const f = wallFrame(wall);
+  const len = f.length;
   const h = wallThickness(doc, wall) / 2 + 1;
-  const at = (u: number, v: number): [number, number] => [wall.params.start.x + d.x * u + n.x * v, wall.params.start.y + d.y * u + n.y * v];
-  const box = (u0: number, u1: number, v0: number, v1: number): Ring => [at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1), at(u0, v0)];
+  const box = (u0: number, u1: number, v0: number, v1: number): Ring => f.box(u0, u1, v0, v1);
   const zones: { ring: Ring; layer: Layer }[] = [];
   if (ends) {
     const { outer, depth } = finish(ends);
@@ -203,21 +205,63 @@ function wrapLayers(doc: Document, wall: Wall, regions: Region[], cutZ: number):
   const ring = (l: Vec2[]): Ring => [...l.map((q): [number, number] => [q.x, q.y]), [l[0]!.x, l[0]!.y]];
   const toLoops = (mp: Polygon[]) => mp.flatMap((poly) => poly.slice(0, 1).map((r) => r.slice(0, -1).map(([x, y]) => ({ x, y }))));
   const out: Region[] = [];
-  const all: Polygon[] = [];
   for (const r of regions) {
     out.push(...toLoops(polygonClipping.difference([ring(r.loop)], ...zones.map((z) => [z.ring]))).map((loop) => ({ ...r, loop })));
-    all.push([ring(r.loop)]);
   }
-  // The strips: whatever of the wall lies in them, in the wrapping material (earlier strips win overlaps).
-  const wallArea = polygonClipping.union(all[0]!, ...all.slice(1));
+  // The strips: whatever of the wall lies in them, in the wrapping material (earlier strips win
+  // overlaps). Region by region rather than through their union, which arc bands' shared faces upset.
   let taken: Polygon[] = [];
   for (const z of zones) {
-    let strip = polygonClipping.intersection(wallArea, [z.ring]);
-    if (taken.length) strip = polygonClipping.difference(strip, ...taken);
+    const pieces: Vec2[][] = [];
+    for (const r of regions) {
+      let strip = polygonClipping.intersection([ring(r.loop)], [z.ring]);
+      if (taken.length && strip.length) strip = polygonClipping.difference(strip, ...taken);
+      pieces.push(...toLoops(strip));
+    }
+    // One strip, without lines between the layers it crossed (pieces if they won't merge).
+    let merged = pieces;
+    try {
+      merged = pieces.length > 1 ? unionLoops(pieces) : pieces;
+    } catch {
+      merged = pieces;
+    }
+    for (const loop of merged) out.push({ loop, materialId: z.layer.materialId ?? undefined, priority: PRIORITY[z.layer.function] });
     taken = [...taken, [z.ring]];
-    for (const loop of toLoops(strip)) out.push({ loop, materialId: z.layer.materialId ?? undefined, priority: PRIORITY[z.layer.function] });
   }
   return out;
+}
+
+/**
+ * A wall's own coordinates: `u` along its location line (arc length on arcs) from the start, `v`
+ * to its left (the exterior). `box` is the region between two u's and two v's (following the arc).
+ */
+export function wallFrame(wall: Wall): {
+  length: number;
+  at: (u: number, v: number) => [number, number];
+  box: (u0: number, u1: number, v0: number, v1: number) => Ring;
+} {
+  const { start, end, curve } = wall.params;
+  const a = curve ? arcInfo(start, end, curve) : null;
+  const length = arcLength(start, end, curve);
+  if (!a) {
+    const d = wallDirection(wall);
+    const at = (u: number, v: number): [number, number] => [start.x + d.x * u - d.y * v, start.y + d.y * u + d.x * v];
+    return { length, at, box: (u0, u1, v0, v1) => [at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1), at(u0, v0)] };
+  }
+  const s = Math.sign(a.sweep);
+  // Left of travel is outwards on a clockwise arc, inwards on an anticlockwise one.
+  const at = (u: number, v: number): [number, number] => {
+    const t = a.a0 + (s * u) / a.radius;
+    const r = a.radius - s * v;
+    return [a.center.x + r * Math.cos(t), a.center.y + r * Math.sin(t)];
+  };
+  const box = (u0: number, u1: number, v0: number, v1: number): Ring => {
+    const n = Math.max(1, Math.ceil(Math.abs(u1 - u0) / a.radius / (Math.PI / 90)));
+    const us = Array.from({ length: n + 1 }, (_, i) => u0 + ((u1 - u0) * i) / n);
+    const ring: Ring = [...us.map((u) => at(u, v0)), ...[...us].reverse().map((u) => at(u, v1))];
+    return [...ring, ring[0]!];
+  };
+  return { length, at, box };
 }
 
 /** Walls that join and clean: plain layered walls (not curtain or stacked). */
@@ -232,8 +276,6 @@ function cleanable(doc: Document, wall: Wall): boolean {
  * the through wall's face and its core face, across the stem's width. Null if there's no finish.
  */
 function teeExtension(doc: Document, stem: Wall, end: "start" | "end", through: Wall): Vec2[] | null {
-  // Straight walls only (an arc's faces aren't lines); curved tees keep their plain butt.
-  if (stem.params.curve || through.params.curve) return null;
   const type = doc.get<LayeredTypeParams>(through.typeId!)?.params;
   const layers = type?.layers ?? [];
   const first = layers.findIndex((l) => l.function === "structure");
@@ -244,21 +286,45 @@ function teeExtension(doc: Document, stem: Wall, end: "start" | "end", through: 
   // Layer boundaries from the exterior (left) face inwards, as offsets from the location line.
   const bounds = [ht];
   for (const l of layers) bounds.push(bounds.at(-1)! - l.thickness);
-  const u = wallDirection(through);
-  const n = { x: -u.y, y: u.x };
-  const d = wallDirection(stem);
+  const p = wallEndPoint(stem, end);
+  // The stem heads into the through wall along its end tangent (arcs too, over this short reach).
+  const stemLen = arcLength(stem.params.start, stem.params.end, stem.params.curve);
+  const d = tangentLine(stem, end === "start" ? 0 : stemLen).dir;
   const a = end === "start" ? d : { x: -d.x, y: -d.y };
+  const arc = through.params.curve ? arcInfo(through.params.start, through.params.end, through.params.curve) : null;
+  // The through wall's left normal where the stem meets it.
+  let n: Vec2;
+  if (arc) {
+    const r = Math.hypot(p.x - arc.center.x, p.y - arc.center.y) || 1;
+    const out = { x: (p.x - arc.center.x) / r, y: (p.y - arc.center.y) / r };
+    n = arc.sweep > 0 ? { x: -out.x, y: -out.y } : out;
+  } else {
+    const u = wallDirection(through);
+    n = { x: -u.y, y: u.x };
+  }
   const s = n.x * a.x + n.y * a.y >= 0 ? 1 : -1;
   const faceOff = s * ht;
   const coreOff = s > 0 ? bounds[first]! : bounds[last + 1]!;
   if (Math.abs(faceOff - coreOff) < 1e-6) return null;
-  const p = wallEndPoint(stem, end);
   const hs = wallThickness(doc, stem) / 2;
   const sn = { x: -a.y, y: a.x };
   const o = through.params.start;
   const hit = (side: number, off: number): Vec2 | null => {
-    // Stem face: p + sn·hs·side + a·t; through line: n·(X − o) = off.
     const q = { x: p.x + sn.x * hs * side, y: p.y + sn.y * hs * side };
+    if (arc) {
+      // Stem face q + a·t meets the circle at offset `off` (left = towards the centre when anticlockwise).
+      const R = arc.radius - Math.sign(arc.sweep) * off;
+      const w = { x: q.x - arc.center.x, y: q.y - arc.center.y };
+      const B = w.x * a.x + w.y * a.y;
+      const C = w.x * w.x + w.y * w.y - R * R;
+      const disc = B * B - C;
+      if (disc < 0) return null;
+      const t1 = -B - Math.sqrt(disc);
+      const t2 = -B + Math.sqrt(disc);
+      const t = Math.abs(t1) < Math.abs(t2) ? t1 : t2;
+      return { x: q.x + a.x * t, y: q.y + a.y * t };
+    }
+    // Stem face: p + sn·hs·side + a·t; through line: n·(X − o) = off.
     const den = n.x * a.x + n.y * a.y;
     if (Math.abs(den) < 1e-6) return null;
     const t = (off - (n.x * (q.x - o.x) + n.y * (q.y - o.y))) / den;
@@ -270,7 +336,27 @@ function teeExtension(doc: Document, stem: Wall, end: "start" | "end", through: 
 
 /** Location lines that cross inside both walls (an X crossing, not a join at an end). */
 function crossing(a: Wall, b: Wall): boolean {
-  if (a.params.curve || b.params.curve) return false;
+  if (a.params.curve || b.params.curve) {
+    const pa = arcPoints(a.params.start, a.params.end, a.params.curve, Math.PI / 180);
+    const pb = arcPoints(b.params.start, b.params.end, b.params.curve, Math.PI / 180);
+    const near = (q: Vec2, w: Wall) => Math.hypot(q.x - w.params.start.x, q.y - w.params.start.y) <= 1 || Math.hypot(q.x - w.params.end.x, q.y - w.params.end.y) <= 1;
+    for (let i = 0; i + 1 < pa.length; i++) {
+      for (let k = 0; k + 1 < pb.length; k++) {
+        const p = pa[i]!;
+        const r = { x: pa[i + 1]!.x - p.x, y: pa[i + 1]!.y - p.y };
+        const q = pb[k]!;
+        const s = { x: pb[k + 1]!.x - q.x, y: pb[k + 1]!.y - q.y };
+        const den = r.x * s.y - r.y * s.x;
+        if (Math.abs(den) < 1e-9) continue;
+        const t = ((q.x - p.x) * s.y - (q.y - p.y) * s.x) / den;
+        const v = ((q.x - p.x) * r.y - (q.y - p.y) * r.x) / den;
+        if (t < 0 || t > 1 || v < 0 || v > 1) continue;
+        const x = { x: p.x + r.x * t, y: p.y + r.y * t };
+        if (!near(x, a) && !near(x, b)) return true;
+      }
+    }
+    return false;
+  }
   const p = a.params.start;
   const r = { x: a.params.end.x - p.x, y: a.params.end.y - p.y };
   const q = b.params.start;

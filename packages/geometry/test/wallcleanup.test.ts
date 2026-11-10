@@ -212,6 +212,50 @@ describe("disallow join", () => {
     expect(regionAt(p(1045, 20), 2300)!.materialId).toBe(types.timber);
   });
 
+  it("runs a tee stem's core to the core of a curved through wall", () => {
+    const { doc, wall, types } = setup();
+    // Through wall bows away from the stem: an arc of radius ~R through (0,0)…(4000,0), top at y = −600.
+    const through = wall(p(0, 0), p(4000, 0));
+    doc.transact("Curve", (tx) => setWallCurve(tx, doc, through.id, 600));
+    const t = doc.require(through.id) as Wall;
+    const a = arcInfo(t.params.start, t.params.end, 600)!;
+    const stem = wall(p(2000, a.center.y + a.radius), p(2000, 1500));
+    const cuts = cleanCuts(doc, linework(doc, [doc.require(through.id) as Wall, doc.require(stem.id) as Wall]), planFrame(1200), true, true);
+    const sc = cuts.get(stem.id)!.regions!.filter((r) => r.materialId === types.timber);
+    // Arc centre lies below; the stem's core reaches 45 from the location arc (not the face at 55).
+    const reach = Math.min(...sc.flatMap((r) => r.loop.filter((q) => Math.abs(q.x - 2000) < 50).map((q) => Math.hypot(q.x - a.center.x, q.y - a.center.y))));
+    expect(reach).toBeCloseTo(a.radius + 45, 0);
+  });
+
+  it("cleans a straight wall crossing a curved one", () => {
+    const { doc, wall, types } = setup();
+    const thick = wall(p(0, 0), p(4000, 0), types.t200);
+    doc.transact("Curve", (tx) => setWallCurve(tx, doc, thick.id, 500));
+    const thin = wall(p(2000, -1000), p(2000, 1500), types.t100);
+    const cuts = cleanCuts(doc, linework(doc, [doc.require(thick.id) as Wall, doc.require(thin.id) as Wall]), planFrame(1200), false, true);
+    expect(cuts.get(thin.id)!.loops).toHaveLength(2);
+  });
+
+  it("wraps finish layers round the free ends of a curved wall", () => {
+    const { doc, wall, types } = setup();
+    const w = wall(p(0, 0), p(4000, 0));
+    doc.transact("Curve", (tx) => setWallCurve(tx, doc, w.id, 800));
+    doc.transact("Wrap", (tx) => tx.update<LayeredTypeParams>(types.lined, { wrapEnds: "exterior" }));
+    const cuts = cleanCuts(doc, linework(doc, [doc.require(w.id) as Wall]), planFrame(1200), true, true);
+    const at = (q: Vec2) => cuts.get(w.id)!.regions!.find((r) => pointIn(q, r.loop))?.materialId;
+    // Just inside each end, across the core: the lining wraps; further in it's framing.
+    const wl = doc.require(w.id) as Wall;
+    const arc = arcInfo(wl.params.start, wl.params.end, 800)!;
+    const along = (u: number) => {
+      const t = arc.a0 + (Math.sign(arc.sweep) * u) / arc.radius;
+      return p(arc.center.x + arc.radius * Math.cos(t), arc.center.y + arc.radius * Math.sin(t));
+    };
+    expect(at(along(5))).toBe(types.gib);
+    expect(at(along(30))).toBe(types.timber);
+    const L = Math.abs(arc.sweep) * arc.radius;
+    expect(at(along(L - 5))).toBe(types.gib);
+  });
+
   it("splits curved walls into layers round the arc", () => {
     const { doc, wall, types } = setup();
     const w = wall(p(-3000, 0), p(3000, 0));

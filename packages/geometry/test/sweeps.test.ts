@@ -263,3 +263,26 @@ describe("wall sweeps and reveals", () => {
 
 });
 
+
+describe("Edit Profile on curved walls", () => {
+  it("bends the outline round the arc: volume = outline area × thickness, faces on the arc", () => {
+    const { doc, wall } = setup();
+    doc.transact("Curve", (tx) => setWallCurve(tx, doc, wall.id, 800));
+    const w = doc.require(wall.id) as Wall;
+    const a = arcInfo(w.params.start, w.params.end, 800)!;
+    const L = Math.abs(a.sweep) * a.radius;
+    doc.transact("Profile", (tx) => setWallProfile(tx, doc, wall.id, gableProfile(L, 2400, 4000)));
+    const m = new SimpleKernel().build(doc, doc.require(wall.id))!;
+    const T = 110;
+    const area = L * 2400 + (L * 1600) / 2;
+    expect(meshVolume(m) / (area * T)).toBeCloseTo(1, 2);
+    expect(boundingBox(m).max[2]).toBeCloseTo(4000, 0);
+    // Every vertex lies on the inner or outer face circle (or between, on the ends/top).
+    const P = m.positions;
+    for (let i = 0; i < P.length; i += 3) {
+      const r = Math.hypot(P[i]! - a.center.x, P[i + 1]! - a.center.y);
+      expect(r).toBeGreaterThan(a.radius - T / 2 - 0.5);
+      expect(r).toBeLessThan(a.radius + T / 2 + 0.5);
+    }
+  });
+});

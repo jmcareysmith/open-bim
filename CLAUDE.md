@@ -191,6 +191,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Multi-user editing (Phase 7): toolbar Collaborate → Share this project / Join, via the sync server
   (`npm run serve -w @open-bim/collab`; PORT, OPEN_BIM_DATA, OPEN_BIM_TOKEN). Defaults chosen without
   Jeremy's answer: Yjs, self-hosted, one shared token, no accounts. Revisit if he wants a hosted service.
+  Element borrowing: binding `user`/`isActive` (Y map "owners"); core `doc.addCommitCheck` refuses edits to elements another
+  active editor borrowed (derived edits too, e.g. fittings on their ducts); Collaborate → Relinquish all mine; Properties →
+  Borrowed by. Optimistic: two people borrowing the same element at the same moment both succeed (CRDT).
 - Render (toolbar, from a 3D view): path traced, sun from site/date/time, Save PNG. Materials have
   roughness/metalness/transparency. Realistic style shows textures (Material Browser → Texture: an image,
   else drawn from colour + surface pattern; world-position mapping in viewport, apps/desktop/src/textures.ts); no AI render (needs a service decision).

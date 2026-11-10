@@ -2,7 +2,7 @@ import { getCategory } from "./categories.ts";
 import { clone, newId, type Element, type ElementId, type Params } from "./element.ts";
 
 /** One element's state before and after a transaction. `undefined` = did not exist. */
-interface ElementChange {
+export interface ElementChange {
   id: ElementId;
   before: Element | undefined;
   after: Element | undefined;
@@ -54,6 +54,7 @@ export class Document {
   private redoStack: Committed[] = [];
   private listeners = new Set<ChangeListener>();
   private commitHooks = new Set<(tx: Transaction) => void>();
+  private commitChecks = new Set<(changes: ElementChange[]) => void>();
   private active: Map<ElementId, Element | undefined> | null = null;
 
   // ---- queries -----------------------------------------------------------
@@ -106,6 +107,16 @@ export class Document {
     return () => this.commitHooks.delete(hook);
   }
 
+  /**
+   * Check every undoable transaction's changes (after the commit hooks) before it commits; throwing
+   * rolls it back with that error (used by multi-user editing to refuse edits to elements someone
+   * else has borrowed).
+   */
+  addCommitCheck(check: (changes: ElementChange[]) => void): () => void {
+    this.commitChecks.add(check);
+    return () => this.commitChecks.delete(check);
+  }
+
   // ---- transactions ------------------------------------------------------
 
   get canUndo(): boolean {
@@ -134,6 +145,14 @@ export class Document {
       const tx = this.makeTx(touched);
       result = fn(tx);
       if (touched.size) for (const hook of this.commitHooks) hook(tx);
+      if (touched.size && this.commitChecks.size && opts.undoable !== false) {
+        const pending: ElementChange[] = [];
+        for (const [id, before] of touched) {
+          const after = this.elements.get(id);
+          if (before !== undefined || after !== undefined) pending.push({ id, before, after });
+        }
+        for (const check of this.commitChecks) check(pending);
+      }
     } catch (err) {
       for (const [id, before] of touched) this.put(id, before);
       this.active = null;

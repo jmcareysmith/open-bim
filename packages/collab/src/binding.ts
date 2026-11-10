@@ -16,11 +16,27 @@ type YElement = Y.Map<unknown>;
 export interface BindingOptions {
   /** Called when merged edits leave elements with missing dependencies. Default: delete them. */
   onOrphans?: (ids: ElementId[]) => void;
+  /**
+   * Element borrowing (Revit worksharing): who this editor is. Elements it edits become borrowed
+   * by it; editing an element someone else (still active) has borrowed is refused.
+   */
+  user?: { key: string; name: string };
+  /** Is a borrower still here? (Default: yes.) Borrowings of people who've left lapse. */
+  isActive?: (key: string) => boolean;
 }
+
+/** Who has borrowed an element. */
+export type Borrower = { key: string; name: string };
 
 export interface Binding {
   /** Stop syncing (the Y.Doc and Document stay as they are). */
   destroy(): void;
+  /** The element's active borrower, if anyone (yourself included). */
+  borrower(id: ElementId): Borrower | null;
+  /** Elements this editor has borrowed. */
+  borrowed(): ElementId[];
+  /** Give back everything this editor has borrowed (Revit: Relinquish All Mine). Returns how many. */
+  relinquishAll(): number;
 }
 
 const json = (v: unknown): unknown => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
@@ -75,6 +91,25 @@ export function elementsOf(ydoc: Y.Doc): Element[] {
  */
 export function bindDocument(doc: Document, ydoc: Y.Doc, opts: BindingOptions = {}): Binding {
   const root = ydoc.getMap<YElement>("elements");
+  const owners = ydoc.getMap<Borrower>("owners");
+  const active = (key: string) => opts.isActive?.(key) ?? true;
+  const borrower = (id: ElementId): Borrower | null => {
+    const o = owners.get(id);
+    return o && active(o.key) ? o : null;
+  };
+  // Refuse local edits to elements borrowed by someone else who's still here.
+  const offCheck = opts.user
+    ? doc.addCommitCheck((changes) => {
+        for (const c of changes) {
+          if (!c.before) continue; // new elements are anyone's
+          const o = borrower(c.id);
+          if (o && o.key !== opts.user!.key) {
+            const what = c.before.name ? `${c.before.category} "${c.before.name}"` : c.before.category;
+            throw new Error(`${o.name} is editing that ${what}: ask them to relinquish it (Collaborate → Relinquish all mine)`);
+          }
+        }
+      })
+    : () => {};
 
   if (root.size) doc.load({ format: "open-bim", version: 1, elements: elementsOf(ydoc) });
   else ydoc.transact(() => doc.all().forEach((el) => writeElement(root, el)), LOCAL_ORIGIN);
@@ -84,14 +119,21 @@ export function bindDocument(doc: Document, ydoc: Y.Doc, opts: BindingOptions = 
     doc.transact("Remove orphaned elements", (tx) => ids.forEach((id) => doc.has(id) && tx.delete(id)));
   };
 
-  // Local → Y.Doc.
+  // Local → Y.Doc (and what was edited is now borrowed).
   const offDoc = doc.on((c: ChangeSet) => {
     if (c.remote) return;
     ydoc.transact(() => {
-      for (const id of c.removed) if (!doc.has(id)) root.delete(id);
+      for (const id of c.removed) {
+        if (!doc.has(id)) {
+          root.delete(id);
+          owners.delete(id);
+        }
+      }
       for (const id of [...c.added, ...c.modified]) {
         const el = doc.get(id);
-        if (el) writeElement(root, el);
+        if (!el) continue;
+        writeElement(root, el);
+        if (opts.user && owners.get(id)?.key !== opts.user.key) owners.set(id, { ...opts.user });
       }
     }, LOCAL_ORIGIN);
   });
@@ -121,7 +163,16 @@ export function bindDocument(doc: Document, ydoc: Y.Doc, opts: BindingOptions = 
   return {
     destroy() {
       offDoc();
+      offCheck();
       root.unobserveDeep(onRemote);
+    },
+    borrower,
+    borrowed: () => (opts.user ? [...owners.entries()].filter(([, o]) => o.key === opts.user!.key).map(([id]) => id) : []),
+    relinquishAll() {
+      if (!opts.user) return 0;
+      const mine = [...owners.entries()].filter(([, o]) => o.key === opts.user!.key).map(([id]) => id);
+      ydoc.transact(() => mine.forEach((id) => owners.delete(id)), LOCAL_ORIGIN);
+      return mine.length;
     },
   };
 }

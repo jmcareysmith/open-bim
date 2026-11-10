@@ -375,6 +375,8 @@ export function h<K extends keyof HTMLElementTagNameMap>(
 export interface PanelContext {
   doc: Document;
   selection(): ElementId[];
+  /** Multi-user editing: who has borrowed an element (null if nobody, or not collaborating). */
+  borrowerOf?(id: ElementId): { name: string; mine: boolean } | null;
   setSelection(ids: ElementId[]): void;
   activeLevelId(): ElementId;
   setActiveLevel(id: ElementId): void;
@@ -2842,6 +2844,9 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
     edit(ctx, name, (tx) => tx.update<P>(el.id, patch));
 
   const sec = h("div", { class: "section" }, h("h3", {}, el.category));
+  // Element borrowing: who's editing it (Revit's Editable / Owner).
+  const owner = ctx.borrowerOf?.(el.id);
+  if (owner) sec.append(row("Borrowed by", h("span", { class: owner.mine ? "" : "warn", title: owner.mine ? "Relinquish in Collaborate" : "Others can't edit it until they relinquish it" }, owner.mine ? `you (${owner.name})` : owner.name)));
 
   switch (el.category) {
     case Cat.Level: {

@@ -152,3 +152,35 @@ describe("sync server", () => {
     expect(b.size).toBe(a.size);
   });
 });
+
+describe("element borrowing", () => {
+  it("borrows what you edit, refuses others' edits while you're here, and relinquishes", () => {
+    const a = new Document();
+    const ids = applyResidentialTemplate(a);
+    const ya = new Y.Doc();
+    const yb = new Y.Doc();
+    ya.on("update", (u: Uint8Array, o: unknown) => o !== "net" && Y.applyUpdate(yb, u, "net"));
+    yb.on("update", (u: Uint8Array, o: unknown) => o !== "net" && Y.applyUpdate(ya, u, "net"));
+    const here = new Set(["ann", "bob"]);
+    const isActive = (k: string) => here.has(k);
+    const ba = bindDocument(a, ya, { user: { key: "ann", name: "Ann" }, isActive });
+    const b = new Document();
+    const bb = bindDocument(b, yb, { user: { key: "bob", name: "Bob" }, isActive });
+    const w = a.transact("Wall", (tx) => createWall(tx, ids.wallTypes.exterior, { x: 0, y: 0 }, { x: 3000, y: 0 }, ids.levels.ground));
+    expect(ba.borrowed()).toContain(w.id);
+    expect(bb.borrower(w.id)?.name).toBe("Ann");
+    // Bob can't change Ann's wall; nothing changes on either side.
+    expect(() => b.transact("Move", (tx) => tx.update<WallParams>(w.id, { end: { x: 5000, y: 0 } }))).toThrow(/Ann is editing that Wall/);
+    expect(wallLength(a.require(w.id) as Wall)).toBe(3000);
+    // Ann relinquishes: Bob edits it, and now Bob has it.
+    expect(ba.relinquishAll()).toBeGreaterThan(0);
+    b.transact("Move", (tx) => tx.update<WallParams>(w.id, { end: { x: 5000, y: 0 } }));
+    expect(wallLength(a.require(w.id) as Wall)).toBe(5000);
+    expect(ba.borrower(w.id)?.key).toBe("bob");
+    expect(() => a.transact("Back", (tx) => tx.update<WallParams>(w.id, { end: { x: 3000, y: 0 } }))).toThrow(/Bob/);
+    // Bob leaves: his borrowings lapse.
+    here.delete("bob");
+    a.transact("Back", (tx) => tx.update<WallParams>(w.id, { end: { x: 3000, y: 0 } }));
+    expect(wallLength(b.require(w.id) as Wall)).toBe(3000);
+  });
+});

@@ -454,6 +454,10 @@ const ctx: ModifyToolContext & PanelContext = {
   },
   activeLevelId: () => activeLevelId,
   activeTypeId,
+  borrowerOf(id: ElementId) {
+    const b = collab?.binding.borrower(id);
+    return b ? { name: b.name, mine: b.key === String(collab!.client.ydoc.clientID) } : null;
+  },
   selection: () => selection,
   setSelection(ids) {
     selection = ids;
@@ -2273,7 +2277,12 @@ async function startCollab(mode: "share" | "join", s: CollabSettings): Promise<v
     client.close();
     return status(`\u26a0 "${s.room}" is empty. Use Share this project to start it.`);
   }
-  const binding = bindDocument(doc, ydoc);
+  // Element borrowing: what you edit is yours until you relinquish it or leave.
+  const me = String(ydoc.clientID);
+  const binding = bindDocument(doc, ydoc, {
+    user: { key: me, name: s.name.trim() },
+    isActive: (key) => key === me || client.awareness.getStates().has(Number(key)),
+  });
   collab = { client, binding, room: s.room.trim() };
   if (mode === "join") {
     filePath = null;
@@ -2318,9 +2327,19 @@ function renderCollabPane(): void {
       row.onclick = () => sel.length && ctx.setSelection(sel);
       items.push(row);
     }
+    // Element borrowing (Revit worksharing): edits borrow elements; others can't change them meanwhile.
+    const mine = collab.binding.borrowed().filter((id) => doc.has(id)).length;
+    items.push(el("p", mine ? `You have ${mine} element${mine === 1 ? "" : "s"} borrowed (others can't edit them until you relinquish or leave).` : "You have nothing borrowed."));
+    const give = el("button", "Relinquish all mine") as HTMLButtonElement;
+    give.disabled = !mine;
+    give.onclick = () => {
+      const n = collab?.binding.relinquishAll() ?? 0;
+      status(`Relinquished ${n} element${n === 1 ? "" : "s"}.`);
+      renderCollabPane();
+    };
     const leave = el("button", "Leave") as HTMLButtonElement;
     leave.onclick = leaveCollab;
-    bar.append(leave);
+    bar.append(give, leave);
   } else {
     const s = collabSettings();
     const field = (label: string, key: keyof CollabSettings, type = "text", hint = "") => {

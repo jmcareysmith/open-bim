@@ -150,3 +150,60 @@ describe("visual programming", () => {
     expect(t.doc.require(lv.id).name).toBe("Renamed");
   });
 });
+
+describe("custom nodes", () => {
+  it("uses a graph as a node: its Inputs and Outputs are the ports, its elements stay bound", () => {
+    const doc = new Document();
+    applyResidentialTemplate(doc);
+    // Custom node: Wall at X — a 3 m wall along y at the given x; outputs the wall and x doubled.
+    const def = doc.transact("Def", (tx) => createGraph(tx, "Wall at X"));
+    let d: GraphParams = {
+      nodes: [
+        { id: "i", type: "graphInput", x: 0, y: 0, values: { name: "x" } },
+        { id: "y", type: "number", x: 0, y: 0, values: { value: 3000 } },
+        { id: "a", type: "point", x: 0, y: 0 },
+        { id: "b", type: "point", x: 0, y: 0 },
+        { id: "l", type: "line", x: 0, y: 0 },
+        { id: "w", type: "wallByLine", x: 0, y: 0 },
+        { id: "two", type: "formula", x: 0, y: 0, values: { formula: "a * 2" } },
+        { id: "o1", type: "graphOutput", x: 0, y: 0, values: { name: "wall" } },
+        { id: "o2", type: "graphOutput", x: 0, y: 0, values: { name: "double" } },
+      ],
+      links: [],
+      custom: true,
+    };
+    const ln = (f: string, fp: string, t: string, tp: string) => (d = linkNodes(d, { node: f, port: fp }, { node: t, port: tp }, doc));
+    ln("i", "value", "a", "x");
+    ln("i", "value", "b", "x");
+    ln("y", "value", "b", "y");
+    ln("a", "point", "l", "start");
+    ln("b", "point", "l", "end");
+    ln("l", "line", "w", "line");
+    ln("w", "wall", "o1", "value");
+    ln("i", "value", "two", "a");
+    ln("two", "result", "o2", "value");
+    doc.transact("Save", (tx) => tx.update<GraphParams>(def.id, d));
+    expect(nodeDefs(doc).some((n) => n.type === `custom:${def.id}` && n.category === "Custom")).toBe(true);
+
+    // Use it with a list of x: two walls.
+    const use = doc.transact("Use", (tx) => createGraph(tx, "Use"));
+    let u: GraphParams = {
+      nodes: [
+        { id: "xs", type: "range", x: 0, y: 0, values: { start: 10000, end: 12000, step: 2000 } },
+        { id: "c", type: `custom:${def.id}`, x: 0, y: 0 },
+      ],
+      links: [],
+    };
+    u = linkNodes(u, { node: "xs", port: "list" }, { node: "c", port: "x" }, doc);
+    doc.transact("Save", (tx) => tx.update<GraphParams>(use.id, u));
+    const walls = () => doc.byCategory(Cat.Wall).filter((w) => (w.params as { start: { x: number } }).start.x >= 10000);
+    let r = runGraph(doc, use.id);
+    expect(r.get("c")!.error).toBeUndefined();
+    expect(r.get("c")!.outputs.double).toEqual([20000, 24000]);
+    expect(walls()).toHaveLength(2);
+    const ids = walls().map((w) => w.id).sort();
+    // Running again updates the same walls, not more.
+    r = runGraph(doc, use.id, { full: true });
+    expect(walls().map((w) => w.id).sort()).toEqual(ids);
+  });
+});

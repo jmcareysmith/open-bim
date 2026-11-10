@@ -166,7 +166,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 |---|---|---|
 | Plugin API (TypeScript) | 4 | ✅ |
 | Scripting console | 4 | ✅ |
-| Visual programming (Dynamo equivalent) | 8 | ✅ (node editor, ~45 nodes, incremental runs, lacing, bound elements; no custom nodes or Python yet) |
+| Visual programming (Dynamo equivalent) | 8 | ✅ (node editor, ~45 nodes, incremental runs, lacing, bound elements; custom nodes (a graph with Input/Output nodes, ticked Custom node); no Python yet) |
 | Add-in manager | 4 | ✅ (Manage → Add-ins: installed plugins on/off, remove, load; console + plugin API) |
 
 ## 15. Editing & interface

@@ -484,4 +484,23 @@ def({
 });
 
 // ---- Display ----
+// ---- Custom node ports (in a graph used as a custom node) ----
+def({
+  type: "graphInput",
+  label: "Input",
+  category: "Custom",
+  inputs: [],
+  outputs: [out("value", "any")],
+  settings: [
+    { name: "name", type: "string" },
+    { name: "list", type: "boolean" },
+    { name: "value", type: "string" },
+  ],
+  // Run on its own (not as a custom node): its default value, a number when it reads as one.
+  run: (_i, _c, n) => {
+    const v = n.values?.value;
+    return { value: typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : (v ?? 0) };
+  },
+});
+def({ type: "graphOutput", label: "Output", category: "Custom", inputs: [{ name: "value", type: "any", list: true }], outputs: [out("value", "any")], settings: [{ name: "name", type: "string" }], run: ({ value }) => ({ value }) });
 def({ type: "watch", label: "Watch", category: "Display", inputs: [{ name: "value", type: "any", list: true }], outputs: [out("value", "any")], run: ({ value }) => ({ value }) });

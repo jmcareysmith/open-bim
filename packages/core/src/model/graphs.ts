@@ -28,6 +28,11 @@ export type GraphParams = {
   bindings?: Record<string, ElementId[]>;
   /** Run whenever the graph or the model changes (Dynamo's Automatic). */
   automatic?: boolean;
+  /**
+   * Custom node (Dynamo: a .dyf): other graphs can use this one as a node (type `custom:<id>`),
+   * its Input nodes as the node's inputs and its Output nodes as its outputs.
+   */
+  custom?: boolean;
 };
 export type Graph = Element<GraphParams>;
 
@@ -83,12 +88,82 @@ export function registerNode(def: NodeDef): void {
   defs.set(def.type, def);
 }
 
-export function nodeDef(type: string): NodeDef | undefined {
+/** A node type: a registered one, or (with `doc`) a custom node made from a graph. */
+export function nodeDef(type: string, doc?: Document): NodeDef | undefined {
+  if (type.startsWith(CUSTOM) && doc) return customDef(doc, type.slice(CUSTOM.length));
   return defs.get(type);
 }
 
-export function nodeDefs(): NodeDef[] {
-  return [...defs.values()];
+/** Every node type (with `doc`: its custom nodes too, under Custom). */
+export function nodeDefs(doc?: Document): NodeDef[] {
+  const custom = doc ? graphs(doc).filter((g) => g.params.custom).flatMap((g) => customDef(doc, g.id) ?? []) : [];
+  return [...defs.values(), ...custom];
+}
+
+// ---- custom nodes -----------------------------------------------------------------------------
+
+const CUSTOM = "custom:";
+
+/** A custom node's ports: its graph's Input nodes (by name) and Output nodes. */
+function customDef(doc: Document, graphId: ElementId): NodeDef | undefined {
+  const g = doc.get<GraphParams>(graphId) as Graph | undefined;
+  if (!g || g.category !== Cat.Graph || !g.params.custom) return undefined;
+  const portName = (n: GraphNode, fallback: string) => String(n.values?.name ?? "").trim() || fallback;
+  const ins = g.params.nodes.filter((n) => n.type === "graphInput");
+  const outs = g.params.nodes.filter((n) => n.type === "graphOutput");
+  return {
+    type: CUSTOM + graphId,
+    label: g.name ?? "Custom node",
+    category: "Custom",
+    inputs: ins.map((n, i) => ({ name: portName(n, `in${i + 1}`), type: "any" as const, ...(n.values?.list ? { list: true } : {}) })),
+    outputs: outs.map((n, i) => ({ name: portName(n, `out${i + 1}`), type: "any" as const })),
+    effect: g.params.nodes.some((n) => defs.get(n.type)?.effect || n.type.startsWith(CUSTOM)),
+    run: (inputs, ctx) => runCustom(g, inputs, ctx, 0),
+  };
+}
+
+/** Evaluate a custom node's graph inside the calling graph's run (its elements bind to the caller's node). */
+function runCustom(g: Graph, inputs: Record<string, unknown>, ctx: NodeContext, depth: number): Record<string, unknown> {
+  if (depth > 8) throw new Error("Custom nodes nest too deep (does one use itself?)");
+  const results = new Map<string, Record<string, unknown>>();
+  let slot = 0;
+  const outputs: Record<string, unknown> = {};
+  for (const node of graphOrder(g.params)) {
+    const name = String(node.values?.name ?? "").trim();
+    if (node.type === "graphInput") {
+      const i = g.params.nodes.filter((n) => n.type === "graphInput").indexOf(node);
+      results.set(node.id, { value: inputs[name || `in${i + 1}`] });
+      continue;
+    }
+    const def = node.type.startsWith(CUSTOM) ? customDef(ctx.doc, node.type.slice(CUSTOM.length)) : defs.get(node.type);
+    if (!def) throw new Error(`${g.name}: unknown node type ${node.type}`);
+    const ins: Record<string, unknown> = {};
+    for (const p of def.inputs) {
+      const link = g.params.links.find((l) => l.to.node === node.id && l.to.port === p.name);
+      ins[p.name] = link ? results.get(link.from.node)?.[link.from.port] : (node.values?.[p.name] ?? p.default);
+      if (ins[p.name] === undefined) throw new Error(`${g.name}: ${def.label} needs ${p.name}`);
+    }
+    // Elements made inside take consecutive slots of the calling node's bindings.
+    const base = slot;
+    let used = 0;
+    const inner: NodeContext = {
+      ...ctx,
+      bind: (index, create, o) => {
+        used = Math.max(used, index + 1);
+        return ctx.bind(base + index, create, o);
+      },
+    };
+    const out = node.type.startsWith(CUSTOM)
+      ? runLaced({ ...def, run: (i, c) => runCustom(ctx.doc.require(node.type.slice(CUSTOM.length)) as Graph, i, c, depth + 1) }, ins, inner, node)
+      : runLaced(def, ins, inner, node);
+    slot += used;
+    results.set(node.id, out);
+    if (node.type === "graphOutput") {
+      const i = g.params.nodes.filter((n) => n.type === "graphOutput").indexOf(node);
+      outputs[name || `out${i + 1}`] = out.value;
+    }
+  }
+  return outputs;
 }
 
 // ---- running --------------------------------------------------------------------------------
@@ -167,7 +242,7 @@ export function runGraph(doc: Document, graphId: ElementId, opts: { selection?: 
     const bindings: Record<string, ElementId[]> = {};
     const order = graphOrder(g);
     for (const node of order) {
-      const def = defs.get(node.type);
+      const def = nodeDef(node.type, doc);
       if (!def) {
         results.set(node.id, { outputs: {}, error: `Unknown node type ${node.type}`, ran: false });
         continue;
@@ -263,12 +338,12 @@ export function newNodeId(g: GraphParams): string {
 }
 
 /** Add a link (replacing any link into the same input); refuses loops and unknown ports. */
-export function linkNodes(g: GraphParams, from: { node: string; port: string }, to: { node: string; port: string }): GraphParams {
+export function linkNodes(g: GraphParams, from: { node: string; port: string }, to: { node: string; port: string }, doc?: Document): GraphParams {
   const a = g.nodes.find((n) => n.id === from.node);
   const b = g.nodes.find((n) => n.id === to.node);
   if (!a || !b) throw new Error("Link a node to another node");
-  if (!defs.get(a.type)?.outputs.some((p) => p.name === from.port)) throw new Error(`No output ${from.port}`);
-  if (!defs.get(b.type)?.inputs.some((p) => p.name === to.port)) throw new Error(`No input ${to.port}`);
+  if (!nodeDef(a.type, doc)?.outputs.some((p) => p.name === from.port)) throw new Error(`No output ${from.port}`);
+  if (!nodeDef(b.type, doc)?.inputs.some((p) => p.name === to.port)) throw new Error(`No input ${to.port}`);
   const next = { ...g, links: [...g.links.filter((l) => !(l.to.node === to.node && l.to.port === to.port)), { from, to }] };
   graphOrder(next);
   return next;

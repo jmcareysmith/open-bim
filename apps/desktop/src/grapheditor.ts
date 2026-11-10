@@ -140,7 +140,7 @@ export function openGraphEditor(host: GraphEditorHost): void {
     const pos = at ?? { x: (r ? r.width / 2 : 300) - pan.x - 80 + Math.random() * 40, y: (r ? r.height / 3 : 200) - pan.y + Math.random() * 40 };
     const node: GraphNode = { id: newNodeId(cur.params), type, x: Math.round(pos.x), y: Math.round(pos.y), values: {} };
     selected = node.id;
-    save(`Add ${nodeDef(type)?.label ?? type}`, { nodes: [...cur.params.nodes, node], links: cur.params.links });
+    save(`Add ${nodeDef(type, doc)?.label ?? type}`, { nodes: [...cur.params.nodes, node], links: cur.params.links });
   }
 
   function render() {
@@ -169,6 +169,15 @@ export function openGraphEditor(host: GraphEditorHost): void {
     auto.onchange = () => cur && doc.transact(auto.checked ? "Automatic runs on" : "Automatic runs off", (tx) => tx.update<GraphParams>(cur.id, { automatic: auto.checked }));
     const autoLabel = el("label", "ge-auto");
     autoLabel.append(auto, " Automatic");
+    // Custom node (Dynamo .dyf): other graphs can use this one; its Input/Output nodes are the ports.
+    const custom = el("input");
+    custom.type = "checkbox";
+    custom.checked = !!cur?.params.custom;
+    custom.disabled = !cur;
+    custom.onchange = () => cur && doc.transact(custom.checked ? "Make custom node" : "Not a custom node", (tx) => tx.update<GraphParams>(cur.id, { custom: custom.checked }));
+    const customLabel = el("label", "ge-auto");
+    customLabel.title = "Use this graph as a node in other graphs (library → Custom). Add Input and Output nodes (Custom group) for its ports.";
+    customLabel.append(custom, " Custom node");
     bar.append(
       el("strong", "", "Visual Programming"),
       pick,
@@ -191,6 +200,7 @@ export function openGraphEditor(host: GraphEditorHost): void {
       }),
       btn("▶ Run", run, "Run the graph (one undo step)"),
       autoLabel,
+      customLabel,
       el("span", "ge-spacer"),
       btn("Close", close, "Esc"),
     );
@@ -207,7 +217,8 @@ export function openGraphEditor(host: GraphEditorHost): void {
       list.replaceChildren();
       const q = search.value.trim().toLowerCase();
       const groups = new Map<string, ReturnType<typeof nodeDefs>>();
-      for (const d of nodeDefs()) if (!q || d.label.toLowerCase().includes(q) || d.category.toLowerCase().includes(q)) groups.set(d.category, [...(groups.get(d.category) ?? []), d]);
+      // Custom nodes from the other graphs (a graph can't use itself).
+      for (const d of nodeDefs(doc).filter((x) => x.type !== `custom:${cur?.id}`)) if (!q || d.label.toLowerCase().includes(q) || d.category.toLowerCase().includes(q)) groups.set(d.category, [...(groups.get(d.category) ?? []), d]);
       for (const [cat, ds] of groups) {
         list.append(el("div", "ge-libCat", cat));
         for (const d of ds) {
@@ -261,7 +272,7 @@ export function openGraphEditor(host: GraphEditorHost): void {
     const portEls = new Map<string, HTMLElement>();
     const params = cur.params;
     for (const n of params.nodes) {
-      const d = nodeDef(n.type);
+      const d = nodeDef(n.type, doc);
       const r = results.get(n.id);
       const box = el("div", `ge-node${n.id === selected ? " sel" : ""}${r?.error ? " err" : ""}`);
       box.style.left = `${n.x}px`;
@@ -361,7 +372,7 @@ export function openGraphEditor(host: GraphEditorHost): void {
             const target = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest(".ge-port.in")?.querySelector(".ge-dot") as HTMLElement | null;
             if (!target?.dataset.node || !target.dataset.port) return;
             try {
-              save("Link nodes", linkNodes(params, { node: n.id, port: p.name }, { node: target.dataset.node, port: target.dataset.port }));
+              save("Link nodes", linkNodes(params, { node: n.id, port: p.name }, { node: target.dataset.node, port: target.dataset.port }, doc));
             } catch (err) {
               host.status(`⚠ ${(err as Error).message}`);
             }

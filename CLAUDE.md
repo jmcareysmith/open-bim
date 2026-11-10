@@ -297,7 +297,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   per project (New/Rename/Delete), library (search, click to add), drag output dot → input dot to link,
   click a link to remove, Delete removes a node, unlinked inputs take values, Run (one undo step) or
   Automatic; values/errors under nodes. Engine: core/model/graphs.ts (+ graphnodes.ts library), see
-  ARCHITECTURE.md. Next (Jeremy): back to Revit parity (arc-wall gaps, curved stairs, angular/radial
+  ARCHITECTURE.md. Custom nodes: tick Custom node on a graph with Input/Output nodes; others use it as `custom:<graphId>`
+  (`nodeDef(type, doc)`, `runCustom`; its elements bind to the calling node's slots). Next (Jeremy): back to Revit parity (arc-wall gaps, curved stairs, angular/radial
   dimensions, barge boards, elevation sketch profiles). Jeremy caps usage: 75% of weekly by Wednesday.
 - Phase 9 started (items set in ROADMAP). Rebar (core/model/rebar.ts, geometry/src/rebar.ts): floor / wall (face mats) / pad footing /
   beam / column / strip footing Properties → Reinforcement → Add; area mats or cages laid out from the host

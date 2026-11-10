@@ -20,6 +20,7 @@ import {
   createPipe,
   ensurePipeTypes,
   sizePipes,
+  simultaneousDemand,
   type PipeParams,
   type Duct,
   type DuctFittingParams,
@@ -174,11 +175,16 @@ describe("pipe sizing", () => {
     const main = pipe(p(0, 0, 500), p(4000, 0, 500));
     pipe(p(2000, 0, 500), p(2000, 2000, 500));
     const sys = doc.transact("S", (tx) => createSystem(tx, doc, "coldWater", [src.id, b1.id, b2.id]));
-    const n = doc.transact("Size", (tx) => sizePipes(tx, doc, sys.id, { velocity: 1.5 }));
+    const n = doc.transact("Size", (tx) => sizePipes(tx, doc, sys.id, { velocity: 1.5, diversity: false }));
     expect(n).toBe(3);
     // 0.6 L/s at 1.5 m/s needs a 22.6 mm bore → DN25; 0.3 L/s needs 16 → DN20.
     const sizes = doc.byCategory<PipeParams>(Cat.Pipe).map((x) => x.params.diameter).sort((a, b) => a - b);
     expect(sizes).toEqual([20, 20, 25]);
     expect(doc.require<PipeParams>(main.id).params.diameter).toBe(25);
+    // With simultaneous demand, 0.6 L/s of fixtures is a 0.42 L/s peak (19 mm bore → DN20).
+    expect(simultaneousDemand(0.6, 0.3)).toBeCloseTo(1.48 * 0.6 ** 0.19 - 0.94, 6);
+    expect(simultaneousDemand(0.3, 0.3)).toBeCloseTo(0.3, 6);
+    doc.transact("Size", (tx) => sizePipes(tx, doc, sys.id));
+    expect(doc.require<PipeParams>(main.id).params.diameter).toBe(20);
   });
 });

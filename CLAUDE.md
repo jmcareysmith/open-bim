@@ -333,7 +333,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Pressure loss (core/model/mepcalcs.ts `systemPressure`): duct/pipe system Properties → Pressure loss — flows from the
   equipment, Darcy–Weisbach (Swamee–Jain) per run, joint K (elbow by angle, tee 0.2/0.6, size change 0.1), critical
   path to the worst terminal (Select critical path). Pipe system Properties → Size pipes (`sizePipes`, velocity method,
-  default 1.5 m/s, DN as bore, fixture flows summed without diversity — provisional). Fluid/roughness figures provisional; drainage defers to G13.
+  default 1.5 m/s, DN as bore; fixture flows reduced by `simultaneousDemand` — DIN 1988-300 residential curve, provisional). Fluid/roughness figures provisional; drainage defers to G13.
 - Family form visibility (core family.ts `FormVisibility`, `formShown`): family editor form Properties → Visible in
   (Coarse/Medium/Fine/Plan). Kernels' `build(doc, el, display)` passes the view's detail level and plan-ness to the family
   mesher as reserved values `__detail`/`__plan` (cached per value set; nested families inherit). Viewport rebuilds

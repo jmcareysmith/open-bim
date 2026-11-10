@@ -190,22 +190,37 @@ export function systemPressure(doc: Document, sys: MEPSystem): PressureReport {
 }
 
 /**
- * Size a pressure pipe system's pipes (Revit: Pipe Sizing, velocity method): each takes the
- * smallest DN (as the bore) keeping the flow it carries — the fixtures' design flows beyond it,
- * added without diversity — at or under `velocity` m/s (default 1.5). PROVISIONAL: no loading
- * units or simultaneous-demand curve yet. Returns how many pipes were sized.
+ * Simultaneous (peak) demand from the sum of fixture design flows, L/s (PROVISIONAL: the DIN
+ * 1988-300 residential curve 1.48·ΣQ^0.19 − 0.94, never more than the sum nor less than the
+ * largest single fixture).
  */
-export function sizePipes(tx: Transaction, doc: Document, systemId: ElementId, opts: { velocity?: number } = {}): number {
+export function simultaneousDemand(sum: number, largest: number): number {
+  if (sum <= 0) return 0;
+  const curve = sum >= 0.2 ? 1.48 * sum ** 0.19 - 0.94 : sum;
+  return Math.min(sum, Math.max(largest, curve));
+}
+
+/**
+ * Size a pressure pipe system's pipes (Revit: Pipe Sizing, velocity method): each takes the
+ * smallest DN (as the bore) keeping the flow it carries at or under `velocity` m/s (default 1.5).
+ * The flow is the fixtures' design flows beyond it, reduced for simultaneous use
+ * (`simultaneousDemand`) unless `diversity` is false. PROVISIONAL. Returns how many pipes were sized.
+ */
+export function sizePipes(tx: Transaction, doc: Document, systemId: ElementId, opts: { velocity?: number; diversity?: boolean } = {}): number {
   const sys = doc.require(systemId) as MEPSystem;
   if (classificationInfo(sys.params.classification).domain !== "pipe") throw new Error("Only pipe systems are sized here");
   if (sys.params.classification === "sanitary" || sys.params.classification === "stormwater") throw new Error("Drainage is sized by discharge units: see NZ Checks → G13 drainage");
   const v = opts.velocity ?? 1.5;
   const { runs } = systemPressure(doc, sys);
   if (!runs.length) throw new Error("No pipes reach the system's equipment: connect them to it first");
+  // The largest single fixture flow in the system (the floor under the demand curve).
+  let largest = 0;
+  for (const m of systemMembers(doc, sys)) for (const c of elementConnectors(doc, m)) if (c.classification === sys.params.classification && c.flowDirection === "in") largest = Math.max(largest, c.flow);
   let n = 0;
   for (const r of runs) {
     if (r.flow <= 0) continue;
-    const need = Math.sqrt((4 * (r.flow / 1000 / v)) / Math.PI) * 1000; // mm
+    const q = opts.diversity === false ? r.flow : simultaneousDemand(r.flow, Math.min(largest, r.flow));
+    const need = Math.sqrt((4 * (q / 1000 / v)) / Math.PI) * 1000; // mm
     const dn = PIPE_SIZES.find((d) => d >= need) ?? PIPE_SIZES[PIPE_SIZES.length - 1]!;
     const pipe = doc.get<PipeParams>(r.id);
     if (pipe && pipe.params.diameter !== dn) tx.update<PipeParams>(r.id, { diameter: dn });

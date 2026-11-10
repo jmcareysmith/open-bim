@@ -2,6 +2,7 @@ import { registerCategory } from "../categories.ts";
 import { Document, type DocumentJSON, type Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
 import type { DimensionParams } from "./annotations.ts";
+import { angularLayout, type AngularDimension, type AngularDimensionParams } from "./angulardims.ts";
 import type { ReferencePlaneParams } from "./datums.ts";
 import { evaluate, evaluateParameters, type Num, type Values } from "../expr.ts";
 import { Cat, createLevel } from "./architecture.ts";
@@ -179,6 +180,11 @@ export interface PlaneSystem {
   distances: { a: ElementId; b: ElementId; value: number }[];
   /** Equal spacing a|b|c (b in the middle). */
   equal: [ElementId, ElementId, ElementId][];
+  /**
+   * Angle from plane a's direction to plane b's (radians, anticlockwise +). Plane b pivots about
+   * its start point to suit (Revit: a labelled angular dimension on a pinned reference line).
+   */
+  angles?: { a: ElementId; b: ElementId; value: number }[];
 }
 
 /** Solves a plane system; returns every plane's new line. Throws if it can't be satisfied. */
@@ -226,6 +232,31 @@ export function planeSystem(doc: Document, params: Values): PlaneSystem {
       for (let i = 0; i + 2 < ids.length; i++) sys.equal.push([ids[i]!, ids[i + 1]!, ids[i + 2]!]);
     }
   }
+  // Labelled angular dimensions between two planes.
+  for (const d of doc.byCategory<AngularDimensionParams>(Cat.AngularDimension)) {
+    const { a, b, label } = d.params;
+    if (!label || a.kind !== "datum" || b.kind !== "datum" || !isPlane.has(a.id) || !isPlane.has(b.id)) continue;
+    const deg = params[label];
+    if (deg === undefined) throw new Error(`Dimension label "${label}" isn't a parameter`);
+    const pa = planes.find((p) => p.id === a.id)!;
+    const pb = planes.find((p) => p.id === b.id)!;
+    // The pivoting plane is b unless it's fixed (then a turns, the other way).
+    const [from, to] = pb.fixed && !pa.fixed ? [pb, pa] : [pa, pb];
+    const da = { x: from.end.x - from.start.x, y: from.end.y - from.start.y };
+    const db = { x: to.end.x - to.start.x, y: to.end.y - to.start.y };
+    const phi = Math.atan2(da.x * db.y - da.y * db.x, da.x * db.x + da.y * db.y);
+    let shown = Math.abs(phi);
+    try {
+      shown = angularLayout(doc, d as AngularDimension).angle;
+    } catch {
+      // Parallel just now: take the planes' own angle.
+    }
+    const want = (Math.abs(deg) * Math.PI) / 180;
+    // The dimension shows |φ| or its supplement, depending on the quarter it was placed in.
+    const s = phi >= 0 ? 1 : -1;
+    const value = Math.abs(shown - Math.abs(phi)) < 1e-4 ? s * want : s * (Math.PI - want);
+    (sys.angles ??= []).push({ a: from.id, b: to.id, value });
+  }
   return sys;
 }
 
@@ -233,7 +264,7 @@ export function planeSystem(doc: Document, params: Values): PlaneSystem {
 export function solvedPlanes(doc: Document, params: Values): Map<ElementId, PlaneLine> {
   const sys = planeSystem(doc, params);
   const stored = new Map(sys.planes.map((p) => [p.id, { start: p.start, end: p.end }]));
-  if (!solver || (!sys.distances.length && !sys.equal.length)) return stored;
+  if (!solver || (!sys.distances.length && !sys.equal.length && !sys.angles?.length)) return stored;
   return solver(sys);
 }
 

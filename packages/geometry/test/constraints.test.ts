@@ -5,6 +5,8 @@ import {
   applyFamilyTemplate,
   applyResidentialTemplate,
   createDimension,
+  createAngularDimension,
+  createFamilyParameter,
   createExtrusion,
   createFamilyType,
   createReferencePlane,
@@ -101,5 +103,32 @@ describe("family constraints (PlaneGCS)", () => {
         tx.update(d.id, { label: "Depth" }); // Width and Depth can't both hold
       }),
     ).toThrow(/can't all be satisfied/);
+  });
+});
+
+describe("angular family constraints", () => {
+  it("a labelled angular dimension turns a reference plane about its start", () => {
+    const doc = new Document();
+    applyFamilyTemplate(doc, "GenericModel", "Bracket");
+    enableFamilyFlex(doc);
+    const plan = floorPlanFor(doc, levels(doc)[0]!.id)!;
+    doc.transact("P", (tx) => createFamilyParameter(tx, doc, "Angle", { kind: "angle", value: 30 }));
+    const base = doc.byCategory(Cat.ReferencePlane).find((r) => r.name === "Center (Front/Back)")!.id;
+    // A plane from the origin up and to the right at 45°.
+    const arm = doc.transact("Arm", (tx) => createReferencePlane(tx, doc, p(0, 0), p(1000, 1000), "Arm").id);
+    doc.transact("Dim", (tx) => {
+      const d = createAngularDimension(tx, doc, plan.id, { kind: "datum", id: base, pick: p(500, 0) }, { kind: "datum", id: arm, pick: p(500, 500) }, p(800, 300));
+      tx.update(d.id, { label: "Angle" });
+    });
+    const angle = () => {
+      const a = doc.require<ReferencePlaneParams>(arm).params;
+      return (Math.atan2(a.end.y - a.start.y, a.end.x - a.start.x) * 180) / Math.PI;
+    };
+    expect(angle()).toBeCloseTo(30, 3);
+    doc.transact("60", (tx) => setFamilyValue(tx, doc, "Angle", 60));
+    expect(angle()).toBeCloseTo(60, 3);
+    const a = doc.require<ReferencePlaneParams>(arm).params;
+    expect(a.start.x).toBeCloseTo(0, 6);
+    expect(Math.hypot(a.end.x - a.start.x, a.end.y - a.start.y)).toBeCloseTo(Math.SQRT2 * 1000, 3);
   });
 });

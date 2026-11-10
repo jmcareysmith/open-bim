@@ -137,7 +137,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Families (Phase 3 started): family editor (Browser → Families → New family / Edit family) with
   Extrusion/Blend/Revolve/Sweep (+ Swept Blend: sweep Properties → Make swept blend, `endProfile`) (+ Void), parameters with formulas, family types; Load into Project;
   Component tool (C) places them (free-standing, or in walls for Door/Window families).
-- Family constraints: label a dimension between reference planes with a parameter, or set EQ;
+- Family constraints: label a dimension between reference planes with a parameter, or set EQ; label an angular
+  dimension between two planes with an Angle parameter (the second plane pivots on its start; `PlaneSystem.angles`);
   planes flex (PlaneGCS) on every edit; forms use plane names in formulas (e.g. x = Left).
 - Type catalogs (import/export CSV in Family Types); nested families (Load from project → Component,
   associate parameters with host formulas). Shared (Family Types → Shared): nested instances also exist in the

@@ -12,7 +12,15 @@ import type { ViewParams } from "./viewdefs.ts";
 // through `at` in the quarter where it was placed. Radial: the radius of an arc wall or grid,
 // along the line from its centre through `at`. Both stay live as their references move.
 
-export type AngularDimensionParams = { viewId: ElementId; a: DimRef; b: DimRef; at: Vec2; size: number };
+export type AngularDimensionParams = {
+  viewId: ElementId;
+  a: DimRef;
+  b: DimRef;
+  at: Vec2;
+  size: number;
+  /** In a family: an angle parameter (degrees) driving the angle between two reference planes. */
+  label?: string | null;
+};
 export type RadialDimensionParams = { viewId: ElementId; refId: ElementId; /** Wall faces: which (default centre). */ side?: "left" | "right" | "centre"; at: Vec2; size: number };
 export type AngularDimension = Element<AngularDimensionParams>;
 export type RadialDimension = Element<RadialDimensionParams>;

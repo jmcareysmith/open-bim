@@ -39,12 +39,19 @@ function solvePlanes(gcs: Gcs, sys: PlaneSystem): Map<ElementId, PlaneLine> {
     return id;
   };
   const refs = new Map<ElementId, { a: string; b: string; l: string }>();
+  const pivoting = new Set((sys.angles ?? []).map((g) => g.b));
   for (const pl of sys.planes) {
-    const a = point(pl.start, pl.fixed);
+    // A plane an angle turns pivots on its start and keeps its length.
+    const turns = pivoting.has(pl.id) && !pl.fixed;
+    const a = point(pl.start, pl.fixed || turns);
     const b = point(pl.end, pl.fixed);
     const l = line(a, b);
     refs.set(pl.id, { a, b, l });
     if (pl.fixed) continue;
+    if (turns) {
+      prims.push({ id: nextId(), type: "p2p_distance", p1_id: a, p2_id: b, distance: Math.hypot(pl.end.x - pl.start.x, pl.end.y - pl.start.y) });
+      continue;
+    }
     const dx = pl.end.x - pl.start.x;
     const dy = pl.end.y - pl.start.y;
     // Keep the plane's direction.
@@ -75,6 +82,11 @@ function solvePlanes(gcs: Gcs, sys: PlaneSystem): Map<ElementId, PlaneLine> {
     const C = refs.get(c);
     if (!A || !B || !C) continue;
     prims.push({ id: nextId(), type: "midpoint_on_line_ll", l1_id: line(A.a, C.a), l2_id: B.l });
+  }
+  for (const g of sys.angles ?? []) {
+    const A = refs.get(g.a);
+    const B = refs.get(g.b);
+    if (A && B) prims.push({ id: nextId(), type: "l2l_angle_ll", l1_id: A.l, l2_id: B.l, angle: g.value });
   }
   gcs.push_primitives_and_params(prims);
   const status = gcs.solve();

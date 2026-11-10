@@ -352,6 +352,7 @@ import {
   containmentLength,
   type CableTray,
   type Conduit,
+  type AngularDimensionParams,
 } from "@open-bim/core";
 
 type Child = Node | string | null | undefined | false;
@@ -4019,6 +4020,23 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         btns.push(rm);
       }
       sec.append(row("Leaders", h("div", { class: "buttons wrap" }, ...btns)));
+      break;
+    }
+    case Cat.AngularDimension: {
+      if (familyInfo(doc)) {
+        // Between two reference planes, an angle parameter drives the angle (the second plane pivots on its start).
+        const dp = el.params as AngularDimensionParams;
+        const params = familyParameters(doc).filter((fp) => fp.params.kind === "angle").map((fp) => fp.name ?? "").filter(Boolean);
+        sec.append(
+          row(
+            "Label",
+            select([{ value: "", label: "<None>" }, ...params.map((n) => ({ value: n, label: n }))], dp.label ?? "", (v) =>
+              edit(ctx, "Label angular dimension", (tx) => tx.update<AngularDimensionParams>(el.id, { label: v || null })),
+            ),
+          ),
+        );
+        if (!params.length) sec.append(h("p", { class: "muted" }, "Add an Angle parameter (Family Types) to label this with."));
+      }
       break;
     }
     case Cat.Dimension: {

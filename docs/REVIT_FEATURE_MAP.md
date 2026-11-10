@@ -74,7 +74,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 |---|---|---|
 | System families (walls, floors, roofs) | 1 | ✅ (layered wall/floor/ceiling/roof types, stacked and curtain walls, duct/pipe types) |
 | Loadable family editor (sketch, extrude, revolve, sweep, blend, void) | 3 | ✅ (extrusion, blend, revolve, sweep, swept blend, voids, work planes, visibility, parameters, types, catalogs) |
-| Reference planes + dimension constraints (parametric solver) | 3 | 🟨 |
+| Reference planes + dimension constraints (parametric solver) | 3 | ✅ (PlaneGCS: labelled distances, EQ, labelled angular dimensions pivoting a plane on its start) |
 | Formulas & conditionals in parameters | 3 | ✅ |
 | Nested & shared families | 3 | ✅ |
 | Type catalogs | 3 | ✅ |

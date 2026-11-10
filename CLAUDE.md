@@ -290,8 +290,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Properties → Curve, or drag the arc's middle grip; arc walls' footprint is the band along the arc, mitred
   at corner joins on the end tangents; tees into or out of arcs; layers in plan are annular bands (geometry layers.ts), sweeps lofted round the arc (sweeps.ts `loftArc`) (plan join cleanup included — tee core extension, crossings and wrapping work on arcs via wallcleanup `wallFrame`; Edit Profile on arcs: sweeps.ts `arcProfileMesh`, 2° strips; curtain walls bend their
   straight-built grid onto the arc (curtain.ts `frameAt`), stacked walls narrow radially). Doors/windows/openings/hosted families sit square to the
-  arc (core `tangentLine`, `alongArc`); flipping keeps the arc. Grids draw along the arc (not in sections or
-  dimensions). Length label shows the arc length.
+  arc (core `tangentLine`, `alongArc`); flipping keeps the arc. Grids draw along the arc; sections show each crossing, dimensions
+  take the tangent at the pick (concentric arcs measure radially) or the section crossing nearest it. Length label shows the arc length.
 - Phase 8b is done (2026-11-09).
 - Visual programming (Phase 8 done): Manage → Visual Programming (apps/desktop/src/grapheditor.ts): graphs
   per project (New/Rename/Delete), library (search, click to add), drag output dot → input dot to link,

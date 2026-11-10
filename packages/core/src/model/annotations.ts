@@ -1,6 +1,7 @@
 import { registerCategory } from "../categories.ts";
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
+import { alongArc, arcInfo, tangentLine } from "./arcs.ts";
 import { Cat, wallThickness, type LevelParams, type Wall, type WallParams } from "./architecture.ts";
 import type { DatumLineParams } from "./datums.ts";
 import { validateRegion } from "./sketch.ts";
@@ -160,9 +161,22 @@ const unit = (v: Vec2): Vec2 => {
 export function resolveRef(doc: Document, ref: DimRef, viewId?: ElementId): ResolvedRef {
   const line = viewId ? doc.get<ViewParams>(viewId)?.params.line : undefined;
   if (line && (ref.kind === "wallFace" || ref.kind === "datum")) {
-    const plan = resolveRef(doc, ref);
     const l = Math.hypot(line.end.x - line.start.x, line.end.y - line.start.y) || 1;
     const R = { x: (line.end.x - line.start.x) / l, y: (line.end.y - line.start.y) / l };
+    const g = ref.kind === "datum" ? doc.require<DatumLineParams>(ref.id) : null;
+    const curve = (g?.params as { curve?: number | null } | undefined)?.curve;
+    if (g && curve) {
+      // A curved grid crosses the view line where the line meets its circle: the crossing nearest the pick.
+      const a = arcInfo(g.params.start, g.params.end, curve)!;
+      const w = { x: line.start.x - a.center.x, y: line.start.y - a.center.y };
+      const B = w.x * R.x + w.y * R.y;
+      const disc = B * B - (w.x * w.x + w.y * w.y - a.radius * a.radius);
+      if (disc < 0) throw new Error("That grid doesn't cross the view");
+      const xs = [-B - Math.sqrt(disc), -B + Math.sqrt(disc)];
+      const s = xs.sort((p, q) => Math.abs(p - ref.pick.x) - Math.abs(q - ref.pick.x))[0]!;
+      return { point: { x: s, y: 0 }, dir: { x: 0, y: 1 } };
+    }
+    const plan = resolveRef(doc, ref);
     const D = plan.dir!;
     // line.start + R·s = plan.point + D·t
     const den = R.x * D.y - R.y * D.x;
@@ -183,7 +197,12 @@ export function resolveRef(doc: Document, ref: DimRef, viewId?: ElementId): Reso
     }
     case "datum": {
       const g = doc.require<DatumLineParams>(ref.id);
-      if ((g.params as { curve?: number | null }).curve) throw new Error("Curved grids can't be dimensioned yet");
+      const curve = (g.params as { curve?: number | null }).curve;
+      if (curve) {
+        // Curved grids: the tangent where the pick is (so concentric arcs dimension radially).
+        const t = tangentLine({ params: { start: g.params.start, end: g.params.end, curve } }, alongArc(g.params.start, g.params.end, curve, ref.pick));
+        return { point: t.start, dir: t.dir };
+      }
       return { point: g.params.start, dir: unit({ x: g.params.end.x - g.params.start.x, y: g.params.end.y - g.params.start.y }) };
     }
     case "level": {

@@ -1,4 +1,5 @@
 import {
+  arcPoints,
   Cat,
   levels,
   toViewCoords,
@@ -159,9 +160,15 @@ export function sectionAnnotations(doc: Document, view: View): LineData {
   }
   const r = GRID_BUBBLE_RADIUS * k;
   for (const g of doc.byCategory<GridParams>(Cat.Grid)) {
-    if (g.params.curve) continue; // curved grids: not in sections yet
-    const x = crossing(view, g.params.start, g.params.end);
-    if (x === null || x < crop.min.x || x > crop.max.x) continue;
+    // Where the view line crosses the grid (a curved grid: each piece of its arc, so up to two places).
+    const path = arcPoints(g.params.start, g.params.end, g.params.curve, Math.PI / 360);
+    const xs: number[] = [];
+    for (let i = 1; i < path.length; i++) {
+      const x = crossing(view, path[i - 1]!, path[i]!);
+      if (x !== null && !xs.some((q) => Math.abs(q - x) < 1)) xs.push(x);
+    }
+    for (const x of xs) {
+    if (x < crop.min.x || x > crop.max.x) continue;
     line({ x, y: crop.min.y }, { x, y: crop.max.y });
     const cy = crop.max.y + r;
     for (let i = 0; i < 32; i++) {
@@ -170,6 +177,7 @@ export function sectionAnnotations(doc: Document, view: View): LineData {
       line({ x: x + r * Math.cos(a0), y: cy + r * Math.sin(a0) }, { x: x + r * Math.cos(a1), y: cy + r * Math.sin(a1) });
     }
     labels.push({ text: g.name ?? "", position: [x, cy, 0], ...(k !== 1 ? { size: r * 0.75 } : {}) });
+    }
   }
   // Detail callouts drawn from this view: their box (on the same cut) and a numbered bubble.
   const pl = view.params.line;

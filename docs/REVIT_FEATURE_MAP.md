@@ -24,7 +24,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Levels | 0 | ✅ (plans per level, heads in sections/elevations) |
 | Grids | 1 | ✅ (straight or arc; arc grids cross sections (bubbles at each crossing) and dimension radially / along the section) |
 | Reference planes | 1 | ✅ |
-| Scope boxes | 2 | ✅ (View → Scope Box; plans crop to it; grids set to it are limited to it) |
+| Scope boxes | 2 | ✅ (View → Scope Box; plans crop to it; grids set to it are limited to it; levels set to it show only across it in sections/elevations through it) |
 
 ## 3. Architectural modelling
 | Feature | Phase | Status |

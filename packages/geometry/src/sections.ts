@@ -1,5 +1,6 @@
 import {
   arcPoints,
+  levelExtentInView,
   Cat,
   levels,
   toViewCoords,
@@ -155,8 +156,14 @@ export function sectionAnnotations(doc: Document, view: View): LineData {
   for (const l of levels(doc)) {
     const y = l.params.elevation;
     if (y < crop.min.y || y > crop.max.y) continue;
-    line({ x: crop.min.x - 300 * k, y }, { x: crop.max.x + 300 * k, y });
-    labels.push({ text: `${l.name ?? "Level"}  ${Math.round(y)}`, position: [crop.max.x + 400 * k, y + 250 * k, 0], size: 250 * k, align: "left" });
+    // A scope box limits the level to the stretch of this view inside it (or hides it).
+    const ext = levelExtentInView(doc, l, view);
+    if (ext === "hidden") continue;
+    const x0 = ext ? Math.max(crop.min.x, ext[0]) : crop.min.x - 300 * k;
+    const x1 = ext ? Math.min(crop.max.x, ext[1]) : crop.max.x + 300 * k;
+    if (x1 <= x0) continue;
+    line({ x: x0, y }, { x: x1, y });
+    labels.push({ text: `${l.name ?? "Level"}  ${Math.round(y)}`, position: [x1 + 100 * k, y + 250 * k, 0], size: 250 * k, align: "left" });
   }
   const r = GRID_BUBBLE_RADIUS * k;
   for (const g of doc.byCategory<GridParams>(Cat.Grid)) {

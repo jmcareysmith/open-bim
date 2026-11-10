@@ -33,3 +33,28 @@ describe("curved grids in sections and dimensions", () => {
     expect(dimensionLayout(doc, ds).values[0]).toBeCloseTo(Math.sqrt(7000 ** 2 - 3000 ** 2) - 4000, 3);
   });
 });
+
+describe("levels and scope boxes", () => {
+  it("a boxed level shows only across the box in sections through it, and not in others", async () => {
+    const { createScopeBox } = await import("@open-bim/core");
+    const doc = new Document();
+    applyResidentialTemplate(doc);
+    const lv = levels(doc)[1]!;
+    const box = doc.transact("B", (tx) => createScopeBox(tx, doc, { x: 2000, y: -5000 }, { x: 6000, y: 5000 }));
+    doc.transact("L", (tx) => tx.update(lv.id, { scopeBoxId: box.id }));
+    const through = doc.transact("S", (tx) => createSection(tx, doc, { x: 0, y: 0 }, { x: 10000, y: 0 }));
+    const missing = doc.transact("S", (tx) => createSection(tx, doc, { x: 0, y: 8000 }, { x: 10000, y: 8000 }));
+    const levelSegs = (v: View) => {
+      const a = sectionAnnotations(doc, doc.require(v.id) as View);
+      const y = lv.params.elevation;
+      const out: [number, number][] = [];
+      for (let i = 0; i < a.segments.length; i += 6) if (Math.abs(a.segments[i + 1]! - y) < 1e-6 && Math.abs(a.segments[i + 4]! - y) < 1e-6) out.push([a.segments[i]!, a.segments[i + 3]!]);
+      return out;
+    };
+    const s1 = levelSegs(through);
+    expect(s1).toHaveLength(1);
+    expect(s1[0]![0]).toBeCloseTo(2000);
+    expect(s1[0]![1]).toBeCloseTo(6000);
+    expect(levelSegs(missing)).toHaveLength(0);
+  });
+});

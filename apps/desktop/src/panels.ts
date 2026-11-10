@@ -2854,6 +2854,14 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       sec.append(
         row("Name", textInput(el.name ?? "", (v) => edit(ctx, "Rename level", (tx) => tx.setName(el.id, v || undefined)))),
         row("Elevation", numberInput(p.elevation, (v) => update<LevelParams>("Change level elevation", { elevation: v }))),
+        row(
+          "Scope box",
+          select(
+            [{ value: "", label: "None" }, ...doc.byCategory(Cat.ScopeBox).map((b) => ({ value: b.id, label: b.name ?? b.id }))],
+            p.scopeBoxId ?? "",
+            (v) => update<LevelParams>("Level scope box", { scopeBoxId: v || null }),
+          ),
+        ),
       );
       break;
     }

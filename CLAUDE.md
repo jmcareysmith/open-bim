@@ -329,8 +329,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Analyse panes (NZ Checks, Clashes, Collaborate) sit above the ViewCube (z-index 7).
 - Scope boxes (core/model/scopeboxes.ts): View → Scope Box (two corners in a plan); plan Properties → Scope box sets the
   crop (`planCrop` used by drawings and the viewport); box Properties edit bounds/heights; movable. Grid Properties → Scope box
-  limits straight grids to it (`datumExtent`). Levels aren't
-  limited by them yet.
+  limits straight grids to it (`datumExtent`); level Properties → Scope box
+  limits the level in sections/elevations (`levelExtentInView`: hidden where the view misses the box).
 - Image underlays (core/model/images.ts, view-owned like CAD imports): Insert → Image re-encodes to JPEG (≤4000 px,
   on white), 200 mm paper width by default; Properties: width, position, opacity; move only. Drawings carry
   `images` (transformDrawing/sheets), the PDF writer embeds them as DCTDecode XObjects; viewport `imagePlane`. PDFs: page 1

@@ -117,6 +117,8 @@ export const Cat = {
 export type LevelParams = {
   /** Elevation above project base point, mm. */
   elevation: number;
+  /** Scope box limiting where the level shows in sections and elevations (model/scopeboxes.ts). */
+  scopeBoxId?: string | null;
 };
 export type Level = Element<LevelParams>;
 

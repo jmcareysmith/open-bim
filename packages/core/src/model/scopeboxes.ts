@@ -77,6 +77,39 @@ export function datumExtent(doc: Document, d: { params: { start: Vec2; end: Vec2
   return { start: { x: start.x + dx * Math.max(0, t0), y: start.y + dy * Math.max(0, t0) }, end: { x: start.x + dx * Math.min(1, t1), y: start.y + dy * Math.min(1, t1) } };
 }
 
+/**
+ * A level's extent in a section/elevation when it has a scope box (Revit: levels take their scope
+ * box's extents): the stretch of the view (drawing x, mm along its line) passing through the box, or
+ * "hidden" where the view misses the box or the level is outside its heights; null when unboxed.
+ */
+export function levelExtentInView(doc: Document, level: { params: LevelParams }, view: { params: ViewParams }): [number, number] | "hidden" | null {
+  const box = level.params.scopeBoxId ? doc.get<ScopeBoxParams>(level.params.scopeBoxId) : undefined;
+  const line = view.params.line;
+  if (!box || box.category !== Cat.ScopeBox || !line) return null;
+  const { min, max, bottom, top } = box.params;
+  if (level.params.elevation < bottom || level.params.elevation > top) return "hidden";
+  const L = Math.hypot(line.end.x - line.start.x, line.end.y - line.start.y) || 1;
+  const d = { x: (line.end.x - line.start.x) / L, y: (line.end.y - line.start.y) / L };
+  // The view's (unbounded) line through the box, as distances from its start.
+  let s0 = -Infinity;
+  let s1 = Infinity;
+  for (const [p, q] of [
+    [-d.x, line.start.x - min.x],
+    [d.x, max.x - line.start.x],
+    [-d.y, line.start.y - min.y],
+    [d.y, max.y - line.start.y],
+  ] as const) {
+    if (Math.abs(p) < 1e-12) {
+      if (q < 0) return "hidden";
+      continue;
+    }
+    const t = q / p;
+    if (p < 0) s0 = Math.max(s0, t);
+    else s1 = Math.min(s1, t);
+  }
+  return s0 < s1 ? [s0, s1] : "hidden";
+}
+
 /** Views cropped by this box. */
 export function scopeBoxViews(doc: Document, boxId: ElementId): View[] {
   return doc.byCategory<ViewParams>(Cat.View).filter((v) => v.params.scopeBoxId === boxId) as View[];

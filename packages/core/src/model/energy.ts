@@ -1,12 +1,16 @@
 import type { Document } from "../document.ts";
-import { Cat, levels, type FloorParams, type LevelParams } from "./architecture.ts";
-import { DEFAULT_H1, H1_CLASS_LABELS, h1Check, h1Settings, type ClimateZone, type H1Class } from "./h1.ts";
+import { Cat, levels, type FloorParams, type LevelParams, type Wall } from "./architecture.ts";
+import { wallDirection } from "./joins.ts";
+import { windowPlacement } from "./doors.ts";
+import { projectLocation } from "./settings.ts";
+import { DEFAULT_H1, H1_CLASS_LABELS, h1Check, h1Settings, wallFunction, type ClimateZone, type H1Class } from "./h1.ts";
 import { polygonArea } from "./sketch.ts";
 
 // Energy analysis (Revit: Analyze → Energy Optimization; ours is a steady-state estimate on the
 // H1 envelope): fabric heat loss Σ A/R from the H1 take-off (walls net of their windows and
 // doors), ventilation 0.33·n·V, so H in W/K; peak heating load H·ΔT at the design temperature;
-// annual heating H·HDD·24 h (no solar or internal gains — an upper bound); and the H1
+// annual heating H·HDD·24 h less useful gains (internal, and solar through windows by the way
+// they face); and the H1
 // calculation-method comparison against a reference building with the schedule R-values and the
 // glazing limit.
 //
@@ -24,6 +28,25 @@ export const ZONE_CLIMATE: Record<ClimateZone, { hdd: number; design: number; la
 };
 export const AIR_CHANGES = 0.5;
 export const INDOOR_TEMP = 20;
+
+/**
+ * PROVISIONAL gains figures: heating-season days per zone; internal gains 4 W/m² of floor; solar
+ * on vertical glazing over the heating season (kWh/m², southern hemisphere: north sunniest) by
+ * facing; glass g-value 0.6 × frame/shading 0.7; useful fraction 0.8 of the gains.
+ */
+export const GAINS = {
+  seasonDays: { 1: 150, 2: 180, 3: 210, 4: 240, 5: 250, 6: 270 } as Record<ClimateZone, number>,
+  internal: 4,
+  solar: { N: 350, NE: 280, E: 200, SE: 120, S: 90, SW: 120, W: 200, NW: 280 } as Record<string, number>,
+  transmit: 0.6 * 0.7,
+  utilisation: 0.8,
+};
+
+/** A compass point (8-way) from a bearing in degrees clockwise from north. */
+export function compassPoint(bearing: number): string {
+  const pts = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  return pts[Math.round((((bearing % 360) + 360) % 360) / 45) % 8]!;
+}
 
 export interface EnergyRow {
   cls: H1Class;
@@ -50,8 +73,14 @@ export interface EnergyReport {
   volume: number;
   /** Peak heating load, W, at the zone's design temperature. */
   peak: number;
-  /** Annual heating demand, kWh, and per m² of floor. */
+  /** Annual heating demand, kWh (after useful gains), and per m² of floor. */
   annual: number;
+  /** Before gains, and the gains over the heating season, kWh. */
+  grossAnnual: number;
+  internalGains: number;
+  solarGains: number;
+  /** Window area by the way it faces (8 points), m². */
+  glazingByFacing: Record<string, number>;
   intensity: number;
   /** H1 calculation method: the reference building's fabric heat loss, W/K. */
   reference: number;
@@ -95,7 +124,29 @@ export function energyAnalysis(doc: Document): EnergyReport {
   const ventilation = 0.33 * AIR_CHANGES * volume;
   const total = fabric + ventilation;
   const peak = total * (INDOOR_TEMP - climate.design);
-  const annual = (total * climate.hdd * 24) / 1000;
+  const grossAnnual = (total * climate.hdd * 24) / 1000;
+  // Gains over the heating season: internal by floor area; solar through each exterior window by
+  // the way its wall faces (its exterior side, left of the wall's direction), from true north.
+  const internalGains = (GAINS.internal * floorArea * 24 * GAINS.seasonDays[zone]) / 1000;
+  const loc = projectLocation(doc);
+  const glazingByFacing: Record<string, number> = {};
+  let solarGains = 0;
+  for (const win of doc.byCategory(Cat.Window)) {
+    const p = windowPlacement(doc, win);
+    const wall = doc.get(p.hostId) as Wall | undefined;
+    if (!wall || wall.category !== Cat.Wall) continue;
+    if (wallFunction(wall.typeId ? doc.get(wall.typeId) : undefined) !== "exterior") continue;
+    const d = wallDirection(wall);
+    const out = { x: -d.y, y: d.x };
+    // Project axes → grid east/north (project X points `rotation` from east).
+    const e = out.x * Math.cos(loc.rotation) - out.y * Math.sin(loc.rotation);
+    const n = out.x * Math.sin(loc.rotation) + out.y * Math.cos(loc.rotation);
+    const facing = compassPoint((Math.atan2(e, n) * 180) / Math.PI);
+    const area = (p.width * p.height) / 1e6;
+    glazingByFacing[facing] = (glazingByFacing[facing] ?? 0) + area;
+    solarGains += area * (GAINS.solar[facing] ?? 0) * GAINS.transmit;
+  }
+  const annual = Math.max(0, grossAnnual - GAINS.utilisation * (internalGains + solarGains));
 
   // Reference building: schedule R-values; glazing over the limit counts as wall instead.
   const minR = (cls: H1Class) => req.minR[cls][zone - 1] ?? 1;
@@ -106,8 +157,8 @@ export function energyAnalysis(doc: Document): EnergyReport {
   for (const r of rows) if (r.cls !== "window" && r.cls !== "wall") reference += r.area / minR(r.cls);
   const doorArea = rows.filter((r) => r.cls === "door").reduce((s, r) => s + r.area, 0);
   reference += Math.max(0, wallsAndGlazing - refGlazing - doorArea) / minR("wall") + refGlazing / minR("window");
-  notes.push("Provisional: steady-state estimate without solar or internal gains; degree-days, design temperatures and air changes are our own figures.");
-  return { zone, rows, fabric, ventilation, total, floorArea, volume, peak, annual, intensity: floorArea ? annual / floorArea : 0, reference, pass: fabric <= reference + 1e-6, notes };
+  notes.push("Provisional: steady-state estimate with simple gains (internal 4 W/m², seasonal solar by facing, 80% useful); degree-days, design temperatures, air changes and gains are our own figures.");
+  return { zone, rows, fabric, ventilation, total, floorArea, volume, peak, annual, grossAnnual, internalGains, solarGains, glazingByFacing, intensity: floorArea ? annual / floorArea : 0, reference, pass: fabric <= reference + 1e-6, notes };
 }
 
 function isCurtain(doc: Document, typeId: string): boolean {

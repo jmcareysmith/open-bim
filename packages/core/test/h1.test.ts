@@ -10,6 +10,7 @@ import {
   energyAnalysis,
   ZONE_CLIMATE,
   AIR_CHANGES,
+  GAINS,
   setH1Settings,
   type ThermalTypeParams,
 } from "../src/index.ts";
@@ -95,7 +96,14 @@ describe("energy analysis (provisional)", () => {
     expect(r.ventilation).toBeCloseTo(0.33 * AIR_CHANGES * 216, 6);
     const c = ZONE_CLIMATE[r.zone];
     expect(r.peak).toBeCloseTo(r.total * (20 - c.design), 6);
-    expect(r.annual).toBeCloseTo((r.total * c.hdd * 24) / 1000, 6);
+    expect(r.grossAnnual).toBeCloseTo((r.total * c.hdd * 24) / 1000, 6);
+    // Gains: the windows face the walls' exterior sides (left of each wall's direction): the first
+    // wall's (along +x) faces north, the third's (along −x) south.
+    expect(r.glazingByFacing.N).toBeCloseTo(1.8 * 1.2, 6);
+    expect(r.glazingByFacing.S).toBeCloseTo(1.2 * 1.2, 6);
+    expect(r.solarGains).toBeCloseTo((1.8 * 1.2 * GAINS.solar.N! + 1.2 * 1.2 * GAINS.solar.S!) * GAINS.transmit, 6);
+    expect(r.internalGains).toBeCloseTo((GAINS.internal * 80 * 24 * GAINS.seasonDays[r.zone]) / 1000, 6);
+    expect(r.annual).toBeCloseTo(Math.max(0, r.grossAnnual - GAINS.utilisation * (r.internalGains + r.solarGains)), 6);
     expect(r.pass).toBe(r.fabric <= r.reference + 1e-6);
     // Better walls than the minimum lower the heat loss below the reference.
     const wallType = doc.byCategory("WallType").find((t) => t.name === wall.typeName)!;

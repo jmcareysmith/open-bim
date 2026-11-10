@@ -94,7 +94,10 @@ function energyBody(host: NzChecksHost): Node[] {
         ["Ventilation", `${r.ventilation.toFixed(1)} W/K`, `${r.volume.toFixed(0)} m\u00b3`],
         ["Total heat loss", `${r.total.toFixed(1)} W/K`, ""],
         ["Peak heating load", `${(r.peak / 1000).toFixed(1)} kW`, `at ${c.design} \u00b0C`],
-        ["Annual heating (no gains)", `${Math.round(r.annual).toLocaleString()} kWh`, r.floorArea ? `${r.intensity.toFixed(0)} kWh/m\u00b2 over ${r.floorArea.toFixed(0)} m\u00b2` : ""],
+        ["Heating before gains", `${Math.round(r.grossAnnual).toLocaleString()} kWh`, ""],
+        ["Internal gains (season)", `${Math.round(r.internalGains).toLocaleString()} kWh`, "4 W/m², provisional"],
+        ["Solar gains (season)", `${Math.round(r.solarGains).toLocaleString()} kWh`, Object.entries(r.glazingByFacing).map(([f, a]) => `${f} ${a.toFixed(1)} m²`).join(", ") || "no exterior windows"],
+        ["Annual heating (after 80% of gains)", `${Math.round(r.annual).toLocaleString()} kWh`, r.floorArea ? `${r.intensity.toFixed(0)} kWh/m\u00b2 over ${r.floorArea.toFixed(0)} m\u00b2` : ""],
       ],
     ),
   );

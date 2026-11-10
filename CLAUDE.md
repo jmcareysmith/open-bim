@@ -140,7 +140,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Family constraints: label a dimension between reference planes with a parameter, or set EQ;
   planes flex (PlaneGCS) on every edit; forms use plane names in formulas (e.g. x = Left).
 - Type catalogs (import/export CSV in Family Types); nested families (Load from project → Component,
-  associate parameters with host formulas).
+  associate parameters with host formulas). Shared (Family Types → Shared): nested instances also exist in the
+  project as FamilyInstances with `nestedOf`/`nestedKey` (core `syncSharedNested` hook; nested family loaded by name;
+  drawn by the host's mesh, kernel returns null for them) so schedules count them.
 - Parameters: project parameters (per category, instance/type), shared parameter files, global
   parameters driving element values (browser → Parameters; element properties).
 - Family library: Browser → Families → Load from library (`packages/library`) or Load family file;

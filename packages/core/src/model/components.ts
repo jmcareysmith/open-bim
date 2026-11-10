@@ -3,6 +3,7 @@ import { Document, type DocumentJSON, type Transaction } from "../document.ts";
 import type { Element, ElementId, ParamValue, Vec2 } from "../element.ts";
 import { evaluate, type Values } from "../expr.ts";
 import { Cat, type LevelParams, type WallParams } from "./architecture.ts";
+import { tangentLine } from "./arcs.ts";
 import { familyInfo, familyValues, type FamilyCategory, type FamilyHosting } from "./family.ts";
 import { registerWallCutter, validateHosted, type HostedParams } from "./openings.ts";
 
@@ -38,6 +39,12 @@ export type FamilyInstanceParams = {
    * parameters (Revit's "associate family parameter"), e.g. { Height: "Height - 30" }.
    */
   associations?: Record<string, string> | null;
+  /**
+   * A shared nested family's instance in the project, kept by `enableSharedNested`: the host
+   * instance and the nested instance's id in the host's family. Drawn as part of the host.
+   */
+  nestedOf?: ElementId | null;
+  nestedKey?: string | null;
 };
 export type FamilyInstance = Element<FamilyInstanceParams>;
 
@@ -60,7 +67,7 @@ registerCategory({
   name: Cat.FamilyInstance,
   dependencies: (el) => {
     const p = el.params as FamilyInstanceParams;
-    return [p.familyId, p.levelId, ...(p.hostId ? [p.hostId] : [])];
+    return [p.familyId, p.levelId, ...(p.hostId ? [p.hostId] : []), ...(p.nestedOf ? [p.nestedOf] : [])];
   },
   // A hosted instance changes its host's cut.
   related: (_doc, el) => {
@@ -207,4 +214,118 @@ export function placeFamilyInstance(
   };
   if (params.hostId) validateHosted(doc, familyPlacement(doc, { id: "", category: Cat.FamilyInstance, params }));
   return tx.create<FamilyInstanceParams>(Cat.FamilyInstance, params);
+}
+
+/** Where an instance's family origin sits: model point (z absolute) and the family's +X in plan. */
+export function instanceOrigin(doc: Document, inst: FamilyInstance): { origin: [number, number, number]; x: Vec2 } {
+  const p = inst.params;
+  if (p.hostId) {
+    const wall = doc.require<WallParams>(p.hostId);
+    const { start, dir: d } = tangentLine(wall, p.along);
+    const base = doc.require<LevelParams>(wall.params.baseLevelId).params.elevation + wall.params.baseOffset;
+    const x = p.flipped ? { x: -d.x, y: -d.y } : d;
+    return { origin: [start.x + d.x * p.along, start.y + d.y * p.along, base + p.sillHeight], x };
+  }
+  const z = doc.require<LevelParams>(p.levelId).params.elevation + p.offset;
+  return { origin: [p.position.x, p.position.y, z], x: { x: Math.cos(p.rotation), y: Math.sin(p.rotation) } };
+}
+
+/** Is this loaded family shared (its nested instances show in projects)? */
+export function isSharedFamily(def: FamilyDef): boolean {
+  return familyInfo(familyDocument(def))?.params.shared === true;
+}
+
+/** The project's element standing for a shared nested instance (none for ordinary ones). */
+export function isNestedChild(el: Element): boolean {
+  return el.category === Cat.FamilyInstance && !!(el.params as FamilyInstanceParams).nestedOf;
+}
+
+/**
+ * Keep the project's elements for shared nested families (Revit: Shared): for each placed instance
+ * whose family nests shared families, one free-standing instance per nested one, at the nested
+ * instance's place under the host, with its values (associations evaluated for the host). The
+ * nested family is loaded into the project by its name. Children are drawn by the host's mesh.
+ */
+export function syncSharedNested(tx: Transaction, doc: Document): void {
+  // Projects only (a family document shows its nested families as they are).
+  if (familyInfo(doc)) return;
+  const insts = doc.byCategory<FamilyInstanceParams>(Cat.FamilyInstance) as FamilyInstance[];
+  const children = new Map<string, FamilyInstance>();
+  for (const c of insts) if (c.params.nestedOf) children.set(`${c.params.nestedOf}|${c.params.nestedKey}`, c);
+  const keep = new Set<string>();
+  const loaded = new Map<object, FamilyDef>();
+  for (const host of insts) {
+    if (host.params.nestedOf) continue;
+    const def = doc.get<FamilyDefParams>(host.params.familyId) as FamilyDef | undefined;
+    if (def?.category !== Cat.FamilyDef) continue;
+    const fdoc = familyDocument(def);
+    const nested = fdoc.byCategory<FamilyInstanceParams>(Cat.FamilyInstance) as FamilyInstance[];
+    if (!nested.length) continue;
+    let hostValues: Values | null = null;
+    let at: ReturnType<typeof instanceOrigin> | null = null;
+    for (const n of nested) {
+      const ndef = fdoc.get<FamilyDefParams>(n.params.familyId) as FamilyDef | undefined;
+      if (ndef?.category !== Cat.FamilyDef || !isSharedFamily(ndef)) continue;
+      try {
+        hostValues ??= instanceValues(doc, host);
+        at ??= instanceOrigin(doc, host);
+      } catch {
+        break;
+      }
+      // The nested family in the project (loaded or reloaded when its definition differs).
+      let pdef = loaded.get(ndef.params.json);
+      if (!pdef) {
+        pdef = familyDefs(doc).find((f) => f.name === ndef.name);
+        if (!pdef || (pdef.params.json !== ndef.params.json && JSON.stringify(pdef.params.json) !== JSON.stringify(ndef.params.json)))
+          pdef = loadFamily(tx, doc, familyDocument(ndef), ndef.name ?? "Family");
+        loaded.set(ndef.params.json, pdef);
+      }
+      const overrides: Values = { ...n.params.overrides };
+      for (const [name, formula] of Object.entries(n.params.associations ?? {})) {
+        try {
+          overrides[name] = evaluate(formula, hostValues);
+        } catch {
+          // A broken association leaves the nested value as typed.
+        }
+      }
+      // Place: the host's origin and axes applied to the nested instance's family coordinates.
+      const lz = fdoc.get<LevelParams>(n.params.levelId)?.params.elevation ?? 0;
+      const { origin, x } = at;
+      const px = n.params.position.x;
+      const py = n.params.position.y;
+      const position = { x: origin[0] + x.x * px - x.y * py, y: origin[1] + x.y * px + x.x * py };
+      const rotation = Math.atan2(x.y, x.x) + n.params.rotation;
+      const levelId = host.params.hostId ? doc.require<WallParams>(host.params.hostId).params.baseLevelId : host.params.levelId;
+      const offset = origin[2] + lz + n.params.offset - doc.require<LevelParams>(levelId).params.elevation;
+      const params: FamilyInstanceParams = {
+        familyId: pdef.id,
+        typeName: n.params.typeName,
+        overrides,
+        levelId,
+        offset,
+        position,
+        rotation,
+        hostId: null,
+        along: 0,
+        sillHeight: 0,
+        flipped: false,
+        nestedOf: host.id,
+        nestedKey: n.id,
+      };
+      const key = `${host.id}|${n.id}`;
+      keep.add(key);
+      const have = children.get(key);
+      if (!have) tx.create<FamilyInstanceParams>(Cat.FamilyInstance, params);
+      else {
+        const changed = (Object.keys(params) as (keyof FamilyInstanceParams)[]).some((k) => JSON.stringify(params[k]) !== JSON.stringify(have.params[k] ?? null));
+        if (changed) tx.update<FamilyInstanceParams>(have.id, params);
+      }
+    }
+  }
+  for (const [key, c] of children) if (!keep.has(key) && doc.get(c.id)) tx.delete(c.id);
+}
+
+/** Keep shared nested families' project elements up to date on every commit. */
+export function enableSharedNested(doc: Document): () => void {
+  return doc.addCommitHook((tx) => syncSharedNested(tx, doc));
 }

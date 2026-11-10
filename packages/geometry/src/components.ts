@@ -1,4 +1,4 @@
-import { tangentLine,
+import { instanceOrigin, tangentLine,
   DISPLAY_DETAIL,
   DISPLAY_PLAN,
   DISPLAY_SIDE,
@@ -65,16 +65,7 @@ export interface Placement {
 }
 
 export function instancePlacement(doc: Document, inst: FamilyInstance): Placement {
-  const p = inst.params;
-  if (p.hostId) {
-    const wall = doc.require(p.hostId) as Wall;
-    const { start, dir: d } = tangentLine(wall, p.along);
-    const base = doc.require<LevelParams>(wall.params.baseLevelId).params.elevation + wall.params.baseOffset;
-    const x = p.flipped ? { x: -d.x, y: -d.y } : d;
-    return { origin: [start.x + d.x * p.along, start.y + d.y * p.along, base + p.sillHeight], x };
-  }
-  const z = doc.require<LevelParams>(p.levelId).params.elevation + p.offset;
-  return { origin: [p.position.x, p.position.y, z], x: { x: Math.cos(p.rotation), y: Math.sin(p.rotation) } };
+  return instanceOrigin(doc, inst);
 }
 
 export function placeMeshData(m: MeshData, pl: Placement): MeshData {
@@ -100,6 +91,8 @@ export function placeMeshData(m: MeshData, pl: Placement): MeshData {
 /** An instance's mesh in `doc`'s coordinates. `hostValues`: when `doc` is a family, its values. */
 export function buildFamilyInstance(doc: Document, el: Element, mesher: FamilyMesher, hostValues?: Values, display?: FamilyDisplay): MeshData | null {
   const inst = el as FamilyInstance;
+  // Shared nested families' project elements are drawn by their host's mesh.
+  if (inst.params.nestedOf) return null;
   const def = doc.require(inst.params.familyId) as FamilyDef;
   // The view's detail level and plan-ness ride along as reserved values (nested families inherit them).
   const shown = display ? displayValues(display) : hostValues ? pickDisplay(hostValues) : {};

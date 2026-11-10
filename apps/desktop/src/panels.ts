@@ -1471,6 +1471,17 @@ function familyTypesSection(ctx: PanelContext): HTMLElement {
   sec.append(
     row("Family name", textInput(info.name ?? "", (v) => edit(ctx, "Rename family", (tx) => tx.setName(info.id, v || undefined)))),
     row("Category", p.category + (p.hosting === "wall" ? " (wall hosted)" : "")),
+    ...(["DetailItem", "ViewMarker", "TitleBlock"].includes(p.category)
+      ? []
+      : [
+          row(
+            "Shared",
+            Object.assign(
+              checkbox(p.shared === true, (v) => edit(ctx, "Shared family", (tx) => tx.update<FamilyInfoParams>(info.id, { shared: v }))),
+              { title: "Nested in another family, its instances also show in projects (schedules, tags)" },
+            ),
+          ),
+        ]),
     ...(p.category === "ViewMarker"
       ? [
           row(

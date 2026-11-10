@@ -39,7 +39,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 ## Phase 3 — Families & parameters (done)
 - [x] Family editor: reference planes, sketches, extrude/revolve/sweep/blend/void — profiles editable as formula points; no graphical profile editing after creation yet
 - [x] 2D constraint solver (dimensions drive geometry) — PlaneGCS adopted: labelled + EQ dimensions flex reference planes; forms follow planes by name. Sketch-level locks/angles later
-- [x] Formulas, conditionals, type catalogs, nested/shared families — nested with parameter associations; "shared" nested (scheduled separately) later
+- [x] Formulas, conditionals, type catalogs, nested/shared families — nested with parameter associations; shared nested families (Family Types → Shared) show in projects as their own instances (core `enableSharedNested`), scheduled separately
 - [x] Project, shared and global parameters — shared parameters for projects (family shared params later); not yet in schedules (Phase 4)
 - [x] Family library (doors, windows, furniture) in an open format — `packages/library`, `.obim-family` JSON files
 

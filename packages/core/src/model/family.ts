@@ -50,6 +50,11 @@ export type FamilyInfoParams = {
   currentType: string;
   /** View Marker families: which marker they are. */
   markerRole?: MarkerRole;
+  /**
+   * Shared (Revit): nested in another family, its instances also appear in the project as their own
+   * elements (scheduled, tagged, counted) — see `enableSharedNested` in components.ts.
+   */
+  shared?: boolean;
 };
 export type FamilyInfo = Element<FamilyInfoParams>;
 

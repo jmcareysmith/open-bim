@@ -20,7 +20,7 @@ export function buildMepSymbol(doc: Document, el: Element): LineData | null {
   const inst = el as FamilyInstance;
   const def = doc.get(inst.params.familyId);
   const category = (def?.params as { category?: string } | undefined)?.category ?? "";
-  if (!SYMBOLS.has(category) || inst.params.hostId) return null;
+  if (!SYMBOLS.has(category) || inst.params.hostId || inst.params.nestedOf) return null;
   const mesh = solids?.(doc, el);
   if (!mesh || !mesh.positions.length) return null;
   // The footprint in the instance's own axes (so a turned terminal keeps its square).

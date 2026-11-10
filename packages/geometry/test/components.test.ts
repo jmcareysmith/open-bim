@@ -11,6 +11,9 @@ import {
   setFamilyValue,
   placeFamilyInstance,
   type NumPt,
+  enableSharedNested,
+  familyInfo,
+  type FamilyInstanceParams,
 } from "@open-bim/core";
 import { SimpleKernel, boundingBox, meshVolume } from "../src/index.ts";
 
@@ -106,5 +109,46 @@ describe("nested family geometry", () => {
     expect(meshVolume(k.build(project, dining)!)).toBeCloseTo(1200 * 600 * 30 + 4 * legVol(720), -2);
     expect(meshVolume(k.build(project, coffee)!)).toBeCloseTo(1200 * 600 * 30 + 4 * legVol(420), -2);
     expect(boundingBox(k.build(project, coffee)!).max[2]).toBeCloseTo(450);
+  });
+});
+
+describe("shared nested families", () => {
+  it("a shared leg shows in the project as its own instances, placed and sized under the host", () => {
+    const leg = new Document();
+    applyFamilyTemplate(leg, "GenericModel", "Leg");
+    leg.transact("P", (tx) => createFamilyParameter(tx, leg, "Height", { value: 700 }));
+    leg.transact("E", (tx) => createExtrusion(tx, rect(-25, -25, 25, 25), { end: "Height" }));
+    leg.transact("Shared", (tx) => tx.update(familyInfo(leg)!.id, { shared: true }));
+
+    const table = new Document();
+    applyFamilyTemplate(table, "Furniture", "Table");
+    const legDef = table.transact("Nest", (tx) => loadFamily(tx, table, leg, "Leg"));
+    const lvl = levels(table)[0]!.id;
+    for (const x of [-500, 500]) {
+      table.transact("Leg", (tx) => {
+        const i = placeFamilyInstance(tx, table, legDef.id, "Default", { levelId: lvl, position: { x, y: 100 } });
+        tx.update(i.id, { associations: { Height: "Height - 30" } });
+      });
+    }
+
+    const project = new Document();
+    const ids = applyResidentialTemplate(project);
+    enableSharedNested(project);
+    const def = project.transact("Load", (tx) => loadFamily(tx, project, table, "Table"));
+    const t = project.transact("P", (tx) => placeFamilyInstance(tx, project, def.id, "Default", { levelId: ids.levels.ground, position: { x: 1000, y: 0 }, rotation: Math.PI / 2 }));
+    const kids = () => project.byCategory<FamilyInstanceParams>("FamilyInstance").filter((i) => i.params.nestedOf === t.id);
+    expect(kids()).toHaveLength(2);
+    expect(project.byCategory("FamilyDef").map((d) => d.name).sort()).toEqual(["Leg", "Table"]);
+    const pos = kids().map((k) => k.params.position).sort((a, b) => a.y - b.y);
+    expect(pos[0]!.x).toBeCloseTo(900);
+    expect(pos[0]!.y).toBeCloseTo(-500);
+    expect(kids()[0]!.params.overrides["Height"]).toBeCloseTo(720);
+    // Drawn by the host only.
+    expect(new SimpleKernel().build(project, kids()[0]!)).toBeNull();
+    // They follow the host and go with it.
+    project.transact("Move", (tx) => tx.update(t.id, { position: { x: 2000, y: 0 } }));
+    expect(kids().map((k) => k.params.position.x)).toEqual([1900, 1900].map((v) => expect.closeTo(v)) as unknown as number[]);
+    project.transact("Del", (tx) => tx.delete(t.id));
+    expect(project.byCategory("FamilyInstance")).toHaveLength(0);
   });
 });

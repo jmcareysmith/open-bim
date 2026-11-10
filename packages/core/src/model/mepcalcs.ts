@@ -1,9 +1,9 @@
-import type { Document } from "../document.ts";
+import type { Document, Transaction } from "../document.ts";
 import type { ElementId } from "../element.ts";
 import { Cat } from "./architecture.ts";
 import { ductShape, type Duct } from "./ducts.ts";
 import { classificationInfo, elementConnectors, systemMembers, type MEPSystem, type ModelConnector } from "./mep.ts";
-import type { Pipe } from "./pipes.ts";
+import { PIPE_SIZES, type Pipe, type PipeParams } from "./pipes.ts";
 
 // Pressure loss in duct and pipe systems (Revit: System Inspector / pressure loss reports).
 // From the system's source (equipment) out to every terminal: friction in each run by
@@ -187,4 +187,29 @@ export function systemPressure(doc: Document, sys: MEPSystem): PressureReport {
   if (!report.runs.length) notes.push("No runs connect to the system's equipment.");
   notes.push("Provisional: Darcy–Weisbach with typical roughness and fitting K values; confirm for design.");
   return report;
+}
+
+/**
+ * Size a pressure pipe system's pipes (Revit: Pipe Sizing, velocity method): each takes the
+ * smallest DN (as the bore) keeping the flow it carries — the fixtures' design flows beyond it,
+ * added without diversity — at or under `velocity` m/s (default 1.5). PROVISIONAL: no loading
+ * units or simultaneous-demand curve yet. Returns how many pipes were sized.
+ */
+export function sizePipes(tx: Transaction, doc: Document, systemId: ElementId, opts: { velocity?: number } = {}): number {
+  const sys = doc.require(systemId) as MEPSystem;
+  if (classificationInfo(sys.params.classification).domain !== "pipe") throw new Error("Only pipe systems are sized here");
+  if (sys.params.classification === "sanitary" || sys.params.classification === "stormwater") throw new Error("Drainage is sized by discharge units: see NZ Checks → G13 drainage");
+  const v = opts.velocity ?? 1.5;
+  const { runs } = systemPressure(doc, sys);
+  if (!runs.length) throw new Error("No pipes reach the system's equipment: connect them to it first");
+  let n = 0;
+  for (const r of runs) {
+    if (r.flow <= 0) continue;
+    const need = Math.sqrt((4 * (r.flow / 1000 / v)) / Math.PI) * 1000; // mm
+    const dn = PIPE_SIZES.find((d) => d >= need) ?? PIPE_SIZES[PIPE_SIZES.length - 1]!;
+    const pipe = doc.get<PipeParams>(r.id);
+    if (pipe && pipe.params.diameter !== dn) tx.update<PipeParams>(r.id, { diameter: dn });
+    n++;
+  }
+  return n;
 }

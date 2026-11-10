@@ -17,6 +17,10 @@ import {
   sizeDucts,
   systemPressure,
   frictionFactor,
+  createPipe,
+  ensurePipeTypes,
+  sizePipes,
+  type PipeParams,
   type Duct,
   type DuctFittingParams,
   type DuctParams,
@@ -147,5 +151,34 @@ describe("pressure loss", () => {
     const vp = (1.2 * branch.velocity ** 2) / 2;
     expect(r.critical.loss).toBeCloseTo(first.friction * 2 + branch.friction * 3 + (0.6 + 0.1) * vp, 3);
     expect(frictionFactor(1000, 0)).toBeCloseTo(0.064);
+  });
+});
+
+describe("pipe sizing", () => {
+  it("sizes a cold-water system's pipes by velocity from the fixtures' flows", () => {
+    const { doc, ids } = setup();
+    const fam = (name: string, flowDirection: "in" | "out", flow: number) => {
+      const f = new Document();
+      applyFamilyTemplate(f, name === "Main" ? "MechanicalEquipment" : "PlumbingFixture", name);
+      f.transact("C", (tx) => createConnector(tx, { classification: "coldWater", flowDirection, flow }));
+      return doc.transact("Load", (tx) => loadFamily(tx, doc, f, name)).id;
+    };
+    const place = (id: string, x: number, y: number) =>
+      doc.transact("P", (tx) => placeFamilyInstance(tx, doc, id, "Default", { levelId: ids.levels.ground, position: { x, y }, offset: 500 })) as FamilyInstance;
+    const src = place(fam("Main", "out", 0.6), 0, 0);
+    const basin = fam("Basin", "in", 0.3);
+    const b1 = place(basin, 4000, 0);
+    const b2 = place(basin, 2000, 2000);
+    const [pex] = doc.transact("T", (tx) => ensurePipeTypes(tx, doc));
+    const pipe = (a: P3, b: P3) => doc.transact("Pipe", (tx) => createPipe(tx, doc, pex!, ids.levels.ground, a, b, { diameter: 15, classification: "coldWater" }));
+    const main = pipe(p(0, 0, 500), p(4000, 0, 500));
+    pipe(p(2000, 0, 500), p(2000, 2000, 500));
+    const sys = doc.transact("S", (tx) => createSystem(tx, doc, "coldWater", [src.id, b1.id, b2.id]));
+    const n = doc.transact("Size", (tx) => sizePipes(tx, doc, sys.id, { velocity: 1.5 }));
+    expect(n).toBe(3);
+    // 0.6 L/s at 1.5 m/s needs a 22.6 mm bore → DN25; 0.3 L/s needs 16 → DN20.
+    const sizes = doc.byCategory<PipeParams>(Cat.Pipe).map((x) => x.params.diameter).sort((a, b) => a - b);
+    expect(sizes).toEqual([20, 20, 25]);
+    expect(doc.require<PipeParams>(main.id).params.diameter).toBe(25);
   });
 });

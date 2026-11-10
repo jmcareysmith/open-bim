@@ -311,6 +311,7 @@ import {
   ductSizeLabel,
   ductSystems,
   sizeDucts,
+  sizePipes,
   type Duct,
   type DuctFittingParams,
   type DuctParams,
@@ -3756,6 +3757,17 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
           if (n) ctx.status(`Sized ${n} duct(s) for ${vel.value} m/s.`);
         };
         sec.append(row("Duct sizing (m/s)", h("div", { class: "buttons" }, vel, size)));
+      }
+      if (info.domain === "pipe" && sys.params.classification !== "sanitary" && sys.params.classification !== "stormwater") {
+        // Pipe Sizing (velocity method) from the fixtures' flows beyond each pipe (no diversity yet).
+        const vel = h("input", { type: "number", value: "1.5", min: "0.3", step: "0.1", title: "Target velocity, m/s" }) as HTMLInputElement;
+        const size = h("button", { textContent: "Size pipes", title: "Provisional: fixtures' design flows added without a simultaneous-demand allowance" });
+        size.onclick = () => {
+          let n = 0;
+          edit(ctx, "Size pipes", (tx) => (n = sizePipes(tx, doc, sys.id, { velocity: Number(vel.value) || 1.5 })));
+          if (n) ctx.status(`Sized ${n} pipe(s) for ${vel.value} m/s (provisional).`);
+        };
+        sec.append(row("Pipe sizing (m/s)", h("div", { class: "buttons" }, vel, size)));
       }
       if (info.domain === "duct" || info.domain === "pipe") {
         // Pressure loss along the worst path from the equipment (provisional figures).

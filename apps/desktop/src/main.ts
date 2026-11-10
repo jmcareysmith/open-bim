@@ -1338,6 +1338,10 @@ const commands: Record<string, () => void | Promise<void>> = {
     placeFromCategory("ElectricalFixture", "Power Outlet - Double");
   },
   placeLightingFixture: () => placeFromCategory("LightingFixture", "Light - LED Downlight"),
+  placeSprinkler() {
+    placeFromCategory("Sprinkler", "Sprinkler - Pendent");
+    status("Sprinkler: click to place heads at the ceiling (2400); pipe them with Pipe (PI), system Fire protection.");
+  },
   placeSwitchboard: () => placeFromCategory("ElectricalEquipment", "Switchboard - Residential"),
   placePlumbingFixture() {
     if (!familyDefs(doc).some((f) => f.params.category === "PlumbingFixture")) {

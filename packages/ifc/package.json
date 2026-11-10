@@ -11,5 +11,8 @@
     "@open-bim/core": "0.1.0",
     "@open-bim/geometry": "0.1.0",
     "web-ifc": "0.0.77"
+  },
+  "devDependencies": {
+    "@open-bim/library": "0.1.0"
   }
 }

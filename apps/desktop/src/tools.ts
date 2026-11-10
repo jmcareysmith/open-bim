@@ -2458,7 +2458,7 @@ export class SweepTool implements Tool {
 
 /** Component: place the selected family type; hosted families go in a wall. Space rotates 90 degrees. */
 /** Family categories placed at ceiling height. */
-const CEILING_FAMILIES = new Set<string>(["AirTerminal", "LightingFixture"]);
+const CEILING_FAMILIES = new Set<string>(["AirTerminal", "LightingFixture", "Sprinkler"]);
 
 export class ComponentTool implements Tool {
   readonly name = "component";

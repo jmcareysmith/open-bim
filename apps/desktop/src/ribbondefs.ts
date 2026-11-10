@@ -230,6 +230,7 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
           items: [
             { label: "Pipe", icon: "pipe", tool: "pipe", large: true, title: "Pipe: route runs; bends, junctions and reducers are automatic; drainage falls (PI)" },
             { label: "Plumbing Fixture", icon: "component", cmd: "placePlumbingFixture", title: "Place a plumbing fixture (loads WC, basin, shower, bath, sinks and a hot water cylinder from the library if there are none)" },
+            { label: "Sprinkler", icon: "component", cmd: "placeSprinkler", title: "Place sprinkler heads at the ceiling (loads Sprinkler - Pendent from the library if there are none)" },
           ],
         },
       ],

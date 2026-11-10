@@ -14,7 +14,7 @@ export function setSymbolSolids(build: Builder): void {
   solids = build;
 }
 
-const SYMBOLS = new Set(["AirTerminal", "LightingFixture", "ElectricalFixture", "ElectricalEquipment"]);
+const SYMBOLS = new Set(["AirTerminal", "LightingFixture", "ElectricalFixture", "ElectricalEquipment", "Sprinkler"]);
 
 export function buildMepSymbol(doc: Document, el: Element): LineData | null {
   const inst = el as FamilyInstance;
@@ -46,7 +46,19 @@ export function buildMepSymbol(doc: Document, el: Element): LineData | null {
   const seg: number[] = [];
   const line = (a: [number, number], b: [number, number]) => seg.push(a[0], a[1], z, b[0], b[1], z);
   const corners = [at(u0, v0), at(u1, v0), at(u1, v1), at(u0, v1)];
-  if (category === "LightingFixture") {
+  if (category === "Sprinkler") {
+    // Sprinkler head: a small filled-looking circle (two rings) with a short tail, 200 across.
+    const cu = (u0 + u1) / 2;
+    const cv = (v0 + v1) / 2;
+    for (const r of [100, 60]) {
+      for (let i = 0; i < 20; i++) {
+        const a0 = (i / 20) * 2 * Math.PI;
+        const a1 = ((i + 1) / 20) * 2 * Math.PI;
+        line(at(cu + r * Math.cos(a0), cv + r * Math.sin(a0)), at(cu + r * Math.cos(a1), cv + r * Math.sin(a1)));
+      }
+    }
+    line(at(cu - 70, cv - 70), at(cu + 70, cv + 70));
+  } else if (category === "LightingFixture") {
     const cu = (u0 + u1) / 2;
     const cv = (v0 + v1) / 2;
     const r = Math.max(u1 - u0, v1 - v0) / 2;

@@ -91,8 +91,34 @@ function mapping(doc: Document, el: Element): Mapping | null {
       if (c === "Door") return { entity: "IfcDoor", predefined: "DOOR" };
       if (c === "Window") return { entity: "IfcWindow", predefined: "WINDOW" };
       if (c === "Furniture" || c === "Casework") return { entity: "IfcFurniture", predefined: "NOTDEFINED" };
+      // MEP families as their IFC4 distribution classes.
+      const mep: Record<string, [string, string]> = {
+        AirTerminal: ["IfcAirTerminal", "DIFFUSER"],
+        MechanicalEquipment: ["IfcUnitaryEquipment", "NOTDEFINED"],
+        PlumbingFixture: ["IfcSanitaryTerminal", "NOTDEFINED"],
+        Sprinkler: ["IfcFireSuppressionTerminal", "SPRINKLER"],
+        LightingFixture: ["IfcLightFixture", "POINTSOURCE"],
+        ElectricalFixture: ["IfcOutlet", "POWEROUTLET"],
+        ElectricalEquipment: ["IfcElectricDistributionBoard", "DISTRIBUTIONBOARD"],
+      };
+      if (c && mep[c]) return { entity: mep[c]![0], predefined: mep[c]![1] };
       return { entity: "IfcBuildingElementProxy", predefined: "NOTDEFINED" };
     }
+    case Cat.Duct:
+      return { entity: "IfcDuctSegment", predefined: "RIGIDSEGMENT" };
+    case Cat.Pipe:
+      return { entity: "IfcPipeSegment", predefined: "RIGIDSEGMENT" };
+    case Cat.DuctFitting:
+      return { entity: "IfcDuctFitting", predefined: "NOTDEFINED" };
+    case Cat.PipeFitting:
+      return { entity: "IfcPipeFitting", predefined: "NOTDEFINED" };
+    case Cat.CableTray:
+      return { entity: "IfcCableCarrierSegment", predefined: "CABLETRAYSEGMENT" };
+    case Cat.Conduit:
+      return { entity: "IfcCableCarrierSegment", predefined: "CONDUITSEGMENT" };
+    case Cat.CableTrayFitting:
+    case Cat.ConduitFitting:
+      return { entity: "IfcCableCarrierFitting", predefined: "NOTDEFINED" };
     default:
       return null;
   }

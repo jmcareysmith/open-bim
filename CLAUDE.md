@@ -234,6 +234,10 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - HVAC library (packages/library): Supply Diffuser - Square, Return Grille, Exhaust Fan - Ceiling,
   Ducted Heat Pump - Indoor Unit (supply/return/power/condensate), Heat Pump - Outdoor Unit.
   Systems → Air Terminal / Mechanical Equipment place them (terminals and lights at 2400).
+- Fire protection: Sprinkler family category (Systems → Sprinkler places library Sprinkler - Pendent at 2400; plan symbol;
+  schedules); pipe it as Fire protection (Size pipes: no diversity there). IFC export writes MEP families/runs/fittings as
+  IfcAirTerminal/IfcFireSuppressionTerminal/IfcSanitaryTerminal/IfcLightFixture/IfcOutlet/IfcUnitaryEquipment/
+  IfcElectricDistributionBoard, IfcDuct/PipeSegment/Fitting, IfcCableCarrierSegment/Fitting (import maps them back).
 - Plumbing library: WC, basin, shower, bath, kitchen sink, laundry tub (sanitary connectors carry
   discharge units + outlet DN; DN15 hot/cold), hot water cylinder. Systems → Plumbing Fixture.
   NZ Checks → G13 drainage (core/model/drainage.ts): units per drain from its outlet, capacity by

@@ -31,12 +31,13 @@ export type FamilyCategory =
   | "ElectricalEquipment"
   | "ElectricalFixture"
   | "LightingFixture"
+  | "Sprinkler"
   | "Mass"
   | "Site"
   | "Parking";
 
 /** Family categories that carry MEP connectors. */
-export const MEP_FAMILY_CATEGORIES: FamilyCategory[] = ["MechanicalEquipment", "AirTerminal", "PlumbingFixture", "ElectricalEquipment", "ElectricalFixture", "LightingFixture"];
+export const MEP_FAMILY_CATEGORIES: FamilyCategory[] = ["MechanicalEquipment", "AirTerminal", "PlumbingFixture", "ElectricalEquipment", "ElectricalFixture", "LightingFixture", "Sprinkler"];
 /** What a View Marker family draws. */
 export type MarkerRole = "elevation" | "sectionHead" | "sectionTail" | "calloutHead";
 export type FamilyHosting = "none" | "wall";
@@ -376,6 +377,7 @@ const STARTER: Record<FamilyCategory, [string, number][]> = {
     ["Depth", 450],
     ["Height", 850],
   ],
+  Sprinkler: [],
   ElectricalEquipment: [
     ["Width", 400],
     ["Height", 600],

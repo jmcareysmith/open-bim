@@ -69,6 +69,7 @@ export const SCHEDULE_CATEGORIES: [string, string][] = [
   ["AirTerminal", "Air Terminals"],
   ["MechanicalEquipment", "Mechanical Equipment"],
   ["PlumbingFixture", "Plumbing Fixtures"],
+  ["Sprinkler", "Sprinklers"],
   ["ElectricalFixture", "Electrical Fixtures"],
   ["LightingFixture", "Lighting Fixtures"],
   ["ElectricalEquipment", "Electrical Equipment"],

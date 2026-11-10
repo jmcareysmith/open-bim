@@ -219,7 +219,9 @@ export function sizePipes(tx: Transaction, doc: Document, systemId: ElementId, o
   let n = 0;
   for (const r of runs) {
     if (r.flow <= 0) continue;
-    const q = opts.diversity === false ? r.flow : simultaneousDemand(r.flow, Math.min(largest, r.flow));
+    // Sprinklers in the design area all flow at once: no diversity on fire protection.
+    const diverse = opts.diversity ?? sys.params.classification !== "fireProtection";
+    const q = diverse ? simultaneousDemand(r.flow, Math.min(largest, r.flow)) : r.flow;
     const need = Math.sqrt((4 * (q / 1000 / v)) / Math.PI) * 1000; // mm
     const dn = PIPE_SIZES.find((d) => d >= need) ?? PIPE_SIZES[PIPE_SIZES.length - 1]!;
     const pipe = doc.get<PipeParams>(r.id);

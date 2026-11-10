@@ -1357,6 +1357,7 @@ const FAMILY_CATEGORIES: [FamilyCategory, string][] = [
   ["ElectricalEquipment", "Electrical Equipment (MEP)"],
   ["ElectricalFixture", "Electrical Fixture (MEP)"],
   ["LightingFixture", "Lighting Fixture (MEP)"],
+  ["Sprinkler", "Sprinkler (MEP)"],
   ["Mass", "Mass (conceptual)"],
   ["Site", "Site (trees, site furniture)"],
   ["Parking", "Parking"],
@@ -3761,7 +3762,7 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
       if (info.domain === "pipe" && sys.params.classification !== "sanitary" && sys.params.classification !== "stormwater") {
         // Pipe Sizing (velocity method) from the fixtures' flows beyond each pipe, with simultaneous demand.
         const vel = h("input", { type: "number", value: "1.5", min: "0.3", step: "0.1", title: "Target velocity, m/s" }) as HTMLInputElement;
-        const div = h("input", { type: "checkbox", checked: true, title: "Peak flow for fixtures not all running at once (provisional curve)" }) as HTMLInputElement;
+        const div = h("input", { type: "checkbox", checked: sys.params.classification !== "fireProtection", title: "Peak flow for fixtures not all running at once (provisional curve)" }) as HTMLInputElement;
         const size = h("button", { textContent: "Size pipes", title: "Provisional figures" });
         size.onclick = () => {
           let n = 0;

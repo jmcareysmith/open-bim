@@ -55,6 +55,19 @@ const IFC_CLASS_CATEGORY: Record<string, string> = {
   IfcFurniture: "Furniture",
   IfcFurnishingElement: "Furniture",
   IfcBuildingElementProxy: "GenericModel",
+  IfcDuctSegment: Cat.Duct,
+  IfcDuctFitting: Cat.DuctFitting,
+  IfcPipeSegment: Cat.Pipe,
+  IfcPipeFitting: Cat.PipeFitting,
+  IfcCableCarrierSegment: Cat.CableTray,
+  IfcCableCarrierFitting: Cat.CableTrayFitting,
+  IfcAirTerminal: "AirTerminal",
+  IfcUnitaryEquipment: "MechanicalEquipment",
+  IfcSanitaryTerminal: "PlumbingFixture",
+  IfcFireSuppressionTerminal: "Sprinkler",
+  IfcLightFixture: "LightingFixture",
+  IfcOutlet: "ElectricalFixture",
+  IfcElectricDistributionBoard: "ElectricalEquipment",
 };
 
 export function ifcClassCategory(ifcClass: string): string | undefined {

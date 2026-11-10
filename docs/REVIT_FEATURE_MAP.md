@@ -66,7 +66,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Ducts, pipes, fittings, routing | 8 | 🟨 (ducts: round/rect, auto elbows/tees/transitions/crosses, risers, sizing by velocity; pipes: DN sizes, materials, drainage falls, auto fittings; insulation on ducts/pipes and their fittings) |
 | Systems (supply, return, sanitary…) | 8 | ✅ (connectors in families; systems with flow/load totals; system browser) |
 | Electrical circuits, panels, cable trays, conduit | 8 | ✅ (circuits on switchboards, schedules with loads; cable tray and conduit with fittings) |
-| Fixtures & equipment | 8 | 🟨 (MEP family categories with connectors; HVAC library: diffusers, grilles, exhaust fan, heat pump units) |
+| Fixtures & equipment | 8 | 🟨 (MEP family categories with connectors; HVAC library: diffusers, grilles, exhaust fan, heat pump units; plumbing and electrical libraries; Sprinkler category + pendent head; IFC4 distribution classes on export/import) |
 | Sizing & pressure-loss calcs | 9 | 🟨 (duct and pipe sizing by velocity (pipes: fixture flows with a simultaneous-demand curve); system Properties → pressure loss: Darcy–Weisbach + fitting K, critical path; provisional) |
 
 ## 6. Families & parameters

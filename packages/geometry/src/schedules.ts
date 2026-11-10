@@ -205,7 +205,7 @@ const SKETCHED: FieldDef[] = [
 ];
 
 /** Schedulable categories made of loadable families. */
-const FAMILY_SCHEDULE_CATEGORIES = new Set(["Furniture", "Casework", "GenericModel", "AirTerminal", "MechanicalEquipment", "PlumbingFixture", "ElectricalFixture", "LightingFixture", "ElectricalEquipment"]);
+const FAMILY_SCHEDULE_CATEGORIES = new Set(["Furniture", "Casework", "GenericModel", "AirTerminal", "MechanicalEquipment", "PlumbingFixture", "Sprinkler", "ElectricalFixture", "LightingFixture", "ElectricalEquipment"]);
 
 /** MEP run fields: system, size and length. */
 const runFields: FieldDef[] = [

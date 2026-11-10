@@ -801,6 +801,20 @@ export const downlight: LibraryFamily = {
     }),
 };
 
+export const sprinkler: LibraryFamily = {
+  name: "Sprinkler - Pendent",
+  category: "Sprinkler",
+  description: "Pendent sprinkler head below the ceiling, DN15 fire-protection connector up (K80, 1.0 L/s provisional design flow).",
+  build: () =>
+    family("Sprinkler", "Sprinkler - Pendent", [["Flow", 1.0]], [["K80 68 \u00b0C", { Flow: 1.0 }], ["K80 93 \u00b0C", { Flow: 1.0 }]], (tx) => {
+      // Escutcheon at the ceiling, frame and deflector below.
+      createRevolution(tx, rect(0, -10, 32, 0), { axis: 0 });
+      createRevolution(tx, rect(0, -55, 8, -10), { axis: 0 });
+      createRevolution(tx, rect(0, -62, 22, -55), { axis: 0 });
+      createConnector(tx, { classification: "fireProtection", z: 0, facing: "+z", diameter: 15, flow: "Flow", flowDirection: "in" });
+    }),
+};
+
 export const lightSwitch: LibraryFamily = {
   name: "Switch - Light",
   category: "ElectricalFixture",
@@ -872,6 +886,7 @@ export const titleBlockA1: LibraryFamily = {
 };
 
 export const LIBRARY: LibraryFamily[] = [
+  sprinkler,
   singleDoor,
   casementWindow,
   diningTable,

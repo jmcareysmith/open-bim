@@ -353,6 +353,7 @@ import {
   type CableTray,
   type Conduit,
   type AngularDimensionParams,
+  type EndFixity,
 } from "@open-bim/core";
 
 type Child = Node | string | null | undefined | false;
@@ -2757,6 +2758,16 @@ function projectSections(ctx: PanelContext): Record<string, HTMLElement> {
 function beamLoadRows(ctx: PanelContext, beamId: ElementId): HTMLElement[] {
   const doc = ctx.doc;
   const out: HTMLElement[] = [h("h4", {}, "Loads and check (provisional)")];
+  // End conditions (Revit: analytical releases) drive the check's moment and deflection coefficients.
+  const bp = doc.require(beamId).params as BeamParams;
+  const fixOpts = [
+    { value: "pinned", label: "Pinned" },
+    { value: "fixed", label: "Fixed" },
+  ];
+  out.push(
+    row("Start", select(fixOpts, bp.startFixity ?? "pinned", (v) => edit(ctx, "Beam start fixity", (tx) => tx.update<BeamParams>(beamId, { startFixity: v as EndFixity })))),
+    row("End", select(fixOpts, bp.endFixity ?? "pinned", (v) => edit(ctx, "Beam end fixity", (tx) => tx.update<BeamParams>(beamId, { endFixity: v as EndFixity })))),
+  );
   for (const l of doc.byCategory<StructuralLoadParams>(Cat.StructuralLoad).filter((x) => x.params.hostId === beamId)) {
     const b = h("button", { textContent: `${l.params.case}  ${l.params.value} ${l.params.kind === "line" ? "kN/m" : `kN @ ${l.params.at ?? 0}`}`, title: "Select this load" });
     b.onclick = () => ctx.setSelection([l.id]);
@@ -3031,6 +3042,19 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         row("Top level", select(levelOpts, p.topLevelId, (v) => update<ColumnParams>("Change column top", { topLevelId: v }))),
         row("Top offset", numberInput(p.topOffset, (v) => update<ColumnParams>("Change column top offset", { topOffset: v }))),
         row("Rotation (\u00b0)", numberInput(Math.round(((p.rotation * 180) / Math.PI) * 100) / 100, (v) => update<ColumnParams>("Rotate column", { rotation: (v * Math.PI) / 180 }))),
+        row(
+          "Base support",
+          select(
+            [
+              { value: "auto", label: "Automatic (pinned on a footing or the lowest level)" },
+              { value: "pinned", label: "Pinned" },
+              { value: "fixed", label: "Fixed" },
+              { value: "none", label: "None" },
+            ],
+            p.baseSupport ?? "auto",
+            (v) => update<ColumnParams>("Column base support", { baseSupport: v as ColumnParams["baseSupport"] }),
+          ),
+        ),
       );
       const cc = columnCheck(doc, el.id);
       if (cc) {

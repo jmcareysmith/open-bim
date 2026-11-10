@@ -63,6 +63,13 @@ describe("IFC structural analysis view", () => {
     let supports = 0;
     for (let i = 0; i < conns.size(); i++) if (api.GetLine(model, conns.get(i)).AppliedCondition) supports++;
     expect(supports).toBe(2);
+    // Member ends carry their condition: columns rigid (Fixed), beam and brace ends hinged (Pinned).
+    const conds = api.GetLineIDsWithType(model, WebIFC.IFCBOUNDARYNODECONDITION);
+    expect([0, 1].map((k) => api.GetLine(model, conds.get(k)).Name.value).sort()).toEqual(["Fixed", "Pinned"]);
+    const rels = api.GetLineIDsWithType(model, WebIFC.IFCRELCONNECTSSTRUCTURALMEMBER);
+    let withCondition = 0;
+    for (let k = 0; k < rels.size(); k++) if (api.GetLine(model, rels.get(k)).AppliedCondition) withCondition++;
+    expect(withCondition).toBe(8);
     api.CloseModel(model);
   });
 

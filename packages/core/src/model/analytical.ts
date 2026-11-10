@@ -1,7 +1,7 @@
 import type { Document } from "../document.ts";
 import type { ElementId, Vec2 } from "../element.ts";
 import { Cat, floorExtent, wallExtent, type Floor, type LevelParams, type Wall } from "./architecture.ts";
-import { columnExtent, type BeamParams, type Column, type PadFootingParams, type StructuralSectionParams } from "./structure.ts";
+import { columnExtent, type BeamParams, type Column, type EndFixity, type PadFootingParams, type StructuralSectionParams } from "./structure.ts";
 
 // The structural analytical model (Revit: Analytical Model), derived from the physical one:
 // - columns: their axis, base to top;
@@ -18,8 +18,10 @@ type V3 = [number, number, number];
 
 export interface AnalyticalNode {
   p: V3;
-  /** Pinned support (column base on a footing or at the lowest level). */
+  /** A support (column base on a footing or at the lowest level, or as the column says). */
   support: boolean;
+  /** The support's fixity (when `support`): pinned unless the column says fixed. */
+  fixity?: EndFixity;
 }
 
 export interface AnalyticalMember {
@@ -27,6 +29,8 @@ export interface AnalyticalMember {
   kind: "column" | "beam" | "brace";
   a: number;
   b: number;
+  /** How each end connects (columns are continuous: fixed; beams and braces pinned unless released otherwise). */
+  ends: [EndFixity, EndFixity];
 }
 
 export interface AnalyticalPanel {
@@ -66,12 +70,15 @@ export function analyticalModel(doc: Document): AnalyticalModel {
     axes.push({ at, bottom, top });
     const a = nodeAt([at.x, at.y, bottom]);
     const b = nodeAt([at.x, at.y, top]);
-    members.push({ id: c.id, kind: "column", a, b });
+    members.push({ id: c.id, kind: "column", a, b, ends: ["fixed", "fixed"] });
     const onPad = pads.some((f) => {
       const lv = doc.get<LevelParams>(f.params.levelId)?.params.elevation ?? 0;
       return Math.hypot(f.params.position.x - at.x, f.params.position.y - at.y) <= Math.max(f.params.width, f.params.length) / 2 && Math.abs(lv + f.params.offset - bottom) <= ANALYTICAL_TOLERANCE;
     });
-    if (onPad || Math.abs(bottom - lowest) <= ANALYTICAL_TOLERANCE) nodes[a]!.support = true;
+    const mode = c.params.baseSupport ?? "auto";
+    if (mode === "pinned" || mode === "fixed") nodes[a]!.support = true;
+    else if (mode === "auto" && (onPad || Math.abs(bottom - lowest) <= ANALYTICAL_TOLERANCE)) nodes[a]!.support = true;
+    if (nodes[a]!.support) nodes[a]!.fixity = mode === "fixed" ? "fixed" : (nodes[a]!.fixity ?? "pinned");
   }
 
   /** A beam end, moved onto a column axis it frames into (within the tolerance in plan). */
@@ -91,7 +98,7 @@ export function analyticalModel(doc: Document): AnalyticalModel {
     const a = snap([p.start.x, p.start.y, lv + p.offset - half]);
     const e = snap([p.end.x, p.end.y, lv + (p.endOffset ?? p.offset) - half]);
     if (d3(a, e) < 1) continue;
-    members.push({ id: b.id, kind: p.brace ? "brace" : "beam", a: nodeAt(a), b: nodeAt(e) });
+    members.push({ id: b.id, kind: p.brace ? "brace" : "beam", a: nodeAt(a), b: nodeAt(e), ends: [p.startFixity ?? "pinned", p.endFixity ?? "pinned"] });
   }
 
   for (const w of doc.byCategory(Cat.Wall) as Wall[]) {

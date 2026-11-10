@@ -58,7 +58,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Foundations (isolated, strip, slab: Foundation → Slab) | 6 | ✅ |
 | Structural framing systems | 6 | ✅ (Structure → Beam System: click a floor; live system — follows the floor, spacing, direction, type; owns its beams) |
 | Rebar (area reinforcement in slabs, pads and walls; cages in beams, columns, strip footings; host Properties → Reinforcement) | 9 | ✅ (cogged ends, laps at stock length (40d), bar marks; no general bent shapes) |
-| Analytical model (members, nodes, supports, panels; 3D overlay) | 9 | 🟨 |
+| Analytical model (members, nodes, supports, panels; 3D overlay) | 9 | ✅ (beam/brace end fixity pinned/fixed; column base support auto/pinned/fixed/none; in the beam check and IFC structural view) |
 
 ## 5. MEP
 | Feature | Phase | Status |

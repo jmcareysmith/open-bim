@@ -258,17 +258,40 @@ export function beamCheck(doc: Document, beamId: ElementId): BeamCheck | null {
   const { I, Av } = sectionProperties(s);
   const Lm = L / 1000;
   const EI = E[mat] * I;
+  // End fixity: both fixed (encastré), one fixed (propped cantilever), or simply supported.
+  const fixedEnds = (p.startFixity === "fixed" ? 1 : 0) + (p.endFixity === "fixed" ? 1 : 0);
   const actions = (f: Record<LoadCase, number>) => {
     const { w, pts } = factored(ld, f);
-    let M = (w * Lm * Lm) / 8;
-    let V = (w * Lm) / 2;
-    let defl = (5 * w * L ** 4) / (384 * EI); // w kN/m = N/mm
+    let M: number;
+    let V: number;
+    let defl: number;
+    if (fixedEnds === 2) {
+      M = (w * Lm * Lm) / 12;
+      V = (w * Lm) / 2;
+      defl = (w * L ** 4) / (384 * EI);
+    } else if (fixedEnds === 1) {
+      M = (w * Lm * Lm) / 8;
+      V = (5 * w * Lm) / 8;
+      defl = (w * L ** 4) / (185 * EI);
+    } else {
+      M = (w * Lm * Lm) / 8;
+      V = (w * Lm) / 2;
+      defl = (5 * w * L ** 4) / (384 * EI); // w kN/m = N/mm
+    }
     for (const q of pts) {
       const b = Lm - q.a;
-      M += (q.P * q.a * b) / Lm;
-      V += (q.P * Math.max(q.a, b)) / Lm;
-      const bb = Math.min(q.a, b) * 1000;
-      defl += (q.P * 1000 * bb * (3 * L * L - 4 * bb * bb)) / (48 * EI);
+      if (fixedEnds === 2) {
+        // Fixed-end moments; the larger governs. Deflection under the load.
+        M += Math.max(q.P * q.a * b * b, q.P * q.a * q.a * b) / (Lm * Lm);
+        V += (q.P * Math.max(b * b * (3 * q.a + b), q.a * q.a * (q.a + 3 * b))) / Lm ** 3;
+        defl += (q.P * 1000 * (q.a * 1000) ** 3 * (b * 1000) ** 3) / (3 * EI * L ** 3);
+      } else {
+        // Simply supported figures (conservative for a propped end, shear taken as the whole load there).
+        M += (q.P * q.a * b) / Lm;
+        V += fixedEnds === 1 ? q.P : (q.P * Math.max(q.a, b)) / Lm;
+        const bb = Math.min(q.a, b) * 1000;
+        defl += (q.P * 1000 * bb * (3 * L * L - 4 * bb * bb)) / (48 * EI);
+      }
     }
     return { M, V, defl };
   };
@@ -314,7 +337,8 @@ export function beamCheck(doc: Document, beamId: ElementId): BeamCheck | null {
   }
   const ok = phiM !== null && phiV !== null && gov.M <= phiM && gov.V <= phiV && deflection <= limit;
   if (ld.tributary > 0) notes.push(`Floor area loads over a ${Math.round(ld.tributary)} mm tributary width (floor self-weight not included: add it as a G area load).`);
-  notes.push("Provisional figures: simply supported, NZS 1170.0 combinations; confirm with an engineer.");
+  const support = fixedEnds === 2 ? "fixed both ends" : fixedEnds === 1 ? "fixed one end, pinned the other" : "simply supported";
+  notes.push(`Provisional figures: ${support}, NZS 1170.0 combinations; confirm with an engineer.`);
   return { material: mat, span: L, selfWeight, combination: gov.name, M: gov.M, V: gov.V, phiM, phiV, deflection, limit, ok, notes, tributary: ld.tributary };
 }
 

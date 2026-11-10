@@ -1068,12 +1068,14 @@ void main() {
         lines(m.members.filter((x) => x.kind === kind).flatMap((x) => [...m.nodes[x.a]!.p, ...m.nodes[x.b]!.p]), color);
       }
       lines(m.panels.flatMap((pn) => pn.loop.flatMap((q, i) => [...q, ...pn.loop[(i + 1) % pn.loop.length]!])), 0x8a5cf6);
-      for (const support of [false, true]) {
-        const ns = m.nodes.filter((n) => n.support === support);
+      // Nodes dark grey; pinned supports red, fixed supports larger and darker red.
+      for (const kind of ["node", "pinned", "fixed"] as const) {
+        const ns = m.nodes.filter((n) => (n.support ? (n.fixity === "fixed" ? "fixed" : "pinned") : "node") === kind);
         if (!ns.length) continue;
         const geom = new THREE.BufferGeometry();
         geom.setAttribute("position", new THREE.Float32BufferAttribute(ns.flatMap((n) => n.p), 3));
-        const pts = new THREE.Points(geom, new THREE.PointsMaterial({ color: support ? 0xc92a2a : 0x222222, size: support ? 9 : 6, sizeAttenuation: false, depthTest: false }));
+        const style = { node: [0x222222, 6], pinned: [0xc92a2a, 9], fixed: [0x7a0f0f, 13] }[kind];
+        const pts = new THREE.Points(geom, new THREE.PointsMaterial({ color: style[0], size: style[1], sizeAttenuation: false, depthTest: false }));
         pts.renderOrder = 11;
         g.add(pts);
       }

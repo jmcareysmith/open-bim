@@ -56,9 +56,12 @@ export function writeStructuralModel(w: StepWriter, doc: Document, ctx: Ref, wor
 
   // Nodes: a vertex each; point connections (supports pinned: translations fixed).
   const pinned = w.add("IfcBoundaryNodeCondition", "Pinned", typed("IFCBOOLEAN", true), typed("IFCBOOLEAN", true), typed("IFCBOOLEAN", true), typed("IFCBOOLEAN", false), typed("IFCBOOLEAN", false), typed("IFCBOOLEAN", false));
+  // Fixed: rotations held too (written once, when something needs it).
+  let fixedRef: ReturnType<typeof w.add> | null = null;
+  const fixed = () => (fixedRef ??= w.add("IfcBoundaryNodeCondition", "Fixed", ...Array.from({ length: 6 }, () => typed("IFCBOOLEAN", true))));
   const vertices = model.nodes.map((nd) => w.add("IfcVertexPoint", pt(nd.p)));
   const connections = model.nodes.map((nd, i) =>
-    w.add("IfcStructuralPointConnection", g("node", String(i)), null, `N${i + 1}`, null, null, placement, topo("Vertex", vertices[i]!), nd.support ? pinned : null, null),
+    w.add("IfcStructuralPointConnection", g("node", String(i)), null, `N${i + 1}`, null, null, placement, topo("Vertex", vertices[i]!), nd.support ? (nd.fixity === "fixed" ? fixed() : pinned) : null, null),
   );
 
   // Profiles and materials for curve members, one set per section type.
@@ -108,7 +111,8 @@ export function writeStructuralModel(w: StepWriter, doc: Document, ctx: Ref, wor
     );
     memberRefs.set(m.id, ref);
     related.push(ref);
-    for (const k of [m.a, m.b]) w.add("IfcRelConnectsStructuralMember", g("conn"), null, null, null, ref, connections[k]!, null, null, null, null);
+    // Each end's connection carries its condition: a pinned (hinged) or fixed (rigid) joint.
+    [m.a, m.b].forEach((k, e) => w.add("IfcRelConnectsStructuralMember", g("conn"), null, null, null, ref, connections[k]!, m.ends[e] === "fixed" ? fixed() : pinned, null, null, null));
     const set = el?.typeId ? profileSet(el.typeId) : null;
     if (set) materialUse.set(set, [...(materialUse.get(set) ?? []), ref]);
   }

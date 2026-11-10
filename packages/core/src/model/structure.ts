@@ -29,8 +29,16 @@ export type ColumnParams = {
   position: Vec2;
   /** Radians about Z. */
   rotation: number;
+  /**
+   * Analytical support at the base (Revit: boundary condition): "auto" (default) pins it when it
+   * stands on a pad footing or the lowest level; "pinned", "fixed" or "none" say so outright.
+   */
+  baseSupport?: "auto" | "pinned" | "fixed" | "none" | null;
 };
 export type Column = Element<ColumnParams>;
+
+/** How a member end connects in the analytical model (Revit: releases). */
+export type EndFixity = "pinned" | "fixed";
 
 export type BeamParams = {
   levelId: ElementId;
@@ -48,6 +56,9 @@ export type BeamParams = {
   systemId?: ElementId | null;
   /** Tributary width for floor area loads, mm (unset: worked out from neighbouring beams). */
   tributary?: number | null;
+  /** Analytical end conditions (default pinned: simply supported). */
+  startFixity?: EndFixity | null;
+  endFixity?: EndFixity | null;
 };
 export type Beam = Element<BeamParams>;
 

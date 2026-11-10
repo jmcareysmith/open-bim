@@ -16,6 +16,9 @@ import {
   sectionProperties,
   type StructuralSectionParams,
   type Vec2,
+  analyticalModel,
+  type BeamParams,
+  type ColumnParams,
 } from "../src/index.ts";
 
 const p = (x: number, y: number): Vec2 => ({ x, y });
@@ -117,5 +120,35 @@ describe("loads and beam checks (provisional)", () => {
     expect(c.phiN).toBeCloseTo(0.9 / (1 / (A * 300) + 1 / Ncr) / 1000, 6);
     expect(c.ok).toBe(true);
     expect(sectionMaterial("Timber 190x45 SG8", { shape: "rect", d: 190, b: 45, tf: 0, tw: 0 })).toBe("timber");
+  });
+});
+
+describe("end fixity", () => {
+  it("fixed ends change the beam check's coefficients and the analytical model's ends and supports", () => {
+    const { doc, ids, byName } = setup();
+    const b = doc.transact("B", (tx) => createBeam(tx, doc, byName("Steel 200UB25"), ids.levels.first, p(0, 0), p(6000, 0)));
+    doc.transact("L", (tx) => createLoad(tx, doc, b.id, { case: "G", kind: "line", value: 2 }));
+    const ss = beamCheck(doc, b.id)!;
+    doc.transact("F", (tx) => tx.update<BeamParams>(b.id, { startFixity: "fixed", endFixity: "fixed" }));
+    const ff = beamCheck(doc, b.id)!;
+    expect(ff.M / ss.M).toBeCloseTo(8 / 12, 6);
+    expect(ff.deflection / ss.deflection).toBeCloseTo(1 / 5, 6);
+    expect(ff.notes.some((n) => n.includes("fixed both ends"))).toBe(true);
+    doc.transact("P", (tx) => tx.update<BeamParams>(b.id, { endFixity: "pinned" }));
+    expect(beamCheck(doc, b.id)!.V / ss.V).toBeCloseTo(5 / 4, 6);
+    const m = analyticalModel(doc);
+    expect(m.members.find((x) => x.id === b.id)!.ends).toEqual(["fixed", "pinned"]);
+
+    const c = doc.transact("C", (tx) => createColumn(tx, doc, byName("Steel 200UB25"), ids.levels.ground, ids.levels.first, p(10000, 0)));
+    const base = () => {
+      const mm = analyticalModel(doc);
+      return mm.nodes[mm.members.find((x) => x.id === c.id)!.a]!;
+    };
+    expect(base().support).toBe(true);
+    expect(base().fixity).toBe("pinned");
+    doc.transact("Fx", (tx) => tx.update<ColumnParams>(c.id, { baseSupport: "fixed" }));
+    expect(base().fixity).toBe("fixed");
+    doc.transact("No", (tx) => tx.update<ColumnParams>(c.id, { baseSupport: "none" }));
+    expect(base().support).toBe(false);
   });
 });

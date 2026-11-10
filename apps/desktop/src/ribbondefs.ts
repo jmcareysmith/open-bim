@@ -539,6 +539,7 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
           title: "Visual Programming",
           items: [{ label: "Visual Programming", icon: "parameters", cmd: "visualProgramming", large: true, title: "Node graphs that make and change the model (Dynamo-like)" }],
         },
+        { title: "Add-ins", items: [{ label: "Add-ins", icon: "load", cmd: "addinManager", large: true, title: "Add-in Manager: installed plugins, switch on/off, remove, load" }] },
         {
           title: "Phasing & Options",
           items: [

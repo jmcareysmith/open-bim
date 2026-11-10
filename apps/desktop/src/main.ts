@@ -131,7 +131,7 @@ import type { IfcApi } from "@open-bim/ifc";
 import ifcWasmUrl from "web-ifc/web-ifc.wasm?url";
 import { dwgConverterPath, isTauri, openBytes, openCad, openProject, openText, readProjectAt, saveBytes, saveCad, savePdf, saveProject, saveText, setDwgConverterPath } from "./io.ts";
 import { renderBrowser, renderProperties, renderSchedulePane, viewGraphicsEditor, type PanelContext } from "./panels.ts";
-import { PluginHost, mountConsole } from "./plugins.ts";
+import { PluginHost, addinManagerBody, mountConsole } from "./plugins.ts";
 import { buildSample } from "./sample.ts";
 import {
   GridTool,
@@ -1169,6 +1169,21 @@ const commands: Record<string, () => void | Promise<void>> = {
     } catch (err) {
       status(`⚠ OBJ export failed: ${(err as Error).message}`);
     }
+  },
+  addinManager() {
+    const d = openDialog(
+      "Add-in Manager",
+      () =>
+        addinManagerBody(
+          plugins,
+          async () => {
+            const text = await openText({ name: "JavaScript add-in", extensions: ["js", "mjs"] });
+            return text ? { text, name: "Add-in" } : null;
+          },
+          () => d.refresh(),
+          status,
+        ),
+    );
   },
   exportIfc: () => exportIfcFile("IFC4"),
   exportIfc4x3: () => exportIfcFile("IFC4X3_ADD2"),

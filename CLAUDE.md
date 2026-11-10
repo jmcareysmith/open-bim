@@ -154,7 +154,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   total) and schedules on sheets (sheet Properties → Place view; any number of sheets; drawn as a table).
 - Revisions (browser → Revisions; Cloud tool; sheet revision schedule) and model groups (Group /
   Ctrl+G; Place copy; Apply to other instances; Ungroup) and detail groups (view drafting).
-- Plugins + scripting console (toolbar Console or `; docs/PLUGINS.md, examples/plugins).
+- Plugins + scripting console (toolbar Console or `; docs/PLUGINS.md, examples/plugins); Manage → Add-ins (Add-in Manager:
+  on/off — off ones stay installed but don't load at start-up, remove, load; plugins.ts `installed`/`setEnabled`).
 - IFC: Export IFC (File → Export → IFC4 or IFC4X3, packages/ifc `schema` option) and Import IFC (web-ifc → DirectShapes on matching levels;
   they show/style as their IFC class's category — core `ifcClassCategory`).
 - DXF/DWG: Export DXF/DWG (open view/sheet) and Import DXF/DWG (into the open view as a CadImport).

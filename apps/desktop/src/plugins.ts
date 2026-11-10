@@ -137,26 +137,69 @@ export class PluginHost {
     this.onChanged();
   }
 
-  /** Reload plugins saved in this browser/WebView profile. */
+  /** Add-ins installed but switched off (kept, not loaded at start-up). */
+  private disabled = new Map<string, string>();
+
+  /** Reload plugins saved in this browser/WebView profile (disabled ones stay off). */
   async restore(): Promise<void> {
-    let saved: { name: string; source: string }[] = [];
+    let saved: { name: string; source: string; enabled?: boolean }[] = [];
     try {
       saved = JSON.parse(localStorage.getItem(STORE) ?? "[]") as typeof saved;
     } catch {
       saved = [];
     }
     for (const p of saved) {
+      if (p.enabled === false) {
+        this.disabled.set(p.name, p.source);
+        continue;
+      }
       try {
         await this.load(p.source, p.name, false);
       } catch (err) {
         this.printer(`Plugin ${p.name} failed to load: ${(err as Error).message}`, "err");
       }
     }
+    this.onChanged();
+  }
+
+  /** Every installed add-in: loaded (on) or disabled (off), with its commands. */
+  installed(): { name: string; enabled: boolean; commands: number }[] {
+    return [
+      ...[...this.loaded.values()].map((l) => ({ name: l.name, enabled: true, commands: l.commands.length })),
+      ...[...this.disabled.keys()].map((name) => ({ name, enabled: false, commands: 0 })),
+    ].sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** Switch an add-in on (load it) or off (unload it but keep it installed). */
+  async setEnabled(name: string, on: boolean): Promise<void> {
+    if (on) {
+      const source = this.disabled.get(name);
+      if (source === undefined) return;
+      this.disabled.delete(name);
+      await this.load(source, name);
+    } else {
+      const l = this.loaded.get(name);
+      if (!l) return;
+      this.disabled.set(name, l.source);
+      this.unload(name);
+    }
+  }
+
+  /** Uninstall an add-in (loaded or disabled). */
+  remove(name: string): void {
+    this.disabled.delete(name);
+    if (this.loaded.has(name)) this.unload(name);
+    else {
+      this.save();
+      this.onChanged();
+    }
   }
 
   private save(): void {
     try {
-      localStorage.setItem(STORE, JSON.stringify([...this.loaded.values()].map((l) => ({ name: l.name, source: l.source }))));
+      const on = [...this.loaded.values()].map((l) => ({ name: l.name, source: l.source, enabled: true }));
+      const off = [...this.disabled].map(([name, source]) => ({ name, source, enabled: false }));
+      localStorage.setItem(STORE, JSON.stringify([...on, ...off]));
     } catch {
       // Storage full or unavailable: plugins still work this session.
     }
@@ -267,4 +310,64 @@ export function mountConsole(root: HTMLElement, host: PluginHost, openFile: () =
       input.value = history[at] ?? "";
     }
   });
+}
+
+/**
+ * Add-in Manager (Revit: Manage → Add-ins): the installed plugins with their commands, switched on
+ * or off (off ones stay installed but don't load at start-up), removed, or a new one loaded.
+ */
+export function addinManagerBody(host: PluginHost, openFile: () => Promise<{ text: string; name: string } | null>, refresh: () => void, status: (t: string) => void): HTMLElement {
+  const root = document.createElement("div");
+  root.className = "addin-manager";
+  const list = host.installed();
+  const intro = document.createElement("p");
+  intro.className = "muted";
+  intro.textContent = list.length
+    ? "Add-ins load at start-up while switched on. Their commands appear in Add-ins menus and the console."
+    : "No add-ins installed. Load a JavaScript plugin (see docs/PLUGINS.md and examples/plugins).";
+  root.append(intro);
+  const table = document.createElement("table");
+  for (const a of list) {
+    const tr = document.createElement("tr");
+    const on = Object.assign(document.createElement("input"), { type: "checkbox", checked: a.enabled, title: a.enabled ? "Switch off" : "Switch on" });
+    on.onchange = async () => {
+      try {
+        await host.setEnabled(a.name, on.checked);
+        status(`${a.name} ${on.checked ? "switched on" : "switched off"}.`);
+      } catch (err) {
+        status(`\u26a0 ${a.name}: ${(err as Error).message}`);
+      }
+      refresh();
+    };
+    const name = Object.assign(document.createElement("td"), { textContent: a.name });
+    const cmds = Object.assign(document.createElement("td"), { className: "muted", textContent: a.enabled ? `${a.commands} command${a.commands === 1 ? "" : "s"}` : "off" });
+    const del = Object.assign(document.createElement("button"), { textContent: "Remove" });
+    del.onclick = () => {
+      if (!confirm(`Remove the add-in ${a.name}?`)) return;
+      host.remove(a.name);
+      status(`${a.name} removed.`);
+      refresh();
+    };
+    const c0 = document.createElement("td");
+    c0.append(on);
+    const c3 = document.createElement("td");
+    c3.append(del);
+    tr.append(c0, name, cmds, c3);
+    table.append(tr);
+  }
+  root.append(table);
+  const add = Object.assign(document.createElement("button"), { textContent: "Load add-in\u2026" });
+  add.onclick = async () => {
+    const f = await openFile();
+    if (!f) return;
+    try {
+      const n = await host.load(f.text, f.name);
+      status(`Add-in ${n} loaded.`);
+    } catch (err) {
+      status(`\u26a0 ${(err as Error).message}`);
+    }
+    refresh();
+  };
+  root.append(add);
+  return root;
 }

@@ -131,7 +131,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Visual programming engine: node graphs with incremental re-run, saved in the project
 - [x] Node editor and node library (selection, parameters, geometry, maths/lists, element creation)
 
-## Phase 9 — Analysis, rebar, point clouds
+## Phase 9 — Analysis, rebar, point clouds (done, 2026-11-11)
 
 - [x] Rebar: area reinforcement in slabs and pad footings (mats, spacing, cover, direction), cages in
       beams, columns and strip footings (bars + ties); NZ bar sizes (D 300E / HD 500E); mass in

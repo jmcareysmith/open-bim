@@ -306,7 +306,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - 2026-11-10: every REVIT_FEATURE_MAP row is ✅ except the three that rest on provisional figures (MEP sizing,
   energy, loads: waiting on Jeremy's standards). Visual programming has a Script (JavaScript) node (Jeremy's go-ahead,
   2026-11-11; `IN` list + `doc`, runs with app rights like the console); Python would need Pyodide.
-- Phase 9 started (items set in ROADMAP). Rebar (core/model/rebar.ts, geometry/src/rebar.ts): floor / wall (face mats) / pad footing /
+- Phase 9 done (2026-11-11); every roadmap phase is ticked. Next phase not yet agreed with Jeremy. Rebar (core/model/rebar.ts, geometry/src/rebar.ts): floor / wall (face mats) / pad footing /
   beam / column / strip footing Properties → Reinforcement → Add; area mats or cages laid out from the host
   (`rebarBars`), NZ bar sizes, mass (`rebarQuantities`), schedule category Structural Rebar. Bars sit inside the
   concrete; Graphic Display Options → Rebar unobscured (view `display.rebarUnobscured`) draws them over everything.

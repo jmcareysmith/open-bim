@@ -286,3 +286,19 @@ describe("Edit Profile on curved walls", () => {
     }
   });
 });
+
+describe("crossing walls (OCCT)", () => {
+  it("cuts the thinner wall where a thicker one runs through, with an opening too", () => {
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const walls = doc.transact("W", (tx) => [
+      createWall(tx, ids.wallTypes.exterior, p(0, 0), p(4000, 0), ids.levels.ground, { height: 2400 }),
+      createWall(tx, ids.wallTypes.interior, p(2000, -2000), p(2000, 2000), ids.levels.ground, { height: 2400 }),
+    ]);
+    const ext = new SimpleKernel().build(doc, doc.require(walls[0]!.id))!;
+    const extT = (boundingBox(ext).max[1] - boundingBox(ext).min[1]);
+    doc.transact("O", (tx) => createWallOpening(tx, doc, walls[1]!.id, 800, { width: 400, sillHeight: 0, height: 2000 }));
+    const v = meshVolume(occt.build(doc, doc.require(walls[1]!.id))!);
+    expect(v).toBeCloseTo(((4000 - extT) * 2400 - 400 * 2000) * T, -4);
+  });
+});

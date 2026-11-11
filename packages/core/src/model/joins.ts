@@ -1,7 +1,7 @@
 import type { Document } from "../document.ts";
 import type { ElementId, Vec2 } from "../element.ts";
 import { Cat, totalThickness, type LayeredTypeParams, type LevelParams, type Wall, type WallParams } from "./architecture.ts";
-import { alongArc, arcInfo, arcLength, tangentLine } from "./arcs.ts";
+import { alongArc, arcInfo, arcLength, arcPoints, tangentLine } from "./arcs.ts";
 
 // Wall joins are derived from geometry, not stored: wall ends that meet, or a wall end that
 // runs into the side of another wall, join automatically (Revit's default behaviour).
@@ -58,7 +58,39 @@ export function relatedWalls(doc: Document, wall: Wall): ElementId[] {
       if (teeDistance(wallEndPoint(o, end), endDirection(o, end), wall, half) !== null) out.add(o.id);
     }
   }
+  for (const id of crossingWalls(doc, wall)) out.add(id);
   return [...out];
+}
+
+/**
+ * Walls whose location lines cross this one's away from both walls' ends (an X crossing, not a
+ * join), at heights they share. Arcs are followed piece by piece.
+ */
+export function crossingWalls(doc: Document, wall: Wall): ElementId[] {
+  const pa = arcPoints(wall.params.start, wall.params.end, wall.params.curve, Math.PI / 90);
+  const near = (q: Vec2, w: Wall) => Math.hypot(q.x - w.params.start.x, q.y - w.params.start.y) <= 1 || Math.hypot(q.x - w.params.end.x, q.y - w.params.end.y) <= 1;
+  const out: ElementId[] = [];
+  for (const o of joinCandidates(doc, wall)) {
+    const pb = arcPoints(o.params.start, o.params.end, o.params.curve, Math.PI / 90);
+    let hit = false;
+    for (let i = 0; i + 1 < pa.length && !hit; i++) {
+      for (let k = 0; k + 1 < pb.length && !hit; k++) {
+        const p = pa[i]!;
+        const r = { x: pa[i + 1]!.x - p.x, y: pa[i + 1]!.y - p.y };
+        const q = pb[k]!;
+        const s = { x: pb[k + 1]!.x - q.x, y: pb[k + 1]!.y - q.y };
+        const den = r.x * s.y - r.y * s.x;
+        if (Math.abs(den) < 1e-9) continue;
+        const t = ((q.x - p.x) * s.y - (q.y - p.y) * s.x) / den;
+        const v = ((q.x - p.x) * r.y - (q.y - p.y) * r.x) / den;
+        if (t < 0 || t > 1 || v < 0 || v > 1) continue;
+        const x = { x: p.x + r.x * t, y: p.y + r.y * t };
+        if (!near(x, wall) && !near(x, o)) hit = true;
+      }
+    }
+    if (hit) out.push(o.id);
+  }
+  return out;
 }
 
 // ---- internals -------------------------------------------------------------

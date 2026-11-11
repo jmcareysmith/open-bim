@@ -33,6 +33,7 @@ import {
 import { buildConnectorLines, buildGridLines, buildOpeningLines, buildReferencePlaneLines, buildScopeBoxLines, type LineData } from "./datums.ts";
 import { buildDoor, buildDoorLines, buildWindow, buildWindowLines } from "./doors.ts";
 import { joinedWallFootprint } from "./joins.ts";
+import { crossingCutters, cutWallBody } from "./wallcrossings.ts";
 import { buildRoof } from "./roof.ts";
 import { buildForm, formMesh } from "./forms.ts";
 import { mergeMeshes } from "./doors.ts";
@@ -106,7 +107,8 @@ export function buildWall(doc: Document, el: Element): MeshData | null {
   const segments = stackSegments(doc, wall);
   if (segments.length) return buildStackedWall(doc, wall, segments);
   // Attached under a sloped roof: the top follows it.
-  const body = wallProfileMesh(doc, wall) ?? (hasSlopedTop(doc, wall) && !wall.params.curve ? slopedTopWallMesh(doc, wall) : extrudePolygon(joinedWallFootprint(doc, wall), [], bottom, top));
+  // Crossing walls: the thinner one is cut where the other runs through it.
+  const body = wallProfileMesh(doc, wall) ?? (hasSlopedTop(doc, wall) && !wall.params.curve ? slopedTopWallMesh(doc, wall) : cutWallBody(joinedWallFootprint(doc, wall), bottom, top, crossingCutters(doc, wall)));
   return withSweeps(doc, wall, body);
 }
 

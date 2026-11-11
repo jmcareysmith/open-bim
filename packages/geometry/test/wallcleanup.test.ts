@@ -283,3 +283,18 @@ function pointIn(q: Vec2, poly: Vec2[]): boolean {
   }
   return c;
 }
+
+describe("crossing walls in 3D", () => {
+  it("the thinner wall is cut where the thicker runs through it", async () => {
+    const { SimpleKernel, meshVolume } = await import("../src/index.ts");
+    const { doc, wall, types } = setup();
+    const thick = wall(p(0, 0), p(4000, 0), types.t200);
+    const thin = wall(p(2000, -2000), p(2000, 2000), types.t100);
+    const k = new SimpleKernel();
+    expect(meshVolume(k.build(doc, doc.require(thick.id))!)).toBeCloseTo(4000 * 200 * 2400, -4);
+    expect(meshVolume(k.build(doc, doc.require(thin.id))!)).toBeCloseTo((4000 - 200) * 100 * 2400, -4);
+    // Move the thick wall away: the thin one is whole again.
+    doc.transact("Move", (tx) => tx.update(thick.id, { start: p(0, 5000), end: p(4000, 5000) }));
+    expect(meshVolume(k.build(doc, doc.require(thin.id))!)).toBeCloseTo(4000 * 100 * 2400, -4);
+  });
+});

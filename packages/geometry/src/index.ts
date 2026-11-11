@@ -42,3 +42,4 @@ export * from "./massfloors.ts";
 export * from "./faces.ts";
 export * from "./sweeps.ts";
 export * from "./ifcnative.ts";
+export * from "./wallcrossings.ts";

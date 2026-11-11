@@ -22,6 +22,7 @@ import { formMesh } from "./forms.ts";
 import { buildFamilyInstance, nestedMeshes, type FamilyDisplay } from "./components.ts";
 import type { LineData } from "./datums.ts";
 import { joinedWallFootprint } from "./joins.ts";
+import { crossingCutters } from "./wallcrossings.ts";
 import { SimpleKernel, withSweeps, type GeometryKernel } from "./kernel.ts";
 import { wallProfileMesh, wallSweepSolids } from "./sweeps.ts";
 import { buildLink } from "./links.ts";
@@ -58,7 +59,7 @@ export class OcctKernel implements GeometryKernel {
       const cuts = wallCuts(doc, wall);
       // Curtain walls aren't cut: panels and mullions are built on their own grid.
       const reveals = wallSweepSolids(doc, wall).reveals;
-      if ((cuts.length || reveals.length) && !curtainOf(doc, wall)) return this.buildWallWithCuts(doc, wall, cuts, reveals);
+      if ((cuts.length || reveals.length || crossingCutters(doc, wall).length) && !curtainOf(doc, wall)) return this.buildWallWithCuts(doc, wall, cuts, reveals);
     }
     if (el.category === Cat.FamilyInstance) return buildFamilyInstance(doc, el, this.mesher, undefined, display);
     if (el.category === Cat.Link) return buildLink(doc, el, this);
@@ -172,6 +173,18 @@ export class OcctKernel implements GeometryKernel {
       });
       const face = keep(keep(new oc.BRepBuilderAPI_MakeFace(keep(wire.Wire()), true)).Shape());
       let solid: TopoDS_Shape = sloped ? this.meshToSolid(sloped, keep) : keep(keep(new oc.BRepPrimAPI_MakePrism(face, keep(new oc.gp_Vec(0, 0, top - bottom)), false, true)).Shape());
+
+      // Crossing walls running through this one cut it (as in plan).
+      for (const c of crossingCutters(doc, wall)) {
+        const cw = keep(new oc.BRepBuilderAPI_MakeWire());
+        c.loop.forEach((a, i) => {
+          const b = c.loop[(i + 1) % c.loop.length]!;
+          cw.Add(keep(keep(new oc.BRepBuilderAPI_MakeEdge(keep(new oc.gp_Pnt(a.x, a.y, c.z0)), keep(new oc.gp_Pnt(b.x, b.y, c.z0)))).Edge()));
+        });
+        const cf = keep(keep(new oc.BRepBuilderAPI_MakeFace(keep(cw.Wire()), true)).Shape());
+        const prism = keep(keep(new oc.BRepPrimAPI_MakePrism(cf, keep(new oc.gp_Vec(0, 0, c.z1 - c.z0)), false, true)).Shape());
+        solid = keep(keep(new oc.BRepAlgoAPI_Cut(solid, prism)).Shape());
+      }
 
       // Each cut: a box aligned with the wall (x along it, y across), through its full thickness.
       const half = wallThickness(doc, wall) / 2 + CUT_OVERSHOOT;

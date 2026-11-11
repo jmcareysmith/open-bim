@@ -36,7 +36,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 | Wall sweeps and reveals, Edit Profile | 8b | ✅ (type and instance; built-in profiles; profile by presets/points or sketched in a section/elevation along the wall) |
 | Curtain walls, grids, mullions, panels | 6 | ✅ (per wall: own grid lines, removed mullion segments, panel swaps glass/solid/empty/door; mullion profiles per type (interior/border) and per segment; pick a mullion or panel in the view — click the selected wall or Tab) |
 | Floors (sketch-based, layered, slope arrows) | 1 | ✅ (Pick Walls for floors/ceilings/roofs; slope arrows; shape editing points (falls to drains, variable thickness); slab edges) |
-| Roofs (footprint, extrusion, slopes, fascia/gutter) | 1 | ✅ (footprint: exact for convex/L/T/U; extrusion: gable/mono/curved/points profile; fascia, gutter, soffit on eaves; barge boards on gable rakes) |
+| Roofs (footprint, extrusion, slopes, fascia/gutter) | 1 | ✅ (footprint: exact for any simple footprint via our weighted straight skeleton; extrusion: gable/mono/curved/points profile; fascia, gutter, soffit on eaves; barge boards on gable rakes) |
 | Ceilings | 1 | ✅ (Automatic Ceiling by clicking inside walls, or sketched; grid patterns; reflected ceiling plans) |
 | Doors & windows (hosted, cut openings) | 1 | ✅ (parametric types with architraves, handles, sashes, mullion, sill; loadable door/window families; square to curved walls) |
 | Openings (shaft, wall, vertical) | 1 | ✅ (wall openings; shaft openings cut floors/ceilings between levels; vertical openings in roofs; floors via sketch holes) |

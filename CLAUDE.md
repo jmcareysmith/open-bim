@@ -130,7 +130,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   interior finish layers carry round free ends, and into door/window/opening jambs the plan cuts (exterior/interior/both halves), at Medium/Fine. Disallow Join per end (Properties / right-click).
 - Known gaps: join cleanup is plan-only (3D solids overlap at crossings);
   floors: Pick Walls (sketch options strip: face/core/centre line + offset) and slope arrows (floor
-  Properties → Add slope arrow; tail/head heights; plane top, sheared slab, 1:n arrow in plan); roofs exact for convex/L/T/U only; doors/windows parametric;
+  Properties → Add slope arrow; tail/head heights; plane top, sheared slab, 1:n arrow in plan); footprint roofs use a weighted straight skeleton (core/model/skeleton.ts `skeletonFaces`: edge and split events,
+  gables static; `RoofPlane.face`, wedges as fallback) so any simple footprint is exact; doors/windows parametric;
   angular dimensions in plans and sections (sections: picked drawn edges become fixed `line` DimRefs, level lines stay
   live; viewport `pickSegment`), radial plan-only (Dimension ▾ Angular / Radial; core/model/angulardims.ts).
   Screen and sheet/PDF share `lineworkDrawing` for cut/projection line work.

@@ -68,3 +68,29 @@ describe("roof geometry", () => {
     expect(before - after).toBeCloseTo(2e6 * T, -5);
   });
 });
+
+describe("roofs on any footprint (straight skeleton)", () => {
+  it("a U and an irregular plan build closed solids peaking at the skeleton's highest node", async () => {
+    const { skeletonFaces } = await import("@open-bim/core");
+    const area = (l: Vec2[]) => Math.abs(l.reduce((s, q, i) => s + q.x * l[(i + 1) % l.length]!.y - l[(i + 1) % l.length]!.x * q.y, 0)) / 2;
+    const peak = (b: Vec2[], s: number) => {
+      const f = skeletonFaces(b, b.map(() => s))!;
+      let h = 0;
+      f.forEach((face, e) => {
+        const a = b[e]!;
+        const c = b[(e + 1) % b.length]!;
+        const l = Math.hypot(c.x - a.x, c.y - a.y);
+        for (const q of face) h = Math.max(h, Math.tan(s) * ((-(c.y - a.y) / l) * (q.x - a.x) + ((c.x - a.x) / l) * (q.y - a.y)));
+      });
+      return h;
+    };
+    for (const b of [
+      [p(0, 0), p(20000, 0), p(20000, 9000), p(14000, 9000), p(14000, 3000), p(6000, 3000), p(6000, 9000), p(0, 9000)],
+      [p(0, 0), p(12000, 1000), p(13000, 7000), p(8000, 6000), p(7000, 11000), p(2000, 12000), p(3000, 6000), p(-1000, 5000)],
+    ]) {
+      const m = roof(b, b.map(() => deg(30)));
+      expect(meshVolume(m)).toBeCloseTo(area(b) * T, -5);
+      expect(boundingBox(m).max[2]).toBeCloseTo(BASE + peak(b, deg(30)) + T, 0);
+    }
+  });
+});

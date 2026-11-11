@@ -1,4 +1,5 @@
 import { registerCategory } from "../categories.ts";
+import { skeletonFaces } from "./skeleton.ts";
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
 import { Cat, attachedWalls, layerMaterialDeps, type LevelParams } from "./architecture.ts";
@@ -7,8 +8,8 @@ import { polygonArea, validateRegion } from "./sketch.ts";
 // Footprint roofs (Revit "Roof by Footprint"): a boundary loop where each edge either defines
 // a slope (rising inwards from the eave) or doesn't (a gable). The roof surface is the lower
 // envelope of the edge planes, each limited to the wedge between the hip/valley lines at its
-// ends. Exact for convex footprints and typical L/T/U house plans; complex footprints with
-// split events would need a full weighted straight skeleton.
+// ends, refined by the weighted straight skeleton (model/skeleton.ts): each plane applies exactly
+// over its own face, for any simple footprint (the wedges stay as the fallback).
 
 export type RoofParams = {
   levelId: ElementId;
@@ -295,6 +296,8 @@ export interface RoofPlane {
   /** Hip/valley/gable directions bounding the wedge at a and b; null = unbounded on that side. */
   va: Vec2 | null;
   vb: Vec2 | null;
+  /** The plane's exact face from the straight skeleton (counter-clockwise), when it could be worked out. */
+  face?: Vec2[] | null;
 }
 
 const EPS = 1e-6;
@@ -346,6 +349,9 @@ export function roofPlanes(boundary: Vec2[], slopes: (number | null)[]): RoofPla
     if (ki === null || ki === undefined) continue;
     planes.push({ edge: i, a: boundary[i]!, b: boundary[(i + 1) % n]!, n: normals[i]!, k: ki, va: corner(i), vb: corner((i + 1) % n) });
   }
+  // Exact faces from the straight skeleton (null: keep the wedges).
+  const faces = planes.length ? skeletonFaces(boundary, slopes) : null;
+  if (faces) for (const pl of planes) pl.face = faces[pl.edge]?.length ? faces[pl.edge]! : null;
   return planes;
 }
 
@@ -355,6 +361,7 @@ export function planeHeight(pl: RoofPlane, p: Vec2): number {
 
 /** Is `p` inside the plane's wedge (inner side of its eave, between its corner lines)? */
 export function inWedge(pl: RoofPlane, p: Vec2, eps = 1e-6): boolean {
+  if (pl.face) return inFace(pl.face, p, Math.max(eps, 1e-3));
   if (dot(pl.n, sub(p, pl.a)) < -eps) return false;
   if (pl.va && cross(pl.va, sub(p, pl.a)) * Math.sign(cross(pl.va, sub(pl.b, pl.a))) < -eps) return false;
   if (pl.vb && cross(pl.vb, sub(p, pl.b)) * Math.sign(cross(pl.vb, sub(pl.a, pl.b))) < -eps) return false;
@@ -377,4 +384,20 @@ export function roofPlaneAt(planes: RoofPlane[], p: Vec2): RoofPlane | null {
 export function roofHeightAt(planes: RoofPlane[], p: Vec2): number {
   const pl = roofPlaneAt(planes, p);
   return pl ? Math.max(0, planeHeight(pl, p)) : 0;
+}
+
+/** Inside a polygon, or within `tol` of its outline. */
+function inFace(poly: Vec2[], p: Vec2, tol: number): boolean {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const a = poly[i]!;
+    const b = poly[j]!;
+    // On an edge (within tol) counts.
+    const ab = sub(b, a);
+    const l2 = dot(ab, ab);
+    const t = l2 > 0 ? Math.max(0, Math.min(1, dot(sub(p, a), ab) / l2)) : 0;
+    if (Math.hypot(p.x - a.x - ab.x * t, p.y - a.y - ab.y * t) <= tol) return true;
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x) inside = !inside;
+  }
+  return inside;
 }

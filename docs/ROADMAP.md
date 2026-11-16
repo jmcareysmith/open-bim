@@ -166,4 +166,5 @@ to native elements where their shapes allow.
 - [x] Converted walls snap their ends onto each other's centrelines, so corners and tees join
 - [x] IfcSpace → rooms (number from Name, name from LongName; web-ifc streams spaces separately)
 - [x] Grids: IfcGrid axes → grids by tag (placements resolved); export writes straight grids as an IfcGrid
+- [x] Wall types split exterior/interior from Pset_WallCommon.IsExternal (H1 uses it)
 - [ ] Still shapes: non-rectangular curtain panels; anything whose rebuilt version wouldn't match its mesh

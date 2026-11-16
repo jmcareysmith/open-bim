@@ -430,3 +430,19 @@ describe("imported walls join", () => {
     expect(Object.values(wallJoins(doc, c!)).some((x) => x?.kind === "tee")).toBe(true);
   });
 });
+
+describe("exterior and interior walls from IFC", () => {
+  it("walls of one thickness get exterior/interior types from IsExternal", async () => {
+    const { wallFunction } = await import("@open-bim/core");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const mk = (y: number, ext: string) =>
+      doc.transact("I", (tx) => createDirectShape(tx, { levelId: ids.levels.ground, ifcClass: "IfcWall", globalId: `w${y}`, ...box(rect(0, y, 4000, y + 177), 0, 2700), color: 0x999999, properties: { "Pset_WallCommon.IsExternal": ext } }).id);
+    const a = mk(0, "T");
+    const b = mk(3000, "F");
+    const r = doc.transact("C", (tx) => convertDirectShapes(tx, doc, [a, b]));
+    const types = r.created.map((id) => doc.require(doc.require(id).typeId!));
+    expect(types[0]!.id).not.toBe(types[1]!.id);
+    expect(types.map((t) => wallFunction(t))).toEqual(["exterior", "interior"]);
+  });
+});

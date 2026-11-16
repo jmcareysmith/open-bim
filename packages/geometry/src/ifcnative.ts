@@ -35,6 +35,7 @@ import {
   type WallParams,
   type Wall,
   wallThickness,
+  wallFunction,
   type Material,
   type MaterialParams,
   createMaterial,
@@ -144,6 +145,13 @@ function snapWallEnds(tx: Transaction, doc: Document, ids: ElementId[]): void {
   }
 }
 
+/** Exterior or interior, from the wall's IsExternal property (Pset_WallCommon), when it says. */
+function wallRole(p: DirectShapeParams): "exterior" | "interior" | undefined {
+  const v = Object.entries(p.properties).find(([k]) => /(^|\.)IsExternal$/.test(k))?.[1];
+  if (v === undefined) return undefined;
+  return /^(\.?t\.?|true|yes|1)$/i.test(v.trim()) ? "exterior" : "interior";
+}
+
 /** Mesh points as (distance along a line from `start` in direction `u`, height). */
 function xyzAlong(p: DirectShapeParams, start: Vec2, u: Vec2): Vec2[] {
   const out: Vec2[] = [];
@@ -194,10 +202,18 @@ function bounds(p: DirectShapeParams) {
 const typeThickness = (t: LayeredTypeParams) => t.layers.reduce((s, l) => s + l.thickness, 0);
 
 /** A layered type of this category and total thickness, or a new single-layer one. */
-function typeFor(tx: Transaction, doc: Document, category: string, label: string, t: number, color?: number): ElementId {
-  const have = doc.byCategory<LayeredTypeParams>(category).find((x) => !x.params.curtain && !x.params.stack?.length && Math.abs(typeThickness(x.params) - t) < 0.5);
+function typeFor(tx: Transaction, doc: Document, category: string, label: string, t: number, color?: number, role?: "exterior" | "interior"): ElementId {
+  // Walls: an exterior and an interior wall of one thickness are different types (H1 needs to know).
+  const fits = (x: { params: LayeredTypeParams }) => !role || (x.params as { function?: string }).function === role || (!(x.params as { function?: string }).function && wallFunction(x as never) === role);
+  const have = doc.byCategory<LayeredTypeParams>(category).find((x) => !x.params.curtain && !x.params.stack?.length && Math.abs(typeThickness(x.params) - t) < 0.5 && fits(x));
   if (have) return have.id;
   const r = Math.round(t);
+  if (role) {
+    const mat = color !== undefined ? materialFor(tx, doc, color) : undefined;
+    const layer = { function: "structure" as const, material: mat?.name ?? "Imported", thickness: r, ...(mat ? { materialId: mat.id } : {}) };
+    const name = `${label} ${r} ${role === "exterior" ? "Exterior" : "Interior"}`;
+    return tx.create<LayeredTypeParams & { function: string }>(category, { layers: [layer], function: role }, { name }).id;
+  }
   const mat = color !== undefined ? materialFor(tx, doc, color) : undefined;
   const layer = { function: "structure" as const, material: mat?.name ?? "Imported", thickness: r, ...(mat ? { materialId: mat.id } : {}) };
   return tx.create<LayeredTypeParams>(category, { layers: [layer] }, { name: `${label} ${r}` }).id;
@@ -837,7 +853,7 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
           skipped.push(id);
           continue;
         }
-        const typeId = typeFor(tx, doc, Cat.WallType, "Imported Wall", arc.thick, mat);
+        const typeId = typeFor(tx, doc, Cat.WallType, "Imported Wall", arc.thick, mat, wallRole(p));
         const w = createWall(tx, typeId, arc.start, arc.end, p.levelId, { baseOffset: z0 - lvl, height: z1 - z0 });
         setWallCurve(tx, doc, w.id, arc.curve);
         created.push(w.id);
@@ -845,7 +861,7 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
         tx.delete(id);
         continue;
       }
-      const typeId = typeFor(tx, doc, Cat.WallType, "Imported Wall", r.wid, mat);
+      const typeId = typeFor(tx, doc, Cat.WallType, "Imported Wall", r.wid, mat, wallRole(p));
       const start = { x: r.c.x - (r.u.x * r.len) / 2, y: r.c.y - (r.u.y * r.len) / 2 };
       const end = { x: r.c.x + (r.u.x * r.len) / 2, y: r.c.y + (r.u.y * r.len) / 2 };
       const w = createWall(tx, typeId, start, end, p.levelId, { baseOffset: z0 - lvl, height: z1 - z0 });

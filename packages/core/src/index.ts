@@ -86,3 +86,4 @@ export * from "./model/pins.ts";
 export * from "./model/worksets.ts";
 export * from "./model/purge.ts";
 export * from "./model/transfer.ts";
+export * from "./model/joingeometry.ts";

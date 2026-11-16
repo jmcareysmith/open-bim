@@ -47,6 +47,9 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
     { label: "Split", icon: "split", tool: "split", title: "Split element (SL)" },
     { label: "Pin", icon: "pin", cmd: "pin", title: "Pin (PN): the selection can't be moved or deleted until unpinned" },
     { label: "Unpin", icon: "unpin", cmd: "unpin", title: "Unpin (UP)" },
+    { label: "Join Geometry", icon: "group", tool: "joingeometry", title: "Join Geometry: click the element that cuts, then the one it cuts (walls with floors/ceilings)" },
+    { label: "Unjoin", icon: "split", tool: "unjoingeometry", title: "Unjoin Geometry: click the two joined elements" },
+    { label: "Switch Join", icon: "rotate", tool: "switchjoin", title: "Switch Join Order: click the two joined elements" },
     { label: "Create Similar", icon: "copy", cmd: "createSimilar", title: "Create Similar (CS): the selected element's tool and type" },
     { label: "Match Type", icon: "match", tool: "matchtype", title: "Match Type Properties (MA): click the source, then the elements to change" },
   ];

@@ -4,6 +4,7 @@ import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
 import { Cat, attachedWalls, layerMaterialDeps, type LevelParams } from "./architecture.ts";
 import { polygonArea, validateRegion } from "./sketch.ts";
+import { joinedGeometry } from "./joingeometry.ts";
 
 // Footprint roofs (Revit "Roof by Footprint"): a boundary loop where each edge either defines
 // a slope (rising inwards from the eave) or doesn't (a gable). The roof surface is the lower
@@ -238,7 +239,7 @@ registerCategory({ name: Cat.RoofType, dependencies: layerMaterialDeps, cascadeD
 registerCategory({
   name: Cat.Roof,
   dependencies: (el) => [(el.params as RoofParams).levelId, ...(el.typeId ? [el.typeId] : [])],
-  related: (doc, el) => attachedWalls(doc, el.id),
+  related: (doc, el) => [...attachedWalls(doc, el.id), ...joinedGeometry(doc, el)],
   cascadeDelete: true,
   isType: false,
 });

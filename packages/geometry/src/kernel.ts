@@ -5,6 +5,7 @@ import { buildDuct, buildDuctFitting, buildDuctFittingLines, buildDuctLines } fr
 import { slopedTopWallMesh } from "./wallattach.ts";
 import {
   Cat,
+  cuttersOf,
   ceilingExtent,
   isFormCategory,
   type Values,
@@ -108,7 +109,7 @@ export function buildWall(doc: Document, el: Element): MeshData | null {
   if (segments.length) return buildStackedWall(doc, wall, segments);
   // Attached under a sloped roof: the top follows it.
   // Crossing walls: the thinner one is cut where the other runs through it.
-  const body = wallProfileMesh(doc, wall, wall.params.profile ? profileCrossCuts(doc, wall) : []) ?? (hasSlopedTop(doc, wall) && !wall.params.curve ? cutSlopedWall(doc, wall, crossingCutters(doc, wall)) : cutWallBody(joinedWallFootprint(doc, wall), bottom, top, crossingCutters(doc, wall)));
+  const body = wallProfileMesh(doc, wall, wall.params.profile ? profileCrossCuts(doc, wall) : []) ?? (hasSlopedTop(doc, wall) && !wall.params.curve ? cutSlopedWall(doc, wall, crossingCutters(doc, wall)) : cutWallBody(joinedWallFootprint(doc, wall), bottom, top, [...crossingCutters(doc, wall), ...joinedSlabCuts(doc, wall)]));
   return withSweeps(doc, wall, body);
 }
 
@@ -205,7 +206,7 @@ function floorBody(doc: Document, floor: Floor): MeshData | null {
     const plane = floorTopPlane(doc, floor);
     const thick = floorThickness(doc, floor);
     const fe = floorExtent(doc, floor);
-    const mesh = extrudeCut(doc, floor.params.boundary, floor.params.holes, -thick, 0, fe.bottom, fe.top);
+    const mesh = extrudeCut(doc, floor.params.boundary, floor.params.holes, -thick, 0, fe.bottom, fe.top, joinedWallCuts(doc, floor, fe.bottom, fe.top));
     const { positions: pos, normals: nor } = mesh;
     const k = Math.hypot(plane.gx, plane.gy, 1);
     for (let i = 0; i < pos.length; i += 3) {
@@ -222,15 +223,42 @@ function floorBody(doc: Document, floor: Floor): MeshData | null {
     return mesh;
   }
   const { bottom, top } = floorExtent(doc, floor);
-  return extrudeCut(doc, floor.params.boundary, floor.params.holes, bottom, top);
+  return extrudeCut(doc, floor.params.boundary, floor.params.holes, bottom, top, bottom, top, joinedWallCuts(doc, floor, bottom, top));
 }
 
 /**
  * Extrude an outline (with holes) less any shafts crossing [cutZ0, cutZ1] (default: the extrusion's
  * own height), as one mesh of however many pieces are left.
  */
-function extrudeCut(doc: Document, boundary: Vec2[], holes: Vec2[][], z0: number, z1: number, cutZ0 = z0, cutZ1 = z1): MeshData {
-  const shafts = shaftsCutting(doc, cutZ0, cutZ1);
+/** Floors and ceilings joined to cut this wall (Join Geometry): their outline over their thickness. */
+export function joinedSlabCuts(doc: Document, wall: Wall): { loop: Vec2[]; z0: number; z1: number }[] {
+  const out: { loop: Vec2[]; z0: number; z1: number }[] = [];
+  for (const c of cuttersOf(doc, wall)) {
+    if (c.category === Cat.Floor) {
+      const z = floorExtent(doc, c as Floor);
+      out.push({ loop: (c as Floor).params.boundary, z0: z.bottom, z1: z.top });
+    } else if (c.category === Cat.Ceiling) {
+      const z = ceilingExtent(doc, c as Ceiling);
+      out.push({ loop: (c as Ceiling).params.boundary, z0: z.bottom, z1: z.top });
+    }
+  }
+  return out;
+}
+
+/** Footprints of walls joined to cut this slab (Join Geometry) that overlap its heights. */
+function joinedWallCuts(doc: Document, slab: Element, bottom: number, top: number): Vec2[][] {
+  return cuttersOf(doc, slab)
+    .filter((c) => c.category === Cat.Wall)
+    .filter((w) => {
+      const z = wallExtent(doc, w as Wall);
+      return Math.min(z.top, top) - Math.max(z.bottom, bottom) > 1;
+    })
+    .map((w) => joinedWallFootprint(doc, w as Wall));
+}
+
+function extrudeCut(doc: Document, boundary: Vec2[], holes: Vec2[][], z0: number, z1: number, cutZ0 = z0, cutZ1 = z1, extra: Vec2[][] = []): MeshData {
+  // Shafts, and walls joined to cut this slab (Join Geometry).
+  const shafts = [...shaftsCutting(doc, cutZ0, cutZ1), ...extra];
   if (!shafts.length) return extrudePolygon(boundary, holes, z0, z1);
   const ring = (l: Vec2[]): [number, number][] => [...l.map((q): [number, number] => [q.x, q.y]), [l[0]!.x, l[0]!.y]];
   const rest = polygonClipping.difference([ring(boundary), ...holes.map(ring)], ...shafts.map((s) => [ring(s)]));
@@ -266,7 +294,7 @@ export function buildFloorLines(doc: Document, el: Element): LineData | null {
 export function buildCeiling(doc: Document, el: Element): MeshData | null {
   const ceiling = el as Ceiling;
   const { bottom, top } = ceilingExtent(doc, ceiling);
-  return extrudeCut(doc, ceiling.params.boundary, ceiling.params.holes, bottom, top);
+  return extrudeCut(doc, ceiling.params.boundary, ceiling.params.holes, bottom, top, bottom, top, joinedWallCuts(doc, ceiling, bottom, top));
 }
 
 export class SimpleKernel implements GeometryKernel {

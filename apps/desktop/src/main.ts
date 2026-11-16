@@ -15,7 +15,7 @@ import { addRecentFile, fileName, recentFiles, removeRecentFile } from "./recent
 import { CameraTool } from "./cameratool.ts";
 import { FloorPointTool, SlopeArrowTool } from "./slopetool.ts";
 import { WallProfileTool } from "./profiletool.ts";
-import { LevelTool, MatchTypeTool, ZoomRegionTool } from "./revittools.ts";
+import { JoinGeometryTool, LevelTool, MatchTypeTool, ZoomRegionTool } from "./revittools.ts";
 import { selectOptions, setSelectOption } from "./selectopts.ts";
 import { openWorksetsDialog } from "./worksetsui.ts";
 import { openPurgeDialog } from "./purgeui.ts";
@@ -628,6 +628,9 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   elevation: new ElevationTool(ctx),
   level: new LevelTool(ctx),
   matchtype: new MatchTypeTool(ctx),
+  joingeometry: new JoinGeometryTool(ctx, "join"),
+  unjoingeometry: new JoinGeometryTool(ctx, "unjoin"),
+  switchjoin: new JoinGeometryTool(ctx, "switch"),
   zoomregion: new ZoomRegionTool(ctx, () => setTool(toolBeforeZoom)),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */

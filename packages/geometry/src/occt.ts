@@ -23,7 +23,7 @@ import { buildFamilyInstance, nestedMeshes, type FamilyDisplay } from "./compone
 import type { LineData } from "./datums.ts";
 import { joinedWallFootprint } from "./joins.ts";
 import { crossingCutters } from "./wallcrossings.ts";
-import { SimpleKernel, withSweeps, type GeometryKernel } from "./kernel.ts";
+import { SimpleKernel, joinedSlabCuts, withSweeps, type GeometryKernel } from "./kernel.ts";
 import { wallProfileMesh, wallSweepSolids } from "./sweeps.ts";
 import { buildLink } from "./links.ts";
 import type { MeshData } from "./mesh.ts";
@@ -174,8 +174,8 @@ export class OcctKernel implements GeometryKernel {
       const face = keep(keep(new oc.BRepBuilderAPI_MakeFace(keep(wire.Wire()), true)).Shape());
       let solid: TopoDS_Shape = sloped ? this.meshToSolid(sloped, keep) : keep(keep(new oc.BRepPrimAPI_MakePrism(face, keep(new oc.gp_Vec(0, 0, top - bottom)), false, true)).Shape());
 
-      // Crossing walls running through this one cut it (as in plan).
-      for (const c of crossingCutters(doc, wall)) {
+      // Crossing walls running through this one cut it (as in plan), and slabs joined to cut it.
+      for (const c of [...crossingCutters(doc, wall), ...joinedSlabCuts(doc, wall)]) {
         const cw = keep(new oc.BRepBuilderAPI_MakeWire());
         c.loop.forEach((a, i) => {
           const b = c.loop[(i + 1) % c.loop.length]!;

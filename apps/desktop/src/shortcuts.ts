@@ -89,6 +89,7 @@ export const COMMANDS: Command[] = [
   { action: "cmd:ungroupSelection", label: "Ungroup", keys: "UG" },
   { action: "cmd:unpin", label: "Unpin", keys: "UP" },
   { action: "tool:matchtype", label: "Match Type Properties", keys: "MA" },
+  { action: "tool:joingeometry", label: "Join Geometry", keys: "JG" },
   { action: "tool:level", label: "Level", keys: "LL" },
   { action: "cmd:selectAllInstances", label: "Select All Instances (Visible in View)", keys: "SA" },
   { action: "cmd:revealHidden", label: "Reveal Hidden Elements", keys: "RH" },

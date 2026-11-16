@@ -2,6 +2,7 @@ import { registerCategory } from "../categories.ts";
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
 import { relatedWalls } from "./joins.ts";
+import { joinedGeometry } from "./joingeometry.ts";
 import { validateRegion } from "./sketch.ts";
 import type { PatternName } from "./materials.ts";
 import type { WallSweep } from "./sweeps.ts";
@@ -542,7 +543,7 @@ registerCategory({
     return [p.baseLevelId, ...(p.topLevelId ? [p.topLevelId] : []), ...typeDeps(el)];
   },
   // Joined walls, and rooms (their boundaries follow walls; extra regeneration is cheap).
-  related: (doc, el) => [...relatedWalls(doc, el as Wall), ...doc.byCategory(Cat.Room).map((r) => r.id)],
+  related: (doc, el) => [...relatedWalls(doc, el as Wall), ...doc.byCategory(Cat.Room).map((r) => r.id), ...joinedGeometry(doc, el)],
   cascadeDelete: true,
   isType: false,
 });
@@ -550,7 +551,7 @@ registerCategory({
 registerCategory({
   name: Cat.Floor,
   dependencies: (el) => [(el.params as FloorParams).levelId, ...typeDeps(el)],
-  related: (doc, el) => attachedWalls(doc, el.id),
+  related: (doc, el) => [...attachedWalls(doc, el.id), ...joinedGeometry(doc, el)],
   cascadeDelete: true,
   isType: false,
 });
@@ -558,7 +559,7 @@ registerCategory({
 registerCategory({
   name: Cat.Ceiling,
   dependencies: (el) => [(el.params as CeilingParams).levelId, ...typeDeps(el)],
-  related: (doc, el) => attachedWalls(doc, el.id),
+  related: (doc, el) => [...attachedWalls(doc, el.id), ...joinedGeometry(doc, el)],
   cascadeDelete: true,
   isType: false,
 });

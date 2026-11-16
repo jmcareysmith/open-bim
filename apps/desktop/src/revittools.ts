@@ -1,4 +1,4 @@
-import { Cat, createFloorPlan, createLevel, type Element, type FamilyInstanceParams, type LevelParams, type View } from "@open-bim/core";
+import { joinGeometry, switchJoinOrder, unjoinGeometry, Cat, createFloorPlan, createLevel, type Element, type FamilyInstanceParams, type LevelParams, type View } from "@open-bim/core";
 import type { Tool, ToolContext } from "./tools.ts";
 
 // Small Revit tools reached mostly by their shortcuts: Level (LL) and Match Type Properties (MA).
@@ -154,5 +154,50 @@ export class ZoomRegionTool implements Tool {
     if (!f) return;
     this.ctx.viewport.zoomRegion({ x0: f.x, y0: f.y, x1: ev.clientX, y1: ev.clientY });
     this.done();
+  }
+}
+
+/**
+ * Join Geometry / Unjoin / Switch Join Order (Revit: Modify → Join ▾): click the first element,
+ * then the second. Join: the first cuts the second where they overlap. Esc ends.
+ */
+export class JoinGeometryTool implements Tool {
+  readonly name: string;
+  private first: string | null = null;
+  constructor(
+    private ctx: ToolContext,
+    private mode: "join" | "unjoin" | "switch",
+  ) {
+    this.name = mode === "join" ? "joingeometry" : mode === "unjoin" ? "unjoingeometry" : "switchjoin";
+  }
+
+  private label(): string {
+    return this.mode === "join" ? "Join Geometry" : this.mode === "unjoin" ? "Unjoin Geometry" : "Switch Join Order";
+  }
+
+  activate(): void {
+    this.first = null;
+    this.ctx.status(`${this.label()}: click the first element${this.mode === "join" ? " (it cuts the second)" : ""}.`);
+  }
+
+  click(ev: PointerEvent): void {
+    const id = this.ctx.viewport.pick(ev);
+    if (!id) return;
+    if (!this.first) {
+      this.first = id;
+      this.ctx.setSelection([id]);
+      return this.ctx.status(`${this.label()}: now click the second element.`);
+    }
+    const a = this.first;
+    this.first = null;
+    try {
+      this.ctx.doc.transact(this.label(), (tx) =>
+        this.mode === "join" ? joinGeometry(tx, this.ctx.doc, a, id) : this.mode === "unjoin" ? unjoinGeometry(tx, this.ctx.doc, a, id) : switchJoinOrder(tx, this.ctx.doc, a, id),
+      );
+      this.ctx.setSelection([]);
+      this.ctx.status(`${this.label()} done. Click the next first element, or Esc.`);
+    } catch (e) {
+      this.ctx.status(`⚠ ${(e as Error).message}`);
+    }
   }
 }

@@ -175,6 +175,9 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 |---|---|---|
 | Move, copy, rotate, mirror, array | 7a | ✅ (mirror by drawn axis; radial array via API only) |
 | Align, offset, trim/extend, split | 7a | ✅ (plans/3D) |
+| Join Geometry / Unjoin / Switch Join Order | 7a | ✅ (walls with floors/ceilings: the first cuts the second; SimpleKernel and OCCT) |
+| Wall Joins (miter / butt / square off) | 7a | ✅ (per wall end in Properties) |
+| Pin / Unpin, Scale, Match Type, Create Similar | 7a | ✅ (PN/UP, RE, MA, CS) |
 | Grips, drag editing, temporary dimensions | 7a | ✅ (temp dims while drawing walls, detail lines, beams: length and angle) |
 | Ribbon, contextual tabs, options bar | 7b | ✅ |
 | File menu, Quick Access Toolbar | 7b | ✅ (File menu with Recent on desktop, QAT) |

@@ -343,3 +343,28 @@ describe("wall join styles", () => {
     expect(Math.min(...fb.map((q) => q.y))).toBeCloseTo(100, 3);
   });
 });
+
+describe("join geometry", () => {
+  it("a wall joined to cut a floor takes its footprint out of the slab; switching makes the floor cut the wall", async () => {
+    const { joinGeometry, switchJoinOrder, createFloor, floorExtent } = await import("@open-bim/core");
+    const { SimpleKernel, meshVolume } = await import("../src/index.ts");
+    const { doc, wall, types, ids } = setup() as ReturnType<typeof setup> & { ids: { levels: { ground: string }; floorTypes: Record<string, string> } };
+    const w = wall(p(0, 2000), p(4000, 2000), types.t200);
+    const sq = [p(-1000, 0), p(5000, 0), p(5000, 4000), p(-1000, 4000)];
+    const level = (doc.require(w.id).params as { baseLevelId: string }).baseLevelId;
+    const ft = doc.byCategory("FloorType")[0]!.id;
+    const f = doc.transact("F", (tx) => createFloor(tx, ft, level, sq));
+    // Put the slab across the wall's height.
+    doc.transact("Up", (tx) => tx.update(f.id, { offset: 1000 }));
+    const k = new SimpleKernel();
+    const fv0 = meshVolume(k.build(doc, doc.require(f.id))!);
+    const wv0 = meshVolume(k.build(doc, doc.require(w.id))!);
+    doc.transact("J", (tx) => joinGeometry(tx, doc, w.id, f.id));
+    const fe = floorExtent(doc, doc.require(f.id) as never);
+    const th = fe.top - fe.bottom;
+    expect(fv0 - meshVolume(k.build(doc, doc.require(f.id))!)).toBeCloseTo(4000 * 200 * th, -3);
+    doc.transact("S", (tx) => switchJoinOrder(tx, doc, w.id, f.id));
+    expect(meshVolume(k.build(doc, doc.require(f.id))!)).toBeCloseTo(fv0, -2);
+    expect(wv0 - meshVolume(k.build(doc, doc.require(w.id))!)).toBeCloseTo(4000 * 200 * th, -3);
+  });
+});

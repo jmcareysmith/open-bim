@@ -119,3 +119,23 @@ describe("links in schedules and Bind Link", () => {
   });
 });
 
+
+describe("Bind Link moves everything", () => {
+  it("a flex duct's bend points move with the link", async () => {
+    const { createFlexDuct, ensureDuctTypes } = await import("@open-bim/core");
+    const n = new Document();
+    const nids = applyResidentialTemplate(n);
+    n.transact("F", (tx) => {
+      const [round] = ensureDuctTypes(tx, n);
+      createFlexDuct(tx, n, round!, nids.levels.ground, [{ x: 0, y: 0, z: 2700 }, { x: 1000, y: 500, z: 2700 }, { x: 2000, y: 0, z: 2700 }]);
+    });
+    const host = new Document();
+    applyResidentialTemplate(host);
+    const link = host.transact("Link", (tx) => createLink(tx, n.toJSON(), "n.obim"));
+    host.transact("Move", (tx) => tx.update<LinkParams>(link.id, { offset: { x: 10000, y: 0, z: 0 } }));
+    host.transact("Bind", (tx) => bindLink(tx, host, host.require(link.id) as Link));
+    const d = host.byCategory<{ start: { x: number }; via: { x: number }[] }>("Duct")[0]!;
+    expect(d.params.start.x).toBeCloseTo(10000, 0);
+    expect(d.params.via[0]!.x).toBeCloseTo(11000, 0);
+  });
+});

@@ -116,7 +116,12 @@ export function bindDocument(doc: Document, ydoc: Y.Doc, opts: BindingOptions = 
 
   const repair = (ids: ElementId[]) => {
     if (opts.onOrphans) return opts.onOrphans(ids);
-    doc.transact("Remove orphaned elements", (tx) => ids.forEach((id) => doc.has(id) && tx.delete(id)));
+    try {
+      doc.transact("Remove orphaned elements", (tx) => ids.forEach((id) => doc.has(id) && tx.delete(id)));
+    } catch {
+      // Refused (e.g. someone has borrowed one): their dependencies are gone anyway, so drop them locally.
+      doc.applyRemote("Remove orphaned elements", [], ids.filter((id) => doc.has(id)));
+    }
   };
 
   // Local → Y.Doc (and what was edited is now borrowed).

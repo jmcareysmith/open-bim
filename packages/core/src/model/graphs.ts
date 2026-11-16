@@ -118,6 +118,8 @@ function customDef(doc: Document, graphId: ElementId): NodeDef | undefined {
     inputs: ins.map((n, i) => ({ name: portName(n, `in${i + 1}`), type: "any" as const, ...(n.values?.list ? { list: true } : {}) })),
     outputs: outs.map((n, i) => ({ name: portName(n, `out${i + 1}`), type: "any" as const })),
     effect: g.params.nodes.some((n) => defs.get(n.type)?.effect || n.type.startsWith(CUSTOM)),
+    // Always re-run: what's inside can read the model, and the custom graph itself can change.
+    volatile: true,
     run: (inputs, ctx) => runCustom(g, inputs, ctx, 0),
   };
 }
@@ -308,6 +310,8 @@ export function runGraph(doc: Document, graphId: ElementId, opts: { selection?: 
         bindings[node.id] = made.filter(Boolean);
       } catch (e) {
         results.set(node.id, { outputs: {}, error: (e as Error).message, ran: true });
+        // Elements this failed run made fresh go again (the ones it was updating stay bound).
+        for (const id of made) if (id && !old.includes(id) && doc.has(id)) tx.delete(id);
         bindings[node.id] = old.filter((id) => doc.has(id));
       }
     }

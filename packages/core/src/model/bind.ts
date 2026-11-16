@@ -38,11 +38,18 @@ const isPt = (v: unknown): v is Vec2 =>
   !!v && typeof v === "object" && typeof (v as Vec2).x === "number" && typeof (v as Vec2).y === "number";
 
 /** Plan points of categories the modify tools don't move (MEP runs, site, property lines, shafts). */
-function genericMove(params: Params, t: Affine): Record<string, unknown> {
+function genericMove(params: Params, t: Affine, dz = 0): Record<string, unknown> {
   const p = structuredClone(params) as Record<string, unknown>;
   const map = (q: Vec2) => ({ ...q, ...applyAffine(t, q) });
   for (const k of ["start", "end", "position", "at"]) if (isPt(p[k])) p[k] = map(p[k] as Vec2);
-  for (const k of ["points", "boundary", "path"]) if (Array.isArray(p[k]) && (p[k] as unknown[]).every(isPt)) p[k] = (p[k] as Vec2[]).map(map);
+  // Flex duct bend points, and the outline/point lists of anything else.
+  for (const k of ["points", "boundary", "path", "via"]) if (Array.isArray(p[k]) && (p[k] as unknown[]).every(isPt)) p[k] = (p[k] as Vec2[]).map(map);
+  // Origins (groups, point clouds, images): moved, and raised with the link where they're absolute in z.
+  if (isPt(p.origin)) {
+    const o = map(p.origin as Vec2) as Vec2 & { z?: number };
+    if (typeof o.z === "number") o.z += dz;
+    p.origin = o;
+  }
   if (typeof p.rotation === "number") p.rotation = (p.rotation as number) + Math.atan2(t.yx, t.xx);
   return p;
 }
@@ -68,17 +75,26 @@ export function bindLink(tx: Transaction, doc: Document, link: Link): ElementId[
       const taken = new Set(doc.byCategory(Cat.Level).map((h) => h.name));
       let name = l.name ?? "Level";
       while (taken.has(name)) name += " (bound)";
-      map.set(l.id, tx.create<LevelParams>(Cat.Level, { ...l.params, elevation: z }, { name }).id);
+      const made = tx.create<LevelParams>(Cat.Level, { ...l.params, elevation: z }, { name });
+      map.set(l.id, made.id);
+      hostLevels.push(made);
     }
   }
 
+  // The project's elements by name, per category (looked up once each).
+  const names = new Map<string, Map<string, Element>>();
+  const byName = (cat: string) => {
+    let m = names.get(cat);
+    if (!m) names.set(cat, (m = new Map(doc.byCategory(cat).filter((e) => e.name).map((e) => [e.name!, e]))));
+    return m;
+  };
   // What comes across, and what the project already has by name.
   const copy: Element[] = [];
   for (const el of src.all()) {
     if (el.category === Cat.Level || LEFT_BEHIND.has(el.category)) continue;
     if (typeof (el.params as { viewId?: unknown }).viewId === "string") continue;
     const shareByName = BY_NAME.has(el.category) || getCategory(el.category).isType;
-    const have = shareByName && el.name ? doc.byCategory(el.category).find((h) => h.name === el.name) : undefined;
+    const have = shareByName && el.name ? byName(el.category).get(el.name) : undefined;
     if (have) map.set(el.id, have.id);
     else {
       map.set(el.id, newId());
@@ -95,7 +111,7 @@ export function bindLink(tx: Transaction, doc: Document, link: Link): ElementId[
       try {
         p = transformParams(src, el, t, all) ?? (structuredClone(el.params) as Record<string, unknown>);
       } catch {
-        p = genericMove(el.params, t);
+        p = genericMove(el.params, t, dz);
       }
     }
     const id = map.get(el.id)!;

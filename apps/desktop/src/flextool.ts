@@ -32,6 +32,7 @@ export class FlexDuctTool implements Tool {
 
   activate(): void {
     this.pts = [];
+    this.connectors = null;
     this.showOptions();
     this.ctx.status("Flex Duct: click its start (a terminal's or duct's connector snaps), the points it bends through, then Enter or click a connector to finish. Esc cancels.");
   }
@@ -60,15 +61,27 @@ export class FlexDuctTool implements Tool {
     return this.ctx.doc.get<LevelParams>(this.ctx.activeLevelId())?.params.elevation ?? 0;
   }
 
-  private snap(p: Vec2): ModelConnector | null {
+  /** Duct connectors on this storey (gathered once per run of the tool; refreshed after each duct). */
+  private connectors: ModelConnector[] | null = null;
+  private storeyConnectors(): ModelConnector[] {
+    if (this.connectors) return this.connectors;
     const { doc } = this.ctx;
+    const z0 = this.levelZ();
+    const above = doc.byCategory<LevelParams>(Cat.Level).map((l) => l.params.elevation).filter((e) => e > z0 + 1);
+    const z1 = above.length ? Math.min(...above) : z0 + 4000;
+    const out: ModelConnector[] = [];
+    for (const cat of [Cat.FamilyInstance, Cat.Duct]) {
+      for (const el of doc.byCategory(cat)) for (const c of elementConnectors(doc, el)) if (c.domain === "duct" && c.position[2] >= z0 - 100 && c.position[2] < z1) out.push(c);
+    }
+    return (this.connectors = out);
+  }
+
+  private snap(p: Vec2): ModelConnector | null {
     const tol = SNAP_PX * this.ctx.viewport.mmPerPixel();
     let best: ModelConnector | null = null;
     let bestD = tol;
-    for (const el of doc.all()) {
-      if (el.category !== Cat.FamilyInstance && el.category !== Cat.Duct) continue;
-      for (const c of elementConnectors(doc, el)) {
-        if (c.domain !== "duct") continue;
+    {
+      for (const c of this.storeyConnectors()) {
         const d = Math.hypot(c.position[0] - p.x, c.position[1] - p.y);
         if (d < bestD) {
           bestD = d;
@@ -111,6 +124,12 @@ export class FlexDuctTool implements Tool {
       if (r.snapped.classification && SYSTEM_CLASSIFICATIONS.find((c) => c.value === r.snapped!.classification)?.domain === "duct") this.classification = r.snapped.classification;
       this.showOptions();
     }
+    // A repeated click (a double-click) adds nothing.
+    const last = this.pts[this.pts.length - 1];
+    if (last && Math.hypot(r.p.x - last.x, r.p.y - last.y, r.p.z - last.z) < 1) {
+      if (r.snapped && this.pts.length >= 2) this.finish();
+      return;
+    }
     this.pts.push(r.p);
     this.preview();
     // Ending on a connector finishes it.
@@ -130,6 +149,7 @@ export class FlexDuctTool implements Tool {
         const round = ductTypes(doc).find((t) => (t.params as DuctTypeParams).shape === "round") ?? ductTypes(doc)[0]!;
         id = createFlexDuct(tx, doc, round.id, this.ctx.activeLevelId(), pts, { diameter: this.diameter, classification: this.classification }).id;
       });
+      this.connectors = null;
       this.ctx.setSelection([id]);
       this.ctx.status("Flex duct made. Click the next one's start, or Esc.");
     } catch (err) {

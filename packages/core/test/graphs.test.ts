@@ -221,3 +221,18 @@ describe("script node", () => {
     expect(r.get("bad")!.error).toMatch(/^Script:/);
   });
 });
+
+describe("failed runs", () => {
+  it("a node that fails partway leaves no stray elements", () => {
+    const t = setup();
+    // Three lines, the last zero-length: the third wall throws after two were made.
+    t.node("l", "script", { code: "return [{start:{x:0,y:20000},end:{x:3000,y:20000}},{start:{x:0,y:21000},end:{x:3000,y:21000}},{start:{x:0,y:22000},end:{x:0,y:22000}}];" });
+    t.node("w", "wallByLine");
+    t.link("l", "OUT", "w", "line");
+    t.save();
+    const before = t.doc.byCategory(Cat.Wall).length;
+    const r = runGraph(t.doc, t.g.id);
+    expect(r.get("w")!.error).toBeDefined();
+    expect(t.doc.byCategory(Cat.Wall).length).toBe(before);
+  });
+});

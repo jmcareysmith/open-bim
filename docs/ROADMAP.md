@@ -170,4 +170,5 @@ to native elements where their shapes allow.
 - [x] Ceilings (IfcCovering CEILING) → ceilings at their underside height; other coverings stay shapes
 - [x] Footings: under a converted wall → its strip footing; otherwise a pad (size, depth, top, rotation)
 - [x] Members (rafters, purlins, braces): level → beams; sloped → sloped beams marked brace (end tops kept)
+- [x] Straight ramps (one sloping top plane) → native ramps
 - [ ] Still shapes: non-rectangular curtain panels; anything whose rebuilt version wouldn't match its mesh

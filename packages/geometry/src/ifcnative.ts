@@ -10,6 +10,9 @@ import {
   createBeam,
   createRoof,
   createCeiling,
+  createRamp,
+  type RampParams,
+  type RampTypeParams,
   createPadFooting,
   createStripFooting,
   setWallCurve,
@@ -69,6 +72,7 @@ const CEILING_CLASSES = new Set(["IfcCovering"]);
 const BEAM_CLASSES = new Set(["IfcBeam", "IfcMember"]);
 const ROOF_CLASSES = new Set(["IfcRoof"]);
 const STAIR_CLASSES = new Set(["IfcStair", "IfcStairFlight"]);
+const RAMP_CLASSES = new Set(["IfcRamp", "IfcRampFlight"]);
 const RAILING_CLASSES = new Set(["IfcRailing"]);
 /** Loadable-family categories an imported class stands for (furniture, fixtures, equipment, generic). */
 const FAMILY_OF: Record<string, FamilyCategory> = {
@@ -91,7 +95,7 @@ const INSERT_CLASSES = new Set(["IfcDoor", "IfcWindow"]);
 export function convertible(el: { category: string; params: unknown }): boolean {
   if (el.category !== Cat.DirectShape) return false;
   const c = (el.params as DirectShapeParams).ifcClass;
-  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || CEILING_CLASSES.has(c) || FOOTING_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c) || ROOF_CLASSES.has(c) || STAIR_CLASSES.has(c) || RAILING_CLASSES.has(c) || PLATE_CLASSES.has(c) || c in FAMILY_OF;
+  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || CEILING_CLASSES.has(c) || FOOTING_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c) || ROOF_CLASSES.has(c) || STAIR_CLASSES.has(c) || RAMP_CLASSES.has(c) || RAILING_CLASSES.has(c) || PLATE_CLASSES.has(c) || c in FAMILY_OF;
 }
 
 function hull(pts: Vec2[]): Vec2[] {
@@ -641,6 +645,41 @@ function curtainFromPanels(tx: Transaction, doc: Document, g: Panel[]): ElementI
 }
 
 /**
+ * A straight ramp from its mesh: one sloping top plane over a plan rectangle; it runs uphill along
+ * the rectangle, from its low end's top to its high end's, with the slab's thickness and width.
+ */
+function rampFromMesh(tx: Transaction, doc: Document, p: DirectShapeParams, lvl: number): ElementId | null {
+  const { xy } = bounds(p);
+  const r = minRect(xy);
+  if (!r || r.hullArea < 0.9 * r.len * r.wid) return null;
+  const tops = facePlanes(p, true);
+  if (!tops.length) return null;
+  const g = tops[0]!;
+  if (tops.some((t) => Math.abs(t.a - g.a) > 1e-4 || Math.abs(t.b - g.b) > 1e-4) || Math.hypot(g.a, g.b) < 1e-3) return null;
+  // Uphill along the rectangle's long side.
+  let dir = r.u;
+  if (g.a * dir.x + g.b * dir.y < 0) dir = { x: -dir.x, y: -dir.y };
+  const start = { x: r.c.x - (dir.x * r.len) / 2, y: r.c.y - (dir.y * r.len) / 2 };
+  const end = { x: r.c.x + (dir.x * r.len) / 2, y: r.c.y + (dir.y * r.len) / 2 };
+  const zAt = (q: Vec2) => g.a * q.x + g.b * q.y + g.c;
+  const bottoms = facePlanes(p, false);
+  const under = planeAt(bottoms, r.c, false);
+  const thickness = under ? zAt(r.c) - (under.a * r.c.x + under.b * r.c.y + under.c) : 150;
+  const width = r.wid;
+  const z0 = zAt(start);
+  const z1 = zAt(end);
+  const n = Math.max(1, Math.round(r.len / (z1 - z0)));
+  const type =
+    doc.byCategory<RampTypeParams>(Cat.RampType).find((t) => Math.abs(t.params.width - width) < 2 && Math.abs(t.params.thickness - thickness) < 2)?.id ??
+    tx.create<RampTypeParams>(Cat.RampType, { width: Math.round(width), thickness: Math.round(thickness), maxSlope: Math.min(12, n) }, { name: `Imported Ramp ${Math.round(width)}` }).id;
+  const above = doc.byCategory<LevelParams>(Cat.Level).filter((l) => l.params.elevation > lvl + 1).sort((a, b) => Math.abs(a.params.elevation - z1) - Math.abs(b.params.elevation - z1));
+  const top = above[0] ?? doc.require<LevelParams>(p.levelId);
+  const ramp = createRamp(tx, doc, type, p.levelId, top.id, [{ start, end }]);
+  tx.update<RampParams>(ramp.id, { baseOffset: z0 - lvl, topOffset: z1 - top.params.elevation });
+  return ramp.id;
+}
+
+/**
  * A straight stair from its mesh: the treads are its upward faces at evenly spaced heights; their
  * centres give the direction of travel and the going, their spread across it the width. Null for
  * anything else (turns, winders, uneven risers).
@@ -912,6 +951,13 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
         continue;
       }
       created.push(rail);
+    } else if (RAMP_CLASSES.has(p.ifcClass)) {
+      const ramp = rampFromMesh(tx, doc, p, lvl);
+      if (!ramp) {
+        skipped.push(id);
+        continue;
+      }
+      created.push(ramp);
     } else if (STAIR_CLASSES.has(p.ifcClass)) {
       const stair = stairFromMesh(tx, doc, p, lvl, z0, z1);
       if (!stair) {

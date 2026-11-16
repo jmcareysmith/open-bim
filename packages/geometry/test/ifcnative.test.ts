@@ -492,3 +492,31 @@ describe("braces and rafters from IFC", () => {
     expect(b.start.x).toBeCloseTo(0, -1);
   });
 });
+
+describe("ramps from IFC", () => {
+  it("recovers a straight ramp's run, rise and width", async () => {
+    const { createRamp, ensureRampType, rampLayout } = await import("@open-bim/core");
+    const { SimpleKernel } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const rp = doc.transact("R", (tx) => {
+      const r = createRamp(tx, doc, ensureRampType(tx, doc), ids.levels.ground, ids.levels.first, [{ start: { x: 0, y: 0 }, end: { x: 6000, y: 0 } }]);
+      tx.update(r.id, { topOffset: 500 - 2700 });
+      return r;
+    });
+    const before = rampLayout(doc, doc.require(rp.id) as never);
+    const m = new SimpleKernel().build(doc, doc.require(rp.id))!;
+    const ds = doc.transact("I", (tx) => {
+      tx.delete(rp.id);
+      return createDirectShape(tx, { levelId: ids.levels.ground, ifcClass: "IfcRamp", globalId: "r", positions: [...m.positions], indices: [...m.indices], color: 0x999999, properties: {} }).id;
+    });
+    const r = doc.transact("C", (tx) => convertDirectShapes(tx, doc, [ds]));
+    expect(r.skipped).toEqual([]);
+    const after = rampLayout(doc, doc.byCategory("Ramp")[0] as never);
+    expect(after.bottom).toBeCloseTo(before.bottom, 0);
+    expect(after.top).toBeCloseTo(before.top, 0);
+    const run = (doc.byCategory("Ramp")[0]!.params as { runs: { start: Vec2; end: Vec2 }[] }).runs[0]!;
+    expect(run.start.x).toBeCloseTo(0, -1);
+    expect(run.end.x).toBeCloseTo(6000, -1);
+  });
+});

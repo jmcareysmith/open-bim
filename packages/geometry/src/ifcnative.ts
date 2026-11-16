@@ -8,6 +8,7 @@ import {
   createWindow,
   createColumn,
   createBeam,
+  createRoof,
   type BeamParams,
   type ColumnParams,
   type StructuralSectionParams,
@@ -33,13 +34,14 @@ const WALL_CLASSES = new Set(["IfcWall", "IfcWallStandardCase"]);
 const SLAB_CLASSES = new Set(["IfcSlab"]);
 const COLUMN_CLASSES = new Set(["IfcColumn"]);
 const BEAM_CLASSES = new Set(["IfcBeam"]);
+const ROOF_CLASSES = new Set(["IfcRoof"]);
 const INSERT_CLASSES = new Set(["IfcDoor", "IfcWindow"]);
 
 /** Can this imported shape become a native element? */
 export function convertible(el: { category: string; params: unknown }): boolean {
   if (el.category !== Cat.DirectShape) return false;
   const c = (el.params as DirectShapeParams).ifcClass;
-  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c);
+  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c) || ROOF_CLASSES.has(c);
 }
 
 function hull(pts: Vec2[]): Vec2[] {
@@ -109,6 +111,97 @@ function typeFor(tx: Transaction, doc: Document, category: string, label: string
   if (have) return have.id;
   const r = Math.round(t);
   return tx.create<LayeredTypeParams>(category, { layers: [{ function: "structure", material: "Imported", thickness: r }] }, { name: `${label} ${r}` }).id;
+}
+
+type Plane = { tri: [Vec2, Vec2, Vec2]; a: number; b: number; c: number };
+
+/** Faces of a mesh as planes z = a·x + b·y + c (up: facing up, else down), skipping steep ones. */
+function facePlanes(p: DirectShapeParams, up: boolean): Plane[] {
+  const out: Plane[] = [];
+  const P = p.positions;
+  for (let i = 0; i < p.indices.length; i += 3) {
+    const v = [p.indices[i]! * 3, p.indices[i + 1]! * 3, p.indices[i + 2]! * 3].map((k) => [P[k]!, P[k + 1]!, P[k + 2]!] as const);
+    const [A, B, C] = v as [readonly [number, number, number], readonly [number, number, number], readonly [number, number, number]];
+    const u = [B[0] - A[0], B[1] - A[1], B[2] - A[2]];
+    const w = [C[0] - A[0], C[1] - A[1], C[2] - A[2]];
+    const n = [u[1]! * w[2]! - u[2]! * w[1]!, u[2]! * w[0]! - u[0]! * w[2]!, u[0]! * w[1]! - u[1]! * w[0]!];
+    const l = Math.hypot(n[0]!, n[1]!, n[2]!);
+    if (l < 1e-9 || (up ? n[2]! / l < 0.2 : n[2]! / l > -0.2)) continue;
+    const a = -n[0]! / n[2]!;
+    const b = -n[1]! / n[2]!;
+    out.push({ tri: [{ x: A[0], y: A[1] }, { x: B[0], y: B[1] }, { x: C[0], y: C[1] }], a, b, c: A[2] - a * A[0] - b * A[1] });
+  }
+  return out;
+}
+
+/** The highest (top) or lowest (bottom) face over a plan point. */
+function planeAt(planes: Plane[], q: Vec2, highest: boolean): Plane | null {
+  let best: Plane | null = null;
+  let bz = highest ? -Infinity : Infinity;
+  for (const pl of planes) {
+    const [a, b, c] = pl.tri;
+    const d = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+    if (Math.abs(d) < 1e-9) continue;
+    const s = ((q.x - a.x) * (c.y - a.y) - (q.y - a.y) * (c.x - a.x)) / d;
+    const t = ((b.x - a.x) * (q.y - a.y) - (b.y - a.y) * (q.x - a.x)) / d;
+    if (s < -1e-6 || t < -1e-6 || s + t > 1 + 1e-6) continue;
+    const z = pl.a * q.x + pl.b * q.y + pl.c;
+    if (highest ? z > bz : z < bz) [best, bz] = [pl, z];
+  }
+  return best;
+}
+
+/**
+ * Roof: a footprint roof from an imported roof's shape — the outline of its top faces, each eave's
+ * slope from the face just inside it (none rising from it: a gable), thickness from top to bottom.
+ */
+function roofFromMesh(tx: Transaction, doc: Document, p: DirectShapeParams, lvl: number, z0: number): ElementId | null {
+  const tops = facePlanes(p, true);
+  if (!tops.length) return null;
+  let outline: Polygon[] = [];
+  try {
+    const polys = tops.map((t): Polygon => [[...t.tri.map((q): [number, number] => [q.x, q.y]), [t.tri[0].x, t.tri[0].y]]]);
+    outline = polygonClipping.union(polys[0]!, ...polys.slice(1));
+  } catch {
+    return null;
+  }
+  const big = outline.map((poly) => poly[0]!.slice(0, -1).map(([x, y]) => ({ x, y }))).sort((a, b) => polyArea(b) - polyArea(a))[0];
+  if (!big || big.length < 3) return null;
+  // Counter-clockwise, without points in the middle of straight runs.
+  let ring = big;
+  let s2 = 0;
+  ring.forEach((q, i) => (s2 += q.x * ring[(i + 1) % ring.length]!.y - ring[(i + 1) % ring.length]!.x * q.y));
+  if (s2 < 0) ring = [...ring].reverse();
+  ring = ring.filter((q, i) => {
+    const a = ring[(i - 1 + ring.length) % ring.length]!;
+    const b = ring[(i + 1) % ring.length]!;
+    return Math.abs((q.x - a.x) * (b.y - q.y) - (q.y - a.y) * (b.x - q.x)) > 1 * Math.hypot(b.x - a.x, b.y - a.y);
+  });
+  if (ring.length < 3) return null;
+  const bottoms = facePlanes(p, false);
+  const slopes: (number | null)[] = [];
+  const thick: number[] = [];
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i]!;
+    const b = ring[(i + 1) % ring.length]!;
+    const L = Math.hypot(b.x - a.x, b.y - a.y);
+    const n = { x: -(b.y - a.y) / L, y: (b.x - a.x) / L };
+    const q = { x: (a.x + b.x) / 2 + n.x * Math.min(150, L / 4), y: (a.y + b.y) / 2 + n.y * Math.min(150, L / 4) };
+    const top = planeAt(tops, q, true);
+    if (!top) {
+      slopes.push(null);
+      continue;
+    }
+    const rise = top.a * n.x + top.b * n.y;
+    // Rising inwards from this edge: its slope; flat or rising along it: a gable (or flat roof edge).
+    slopes.push(rise > 0.02 ? Math.atan(rise) : null);
+    const bottom = planeAt(bottoms, q, false);
+    if (bottom) thick.push(top.a * q.x + top.b * q.y + top.c - (bottom.a * q.x + bottom.b * q.y + bottom.c));
+  }
+  const t = thick.length ? thick.sort((x, y) => x - y)[Math.floor(thick.length / 2)]! : 200;
+  if (!(t > 1)) return null;
+  const typeId = typeFor(tx, doc, Cat.RoofType, "Imported Roof", t);
+  return createRoof(tx, typeId, p.levelId, ring, { slopes, baseOffset: z0 - lvl }).id;
 }
 
 /** A structural section of this shape and size (b across, d deep), else a new "Imported <what> b x d". */
@@ -197,6 +290,13 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
       const col = createColumn(tx, doc, typeId, p.levelId, top.id === p.levelId ? p.levelId : top.id, r.c, round ? 0 : Math.atan2(r.u.y, r.u.x) - Math.PI / 2);
       tx.update<ColumnParams>(col.id, { baseOffset: z0 - lvl, topOffset: z1 - top.params.elevation });
       created.push(col.id);
+    } else if (ROOF_CLASSES.has(p.ifcClass)) {
+      const roof = roofFromMesh(tx, doc, p, lvl, z0);
+      if (!roof) {
+        skipped.push(id);
+        continue;
+      }
+      created.push(roof);
     } else if (BEAM_CLASSES.has(p.ifcClass)) {
       // Beam: along its plan box's long side, top at its highest point, section width × depth.
       const r = minRect(xy);

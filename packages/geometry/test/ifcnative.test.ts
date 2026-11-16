@@ -70,3 +70,30 @@ describe("IFC columns and beams to native", () => {
     expect((b.params as { offset: number }).offset).toBeCloseTo(2700);
   });
 });
+
+describe("IFC roofs to native", () => {
+  it("recovers a hip roof's footprint and slopes, and a gable roof's gables, from their meshes", async () => {
+    const { createRoof, SimpleKernelImport } = { ...(await import("@open-bim/core")), SimpleKernelImport: (await import("../src/index.ts")).SimpleKernel };
+    const deg = (d: number) => (d * Math.PI) / 180;
+    for (const slopes of [[30, 30, 30, 30], [30, null, 30, null]] as const) {
+      const doc = new Document();
+      const ids = applyResidentialTemplate(doc);
+      const b = [{ x: 0, y: 0 }, { x: 10000, y: 0 }, { x: 10000, y: 6000 }, { x: 0, y: 6000 }];
+      const r = doc.transact("R", (tx) => createRoof(tx, ids.roofTypes.steel, ids.levels.ground, b, { slopes: slopes.map((s) => (s === null ? null : deg(s))), baseOffset: 2700 }));
+      const m = new SimpleKernelImport().build(doc, r)!;
+      const ds = doc.transact("I", (tx) => {
+        tx.delete(r.id);
+        return createDirectShape(tx, { levelId: ids.levels.ground, ifcClass: "IfcRoof", globalId: "r", positions: [...m.positions], indices: [...m.indices], color: 0x999999, properties: {} }).id;
+      });
+      const res = doc.transact("C", (tx) => convertDirectShapes(tx, doc, [ds]));
+      expect(res.skipped).toEqual([]);
+      const roof = doc.byCategory<{ boundary: { x: number; y: number }[]; slopes: (number | null)[]; baseOffset: number }>("Roof")[0]!;
+      expect(roof.params.boundary).toHaveLength(4);
+      expect(roof.params.baseOffset).toBeCloseTo(2700, 0);
+      const got = roof.params.slopes.map((s) => (s === null ? null : Math.round((s * 180) / Math.PI)));
+      // Same edges (the footprint may start at another corner): compare as sorted lists.
+      expect(got.map(String).sort()).toEqual(slopes.map(String).sort());
+      expect(doc.get(roof.typeId!)!.id).toBe(ids.roofTypes.steel);
+    }
+  });
+});

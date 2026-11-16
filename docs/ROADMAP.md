@@ -151,6 +151,6 @@ to native elements where their shapes allow.
 - [x] Walls (boxy IfcWall → wall, type by thickness) and slabs (IfcSlab → floor from its top faces)
 - [x] Doors and windows → native hosted doors/windows in the converted walls (IFC OverallWidth/Height; types by size)
 - [x] Columns and beams → native structural elements (rectangular/round sections by size; I-sections come in as their envelope)
-- [ ] Roofs (IfcRoof / roof slabs) → footprint roofs (slopes from the faces) or floors when flat
+- [x] Roofs (IfcRoof) → footprint roofs: outline of the top faces, slope per eave from the face inside it (gables where none rises), type by thickness
 - [ ] Names, marks and colours carried over (materials from the IFC colours)
 - [ ] Batch: convert everything on import (option), with a summary of what stayed as shapes

@@ -128,7 +128,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Manage-tab dialogs (`projectSection` in panels.ts). Manage → Purge Unused (core purge.ts `unusedElements`: types without instances,
   unreferenced materials (by id or layer name)/families/templates/filters; one type of each kind kept; purgeui.ts). Manage → Transfer
   Standards (core transfer.ts: pick categories from another project file, skip/overwrite same names, needed materials/filters
-  come along, refs remapped; transferui.ts — dialog untested in the app).
+  come along, refs remapped; transferui.ts).
 - Status bar: ⧩ selection count at the right; click to filter the selection by category. Revit's selection toggles beside it
   (selectopts.ts, local storage): 📌 Select pinned elements (off: pinned can't be selected), ✥ Drag elements on selection
   (on: press on any element and drag it; default off).

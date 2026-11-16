@@ -1047,6 +1047,9 @@ function carryOver(tx: Transaction, doc: Document, id: ElementId, ds: { name?: s
   if (ds.name) tx.setName(id, ds.name);
   const mark = Object.entries(ds.params.properties).find(([k]) => /(^|\.)Mark$/.test(k))?.[1];
   if (mark) tx.update(id, { mark });
+  // The IFC property sets and identity, kept on the native element (shown in Properties).
+  const props = Object.fromEntries(Object.entries(ds.params.properties).filter(([k]) => k.includes(".")));
+  tx.update(id, { ifc: { class: ds.params.ifcClass, globalId: ds.params.globalId, properties: props } });
   void doc;
 }
 

@@ -2844,6 +2844,14 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
     edit(ctx, name, (tx) => tx.update<P>(el.id, patch));
 
   const sec = h("div", { class: "section" }, h("h3", {}, el.category));
+  // Converted from IFC: its original class, GlobalId and property sets.
+  const ifc = (el.params as { ifc?: { class: string; globalId: string; properties: Record<string, string> } | null }).ifc;
+  if (ifc) {
+    const box = h("details", { class: "ifc-props" }, h("summary", {}, `From IFC (${ifc.class})`));
+    box.append(row("GlobalId", ifc.globalId || "—"));
+    for (const [k, v] of Object.entries(ifc.properties)) box.append(row(k, v));
+    queueMicrotask(() => root.append(h("div", { class: "section" }, box)));
+  }
   // Element borrowing: who's editing it (Revit's Editable / Owner).
   const owner = ctx.borrowerOf?.(el.id);
   if (owner) sec.append(row("Borrowed by", h("span", { class: owner.mine ? "" : "warn", title: owner.mine ? "Relinquish in Collaborate" : "Others can't edit it until they relinquish it" }, owner.mine ? `you (${owner.name})` : owner.name)));

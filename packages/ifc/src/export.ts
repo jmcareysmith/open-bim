@@ -326,7 +326,9 @@ export function exportIfc(doc: Document, opts: IfcExportOptions = {}): string {
     }
     const name = el.category === Cat.Room ? (el.params as { number: string }).number : (el.name ?? doc.get(el.typeId ?? "")?.name ?? typeLabel(el));
     const tag = elementMark(el) ?? null;
-    const common = [guid(el.id), null, name, null, typeLabel(el, doc), placement, shape] as StepArg[];
+    // Elements converted from IFC (or still imported shapes) keep their original GlobalId.
+    const kept = (el.params as { ifc?: { globalId?: string } | null; globalId?: string }).ifc?.globalId ?? (el.category === Cat.DirectShape ? (el.params as { globalId?: string }).globalId : undefined);
+    const common = [kept && /^[0-9A-Za-z_$]{22}$/.test(kept) ? kept : guid(el.id), null, name, null, typeLabel(el, doc), placement, shape] as StepArg[];
     let ref: Ref;
     if (m.entity === "IfcReinforcingBar") {
       // Bar size, area and total length (all its bars).

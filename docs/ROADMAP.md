@@ -173,6 +173,7 @@ to native elements where their shapes allow.
 - [x] Straight ramps (one sloping top plane) → native ramps
 - [x] Duct and pipe segments → native runs (axis by principal direction; round vs rectangular; DN by size); ends snapped together so the fitting hook remakes elbows/tees/transitions; imported fittings dropped
 - [x] Project name and postal address fill blank Project Information (one undo removes the whole import)
+- [x] Converted elements keep their IFC class, GlobalId and property sets (Properties → From IFC) and export with the same GlobalId
 - [x] Export: rebar as IfcReinforcingBar; shapes still imported go back out as their class (proxy otherwise); curtain walls as plates + mullions; stairs, ramps, railings, terrain
 - [x] Terrain (IfcGeographicElement / site shape) → toposolid (outline, surface points, depth); toposolids export as terrain
 - [x] MEP systems: IfcRelAssignsToGroup → System property → run classification (supply/return/exhaust/outside air; cold/hot water, sanitary, vent, stormwater, fire, gas)

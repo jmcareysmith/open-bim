@@ -85,3 +85,20 @@ describe("IFC round trip of a whole house", () => {
     expect(count("Duct")).toBe(1);
   });
 });
+
+describe("IFC identity", () => {
+  it("converted elements keep their IFC GlobalId and property sets, and export with the same GlobalId", async () => {
+    const src = new Document();
+    const ids = applyResidentialTemplate(src);
+    src.transact("W", (tx) => createWall(tx, ids.wallTypes.exterior, p(0, 0), p(5000, 0), ids.levels.ground, { height: 2700 }));
+    const doc = new Document();
+    await importIfc(doc, new TextEncoder().encode(exportIfc(src, { timestamp: "t" })), api);
+    const shape = doc.byCategory<DirectShapeParams>(Cat.DirectShape).find((d) => d.params.ifcClass === "IfcWall")!;
+    const gid = shape.params.globalId;
+    const { created } = doc.transact("C", (tx) => convertDirectShapes(tx, doc, [shape.id]));
+    const w = doc.require<{ ifc?: { globalId: string; properties: Record<string, string> } }>(created[0]!);
+    expect(w.params.ifc?.globalId).toBe(gid);
+    expect(Object.keys(w.params.ifc!.properties).some((k) => k.startsWith("Pset_WallCommon."))).toBe(true);
+    expect(exportIfc(doc, { timestamp: "t" })).toContain(`'${gid}'`);
+  });
+});

@@ -126,3 +126,20 @@ describe("3D shape handles: top and base", () => {
     expect(wallExtent(doc, doc.require(w.id) as never)).toEqual({ bottom: 3090, top: 3100 });
   });
 });
+
+describe("3D shape handles: floors, ceilings, roofs, families", () => {
+  it("one handle moves the element to the height dragged to", async () => {
+    const { Document, applyResidentialTemplate, createFloor, setVerticalEdge, verticalHandles } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const sq = [{ x: 0, y: 0 }, { x: 4000, y: 0 }, { x: 4000, y: 3000 }, { x: 0, y: 3000 }];
+    const f = doc.transact("F", (tx) => createFloor(tx, ids.floorTypes.timber, ids.levels.ground, sq));
+    const h = verticalHandles(doc, f)!;
+    expect(h.at).toEqual({ x: 2000, y: 1500 });
+    expect(h.top).toBe(0);
+    expect(h.bottom).toBeNull();
+    doc.transact("Up", (tx) => setVerticalEdge(tx, doc, f.id, "top", 450));
+    expect(doc.require<{ offset: number }>(f.id).params.offset).toBe(450);
+    expect(() => doc.transact("Bad", (tx) => setVerticalEdge(tx, doc, f.id, "base", 0))).toThrow(/no base handle/);
+  });
+});

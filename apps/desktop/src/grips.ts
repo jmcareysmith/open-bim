@@ -3,7 +3,9 @@ import {
   arcLength,
   Cat,
   columnExtent,
+  curtainOf,
   dragGrip,
+  setCurtainEdits,
   elementGrips,
   flipWall,
   floorExtent,
@@ -26,6 +28,7 @@ import {
   type Grip,
   type Vec2,
 } from "@open-bim/core";
+import { curtainExtent, curtainGridLines } from "@open-bim/geometry";
 import { snapPoint, viewPoint, type ToolContext } from "./tools.ts";
 
 // Grips and temporary dimensions over the viewport (Revit's drag controls). Shown for the
@@ -106,6 +109,7 @@ export class GripLayer {
       if (in3d) this.addHeightHandles(el);
     }
     if (sel.length === 1) this.addLength(sel[0]!);
+    if (in3d && sel.length === 1 && sel[0]!.category === Cat.Wall && curtainOf(doc, sel[0]!)) this.addCurtainLines(sel[0] as Wall);
     if (sel.length === 1 && sel[0]!.category === Cat.View) this.showExtent(sel[0] as View);
     if (sel.length === 1 && sel[0]!.category === Cat.Wall && this.ctx.viewport.viewMode !== "drawing") this.addFlip(sel[0]!);
     this.position();
@@ -171,16 +175,96 @@ export class GripLayer {
     this.placed.push({ el, at: () => at, z: () => z });
   }
 
+  /**
+   * A curtain wall's interior grid lines in 3D: a grip on each (verticals at mid-height,
+   * horizontals at mid-length); drag along the wall or up and down to move the line.
+   */
+  private addCurtainLines(wall: Wall): void {
+    const { doc } = this.ctx;
+    const grid = curtainOf(doc, wall);
+    if (!grid || wall.params.curve) return;
+    const { start, end } = wall.params;
+    const len = Math.hypot(end.x - start.x, end.y - start.y);
+    if (len < 1) return;
+    const d = { x: (end.x - start.x) / len, y: (end.y - start.y) / len };
+    const { bottom, top } = curtainExtent(doc, wall);
+    const edits = wall.params.curtainEdits ?? {};
+    const { u: us, z: zs } = curtainGridLines(len, bottom, top, grid, edits);
+    const uIn = us.slice(1, -1);
+    const zIn = zs.slice(1, -1).map((z) => z - bottom);
+    const point = (u: number): Vec2 => ({ x: start.x + d.x * u, y: start.y + d.y * u });
+    const save = (uLines: number[], zLines: number[]) => {
+      try {
+        doc.transact("Move grid line", (tx) => setCurtainEdits(tx, doc, wall.id, { ...edits, uLines, zLines }));
+        this.ctx.status("Grid line moved. Ctrl+Z to undo.");
+      } catch (e) {
+        this.ctx.status(`⚠ ${(e as Error).message}`);
+      }
+      this.refresh();
+    };
+    const line = (axis: "u" | "z", k: number) => {
+      const el = document.createElement("div");
+      el.className = "grip grip-line";
+      el.title = axis === "u" ? "Drag to move this grid line along the wall" : "Drag to move this grid line up or down";
+      let u = axis === "u" ? uIn[k]! : len / 2;
+      let z = axis === "z" ? bottom + zIn[k]! : (bottom + top) / 2;
+      el.onpointerdown = (ev) => {
+        if (ev.button !== 0) return;
+        ev.stopPropagation();
+        ev.preventDefault();
+        el.setPointerCapture(ev.pointerId);
+        this.dragging = true;
+        const [u0, z0] = [u, z];
+        el.onpointermove = (mv) => {
+          if (axis === "u") {
+            const p = this.ctx.viewport.pickPlane(mv, z);
+            if (!p) return;
+            const t = (p.x - start.x) * d.x + (p.y - start.y) * d.y;
+            // Between its neighbours (100 mm clear), as Revit keeps grid lines in order.
+            const lo = (k > 0 ? uIn[k - 1]! : 0) + 100;
+            const hi = (k + 1 < uIn.length ? uIn[k + 1]! : len) - 100;
+            u = Math.min(hi, Math.max(lo, mv.shiftKey ? t : Math.round(t / 10) * 10));
+            this.ctx.status(`Grid line at ${Math.round(u)} mm from the start (${u - u0 >= 0 ? "+" : ""}${Math.round(u - u0)}). Shift: no snapping.`);
+          } else {
+            const v = this.ctx.viewport.pickVertical(mv, point(u));
+            if (v === null) return;
+            const lo = bottom + (k > 0 ? zIn[k - 1]! : 0) + 100;
+            const hi = bottom + (k + 1 < zIn.length ? zIn[k + 1]! : top - bottom) - 100;
+            z = Math.min(hi, Math.max(lo, mv.shiftKey ? v : Math.round(v / 10) * 10));
+            this.ctx.status(`Grid line at ${Math.round(z - bottom)} mm above the base (${z - z0 >= 0 ? "+" : ""}${Math.round(z - z0)}). Shift: no snapping.`);
+          }
+          this.position();
+        };
+        el.onpointerup = () => {
+          el.onpointermove = null;
+          el.onpointerup = null;
+          this.dragging = false;
+          if (Math.abs(u - u0) < 0.5 && Math.abs(z - z0) < 0.5) return this.refresh();
+          if (axis === "u") save(uIn.map((x, i) => (i === k ? u : x)), zIn);
+          else save(uIn, zIn.map((x, i) => (i === k ? z - bottom : x)));
+        };
+      };
+      this.root.append(el);
+      this.placed.push({ el, at: () => point(u), z: () => z });
+    };
+    uIn.forEach((_, k) => line("u", k));
+    zIn.forEach((_, k) => line("z", k));
+  }
+
   /** Shape handles in 3D: arrows on a wall's or column's top and base; drag up or down. */
   private addHeightHandles(target: Element): void {
     const h = verticalHandles(this.ctx.doc, target);
     if (!h) return;
+    const both = h.top !== null && h.bottom !== null;
     for (const edge of ["top", "base"] as const) {
+      const start = edge === "top" ? h.top : h.bottom;
+      if (start === null) continue;
       const el = document.createElement("div");
       el.className = `shape-handle shape-${edge}`;
-      el.textContent = edge === "top" ? "\u25B2" : "\u25BC";
-      el.title = edge === "top" ? "Drag to change the top" : "Drag to change the base";
-      let z = edge === "top" ? h.top : h.bottom;
+      // One handle (floors, ceilings, roofs, families): it moves the whole element up and down.
+      el.textContent = both ? (edge === "top" ? "\u25B2" : "\u25BC") : "\u2B0D";
+      el.title = !both ? "Drag to move up or down" : edge === "top" ? "Drag to change the top" : "Drag to change the base";
+      let z = start;
       el.onpointerdown = (ev) => {
         if (ev.button !== 0) return;
         ev.stopPropagation();

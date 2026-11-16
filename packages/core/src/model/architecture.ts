@@ -316,7 +316,10 @@ export function setCurtainEdits(tx: Transaction, doc: Document, id: ElementId, e
   if (wall.category !== Cat.Wall || !curtainOf(doc, wall)) throw new Error("Only curtain walls have grid lines and panels");
   if (edits) {
     const len = wallRunLength(wall);
-    const { bottom, top } = wallExtent(doc, wall);
+    const { bottom, top: wallTop } = wallExtent(doc, wall);
+    // With an Edit Profile, the grid runs to the profile's top.
+    const prof = wall.params.profile;
+    const top = prof && prof.length >= 3 ? bottom + Math.max(...prof.map((q) => q.y)) : wallTop;
     const check = (xs: number[] | null | undefined, max: number, what: string) => {
       for (const x of xs ?? []) if (!(x > 0 && x < max)) throw new Error(`${what} grid lines must be inside the wall`);
     };

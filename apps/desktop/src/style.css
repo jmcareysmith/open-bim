@@ -450,4 +450,5 @@ body.pane-dragging canvas { pointer-events: none; }
   color: var(--accent); font-size: 16px; line-height: 1; text-shadow: 0 0 2px #fff, 0 0 2px #fff; user-select: none;
 }
 .shape-top { transform: translate(-50%, -100%); }
-.shape-base { transform: translate(-50%, 0); }
+.shape-base { transform: translate(-50%, 8px); }
+.grip-line { width: 8px; height: 8px; transform: translate(-50%, -50%) rotate(45deg); border-radius: 1px; }

@@ -275,10 +275,16 @@ export function setLineLength(tx: Transaction, doc: Document, id: ElementId, len
   }
 }
 
-// ---- shape handles (3D): drag a wall's or column's top or base up and down ------------------
+// ---- shape handles (3D): drag tops and bases up and down -------------------------------------
 
-/** Heights a selected element's top/base handles sit at (walls and columns), or null. */
-export function verticalHandles(doc: Document, el: Element): { at: Vec2; top: number; bottom: number } | null {
+/**
+ * Where a selected element's up/down handles sit: walls and columns have a top and a base; floors
+ * their top; ceilings, roofs and free-standing families their base (moving the whole element).
+ */
+export function verticalHandles(doc: Document, el: Element): { at: Vec2; top: number | null; bottom: number | null } | null {
+  const p = el.params as Record<string, unknown>;
+  const level = (id: unknown) => (typeof id === "string" ? (doc.get<LevelParams>(id)?.params.elevation ?? 0) : 0);
+  const centre = (pts: Vec2[]) => ({ x: pts.reduce((s, q) => s + q.x, 0) / pts.length, y: pts.reduce((s, q) => s + q.y, 0) / pts.length });
   if (el.category === Cat.Wall) {
     const w = el as Wall;
     const { start, end, curve } = w.params;
@@ -290,32 +296,40 @@ export function verticalHandles(doc: Document, el: Element): { at: Vec2; top: nu
     const { bottom, top } = columnExtent(doc, c);
     return { at: c.params.position, top, bottom };
   }
+  const boundary = Array.isArray(p.boundary) ? (p.boundary as Vec2[]) : null;
+  if (el.category === Cat.Floor && boundary?.length) return { at: centre(boundary), top: level(p.levelId) + Number(p.offset ?? 0), bottom: null };
+  if (el.category === Cat.Ceiling && boundary?.length) return { at: centre(boundary), top: null, bottom: level(p.levelId) + Number(p.offset ?? 0) };
+  if (el.category === Cat.Roof && boundary?.length) return { at: centre(boundary), top: null, bottom: level(p.levelId) + Number(p.baseOffset ?? 0) };
+  if (el.category === Cat.FamilyInstance && !p.hostId && p.position && !p.nestedOf) return { at: p.position as Vec2, top: null, bottom: level(p.levelId) + Number(p.offset ?? 0) };
   return null;
 }
 
 /**
- * Move a wall's or column's top or base to height `z` (absolute mm). Tops on a level change their
- * offset from it; an unconnected wall top changes its height. A base changes its offset, and an
- * unconnected wall keeps its top where it was. At least 10 mm stays between base and top.
+ * Move an element's top or base to height `z` (absolute mm). Wall/column tops on a level change
+ * their offset from it; an unconnected wall top changes its height. A wall/column base changes
+ * its offset (an unconnected wall keeps its top); at least 10 mm stays between base and top.
+ * Floors (top), ceilings, roofs and free-standing families (base) move to the height.
  */
 export function setVerticalEdge(tx: Transaction, doc: Document, id: ElementId, edge: "top" | "base", z: number): void {
   const el = doc.require(id);
   const MIN = 10;
+  const p = el.params as Record<string, unknown>;
+  const level = (lid: unknown) => (typeof lid === "string" ? doc.require<LevelParams>(lid).params.elevation : 0);
   if (el.category === Cat.Wall) {
     const w = el as Wall;
-    const p = w.params;
+    const wp = w.params;
     const { bottom, top } = wallExtentRaw(doc, w);
     if (edge === "top") {
       const t = Math.max(z, bottom + MIN);
-      if (p.topAttachId) throw new Error("The top is attached: detach it first (Properties → Detach)");
-      if (p.topLevelId) tx.update<WallParams>(id, { topOffset: Math.round(t - doc.require<LevelParams>(p.topLevelId).params.elevation) });
+      if (wp.topAttachId) throw new Error("The top is attached: detach it first (Properties → Detach)");
+      if (wp.topLevelId) tx.update<WallParams>(id, { topOffset: Math.round(t - level(wp.topLevelId)) });
       else tx.update<WallParams>(id, { height: Math.round(t - bottom) });
     } else {
       const b = Math.min(z, top - MIN);
-      if (p.baseAttachId) throw new Error("The base is attached: detach it first (Properties → Detach)");
-      const base = doc.require<LevelParams>(p.baseLevelId).params.elevation;
+      if (wp.baseAttachId) throw new Error("The base is attached: detach it first (Properties → Detach)");
+      const base = level(wp.baseLevelId);
       const patch: Partial<WallParams> = { baseOffset: Math.round(b - base) };
-      if (!p.topLevelId) patch.height = Math.round(top - (base + patch.baseOffset!));
+      if (!wp.topLevelId) patch.height = Math.round(top - (base + patch.baseOffset!));
       tx.update<WallParams>(id, patch);
     }
     return;
@@ -323,9 +337,12 @@ export function setVerticalEdge(tx: Transaction, doc: Document, id: ElementId, e
   if (el.category === Cat.Column) {
     const c = el as Column;
     const { bottom, top } = columnExtent(doc, c);
-    if (edge === "top") tx.update<ColumnParams>(id, { topOffset: Math.round(Math.max(z, bottom + MIN) - doc.require<LevelParams>(c.params.topLevelId).params.elevation) });
-    else tx.update<ColumnParams>(id, { baseOffset: Math.round(Math.min(z, top - MIN) - doc.require<LevelParams>(c.params.baseLevelId).params.elevation) });
+    if (edge === "top") tx.update<ColumnParams>(id, { topOffset: Math.round(Math.max(z, bottom + MIN) - level(c.params.topLevelId)) });
+    else tx.update<ColumnParams>(id, { baseOffset: Math.round(Math.min(z, top - MIN) - level(c.params.baseLevelId)) });
     return;
   }
-  throw new Error("Only walls and columns have top and base handles");
+  const h = verticalHandles(doc, el);
+  if (!h || (edge === "top" ? h.top : h.bottom) === null) throw new Error(`This element has no ${edge} handle`);
+  const key = el.category === Cat.Roof ? "baseOffset" : "offset";
+  tx.update(id, { [key]: Math.round(z - level(p.levelId)) });
 }

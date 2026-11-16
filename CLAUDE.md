@@ -310,7 +310,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Speed (2026-11-16): `doc.revision` (bumps on every change) keys caches — byCategory index, wall join/crossing
   lookups (core joins.ts `wallIndex`: bbox grid); hlr.ts keeps triangles/feature edges per MeshData (WeakMap), sections keep
   view copies per mesh and cull outside crop/clip. Benchmark: `PERF=1 npx vitest run packages/geometry/test/perf.test.ts`
-  (1443 elements: plan 147 ms, section ~340 ms, kept-mesh plan redraw ~90 ms). Rebar (core/model/rebar.ts, geometry/src/rebar.ts): floor / wall (face mats) / pad footing /
+  (1443 elements: plan 147 ms, section ~340 ms, kept-mesh plan redraw ~90 ms).
+- Rebar (core/model/rebar.ts, geometry/src/rebar.ts): floor / wall (face mats) / pad footing /
   beam / column / strip footing Properties → Reinforcement → Add; area mats or cages laid out from the host
   (`rebarBars`), NZ bar sizes, mass (`rebarQuantities`), schedule category Structural Rebar. Bars sit inside the
   concrete; Graphic Display Options → Rebar unobscured (view `display.rebarUnobscured`) draws them over everything.

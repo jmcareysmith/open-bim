@@ -348,7 +348,33 @@ const ORTHO_DEG = 4;
 export interface Snapped {
   p: Vec2;
   /** What the point snapped to, for status feedback. */
-  kind: "endpoint" | "intersection" | "point" | "grid" | "increment";
+  kind: "endpoint" | "midpoint" | "intersection" | "point" | "grid" | "increment";
+}
+
+// Snap glyphs (Revit's): a small shape at the snapped point while picking — square endpoint,
+// triangle midpoint, X intersection, line-snap tick for grids, dot for scan points.
+let glyph: HTMLDivElement | null = null;
+const GLYPH: Record<Snapped["kind"], string> = { endpoint: "\u25A1", midpoint: "\u25B3", intersection: "\u2715", grid: "\u22A5", point: "\u2022", increment: "" };
+function showGlyph(ctx: ToolContext, s: Snapped): void {
+  if (!glyph) {
+    glyph = document.createElement("div");
+    glyph.className = "snap-glyph";
+    document.body.append(glyph);
+    // Gone when the cursor leaves the view or a click lands.
+    window.addEventListener("pointerdown", () => glyph && (glyph.hidden = true));
+  }
+  const g = GLYPH[s.kind];
+  glyph.hidden = !g;
+  if (!g) return;
+  const at = ctx.viewport.toScreen(s.p);
+  glyph.textContent = g;
+  glyph.title = s.kind;
+  glyph.style.left = `${at.x}px`;
+  glyph.style.top = `${at.y}px`;
+}
+/** Hide the snap glyph (tools that stop picking). */
+export function hideSnapGlyph(): void {
+  if (glyph) glyph.hidden = true;
 }
 
 /**
@@ -357,6 +383,12 @@ export interface Snapped {
  * 50 mm increment. `free` (Shift) turns off ortho.
  */
 export function snapPoint(ctx: ToolContext, p: Vec2, start: Vec2 | null, free: boolean, extra: Vec2[] = []): Snapped {
+  const s = snapPointRaw(ctx, p, start, free, extra);
+  showGlyph(ctx, s);
+  return s;
+}
+
+function snapPointRaw(ctx: ToolContext, p: Vec2, start: Vec2 | null, free: boolean, extra: Vec2[] = []): Snapped {
   const ov = snapOverride;
   // A one-pick override: only that kind, whatever the settings (else the point as picked).
   const so = ov
@@ -389,7 +421,7 @@ export function snapPoint(ctx: ToolContext, p: Vec2, start: Vec2 | null, free: b
   const end = nearest(ends);
   if (end) return { p: { ...end }, kind: "endpoint" };
   const mid = nearest(mids);
-  if (mid) return { p: mid, kind: "endpoint" };
+  if (mid) return { p: mid, kind: "midpoint" };
 
   // 2. Grid intersections
   const crossings: Vec2[] = [];
@@ -462,6 +494,7 @@ function orthoOnGrid(g: DatumLine, start: Vec2, locked: "x" | "y"): Vec2 | null 
 
 const SNAP_LABEL: Record<Snapped["kind"], string> = {
   endpoint: " · snap: endpoint",
+  midpoint: " · snap: midpoint",
   intersection: " · snap: grid intersection",
   point: " · snap: point cloud",
   grid: " · snap: grid / reference plane",

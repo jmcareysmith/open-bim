@@ -462,3 +462,5 @@ body.pane-dragging canvas { pointer-events: none; }
 .sel-opt.off { opacity: 0.35; filter: grayscale(1); }
 .purge { max-height: 60vh; overflow: auto; min-width: 320px; }
 .purge-row { display: block; padding: 1px 0 1px 12px; }
+
+.snap-glyph { position: fixed; transform: translate(-50%, -50%); pointer-events: none; z-index: 30; color: #e0602c; font-size: 15px; font-weight: bold; line-height: 1; text-shadow: 0 0 2px #fff; }

@@ -176,6 +176,7 @@ import {
   SelectTool,
   SketchTool,
   WallTool,
+  hideSnapGlyph,
   type Tool,
   type ToolContext,
 } from "./tools.ts";
@@ -813,6 +814,7 @@ let viewBar: ViewBar | undefined = new ViewBar(
 );
 
 function setTool(name: string): void {
+  hideSnapGlyph();
   if (name === "zoomregion" && tool.name !== "zoomregion") toolBeforeZoom = tool.name;
   if (viewport.viewMode === "drawing" && !DRAWING_TOOLS.has(name)) {
     status("That tool works in plan and 3D views. Open a floor plan or the 3D view to use it.");

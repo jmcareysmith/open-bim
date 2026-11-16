@@ -1,5 +1,5 @@
 import * as WebIFC from "web-ifc";
-import { createDirectShape, createGrid, createLevel, createRoom, levels, type DirectShapeParams, type Document, type ElementId, type LevelParams } from "@open-bim/core";
+import { createDirectShape, createGrid, createLevel, createRoom, ensureProjectSettings, levels, type ProjectSettingsParams, type DirectShapeParams, type Document, type ElementId, type LevelParams } from "@open-bim/core";
 
 // IFC import via web-ifc. Storeys become levels (matched to existing levels by elevation), and each
 // product with a body becomes a DirectShape carrying its IFC class, GlobalId, name, colour and
@@ -277,6 +277,24 @@ export async function importIfc(doc: Document, data: Uint8Array, api: IfcApi): P
     let created = 0;
     let skipped = 0;
     let rooms = 0;
+    // Project information: the project's name and the building's (or site's) postal address, where ours are blank.
+    const address = (() => {
+      for (const t of [WebIFC.IFCBUILDING, WebIFC.IFCSITE]) {
+        const ids2 = api.GetLineIDsWithType(model, t);
+        for (let i = 0; i < ids2.size(); i++) {
+          const b = api.GetLine(model, ids2.get(i));
+          const a = (b.BuildingAddress ?? b.SiteAddress)?.value ? api.GetLine(model, (b.BuildingAddress ?? b.SiteAddress).value as number) : null;
+          if (!a) continue;
+          const lines = ((a.AddressLines ?? []) as unknown[]).map((l) => label(l)).filter(Boolean);
+          const parts = [...lines, label(a.Town), label(a.Region), label(a.PostalCode), label(a.Country)].filter(Boolean);
+          if (parts.length) return parts.join(", ");
+        }
+      }
+      return "";
+    })();
+    // Grids: one per axis, named by its tag (a number added if the name is taken).
+    let grids = 0;
+    const axes = gridAxes(api, model, mm);
     const shapes = doc.transact("Import IFC", (tx) => {
       // Levels: reuse one within 1 mm of the storey's elevation, else create it.
       const levelFor = new Map<number, ElementId>();
@@ -340,22 +358,20 @@ export async function importIfc(doc: Document, data: Uint8Array, api: IfcApi): P
         createDirectShape(tx, params, meta.name);
         n++;
       }
+      // Project information where ours is blank; grids by their tags.
+      const s = ensureProjectSettings(tx, doc);
+      const pinfo = s.params.info;
+      const next = { ...pinfo, ...(pinfo.name ? {} : project !== "IFC project" ? { name: project } : {}), ...(pinfo.address || !address ? {} : { address }) };
+      if (next.name !== pinfo.name || next.address !== pinfo.address) tx.update<ProjectSettingsParams>(s.id, { info: next });
+      for (const ax of axes) {
+        if (Math.hypot(ax.b.x - ax.a.x, ax.b.y - ax.a.y) < 1) continue;
+        let name = ax.tag || undefined;
+        for (let k = 2; name && doc.byCategory("Grid").some((g) => g.name === name); k++) name = `${ax.tag} (${k})`;
+        createGrid(tx, doc, ax.a, ax.b, name);
+        grids++;
+      }
       return n;
     });
-    // Grids: one per axis, named by its tag (a number added if the name is taken).
-    let grids = 0;
-    const axes = gridAxes(api, model, mm);
-    if (axes.length) {
-      doc.transact("Import IFC grids", (tx) => {
-        for (const ax of axes) {
-          if (Math.hypot(ax.b.x - ax.a.x, ax.b.y - ax.a.y) < 1) continue;
-          let name = ax.tag || undefined;
-          for (let k = 2; name && doc.byCategory("Grid").some((g) => g.name === name); k++) name = `${ax.tag} (${k})`;
-          createGrid(tx, doc, ax.a, ax.b, name);
-          grids++;
-        }
-      });
-    }
     return { shapes, levelsCreated: created, skipped, rooms, grids, project };
   } finally {
     api.CloseModel(model);

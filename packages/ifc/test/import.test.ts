@@ -144,3 +144,18 @@ describe("IFC ceilings", () => {
     expect((c.params as { offset: number }).offset).toBeCloseTo(2400, 0);
   });
 });
+
+describe("IFC project information", () => {
+  it("fills a blank project name from the IFC project", async () => {
+    const { ensureProjectSettings } = await import("@open-bim/core");
+    const src = source();
+    src.transact("Info", (tx) => {
+      const s = ensureProjectSettings(tx, src);
+      tx.update(s.id, { info: { ...s.params.info, name: "Smith House" } });
+    });
+    const doc = new Document();
+    await importIfc(doc, new TextEncoder().encode(exportIfc(src, { timestamp: "t" })), api);
+    const { projectSettings } = await import("@open-bim/core");
+    expect(projectSettings(doc)?.params.info.name).toBe("Smith House");
+  });
+});

@@ -10,6 +10,8 @@ import {
   setCurtainEdits,
   elementGrips,
   flipWall,
+  isPinned,
+  setPinned,
   floorExtent,
   lineLength,
   setLineLength,
@@ -112,9 +114,15 @@ export class GripLayer {
     if (!sel.length || sel.length > MAX_ELEMENTS) return;
     const in3d = this.ctx.viewport.viewMode === "3d";
     for (const el of sel) {
+      // Pinned: a pin to click (unpins) instead of grips.
+      if (isPinned(el)) {
+        this.addPin(el);
+        continue;
+      }
       for (const g of elementGrips(doc, el)) this.addGrip(el.id, g);
       if (in3d) this.addHeightHandles(el);
     }
+    if (sel.length === 1 && isPinned(sel[0]!)) return this.position();
     if (sel.length === 1) this.addLength(sel[0]!);
     if (in3d && sel.length === 1 && sel[0]!.category === Cat.Wall && curtainOf(doc, sel[0]!)) this.addCurtainLines(sel[0] as Wall);
     if (sel.length === 1 && sel[0]!.category === Cat.View) this.showExtent(sel[0] as View);
@@ -264,6 +272,32 @@ export class GripLayer {
     };
     uIn.forEach((_, k) => line("u", k));
     zIn.forEach((_, k) => line("z", k));
+  }
+
+  /** A pinned element's pin (Revit's pushpin): click it to unpin. */
+  private addPin(target: Element): void {
+    const { doc } = this.ctx;
+    const g = elementGrips(doc, target)[0];
+    const h = verticalHandles(doc, target);
+    const at = g?.point ?? h?.at;
+    if (!at) return;
+    const b = document.createElement("button");
+    b.className = "pin-marker";
+    b.textContent = "\u{1F4CC}";
+    b.title = "Pinned: click to unpin (UP)";
+    b.onpointerdown = (ev) => ev.stopPropagation();
+    b.onclick = () => {
+      try {
+        doc.transact("Unpin", (tx) => setPinned(tx, doc, [target.id], false));
+        this.ctx.status("Unpinned.");
+      } catch (e) {
+        this.ctx.status(`⚠ ${(e as Error).message}`);
+      }
+      this.refresh();
+    };
+    const z = gripZ(doc, target, g?.key);
+    this.root.append(b);
+    this.placed.push({ el: b, at: () => at, z: () => z });
   }
 
   /** The open section/elevation (a view with a cut line), if that's what the viewport shows. */

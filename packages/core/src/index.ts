@@ -82,3 +82,4 @@ export * from "./model/angulardims.ts";
 export * from "./model/shafts.ts";
 import "./model/graphnodes.ts";
 export * from "./model/skeleton.ts";
+export * from "./model/pins.ts";

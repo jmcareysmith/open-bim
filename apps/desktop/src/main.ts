@@ -15,7 +15,8 @@ import { addRecentFile, fileName, recentFiles, removeRecentFile } from "./recent
 import { CameraTool } from "./cameratool.ts";
 import { FloorPointTool, SlopeArrowTool } from "./slopetool.ts";
 import { WallProfileTool } from "./profiletool.ts";
-import { type DirectShapeParams, enableSharedNested, enableBeamSystems, createImageUnderlay, planCrop, createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
+import { LevelTool, MatchTypeTool } from "./revittools.ts";
+import { enablePinning, isPinned, setPinned, setElementOverrides, setCategoryOverride, type DirectShapeParams, enableSharedNested, enableBeamSystems, createImageUnderlay, planCrop, createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
   ceilingPlanFor,
   createCeilingPlan,
   Cat,
@@ -217,6 +218,8 @@ enableGlobalParameters(doc);
 enableDuctFittings(doc);
 enableBeamSystems(doc);
 enableSharedNested(doc);
+// Pinned elements (PN/UP) can't be moved, reshaped or deleted.
+enablePinning(doc);
 /** While a family is open, the project's state to return to. */
 let projectSession: Session | null = null;
 interface Session {
@@ -611,9 +614,11 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
     ctx.setActiveView(id);
   }),
   elevation: new ElevationTool(ctx),
+  level: new LevelTool(ctx),
+  matchtype: new MatchTypeTool(ctx),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
-const DRAWING_TOOLS = new Set(["select", "symbol", "detailcomponent", "repeatingdetail", "placegroup", "attach", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution", "angulardim", "callout"]);
+const DRAWING_TOOLS = new Set(["level", "matchtype", "select", "symbol", "detailcomponent", "repeatingdetail", "placegroup", "attach", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution", "angulardim", "callout"]);
 let tool: Tool = tools.select!;
 /** Grips and temporary dimensions for the selection (Select tool only). */
 let grips: GripLayer | undefined = new GripLayer(ctx, $("#viewport"));
@@ -1033,6 +1038,59 @@ const commands: Record<string, () => void | Promise<void>> = {
     viewport.visibility.hideCategories(cats);
     afterVisibility(`Hid ${cats.join(", ")}`);
     ctx.setSelection([]);
+  },
+  pin() {
+    const ids = selection.filter((id) => doc.has(id));
+    if (!ids.length) return status("Pin: select something first.");
+    edit("Pin", (tx) => setPinned(tx, doc, ids, true));
+    status(`Pinned ${ids.length} element(s): they can't be moved or deleted until unpinned (UP).`);
+  },
+  unpin() {
+    const ids = selection.filter((id) => doc.has(id));
+    if (!ids.length) return status("Unpin: select something first.");
+    edit("Unpin", (tx) => setPinned(tx, doc, ids, false));
+    status(`Unpinned ${ids.length} element(s).`);
+  },
+  /** Select All Instances (Visible in View): everything of the selection's types that this view shows. */
+  selectAllInstances() {
+    const picked = selection.map((id) => doc.get(id)).filter((e): e is NonNullable<typeof e> => !!e);
+    if (!picked.length) return status("Select All Instances: select one first.");
+    const key = (e: (typeof picked)[number]) =>
+      e.category === Cat.FamilyInstance ? `${(e.params as FamilyInstanceParams).familyId}|${(e.params as FamilyInstanceParams).typeName}` : e.typeId ? `t:${e.typeId}` : `c:${e.category}`;
+    const keys = new Set(picked.map(key));
+    const cats = new Set(picked.map((e) => e.category));
+    const ids = [...cats].flatMap((c) => doc.byCategory(c)).filter((e) => keys.has(key(e)) && viewport.visibility.isVisible(e) && (viewport.viewMode === "drawing" || viewport.hasObject(e.id))).map((e) => e.id);
+    ctx.setSelection(ids);
+    status(`${ids.length} instance(s) selected (visible in this view).`);
+  },
+  revealHidden() {
+    viewport.setRevealHidden(!viewport.revealing);
+    viewBar?.render();
+    status(viewport.revealing ? "Revealing hidden elements: they show in magenta (RH again to stop)." : "Hidden elements hidden again.");
+  },
+  /** Hide in View → Elements (EH): for good in this view (Reveal Hidden shows them). */
+  hideInView() {
+    const v = activeView();
+    const ids = selection.filter((id) => doc.has(id));
+    if (!v || v.category !== Cat.View || !ids.length) return status("Hide in View: select something in a view first.");
+    const g = effectiveGraphics(doc, v as never);
+    edit("Hide in view", (tx) => {
+      for (const id of ids) setElementOverrides(tx, doc, v.id, [id], { ...(g.elementOverrides?.[id] ?? {}), visible: false });
+    });
+    ctx.setSelection([]);
+    status(`Hid ${ids.length} element(s) in this view (Reveal Hidden, RH, to find them).`);
+  },
+  /** Hide in View → Category (VH). */
+  hideCategoryInView() {
+    const v = activeView();
+    const cats = selectedCategories();
+    if (!v || v.category !== Cat.View || !cats.length) return status("Hide Category in View: select something in a view first.");
+    const g = effectiveGraphics(doc, v as never);
+    edit("Hide category in view", (tx) => {
+      for (const c of cats) setCategoryOverride(tx, doc, v.id, c, { ...(g.categoryOverrides?.[c] ?? {}), visible: false });
+    });
+    ctx.setSelection([]);
+    status(`Hid ${cats.join(", ")} in this view.`);
   },
   isolateCategory() {
     const cats = selectedCategories();

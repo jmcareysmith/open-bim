@@ -1962,6 +1962,12 @@ void main() {
     return { right: snap(right), up: snap(fwd) };
   }
 
+  /** Is the element drawn in this view (built and not hidden)? */
+  hasObject(id: ElementId): boolean {
+    const o = this.objects.get(id);
+    return !!o && o.visible;
+  }
+
   /** Client (page) coordinates of a model point at height z (3D grips). */
   toScreen3(p: Vec2, z: number): { x: number; y: number } {
     const r = this.renderer.domElement.getBoundingClientRect();

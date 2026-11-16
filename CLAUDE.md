@@ -100,6 +100,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Keyboard Shortcuts (KS, or File menu): edit one/two-letter keys per command (apps/desktop/src/shortcuts.ts;
   local storage). Revit's defaults too (WA DR WN CM CL BM BR RT ZE ZA HH HI HC HR RR DE GP ME AT PX LF EE SK). Single-letter
   tools fire at once and a second letter within 1 s takes over; single-letter commands that start a pair (H, F) wait 600 ms.
+  Also PN/UP pin (core pins.ts: `pinned` param, `enablePinning` commit check refuses moving/reshaping/deleting; pin marker
+  instead of grips), MA Match Type, LL Level (click in a section/elevation; makes its plan), SA Select All Instances
+  (visible in view), RH Reveal Hidden, EH/VH Hide in View (element/category overrides) — revittools.ts, main.ts commands.
 - View windows (apps/desktop/src/panes.ts): Tile / Cascade / Tab Views (View → Windows, WT/WC/TW,
   or the ▦ ▾ at the end of the view tabs: Tile all / 2 / 3 / 4 most recent, Cascade, Tab Views).
   Each open view is a live window (a Viewport each, up to 9): drag the title bar, resize by the

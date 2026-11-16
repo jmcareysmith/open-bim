@@ -43,6 +43,9 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
     { label: "Offset", icon: "offset", tool: "offset", title: "Offset (OF)" },
     { label: "Trim/Extend", icon: "trim", tool: "trim", title: "Trim/Extend (TR)" },
     { label: "Split", icon: "split", tool: "split", title: "Split element (SL)" },
+    { label: "Pin", icon: "pin", cmd: "pin", title: "Pin (PN): the selection can't be moved or deleted until unpinned" },
+    { label: "Unpin", icon: "unpin", cmd: "unpin", title: "Unpin (UP)" },
+    { label: "Match Type", icon: "match", tool: "matchtype", title: "Match Type Properties (MA): click the source, then the elements to change" },
   ];
 
   return [
@@ -171,6 +174,7 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
         {
           title: "Datum",
           items: [
+            { label: "Level", icon: "level", tool: "level", title: "Level (LL): click at its height in a section or elevation" },
             { label: "Grid", icon: "grid", tool: "grid", title: "Grid (G)" },
             { label: "Ref Plane", icon: "refplane", tool: "refplane", title: "Reference plane (R)" },
           ],

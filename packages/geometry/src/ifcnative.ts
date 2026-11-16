@@ -10,6 +10,8 @@ import {
   createBeam,
   createRoof,
   createCeiling,
+  createPadFooting,
+  createStripFooting,
   setWallCurve,
   setWallProfile,
   createStair,
@@ -61,6 +63,7 @@ import {
 const WALL_CLASSES = new Set(["IfcWall", "IfcWallStandardCase"]);
 const SLAB_CLASSES = new Set(["IfcSlab"]);
 const COLUMN_CLASSES = new Set(["IfcColumn"]);
+const FOOTING_CLASSES = new Set(["IfcFooting"]);
 /** Coverings: ceilings (flat, like slabs). */
 const CEILING_CLASSES = new Set(["IfcCovering"]);
 const BEAM_CLASSES = new Set(["IfcBeam"]);
@@ -88,7 +91,7 @@ const INSERT_CLASSES = new Set(["IfcDoor", "IfcWindow"]);
 export function convertible(el: { category: string; params: unknown }): boolean {
   if (el.category !== Cat.DirectShape) return false;
   const c = (el.params as DirectShapeParams).ifcClass;
-  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || CEILING_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c) || ROOF_CLASSES.has(c) || STAIR_CLASSES.has(c) || RAILING_CLASSES.has(c) || PLATE_CLASSES.has(c) || c in FAMILY_OF;
+  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || CEILING_CLASSES.has(c) || FOOTING_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c) || ROOF_CLASSES.has(c) || STAIR_CLASSES.has(c) || RAILING_CLASSES.has(c) || PLATE_CLASSES.has(c) || c in FAMILY_OF;
 }
 
 function hull(pts: Vec2[]): Vec2[] {
@@ -830,6 +833,7 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
   const familyShapes = ids.filter((id) => ((doc.get(id)?.params as DirectShapeParams | undefined)?.ifcClass ?? "") in FAMILY_OF);
   created.push(...familiesFromShapes(tx, doc, familyShapes));
   const pendingRails: ElementId[] = [];
+  const footings: ElementId[] = [];
   for (const id of ids) {
     if (plates.includes(id) || familyShapes.includes(id)) continue;
     const ds = doc.get<DirectShapeParams>(id) as DirectShape | undefined;
@@ -873,6 +877,9 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
       if (elev.length >= 3 && polyArea(elev) < 0.98 * r.len * (z1 - z0)) setWallProfile(tx, doc, w.id, elev);
       walls.push({ id: w.id, c: r.c, u: r.u, len: r.len, wid: r.wid, base: z0 });
       created.push(w.id);
+    } else if (FOOTING_CLASSES.has(p.ifcClass)) {
+      footings.push(id);
+      continue;
     } else if (COLUMN_CLASSES.has(p.ifcClass)) {
       // Column: a rectangular or round section (by how much of its box the plan fills), base to top.
       const r = minRect(xy);
@@ -982,6 +989,27 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
   // Converted straight walls meet at corners and tees: each end that stops near another wall's
   // centreline moves onto it (the imported shapes run to the outer corner of their mitres).
   snapWallEnds(tx, doc, walls.map((w) => w.id));
+  // Footings: under a converted wall and along it, its strip footing; else a pad.
+  for (const id of footings) {
+    const ds = doc.get<DirectShapeParams>(id) as DirectShape | undefined;
+    if (!ds) continue;
+    const { xy, z0, z1 } = bounds(ds.params);
+    const r = minRect(xy);
+    if (!r || r.hullArea < 0.9 * r.len * r.wid) {
+      skipped.push(id);
+      continue;
+    }
+    const lvl = doc.get<LevelParams>(ds.params.levelId)?.params.elevation ?? 0;
+    const under = r.len > 3 * r.wid
+      ? walls.find((w) => Math.abs(w.u.x * r.u.y - w.u.y * r.u.x) < 0.02 && Math.abs(-w.u.y * (r.c.x - w.c.x) + w.u.x * (r.c.y - w.c.y)) < r.wid / 2 && Math.abs((r.c.x - w.c.x) * w.u.x + (r.c.y - w.c.y) * w.u.y) < w.len / 2)
+      : undefined;
+    const fid = under
+      ? createStripFooting(tx, doc, under.id, { width: Math.round(r.wid), depth: Math.round(z1 - z0) }).id
+      : createPadFooting(tx, doc, ds.params.levelId, r.c, { width: Math.round(r.wid), length: Math.round(r.len), depth: Math.round(z1 - z0), offset: z1 - lvl, rotation: Math.atan2(r.u.y, r.u.x) - Math.PI / 2 }).id;
+    carryOver(tx, doc, fid, ds);
+    created.push(fid);
+    tx.delete(id);
+  }
   // Sloped railings over a stair become that stair's railing on the side they're on.
   for (const id of pendingRails) {
     const ds = doc.get<DirectShapeParams>(id) as DirectShape | undefined;

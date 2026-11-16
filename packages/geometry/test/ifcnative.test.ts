@@ -446,3 +446,24 @@ describe("exterior and interior walls from IFC", () => {
     expect(types.map((t) => wallFunction(t))).toEqual(["exterior", "interior"]);
   });
 });
+
+describe("footings from IFC", () => {
+  it("a footing under a converted wall becomes its strip footing; a lone one a pad", () => {
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const lvl = ids.levels.ground;
+    const mk = (ifcClass: string, mesh: { positions: number[]; indices: number[] }) =>
+      doc.transact("I", (tx) => createDirectShape(tx, { levelId: lvl, ifcClass, globalId: ifcClass + mesh.positions[0], ...mesh, color: 0x999999, properties: {} }).id);
+    const wall = mk("IfcWall", box(rect(0, -95, 6000, 95), 0, 2700));
+    const strip = mk("IfcFooting", box(rect(0, -200, 6000, 200), -300, 0));
+    const pad = mk("IfcFooting", box(rect(9400, -600, 10600, 300), -500, -100));
+    const r = doc.transact("C", (tx) => convertDirectShapes(tx, doc, [wall, strip, pad]));
+    expect(r.skipped).toEqual([]);
+    const sf = doc.byCategory<{ wallId: string; width: number; depth: number }>("StripFooting")[0]!;
+    expect(doc.require(sf.params.wallId).category).toBe("Wall");
+    expect(sf.params).toMatchObject({ width: 400, depth: 300 });
+    const pf = doc.byCategory<{ width: number; length: number; depth: number; offset: number; position: Vec2 }>("PadFooting")[0]!;
+    expect(pf.params).toMatchObject({ width: 900, length: 1200, depth: 400, offset: -100 });
+    expect(pf.params.position.x).toBeCloseTo(10000, 0);
+  });
+});

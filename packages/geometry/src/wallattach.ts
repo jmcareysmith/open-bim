@@ -8,8 +8,11 @@ import type { MeshData } from "./mesh.ts";
 // corners (so the top also slopes across the wall's thickness), over a flat bottom and vertical
 // sides. One closed mesh, so OpenCascade can still cut doors and windows out of it.
 
-export function slopedTopWallMesh(doc: Document, wall: Wall): MeshData | null {
-  const { bottom, top: maxTop } = wallExtent(doc, wall);
+export function slopedTopWallMesh(doc: Document, wall: Wall, piece?: Vec2[], from?: number): MeshData | null {
+  const ext = wallExtent(doc, wall);
+  const maxTop = ext.top;
+  // A plan piece of the wall (crossings cut it into several), from a height above its base.
+  const bottom = from ?? ext.bottom;
   const { start, end } = wall.params;
   const L = Math.hypot(end.x - start.x, end.y - start.y);
   if (L < 1) return null;
@@ -18,8 +21,9 @@ export function slopedTopWallMesh(doc: Document, wall: Wall): MeshData | null {
   const topAt = (p: Vec2) => Math.max(bottom + 1, attachedTopAt(doc, wall, p) ?? maxTop);
 
   // Footprint, counter-clockwise, with points added where each kink line crosses an edge.
-  let fp = joinedWallFootprint(doc, wall);
+  let fp = piece ?? joinedWallFootprint(doc, wall);
   if (signedArea(fp) < 0) fp = [...fp].reverse();
+  if (from !== undefined && fp.every((p) => (attachedTopAt(doc, wall, p) ?? maxTop) <= from + 1)) return null;
   const cuts = wallTopBreaks(doc, wall).slice(1, -1);
   const P: Vec2[] = [];
   fp.forEach((a, i) => {

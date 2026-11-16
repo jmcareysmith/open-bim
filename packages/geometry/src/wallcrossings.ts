@@ -3,6 +3,7 @@ import { Cat, crossingWalls, wallExtent, wallThickness, type Document, type Laye
 import { joinedWallFootprint } from "./joins.ts";
 import { extrudePolygon, type MeshData } from "./mesh.ts";
 import { mergeMeshes } from "./doors.ts";
+import { slopedTopWallMesh } from "./wallattach.ts";
 
 // Crossing walls in 3D (as plan cleanup does): where two walls cross, the thicker one runs through
 // (on a tie, the one drawn first) and the other is cut by its footprint over the heights they share.
@@ -62,4 +63,30 @@ export function cutWallBody(footprint: Vec2[], bottom: number, top: number, cutt
     }
   }
   return parts.length === 1 ? parts[0]! : mergeMeshes(parts);
+}
+
+/**
+ * A wall attached under a sloped roof, cut by the walls running through it: its plan less their
+ * footprints, plus, where one stops below its top, the part above that wall. (Cutters starting
+ * above the wall's base are left out: they're rare, and OCCT cuts them exactly.)
+ */
+export function cutSlopedWall(doc: Document, wall: Wall, cutters: { loop: Vec2[]; z0: number; z1: number }[]): MeshData | null {
+  const { bottom, top } = wallExtent(doc, wall);
+  const fp = joinedWallFootprint(doc, wall);
+  const used = cutters.filter((c) => c.z0 <= bottom + 1);
+  if (!used.length) return slopedTopWallMesh(doc, wall);
+  const outer = (p: Polygon): Vec2[] => p[0]!.slice(0, -1).map(([x, y]) => ({ x, y }));
+  const parts: MeshData[] = [];
+  for (const p of polygonClipping.difference([ring(fp)], ...used.map((c) => [ring(c.loop)] as Polygon))) {
+    const m = slopedTopWallMesh(doc, wall, outer(p));
+    if (m) parts.push(m);
+  }
+  for (const c of used) {
+    if (c.z1 >= top - 1) continue;
+    for (const p of polygonClipping.intersection([ring(fp)], [ring(c.loop)])) {
+      const m = slopedTopWallMesh(doc, wall, outer(p), c.z1);
+      if (m) parts.push(m);
+    }
+  }
+  return parts.length ? mergeMeshes(parts) : null;
 }

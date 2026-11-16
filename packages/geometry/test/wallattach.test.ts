@@ -58,3 +58,18 @@ describe("walls attached under sloped roofs", () => {
     expect(boundingBox(occt.build(doc, wall)!).max[2]).toBeGreaterThan(3500);
   });
 });
+
+describe("crossings through walls under sloped roofs (SimpleKernel)", () => {
+  it("a thicker wall running through cuts its footprint out, above its own top only where it stops", () => {
+    const { doc, ids, wall } = gableWall();
+    const k = new SimpleKernel();
+    const whole = meshVolume(k.build(doc, wall)!);
+    // Exterior (thicker) wall crossing at y = 3000, full height 2400 (below the gable apex).
+    const x = doc.transact("X", (tx) => createWall(tx, ids.wallTypes.exterior, { x: 2000, y: 3000 }, { x: 6000, y: 3000 }, ids.levels.ground, { height: 2400 })) as Wall;
+    const tx = wallThickness(doc, x);
+    const t = wallThickness(doc, wall);
+    const cut = meshVolume(k.build(doc, doc.require(wall.id))!);
+    // Removed: the crossing's width × the gable wall's thickness × 2400 (the wall carries on above it).
+    expect((whole - cut) / (tx * t * 2400)).toBeCloseTo(1, 2);
+  });
+});

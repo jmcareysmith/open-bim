@@ -18,6 +18,8 @@ import {
   setWallClearance,
   pointClearances,
   setPointClearance,
+  createDimension,
+  type DimRef,
   floorExtent,
   lineLength,
   setLineLength,
@@ -383,6 +385,19 @@ export class GripLayer {
       };
       this.root.append(label);
       this.placed.push({ el: label, at: () => at, z: () => z });
+      const other = doc.get(s.otherId) as Wall | undefined;
+      if (other) {
+        const os = other.params.start;
+        const oe = other.params.end;
+        const ol = Math.hypot(oe.x - os.x, oe.y - os.y) || 1;
+        const od = { x: (oe.x - os.x) / ol, y: (oe.y - os.y) / ol };
+        const t = (base.x - os.x) * od.x + (base.y - os.y) * od.y;
+        const onOther = { x: os.x + od.x * t, y: os.y + od.y * t };
+        this.addPermanent(at, [
+          { kind: "wallFace", id: wall.id, side: "centre", pick: base },
+          { kind: "wallFace", id: other.id, side: "centre", pick: onOther },
+        ]);
+      }
     }
   }
 
@@ -422,7 +437,32 @@ export class GripLayer {
       };
       this.root.append(label);
       this.placed.push({ el: label, at: () => mid, z: () => z });
+      this.addPermanent(mid, [
+        { kind: "datum", id: c.gridId, pick: { x: at.x - c.normal.x * c.dist, y: at.y - c.normal.y * c.dist } },
+        { kind: "point", at: { ...at } },
+      ]);
     }
+  }
+
+  /** Revit's "make this temporary dimension permanent" button under a temporary dimension (plans only). */
+  private addPermanent(at: Vec2, refs: DimRef[]): void {
+    const viewId = this.ctx.activeViewId();
+    if (this.ctx.viewport.viewMode !== "plan" || !viewId) return;
+    const b = document.createElement("button");
+    b.className = "temp-dim-permanent";
+    b.textContent = "↦";
+    b.title = "Make this temporary dimension permanent";
+    b.onpointerdown = (ev) => ev.stopPropagation();
+    b.onclick = () => {
+      try {
+        this.ctx.doc.transact("Make dimension permanent", (tx) => createDimension(tx, this.ctx.doc, viewId, refs, at));
+        this.ctx.status("Dimension placed.");
+      } catch (e) {
+        this.ctx.status(`⚠ ${(e as Error).message}`);
+      }
+    };
+    this.root.append(b);
+    this.placed.push({ el: b, at: () => at });
   }
 
   /** A pinned element's pin (Revit's pushpin): click it to unpin. */

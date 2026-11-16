@@ -112,7 +112,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   crossings or the host's ends), click to type (core grips.ts `hostedClearances`/`setHostedClearance`).
   A selected straight wall (plans) shows centreline distances to the nearest parallel wall each side; type one to move
   it across, joined walls follow (`wallClearances`/`setWallClearance`). Columns and free-standing families show the distance to the
-  nearest grid each way (plans, 3D; `pointClearances`/`setPointClearance`).
+  nearest grid each way (plans, 3D; `pointClearances`/`setPointClearance`). Under wall/grid temporary dimensions (plans) a ↦ button makes them
+  permanent (live wall-centre / grid refs).
 - View windows (apps/desktop/src/panes.ts): Tile / Cascade / Tab Views (View → Windows, WT/WC/TW,
   or the ▦ ▾ at the end of the view tabs: Tile all / 2 / 3 / 4 most recent, Cascade, Tab Views).
   Each open view is a live window (a Viewport each, up to 9): drag the title bar, resize by the

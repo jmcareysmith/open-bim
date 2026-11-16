@@ -8,6 +8,7 @@ import {
   mepSystems,
   registerConnectorSource,
   systemMembers,
+  systemNetwork,
   type MEPSystem,
   type ModelConnector,
   type SystemClassification,
@@ -244,65 +245,12 @@ export const enableDuctFittings = enableMepFittings;
 
 // ---- network, flow and sizing ----------------------------------------------
 
-/** Connectors joined to each other (within 2 mm and both duct domain), as an adjacency list. */
-function ductGraph(doc: Document, sys: MEPSystem): { nodes: ModelConnector[]; links: Map<number, number[]> } {
-  const members = systemMembers(doc, sys);
-  const nodes: ModelConnector[] = [];
-  for (const el of [...members, ...ducts(doc).filter((d) => d.params.classification === sys.params.classification)]) {
-    for (const c of elementConnectors(doc, el)) if (c.classification === sys.params.classification) nodes.push(c);
-  }
-  const links = new Map<number, number[]>(nodes.map((_, i) => [i, []]));
-  const link = (a: number, b: number) => {
-    links.get(a)!.push(b);
-    links.get(b)!.push(a);
-  };
-  const at = (c: ModelConnector) => ({ x: c.position[0], y: c.position[1], z: c.position[2] });
-  for (let i = 0; i < nodes.length; i++) {
-    for (let j = i + 1; j < nodes.length; j++) {
-      const a = nodes[i]!;
-      const b = nodes[j]!;
-      // The two ends of one duct are linked through it; coincident connectors are joined.
-      if (a.ownerId === b.ownerId ? doc.get(a.ownerId)?.category === Cat.Duct : dist(at(a), at(b)) <= JOIN_TOL) link(i, j);
-    }
-  }
-  return { nodes, links };
-}
-
 /**
  * Air flow each duct carries (L/s): the terminals downstream of the system's equipment, found by
  * walking the duct network out from it. Ducts not reached aren't in the map.
  */
 export function ductFlows(doc: Document, sys: MEPSystem): Map<ElementId, number> {
-  const { nodes, links } = ductGraph(doc, sys);
-  const isEquipment = (c: ModelConnector) => {
-    const el = doc.get(c.ownerId);
-    return el?.category === Cat.FamilyInstance && c.flowDirection === (sys.params.classification === "supplyAir" || sys.params.classification === "outsideAir" ? "out" : "in");
-  };
-  let source = nodes.findIndex(isEquipment);
-  if (source < 0) source = nodes.findIndex((c) => doc.get(c.ownerId)?.category === Cat.FamilyInstance);
-  const out = new Map<ElementId, number>();
-  if (source < 0) return out;
-  // Depth-first: each node's subtree total of terminal flows.
-  const seen = new Set<number>([source]);
-  const visit = (i: number): number => {
-    let total = 0;
-    const own = nodes[i]!;
-    const el = doc.get(own.ownerId);
-    if (el?.category === Cat.FamilyInstance && i !== source) total += own.flow;
-    for (const j of links.get(i)!) {
-      if (seen.has(j)) continue;
-      seen.add(j);
-      const f = visit(j);
-      // Flow along a duct: what lies beyond its far end.
-      const a = nodes[i]!;
-      const b = nodes[j]!;
-      if (a.ownerId === b.ownerId && doc.get(a.ownerId)?.category === Cat.Duct) out.set(a.ownerId, Math.max(out.get(a.ownerId) ?? 0, f));
-      total += f;
-    }
-    return total;
-  };
-  visit(source);
-  return out;
+  return systemNetwork(doc, sys, Cat.Duct).flows;
 }
 
 /**

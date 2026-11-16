@@ -2,7 +2,7 @@ import type { Document, Transaction } from "../document.ts";
 import type { ElementId } from "../element.ts";
 import { Cat } from "./architecture.ts";
 import { ductPath, ductShape, type Duct } from "./ducts.ts";
-import { classificationInfo, elementConnectors, systemMembers, type MEPSystem, type ModelConnector } from "./mep.ts";
+import { classificationInfo, elementConnectors, systemMembers, systemNetwork, type MEPSystem, type ModelConnector } from "./mep.ts";
 import { PIPE_SIZES, type Pipe, type PipeParams } from "./pipes.ts";
 
 // Pressure loss in duct and pipe systems (Revit: System Inspector / pressure loss reports).
@@ -83,49 +83,12 @@ export function systemPressure(doc: Document, sys: MEPSystem): PressureReport {
     return report;
   }
 
-  // The network: connectors of the members and of matching runs; a run's two ends link through it.
-  const runs = doc.byCategory(runCat).filter((r) => (r.params as { classification?: string }).classification === sys.params.classification);
-  const nodes: ModelConnector[] = [];
-  for (const el of [...systemMembers(doc, sys), ...runs]) for (const c of elementConnectors(doc, el)) if (c.classification === sys.params.classification) nodes.push(c);
-  const links = new Map<number, number[]>(nodes.map((_, i) => [i, []]));
-  const d3 = (a: ModelConnector, b: ModelConnector) => Math.hypot(a.position[0] - b.position[0], a.position[1] - b.position[1], a.position[2] - b.position[2]);
-  for (let i = 0; i < nodes.length; i++) {
-    for (let j = i + 1; j < nodes.length; j++) {
-      const a = nodes[i]!;
-      const b = nodes[j]!;
-      if (a.ownerId === b.ownerId ? doc.get(a.ownerId)?.category === runCat : d3(a, b) <= JOIN_TOL) {
-        links.get(i)!.push(j);
-        links.get(j)!.push(i);
-      }
-    }
-  }
+  // The network and each run's flow (shared with duct sizing: mep.ts systemNetwork).
+  const { nodes, links, source, flows } = systemNetwork(doc, sys, runCat);
   const isInstance = (c: ModelConnector) => doc.get(c.ownerId)?.category === Cat.FamilyInstance;
-  // Supply systems start where the equipment pushes out; return/exhaust where it takes in (drainage left above).
-  const cls = sys.params.classification;
-  const inward = cls === "returnAir" || cls === "exhaustAir" || cls === "vent";
-  let source = nodes.findIndex((c) => isInstance(c) && c.flowDirection === (inward ? "in" : "out"));
-  if (source < 0) source = nodes.findIndex(isInstance);
   if (source < 0) {
     notes.push("No equipment in the system to start from.");
     return report;
-  }
-
-  // Flows: each run carries the terminal flows beyond it.
-  const flows = new Map<ElementId, number>();
-  {
-    const seen = new Set<number>([source]);
-    const visit = (i: number): number => {
-      let total = isInstance(nodes[i]!) && i !== source ? nodes[i]!.flow : 0;
-      for (const j of links.get(i)!) {
-        if (seen.has(j)) continue;
-        seen.add(j);
-        const f = visit(j);
-        if (nodes[i]!.ownerId === nodes[j]!.ownerId) flows.set(nodes[i]!.ownerId, Math.max(flows.get(nodes[i]!.ownerId) ?? 0, f));
-        total += f;
-      }
-      return total;
-    };
-    visit(source);
   }
 
   // Per run: velocity, friction.

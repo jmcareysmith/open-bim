@@ -3,6 +3,7 @@ import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId } from "../element.ts";
 import { evaluate, type Num, type Values } from "../expr.ts";
 import { Cat, type LevelParams } from "./architecture.ts";
+import { JOIN_TOL } from "./runs.ts";
 import { familyDocument, instanceValues, type FamilyDef, type FamilyInstance, type FamilyInstanceParams } from "./components.ts";
 
 // MEP connectors and systems (Revit: connectors in families, then Duct/Piping/Electrical Systems).
@@ -290,4 +291,66 @@ export function systemTotals(doc: Document, s: MEPSystem): SystemTotals {
     }
   }
   return out;
+}
+
+// ---- system networks (shared by duct sizing and pressure loss) --------------------------------
+
+/**
+ * A system's connector network: the connectors of its members and of runs (ducts/pipes of
+ * `runCategory`) with its classification; a run's two ends link through it, coincident connectors
+ * join. `source` is the equipment connector the system starts from (supply: where it pushes out;
+ * return/exhaust/vent: where it takes in), -1 if none. `flows`: each run's flow (L/s), the terminal
+ * flows beyond it from the source; runs not reached aren't in it.
+ */
+export interface SystemNetwork {
+  nodes: ModelConnector[];
+  links: Map<number, number[]>;
+  source: number;
+  flows: Map<ElementId, number>;
+}
+
+/** Does this classification's equipment draw in (return/exhaust/vent) rather than push out? */
+export function drawsIn(classification: SystemClassification): boolean {
+  return classification === "returnAir" || classification === "exhaustAir" || classification === "vent";
+}
+
+export function systemNetwork(doc: Document, sys: MEPSystem, runCategory: string): SystemNetwork {
+  const cls = sys.params.classification;
+  const runs = doc.byCategory(runCategory).filter((r) => (r.params as { classification?: string }).classification === cls);
+  const nodes: ModelConnector[] = [];
+  for (const el of [...systemMembers(doc, sys), ...runs]) for (const c of elementConnectors(doc, el)) if (c.classification === cls) nodes.push(c);
+  const links = new Map<number, number[]>(nodes.map((_, i) => [i, []]));
+  const d3 = (a: ModelConnector, b: ModelConnector) => Math.hypot(a.position[0] - b.position[0], a.position[1] - b.position[1], a.position[2] - b.position[2]);
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i]!;
+      const b = nodes[j]!;
+      if (a.ownerId === b.ownerId ? doc.get(a.ownerId)?.category === runCategory : d3(a, b) <= JOIN_TOL) {
+        links.get(i)!.push(j);
+        links.get(j)!.push(i);
+      }
+    }
+  }
+  const isInstance = (c: ModelConnector) => doc.get(c.ownerId)?.category === Cat.FamilyInstance;
+  let source = nodes.findIndex((c) => isInstance(c) && c.flowDirection === (drawsIn(cls) ? "in" : "out"));
+  if (source < 0) source = nodes.findIndex(isInstance);
+  const flows = new Map<ElementId, number>();
+  if (source >= 0) {
+    // Depth-first: each node's subtree total of terminal flows; a run carries what lies beyond its far end.
+    const seen = new Set<number>([source]);
+    const visit = (i: number): number => {
+      let total = isInstance(nodes[i]!) && i !== source ? nodes[i]!.flow : 0;
+      for (const j of links.get(i)!) {
+        if (seen.has(j)) continue;
+        seen.add(j);
+        const f = visit(j);
+        const owner = nodes[i]!.ownerId;
+        if (owner === nodes[j]!.ownerId && doc.get(owner)?.category === runCategory) flows.set(owner, Math.max(flows.get(owner) ?? 0, f));
+        total += f;
+      }
+      return total;
+    };
+    visit(source);
+  }
+  return { nodes, links, source, flows };
 }

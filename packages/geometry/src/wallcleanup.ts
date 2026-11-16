@@ -5,6 +5,7 @@ import { wallCuts, type Layer,
   arcPoints,
   tangentLine,
   Cat,
+  crossingWalls,
   wallDirection,
   wallEndPoint,
   wallJoins,
@@ -104,7 +105,12 @@ export function cleanCuts(doc: Document, linework: PlanLinework[], frame: ViewFr
     }
   }
   const ids = [...items.keys()];
-  for (let i = 0; i < ids.length; i++) for (let k = i + 1; k < ids.length; k++) if (crossing(items.get(ids[i]!)!.wall, items.get(ids[k]!)!.wall)) relate(ids[i]!, ids[k]!);
+  // Crossings: only walls near each other (the document's cached wall index), confirmed exactly.
+  for (const id of ids) {
+    const w = items.get(id)!.wall;
+    const near = doc.get(id) === w ? crossingWalls(doc, w) : ids.filter((o) => o !== id);
+    for (const o of near) if (o > id && items.has(o) && crossing(w, items.get(o)!.wall)) relate(id, o);
+  }
 
   // Regions per wall: layers (medium/fine) or the whole cut (coarse).
   for (const lw of linework) {

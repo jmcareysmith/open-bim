@@ -162,4 +162,5 @@ to native elements where their shapes allow.
       Revit name; turned copies share it), placed as instances
 - [x] Sloped railings over a converted stair → its left/right railings
 - [x] Winder stairs (turning treads between straight runs; same count at each turn)
+- [x] Walls whose top isn't level (gables, skillions) get their elevation outline as an Edit Profile
 - [ ] Still shapes: non-rectangular curtain panels; anything whose rebuilt version wouldn't match its mesh

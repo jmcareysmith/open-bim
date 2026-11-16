@@ -379,3 +379,26 @@ describe("winder stairs from IFC", () => {
     expect(after.runs.map((x) => x.treads)).toEqual(before.runs.map((x) => x.treads));
   });
 });
+
+describe("gable walls from IFC", () => {
+  it("a wall whose top isn't level gets its elevation outline as its profile", async () => {
+    const { createWall, setWallProfile, gableProfile } = await import("@open-bim/core");
+    const { SimpleKernel, boundingBox, meshVolume } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const w0 = doc.transact("W", (tx) => createWall(tx, ids.wallTypes.interior, { x: 0, y: 0 }, { x: 6000, y: 0 }, ids.levels.ground, { height: 2400 }));
+    doc.transact("P", (tx) => setWallProfile(tx, doc, w0.id, gableProfile(6000, 2400, 4000)));
+    const m = new SimpleKernel().build(doc, doc.require(w0.id))!;
+    const vol = meshVolume(m);
+    const ds = doc.transact("I", (tx) => {
+      tx.delete(w0.id);
+      return createDirectShape(tx, { levelId: ids.levels.ground, ifcClass: "IfcWall", globalId: "g", positions: [...m.positions], indices: [...m.indices], color: 0x999999, properties: {} }).id;
+    });
+    const r = doc.transact("C", (tx) => convertDirectShapes(tx, doc, [ds]));
+    const w = doc.require(r.created[0]!);
+    expect((w.params as { profile?: unknown[] }).profile?.length).toBe(5);
+    const m2 = new SimpleKernel().build(doc, w)!;
+    expect(meshVolume(m2)).toBeCloseTo(vol, -4);
+    expect(boundingBox(m2).max[2]).toBeCloseTo(4000, 0);
+  });
+});

@@ -10,6 +10,7 @@ import {
   createBeam,
   createRoof,
   setWallCurve,
+  setWallProfile,
   createStair,
   createStairType,
   stairLayout,
@@ -102,6 +103,13 @@ function hull(pts: Vec2[]): Vec2[] {
 }
 
 const polyArea = (l: Vec2[]) => Math.abs(l.reduce((s, q, i) => s + q.x * l[(i + 1) % l.length]!.y - l[(i + 1) % l.length]!.x * q.y, 0)) / 2;
+
+/** Mesh points as (distance along a line from `start` in direction `u`, height). */
+function xyzAlong(p: DirectShapeParams, start: Vec2, u: Vec2): Vec2[] {
+  const out: Vec2[] = [];
+  for (let i = 0; i < p.positions.length; i += 3) out.push({ x: (p.positions[i]! - start.x) * u.x + (p.positions[i + 1]! - start.y) * u.y, y: p.positions[i + 2]! });
+  return out;
+}
 
 /** Smallest rectangle round the points (on a hull edge): centre, long axis, length and width. */
 function minRect(pts: Vec2[]): { c: Vec2; u: Vec2; len: number; wid: number; hullArea: number } | null {
@@ -801,6 +809,9 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
       const start = { x: r.c.x - (r.u.x * r.len) / 2, y: r.c.y - (r.u.y * r.len) / 2 };
       const end = { x: r.c.x + (r.u.x * r.len) / 2, y: r.c.y + (r.u.y * r.len) / 2 };
       const w = createWall(tx, typeId, start, end, p.levelId, { baseOffset: z0 - lvl, height: z1 - z0 });
+      // Not a rectangle in elevation (a gable end, a skillion wall): its outline as the wall's profile.
+      const elev = hull(xyzAlong(p, start, r.u).map((q) => ({ x: Math.max(0, Math.min(r.len, q.x)), y: q.y - z0 })));
+      if (elev.length >= 3 && polyArea(elev) < 0.98 * r.len * (z1 - z0)) setWallProfile(tx, doc, w.id, elev);
       walls.push({ id: w.id, c: r.c, u: r.u, len: r.len, wid: r.wid, base: z0 });
       created.push(w.id);
     } else if (COLUMN_CLASSES.has(p.ifcClass)) {

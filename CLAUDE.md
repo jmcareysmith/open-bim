@@ -124,7 +124,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Groups (model/detail), Links. Project Information, Materials, Project Parameters, Levels,
   Filters & Templates, Design Options, Revisions, System Browser (F9) and Model Statistics are
   Manage-tab dialogs (`projectSection` in panels.ts).
-- Status bar: ⧩ selection count at the right; click to filter the selection by category.
+- Status bar: ⧩ selection count at the right; click to filter the selection by category. Revit's selection toggles beside it
+  (selectopts.ts, local storage): 📌 Select pinned elements (off: pinned can't be selected), ✥ Drag elements on selection
+  (on: press on any element and drag it; default off).
 - Drag from the Project Browser: views/legends/schedules onto the open sheet (placed where dropped);
   families into a view start placing them (detail items via the detail component tool).
 - Double-click: section/elevation/callout marker opens its view; sheet viewport opens its view;

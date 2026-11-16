@@ -457,3 +457,6 @@ body.pane-dragging canvas { pointer-events: none; }
   position: absolute; transform: translate(-50%, 40%); pointer-events: auto; cursor: pointer;
   border: 1px solid var(--accent); background: #fff; color: var(--accent); border-radius: 3px; font-size: 11px; line-height: 1; padding: 1px 3px;
 }
+
+.sel-opt { border: 0; background: none; cursor: pointer; font-size: 13px; padding: 0 4px; }
+.sel-opt.off { opacity: 0.35; filter: grayscale(1); }

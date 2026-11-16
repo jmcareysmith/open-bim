@@ -16,6 +16,7 @@ import { CameraTool } from "./cameratool.ts";
 import { FloorPointTool, SlopeArrowTool } from "./slopetool.ts";
 import { WallProfileTool } from "./profiletool.ts";
 import { LevelTool, MatchTypeTool, ZoomRegionTool } from "./revittools.ts";
+import { selectOptions, setSelectOption } from "./selectopts.ts";
 import { ungroup, enablePinning, isPinned, setPinned, setElementOverrides, setCategoryOverride, type DirectShapeParams, enableSharedNested, enableBeamSystems, createImageUnderlay, planCrop, createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
   ceilingPlanFor,
   createCeilingPlan,
@@ -463,6 +464,8 @@ const ctx: ModifyToolContext & PanelContext = {
   },
   selection: () => selection,
   setSelection(ids) {
+    // Select pinned elements off: they can't be picked.
+    if (!selectOptions.selectPinned) ids = ids.filter((id) => !isPinned(doc.get(id)));
     selection = ids;
     const part = curtainPart();
     if (part && (ids.length !== 1 || ids[0] !== part.id)) setCurtainPart(null);
@@ -650,6 +653,27 @@ let panes: Panes | undefined = new Panes($("#panes"), {
   renderSchedule: (container, s) => renderSchedulePane(container, ctx, s as Schedule),
 });
 $("#sel-filter").onclick = () => openSelectionFilter();
+// Revit's selection toggles (status bar).
+function refreshSelectOptions(): void {
+  const p = $<HTMLButtonElement>("#sel-pinned");
+  p.textContent = "📌";
+  p.classList.toggle("off", !selectOptions.selectPinned);
+  p.title = `Select pinned elements: ${selectOptions.selectPinned ? "on" : "off"}`;
+  const d = $<HTMLButtonElement>("#sel-drag");
+  d.textContent = "✥";
+  d.classList.toggle("off", !selectOptions.dragOnSelection);
+  d.title = `Drag elements on selection: ${selectOptions.dragOnSelection ? "on (press on any element and drag it)" : "off (only the selection drags)"}`;
+}
+$("#sel-pinned").onclick = () => {
+  setSelectOption("selectPinned", !selectOptions.selectPinned);
+  if (!selectOptions.selectPinned) ctx.setSelection(selection);
+  refreshSelectOptions();
+};
+$("#sel-drag").onclick = () => {
+  setSelectOption("dragOnSelection", !selectOptions.dragOnSelection);
+  refreshSelectOptions();
+};
+refreshSelectOptions();
 // Drag from the Project Browser: views, legends and schedules onto the open sheet (placed where
 // dropped); families into a view (starts placing them, as Revit does).
 {

@@ -1,5 +1,6 @@
 import type { ToolOption } from "./modifytools.ts";
 import {
+  isPinned,
   wallChain, createBeamSystem, createScopeBox, pointCloudPoints, type PointCloud, type PointCloudParams,
   boundaryFromWalls,
   PICK_WALL_LINES,
@@ -117,6 +118,7 @@ import {
   createPropertyLine,
 } from "@open-bim/core";
 import { curtainPart, partLabel, setCurtainPart } from "./curtainpart.ts";
+import { selectOptions } from "./selectopts.ts";
 import { wallEnclosure, areaBoundary, buildGridLines, buildReferencePlaneLines, buildRoomLines, extrudePolygon, roomBoundary, wallFootprint, type LineData } from "@open-bim/geometry";
 import type { Viewport } from "./viewport.ts";
 
@@ -183,6 +185,12 @@ export class SelectTool implements Tool {
     const el = id ? this.ctx.doc.get(id) : undefined;
     const sel = new Set(this.ctx.selection());
     if (el && (sel.has(el.id) || sel.has(groupOf(el) ?? ""))) {
+      this.moveFrom = viewPoint(this.ctx, ev, null);
+      this.moveTo = null;
+    } else if (el && selectOptions.dragOnSelection && (selectOptions.selectPinned || !isPinned(el))) {
+      // Drag elements on selection: pressing on an unselected element picks it and drags it.
+      const g = groupOf(el);
+      this.ctx.setSelection([g && this.ctx.doc.has(g) ? g : el.id]);
       this.moveFrom = viewPoint(this.ctx, ev, null);
       this.moveTo = null;
     }

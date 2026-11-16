@@ -108,6 +108,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   RE Scale (ModifyTool "scale": origin, reference, new point, or type a factor; core `scalingAbout`), MM pick-axis
   Mirror (DM draws), CS Create Similar (tool + type of the selection), UG Ungroup; right-click has CS/SA/Pin.
   Tab over a wall selects its chain (core joins.ts `wallChain`: L corners carry on, tees/junctions stop; Shift+Tab adds).
+  Clipboard: Ctrl+C copies the selection's ids; Ctrl+V pastes in place and starts Move (click to place); Modify → Paste Same
+  Place / Paste to Levels (core clipboard.ts `pasteToLevel`: offsets kept, top level the same distance up or unconnected, hosted
+  inserts come along).
   ZR/ZZ Zoom Region (drag a box; viewport `zoomRegion`, then back to the previous tool). BX Selection Box (default 3D view,
   section box round the selection + 300, zoomed to it; right-click too). Section box arrows are screen-sized (`sizeBoxHandles`).
   Temporary dimensions on a selected door/window/opening (plans, 3D): clearance to the nearest wall face each side (tees,

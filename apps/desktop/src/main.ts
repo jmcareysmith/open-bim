@@ -21,7 +21,7 @@ import { openWorksetsDialog } from "./worksetsui.ts";
 import { openPurgeDialog } from "./purgeui.ts";
 import { openTransferDialog } from "./transferui.ts";
 import { openSnapsDialog, saveSnapOptions, snapOptions, snapOverride, setSnapOverride, type SnapOverride } from "./snapopts.ts";
-import { worksets, activeWorkset, setActiveWorkset, enableWorksetAssignment, ungroup, enablePinning, isPinned, setPinned, setElementOverrides, setCategoryOverride, type DirectShapeParams, enableSharedNested, enableBeamSystems, createImageUnderlay, planCrop, createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
+import { worksets, activeWorkset, setActiveWorkset, enableWorksetAssignment, pasteSamePlace, pasteToLevel, ungroup, enablePinning, isPinned, setPinned, setElementOverrides, setCategoryOverride, type DirectShapeParams, enableSharedNested, enableBeamSystems, createImageUnderlay, planCrop, createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
   ceilingPlanFor,
   createCeilingPlan,
   Cat,
@@ -1160,6 +1160,61 @@ const commands: Record<string, () => void | Promise<void>> = {
       return box;
     });
   },
+  copyToClipboard() {
+    const ids = selection.filter((id) => doc.has(id));
+    if (!ids.length) return status("Copy to Clipboard: select something first.");
+    clipboard = ids;
+    status(`${ids.length} element(s) copied. Ctrl+V pastes (then click to place); Modify \u2192 Paste \u25be pastes aligned.`);
+  },
+  /** Ctrl+V (Revit): the copies appear in place and Move starts, so a click places them. */
+  paste() {
+    const ids = clipboard.filter((id) => doc.has(id));
+    if (!ids.length) return status("Paste: copy something first (Ctrl+C).");
+    let copies: ElementId[] = [];
+    edit("Paste", (tx) => (copies = pasteSamePlace(tx, doc, ids)));
+    if (!copies.length) return;
+    ctx.setSelection(copies);
+    setTool("move");
+    status("Pasted: click a base point and where it goes (Esc leaves them where they are).");
+  },
+  pasteSamePlace() {
+    const ids = clipboard.filter((id) => doc.has(id));
+    if (!ids.length) return status("Paste: copy something first (Ctrl+C).");
+    let copies: ElementId[] = [];
+    edit("Paste aligned to same place", (tx) => (copies = pasteSamePlace(tx, doc, ids)));
+    ctx.setSelection(copies);
+    status(`Pasted ${copies.length} in the same place.`);
+  },
+  pasteToLevels() {
+    const ids = clipboard.filter((id) => doc.has(id));
+    if (!ids.length) return status("Paste: copy something first (Ctrl+C).");
+    const lv = levels(doc);
+    const picked = new Set<string>();
+    const dlg = openDialog("Paste Aligned to Selected Levels", () => {
+      const box = document.createElement("div");
+      box.className = "purge";
+      for (const l of lv) {
+        const lab = document.createElement("label");
+        lab.className = "purge-row";
+        const cb = Object.assign(document.createElement("input"), { type: "checkbox", checked: picked.has(l.id) });
+        cb.onchange = () => (cb.checked ? picked.add(l.id) : picked.delete(l.id));
+        lab.append(cb, ` ${l.name ?? l.id}`);
+        box.append(lab);
+      }
+      const ok = Object.assign(document.createElement("button"), { textContent: "Paste" });
+      ok.onclick = () => {
+        let made: ElementId[] = [];
+        edit("Paste aligned to selected levels", (tx) => {
+          for (const l of lv) if (picked.has(l.id)) made = [...made, ...pasteToLevel(tx, doc, ids, l.id)];
+        });
+        ctx.setSelection(made);
+        status(`Pasted to ${picked.size} level(s).`);
+        dlg.close();
+      };
+      box.append(ok);
+      return box;
+    });
+  },
   purgeUnused() {
     openPurgeDialog(doc, status, () => refreshAll());
   },
@@ -1835,6 +1890,10 @@ window.addEventListener("keydown", (ev) => {
   if (mod && ev.key.toLowerCase() === "o") return run(ev, "open");
   if (mod && ev.key.toLowerCase() === "n") return run(ev, "new");
   if (mod && ev.key.toLowerCase() === "g") return run(ev, "group");
+  if (mod && ev.key.toLowerCase() === "c") return run(ev, "copyToClipboard");
+  if (mod && ev.key.toLowerCase() === "v") return run(ev, "paste");
+  if (mod && ev.key.toLowerCase() === "c") return run(ev, "copyToClipboard");
+  if (mod && ev.key.toLowerCase() === "v") return run(ev, "paste");
   if (ev.key === "`") return run(ev, "console");
   if (ev.key === "F9") return run(ev, "systemBrowser");
   if (mod) return;
@@ -1907,6 +1966,8 @@ let pendingSingle: ReturnType<typeof setTimeout> | null = null;
 const KEEP_TOOL = new Set(["cmd:snapEndpoint", "cmd:snapMidpoint", "cmd:snapIntersection", "cmd:snapNearest", "cmd:toggleSnaps"]);
 /** The tool running before a single-letter tool shortcut (restored if it turns into a two-letter command). */
 let toolBeforeSingle: string | null = null;
+/** Ctrl+C: what Ctrl+V and Paste ▾ copy (ids in this project). */
+let clipboard: ElementId[] = [];
 /** The tool to go back to after Zoom Region. */
 let toolBeforeZoom = "select";
 

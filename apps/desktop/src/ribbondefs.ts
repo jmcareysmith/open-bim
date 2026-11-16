@@ -50,6 +50,8 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
     { label: "Join Geometry", icon: "group", tool: "joingeometry", title: "Join Geometry: click the element that cuts, then the one it cuts (walls with floors/ceilings)" },
     { label: "Unjoin", icon: "split", tool: "unjoingeometry", title: "Unjoin Geometry: click the two joined elements" },
     { label: "Switch Join", icon: "rotate", tool: "switchjoin", title: "Switch Join Order: click the two joined elements" },
+    { label: "Paste Same Place", icon: "copy", cmd: "pasteSamePlace", title: "Paste Aligned to Same Place (copied with Ctrl+C)" },
+    { label: "Paste to Levels", icon: "level", cmd: "pasteToLevels", title: "Paste Aligned to Selected Levels (copied with Ctrl+C)" },
     { label: "Create Similar", icon: "copy", cmd: "createSimilar", title: "Create Similar (CS): the selected element's tool and type" },
     { label: "Match Type", icon: "match", tool: "matchtype", title: "Match Type Properties (MA): click the source, then the elements to change" },
   ];

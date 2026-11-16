@@ -12,6 +12,9 @@ import {
   setWallCurve,
   createStair,
   createStairType,
+  createRailing,
+  type RailingParams,
+  type RailingTypeParams,
   type StairParams,
   type StairTypeParams,
   type BeamParams,
@@ -45,13 +48,14 @@ const COLUMN_CLASSES = new Set(["IfcColumn"]);
 const BEAM_CLASSES = new Set(["IfcBeam"]);
 const ROOF_CLASSES = new Set(["IfcRoof"]);
 const STAIR_CLASSES = new Set(["IfcStair", "IfcStairFlight"]);
+const RAILING_CLASSES = new Set(["IfcRailing"]);
 const INSERT_CLASSES = new Set(["IfcDoor", "IfcWindow"]);
 
 /** Can this imported shape become a native element? */
 export function convertible(el: { category: string; params: unknown }): boolean {
   if (el.category !== Cat.DirectShape) return false;
   const c = (el.params as DirectShapeParams).ifcClass;
-  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c) || ROOF_CLASSES.has(c) || STAIR_CLASSES.has(c);
+  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c) || ROOF_CLASSES.has(c) || STAIR_CLASSES.has(c) || RAILING_CLASSES.has(c);
 }
 
 function hull(pts: Vec2[]): Vec2[] {
@@ -298,6 +302,102 @@ function arcWall(p: DirectShapeParams): { start: Vec2; end: Vec2; curve: number;
 }
 
 /**
+ * A level railing from its mesh: its top rail's upward faces form a band; the band's two short ends
+ * split its outline into the two sides, whose midpoints pair up into the path. Sloped (stair)
+ * railings and anything else stay as shapes.
+ */
+function railingFromMesh(tx: Transaction, doc: Document, p: DirectShapeParams, lvl: number, z0: number, z1: number): ElementId | null {
+  // Horizontal triangles at the very top (whatever their winding), grouped into pieces that share corners.
+  const P = p.positions;
+  const tris: [Vec2, Vec2, Vec2][] = [];
+  const keys: string[][] = [];
+  for (let i = 0; i < p.indices.length; i += 3) {
+    const ks = [p.indices[i]!, p.indices[i + 1]!, p.indices[i + 2]!].map((v) => v * 3);
+    if (ks.some((k) => Math.abs(P[k + 2]! - z1) > 1)) continue;
+    tris.push(ks.map((k) => ({ x: P[k]!, y: P[k + 1]! })) as [Vec2, Vec2, Vec2]);
+    keys.push(ks.map((k) => `${Math.round(P[k]!)},${Math.round(P[k + 1]!)}`));
+  }
+  if (!tris.length) return null;
+  const parent = tris.map((_, i) => i);
+  const find = (i: number): number => (parent[i] === i ? i : (parent[i] = find(parent[i]!)));
+  const owner = new Map<string, number>();
+  keys.forEach((ks, i) => {
+    for (const k of ks) {
+      const o = owner.get(k);
+      if (o === undefined) owner.set(k, i);
+      else parent[find(i)] = find(o);
+    }
+  });
+  const groups = new Map<number, [Vec2, Vec2, Vec2][]>();
+  tris.forEach((t, i) => groups.set(find(i), [...(groups.get(find(i)) ?? []), t]));
+  const outline = (ts: [Vec2, Vec2, Vec2][]): Vec2[] | null => {
+    try {
+      const polys = ts.map((t): Polygon => [[...t.map((q): [number, number] => [q.x, q.y]), [t[0].x, t[0].y]]]);
+      const u = polygonClipping.union(polys[0]!, ...polys.slice(1));
+      if (u.length !== 1 || u[0]!.length !== 1) return null;
+      const ring = u[0]![0]!.slice(0, -1).map(([x, y]) => ({ x, y }));
+      return ring.filter((q, i) => {
+        const a = ring[(i - 1 + ring.length) % ring.length]!;
+        const b = ring[(i + 1) % ring.length]!;
+        return Math.abs((q.x - a.x) * (b.y - q.y) - (q.y - a.y) * (b.x - q.x)) > 0.5 * Math.hypot(b.x - a.x, b.y - a.y);
+      });
+    } catch {
+      return null;
+    }
+  };
+  let path: Vec2[] | null = null;
+  let w = 0;
+  const pieces = [...groups.values()].map(outline);
+  if (pieces.length > 1 && pieces.every((o) => o && o.length === 4)) {
+    // Separate straight rail pieces: each one's centreline, chained end to end.
+    const segs = pieces.map((o) => {
+      const r = minRect(o!)!;
+      w = r.wid;
+      return [
+        { x: r.c.x - (r.u.x * r.len) / 2, y: r.c.y - (r.u.y * r.len) / 2 },
+        { x: r.c.x + (r.u.x * r.len) / 2, y: r.c.y + (r.u.y * r.len) / 2 },
+      ] as [Vec2, Vec2];
+    });
+    const near = (a: Vec2, b: Vec2) => Math.hypot(a.x - b.x, a.y - b.y) <= w + 1;
+    // Start from a piece with a free end.
+    const freeEnd = (s: [Vec2, Vec2], k: 0 | 1) => !segs.some((o) => o !== s && (near(o[0], s[k]) || near(o[1], s[k])));
+    const first = segs.find((s) => freeEnd(s, 0) || freeEnd(s, 1)) ?? segs[0]!;
+    const left = segs.filter((s) => s !== first);
+    path = !freeEnd(first, 0) && freeEnd(first, 1) ? [first[1], first[0]] : [first[0], first[1]];
+    while (left.length) {
+      const end = path[path.length - 1]!;
+      const k = left.findIndex((s) => near(s[0], end) || near(s[1], end));
+      if (k < 0) return null;
+      const s = left.splice(k, 1)[0]!;
+      const next = near(s[0], end) ? s[1] : s[0];
+      path.push(next);
+    }
+  } else if (pieces.length === 1 && pieces[0]) {
+    // One swept rail: its band's two short ends split the outline into sides; their midpoints pair up.
+    const band = pieces[0];
+    const n = band.length;
+    if (n < 4 || n % 2) return null;
+    const lens = band.map((q, i) => Math.hypot(band[(i + 1) % n]!.x - q.x, band[(i + 1) % n]!.y - q.y));
+    const order = lens.map((l, i) => [l, i] as const).sort((a, b) => a[0] - b[0]);
+    const e0 = order[0]![1];
+    if ((order[1]![1] - e0 + n) % n !== n / 2) return null;
+    w = (order[0]![0] + order[1]![0]) / 2;
+    const k = n / 2;
+    const sideA = Array.from({ length: k }, (_, i) => band[(e0 + 1 + i) % n]!);
+    const sideB = Array.from({ length: k }, (_, i) => band[(e0 - i + n) % n]!);
+    path = sideA.map((a, i) => ({ x: (a.x + sideB[i]!.x) / 2, y: (a.y + sideB[i]!.y) / 2 }));
+  }
+  if (!path || path.length < 2) return null;
+  const height = z1 - z0;
+  const type =
+    doc.byCategory<RailingTypeParams>(Cat.RailingType).find((t) => Math.abs(t.params.height - height) < 2 && Math.abs(t.params.railSize - w) < 2)?.id ??
+    tx.create<RailingTypeParams>(Cat.RailingType, { height: Math.round(height), railSize: Math.round(w), balusterSize: Math.min(25, Math.round(w)), balusterGap: 100 }, { name: `Imported Railing ${Math.round(height)}` }).id;
+  const r = createRailing(tx, doc, type, p.levelId, path);
+  tx.update<RailingParams>(r.id, { baseOffset: z0 - lvl });
+  return r.id;
+}
+
+/**
  * A straight stair from its mesh: the treads are its upward faces at evenly spaced heights; their
  * centres give the direction of travel and the going, their spread across it the width. Null for
  * anything else (turns, winders, uneven risers).
@@ -473,6 +573,13 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
       const col = createColumn(tx, doc, typeId, p.levelId, top.id === p.levelId ? p.levelId : top.id, r.c, round ? 0 : Math.atan2(r.u.y, r.u.x) - Math.PI / 2);
       tx.update<ColumnParams>(col.id, { baseOffset: z0 - lvl, topOffset: z1 - top.params.elevation });
       created.push(col.id);
+    } else if (RAILING_CLASSES.has(p.ifcClass)) {
+      const rail = railingFromMesh(tx, doc, p, lvl, z0, z1);
+      if (!rail) {
+        skipped.push(id);
+        continue;
+      }
+      created.push(rail);
     } else if (STAIR_CLASSES.has(p.ifcClass)) {
       const stair = stairFromMesh(tx, doc, p, lvl, z0, z1);
       if (!stair) {

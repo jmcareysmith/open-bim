@@ -197,3 +197,30 @@ describe("stairs from IFC", () => {
     expect((doc.get(s2.typeId!)!.params as { width: number }).width).toBeCloseTo(900, -1);
   });
 });
+
+describe("railings from IFC", () => {
+  it("recovers a level railing's path and height from its top rail", async () => {
+    const { createRailing, ensureRailingType } = await import("@open-bim/core");
+    const { SimpleKernel } = await import("../src/index.ts");
+    for (const path of [
+      [{ x: 0, y: 0 }, { x: 4000, y: 0 }],
+      [{ x: 0, y: 0 }, { x: 4000, y: 0 }, { x: 4000, y: 3000 }],
+    ]) {
+      const doc = new Document();
+      const ids = applyResidentialTemplate(doc);
+      const r0 = doc.transact("R", (tx) => createRailing(tx, doc, ensureRailingType(tx, doc), ids.levels.ground, path));
+      const m = new SimpleKernel().build(doc, doc.require(r0.id))!;
+      const ds = doc.transact("I", (tx) => {
+        tx.delete(r0.id);
+        return createDirectShape(tx, { levelId: ids.levels.ground, ifcClass: "IfcRailing", globalId: "r", positions: [...m.positions], indices: [...m.indices], color: 0x999999, properties: {} }).id;
+      });
+      const res = doc.transact("C", (tx) => convertDirectShapes(tx, doc, [ds]));
+      expect(res.skipped).toEqual([]);
+      const r = doc.byCategory<{ path: { x: number; y: number }[] }>("Railing")[0]!;
+      const got = r.params.path.map((q) => [Math.round(q.x), Math.round(q.y)]);
+      const want = path.map((q) => [q.x, q.y]);
+      expect([got, [...got].reverse()].map((g) => JSON.stringify(g))).toContain(JSON.stringify(want));
+      expect((doc.get(r.typeId!)!.params as { height: number }).height).toBe(1000);
+    }
+  });
+});

@@ -189,6 +189,7 @@ const COMMON: FieldDef[] = [
   { key: "level", label: "Level", kind: "text", get: (d, e) => levelOf(d, e) },
   { key: "mark", label: "Mark", kind: "text", get: (_d, e) => elementMark(e) ?? "" },
   { key: "keynote", label: "Keynote", kind: "text", get: (d, e) => elementKeynote(d, e) ?? "" },
+  { key: "workset", label: "Workset", kind: "text", get: (d, e) => nameOf(d, (e.params as { worksetId?: string }).worksetId) },
 ];
 
 const OPENING: FieldDef[] = [

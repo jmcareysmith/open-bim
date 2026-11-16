@@ -20,7 +20,7 @@ import { selectOptions, setSelectOption } from "./selectopts.ts";
 import { openWorksetsDialog } from "./worksetsui.ts";
 import { openPurgeDialog } from "./purgeui.ts";
 import { openTransferDialog } from "./transferui.ts";
-import { openSnapsDialog, saveSnapOptions, snapOptions } from "./snapopts.ts";
+import { openSnapsDialog, saveSnapOptions, snapOptions, snapOverride, setSnapOverride, type SnapOverride } from "./snapopts.ts";
 import { worksets, activeWorkset, setActiveWorkset, enableWorksetAssignment, ungroup, enablePinning, isPinned, setPinned, setElementOverrides, setCategoryOverride, type DirectShapeParams, enableSharedNested, enableBeamSystems, createImageUnderlay, planCrop, createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
   ceilingPlanFor,
   createCeilingPlan,
@@ -854,7 +854,11 @@ window.addEventListener("pointerup", (ev) => {
   if (ev.button !== 0 || !downAt) return;
   const moved = Math.hypot(ev.clientX - downAt.x, ev.clientY - downAt.y);
   downAt = null;
-  if (moved < 5 && ev.target === canvas) tool.click?.(ev);
+  if (moved < 5 && ev.target === canvas) {
+    tool.click?.(ev);
+    // A snap override lasts one pick.
+    if (snapOverride) setSnapOverride(null);
+  }
 });
 canvas.addEventListener("pointermove", (ev) => {
   if (dragPlace && !dragPlace.started && ev.buttons & 1 && Math.hypot(ev.clientX - dragPlace.down.clientX, ev.clientY - dragPlace.down.clientY) > 8) {
@@ -1120,6 +1124,10 @@ const commands: Record<string, () => void | Promise<void>> = {
   snaps() {
     openSnapsDialog(status);
   },
+  snapEndpoint: () => snapOnce("endpoint"),
+  snapMidpoint: () => snapOnce("midpoint"),
+  snapIntersection: () => snapOnce("intersection"),
+  snapNearest: () => snapOnce("nearest"),
   /** SO: snapping on or off. */
   toggleSnaps() {
     snapOptions.on = !snapOptions.on;
@@ -1821,8 +1829,13 @@ window.addEventListener("keydown", (ev) => {
     // The first letter's command was waiting for this one: it gives way.
     if (pendingSingle) clearTimeout(pendingSingle);
     pendingSingle = null;
-    // A command (e.g. WT) shouldn't leave the first letter's tool (W = wall) running.
-    if (two.startsWith("cmd:") && tool.name !== "select") setTool("select");
+    // A command (WT, SE…) shouldn't leave the first letter's tool (W = wall, S = section) running:
+    // back to the tool from before that letter (e.g. still drawing walls after SE).
+    if (two.startsWith("cmd:")) {
+      const back = toolBeforeSingle ?? tool.name;
+      if (tool.name !== back) setTool(back);
+    }
+    toolBeforeSingle = null;
     return runShortcut(two);
   }
   if (tool.key?.(ev)) return ev.preventDefault();
@@ -1840,12 +1853,18 @@ window.addEventListener("keydown", (ev) => {
     }, 600);
     return;
   }
-  if (one) return runShortcut(one);
+  if (one) {
+    // Remember what was running, in case a second letter makes this a command (SE, WT…).
+    toolBeforeSingle = one.startsWith("tool:") ? tool.name : null;
+    return runShortcut(one);
+  }
 });
 
 let shortcuts = shortcutTable();
 let lastKey: { key: string; at: number } | null = null;
 let pendingSingle: ReturnType<typeof setTimeout> | null = null;
+/** The tool running before a single-letter tool shortcut (restored if it turns into a two-letter command). */
+let toolBeforeSingle: string | null = null;
 /** The tool to go back to after Zoom Region. */
 let toolBeforeZoom = "select";
 
@@ -2239,6 +2258,12 @@ function refreshTypeSelector(): void {
 }
 
 /** Status bar selection count (Revit's funnel): click to filter the selection by category. */
+/** Revit's snap overrides: only this kind of snap for the next pick (the tool keeps running). */
+function snapOnce(o: SnapOverride): void {
+  setSnapOverride(o);
+  status(`Next pick snaps only to ${o === "nearest" ? "the nearest grid or reference plane line" : `${o}s`}.`);
+}
+
 /** Status bar: the active workset (Revit's), when the project has worksets. */
 function refreshWorksetPicker(): void {
   const s = $<HTMLSelectElement>("#active-ws");

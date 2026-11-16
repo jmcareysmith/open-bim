@@ -129,7 +129,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   unreferenced materials (by id or layer name)/families/templates/filters; one type of each kind kept; purgeui.ts). Manage → Transfer
   Standards (core transfer.ts: pick categories from another project file, skip/overwrite same names, needed materials/filters
   come along, refs remapped; transferui.ts). Manage → Snaps (snapopts.ts, local storage: endpoints, midpoints, intersections,
-  grid lines, scans, ortho, length increment, snap distance in screen px — tools.ts `snapPoint`); SO toggles snapping.
+  grid lines, scans, ortho, length increment, snap distance in screen px — tools.ts `snapPoint`); SO toggles snapping;
+  SE/SM/SI/SN snap only to endpoints/midpoints/intersections/nearest line for the next pick (`snapOverride`). Two-letter
+  commands go back to the tool from before their first letter (`toolBeforeSingle`), so SE keeps the Wall tool.
 - Status bar: ⧩ selection count at the right; click to filter the selection by category. Revit's selection toggles beside it
   (selectopts.ts, local storage): 📌 Select pinned elements (off: pinned can't be selected), ✥ Drag elements on selection
   (on: press on any element and drag it; default off).

@@ -35,6 +35,13 @@ function load(): SnapOptions {
 
 export const snapOptions: SnapOptions = load();
 
+/** One-pick snap override (Revit's SE/SM/SI/SN): only this kind for the next click, then back to normal. */
+export type SnapOverride = "endpoint" | "midpoint" | "intersection" | "nearest" | null;
+export let snapOverride: SnapOverride = null;
+export function setSnapOverride(o: SnapOverride): void {
+  snapOverride = o;
+}
+
 export function saveSnapOptions(): void {
   try {
     localStorage.setItem(KEY, JSON.stringify(snapOptions));

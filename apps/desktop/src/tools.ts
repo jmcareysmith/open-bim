@@ -119,7 +119,7 @@ import {
 } from "@open-bim/core";
 import { curtainPart, partLabel, setCurtainPart } from "./curtainpart.ts";
 import { selectOptions } from "./selectopts.ts";
-import { snapOptions } from "./snapopts.ts";
+import { snapOptions, snapOverride } from "./snapopts.ts";
 import { wallEnclosure, areaBoundary, buildGridLines, buildReferencePlaneLines, buildRoomLines, extrudePolygon, roomBoundary, wallFootprint, type LineData } from "@open-bim/geometry";
 import type { Viewport } from "./viewport.ts";
 
@@ -357,7 +357,11 @@ export interface Snapped {
  * 50 mm increment. `free` (Shift) turns off ortho.
  */
 export function snapPoint(ctx: ToolContext, p: Vec2, start: Vec2 | null, free: boolean, extra: Vec2[] = []): Snapped {
-  const so = snapOptions;
+  const ov = snapOverride;
+  // A one-pick override: only that kind, whatever the settings (else the point as picked).
+  const so = ov
+    ? { ...snapOptions, on: true, endpoints: ov === "endpoint", midpoints: ov === "midpoint", intersections: ov === "intersection", gridLines: ov === "nearest", scans: false, ortho: false, increment: 0 }
+    : snapOptions;
   // Snaps off (SO): the point as picked.
   if (!so.on) return { p: { ...p }, kind: "increment" };
   const grids = datumLines(ctx.doc); // grids and reference planes

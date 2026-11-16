@@ -133,7 +133,8 @@ export function cleanCuts(doc: Document, linework: PlanLinework[], frame: ViewFr
     const ta = items.get(a)!.thickness;
     const tb = items.get(b)!.thickness;
     if (Math.abs(ta - tb) > 1e-6) return ta > tb;
-    return order.get(a)! < order.get(b)!;
+    // Equal thickness: the lower id (as 3D does; stable through undo and between collaborators).
+    return a < b;
   };
   for (const a of ids) {
     for (const b of related.get(a)!) {

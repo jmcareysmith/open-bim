@@ -51,8 +51,11 @@ export interface DocumentJSON {
 /** The element store: counts every change, so derived data can be cached per revision. */
 class ElementMap extends Map<ElementId, Element> {
   rev = 0;
+  /** Bumped by changes that can add dependencies (sets and in-place edits), not by deletions. */
+  structRev = 0;
   override set(k: ElementId, v: Element): this {
     this.rev++;
+    this.structRev++;
     return super.set(k, v);
   }
   override delete(k: ElementId): boolean {
@@ -61,6 +64,7 @@ class ElementMap extends Map<ElementId, Element> {
   }
   override clear(): void {
     this.rev++;
+    this.structRev++;
     super.clear();
   }
 }
@@ -122,7 +126,25 @@ export class Document {
 
   /** Elements that list `id` as a dependency (direct only). */
   dependents(id: ElementId): Element[] {
-    return this.all().filter((e) => this.depsOf(e).includes(id));
+    return (this.reverseIndex().get(id) ?? []).map((d) => this.elements.get(d)).filter((e): e is Element => !!e);
+  }
+
+  /** id → ids of elements depending on it, built once per revision. */
+  private reverseCache: { rev: number; map: Map<ElementId, ElementId[]> } | null = null;
+  private reverseIndex(): Map<ElementId, ElementId[]> {
+    // Deletions only remove dependents (gone ids are skipped by readers), so they don't stale it.
+    const rev = this.revBase * 1e9 + this.elements.structRev;
+    if (this.reverseCache?.rev === rev) return this.reverseCache.map;
+    const map = new Map<ElementId, ElementId[]>();
+    for (const el of this.elements.values()) {
+      for (const dep of new Set(this.depsOf(el))) {
+        const list = map.get(dep);
+        if (list) list.push(el.id);
+        else map.set(dep, [el.id]);
+      }
+    }
+    this.reverseCache = { rev, map };
+    return map;
   }
 
   // ---- events ------------------------------------------------------------
@@ -352,6 +374,7 @@ export class Document {
         const el = this.require<P>(id);
         remember(id);
         this.elements.rev++;
+        this.elements.structRev++;
         el.params = { ...el.params, ...clone(patch) } as P;
         for (const dep of this.depsOf(el)) {
           if (!this.elements.has(dep)) throw new Error(`${el.category} depends on missing element ${dep}`);
@@ -375,6 +398,7 @@ export class Document {
         if (!getCategory(type.category).isType) throw new Error(`${type.category} is not a type`);
         remember(id);
         this.elements.rev++;
+        this.elements.structRev++;
         el.typeId = typeId;
       },
 
@@ -419,14 +443,7 @@ export class Document {
     // Regenerate: changed elements plus everything transitively depending on them.
     const regen = new Set<ElementId>();
     const queue = [...added, ...modified, ...removed];
-    const reverse = new Map<ElementId, ElementId[]>();
-    for (const el of this.elements.values()) {
-      for (const dep of this.depsOf(el)) {
-        let list = reverse.get(dep);
-        if (!list) reverse.set(dep, (list = []));
-        list.push(el.id);
-      }
-    }
+    const reverse = this.reverseIndex();
     while (queue.length) {
       const id = queue.pop()!;
       if (regen.has(id)) continue;

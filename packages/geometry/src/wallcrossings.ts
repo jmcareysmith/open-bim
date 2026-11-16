@@ -13,18 +13,10 @@ function plain(doc: Document, w: Wall): boolean {
   return !!t && !t.curtain && !t.stack?.length;
 }
 
-const orders = new WeakMap<Document, { rev: number; order: Map<string, number> }>();
-/** Walls' drawing order (ties go to the earlier), cached per document revision. */
-function wallOrder(doc: Document): Map<string, number> {
-  let c = orders.get(doc);
-  if (!c || c.rev !== doc.revision) orders.set(doc, (c = { rev: doc.revision, order: new Map(doc.byCategory(Cat.Wall).map((w, i) => [w.id, i])) }));
-  return c.order;
-}
 
 /** The footprints (with height ranges) of walls running through this one. */
 export function crossingCutters(doc: Document, wall: Wall): { loop: Vec2[]; z0: number; z1: number }[] {
   if (!plain(doc, wall)) return [];
-  const order = wallOrder(doc);
   const own = wallThickness(doc, wall);
   const { bottom, top } = wallExtent(doc, wall);
   const out: { loop: Vec2[]; z0: number; z1: number }[] = [];
@@ -32,7 +24,8 @@ export function crossingCutters(doc: Document, wall: Wall): { loop: Vec2[]; z0: 
     const o = doc.get(id) as Wall | undefined;
     if (!o || !plain(doc, o)) continue;
     const t = wallThickness(doc, o);
-    const wins = t > own + 1e-6 || (Math.abs(t - own) <= 1e-6 && (order.get(o.id) ?? 0) < (order.get(wall.id) ?? 0));
+    // Equal thickness: the lower id runs through (stable through undo and between collaborators; plan cleanup agrees).
+    const wins = t > own + 1e-6 || (Math.abs(t - own) <= 1e-6 && o.id < wall.id);
     if (!wins) continue;
     const r = wallExtent(doc, o);
     const z0 = Math.max(bottom, r.bottom);
@@ -49,11 +42,18 @@ export function cutWallBody(footprint: Vec2[], bottom: number, top: number, cutt
   if (!cutters.length) return extrudePolygon(footprint, [], bottom, top);
   const zs = [...new Set([bottom, top, ...cutters.flatMap((c) => [c.z0, c.z1])])].filter((z) => z >= bottom && z <= top).sort((a, b) => a - b);
   const parts: MeshData[] = [];
+  // Bands between cutter heights; neighbouring bands cut by the same walls are one (no faces inside the wall).
+  const bands: { z0: number; z1: number; active: typeof cutters }[] = [];
   for (let i = 0; i + 1 < zs.length; i++) {
     const z0 = zs[i]!;
     const z1 = zs[i + 1]!;
     if (z1 - z0 < 1e-6) continue;
     const active = cutters.filter((c) => c.z0 <= z0 + 1e-6 && c.z1 >= z1 - 1e-6);
+    const last = bands[bands.length - 1];
+    if (last && last.active.length === active.length && last.active.every((c, k) => c === active[k])) last.z1 = z1;
+    else bands.push({ z0, z1, active });
+  }
+  for (const { z0, z1, active } of bands) {
     let polys: Polygon[] = [[ring(footprint)]];
     if (active.length) polys = polygonClipping.difference(polys[0]!, ...active.map((c) => [ring(c.loop)] as Polygon));
     for (const poly of polys) {

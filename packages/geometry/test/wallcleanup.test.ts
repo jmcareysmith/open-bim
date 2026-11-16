@@ -298,3 +298,30 @@ describe("crossing walls in 3D", () => {
     expect(meshVolume(k.build(doc, doc.require(thin.id))!)).toBeCloseTo(4000 * 100 * 2400, -4);
   });
 });
+
+describe("crossings vs tees, and stable ties", () => {
+  it("a stem drawn to the far face of a thin wall is a tee, not a crossing", async () => {
+    const { crossingWalls } = await import("@open-bim/core");
+    const { doc, wall, types } = setup();
+    const thin = wall(p(0, 0), p(4000, 0), types.t100);
+    // 200 thick stem ending 50 past the thin wall's centreline (its far face).
+    const stem = wall(p(2000, 3000), p(2000, -50), types.t200);
+    expect(crossingWalls(doc, doc.require(stem.id) as Wall)).toEqual([]);
+    expect(crossingWalls(doc, doc.require(thin.id) as Wall)).toEqual([]);
+  });
+
+  it("equal walls: the same one runs through after a delete and undo", async () => {
+    const { crossingCutters } = await import("../src/index.ts");
+    const { doc, wall, types } = setup();
+    const a = wall(p(0, 0), p(4000, 0), types.t100);
+    const b = wall(p(2000, -2000), p(2000, 2000), types.t100);
+    const cutOf = () => [a, b].map((w) => crossingCutters(doc, doc.require(w.id) as Wall).length);
+    const first = cutOf();
+    expect([...first].sort()).toEqual([0, 1]);
+    doc.transact("Del", (tx) => tx.delete(a.id));
+    doc.undo();
+    expect(cutOf()).toEqual(first);
+  });
+
+
+});

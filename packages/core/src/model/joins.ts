@@ -71,9 +71,12 @@ export function crossingWalls(doc: Document, wall: Wall): ElementId[] {
   const hit = idx.crossing.get(wall.id);
   if (hit && doc.get(wall.id) === wall) return hit;
   const pa = arcPoints(wall.params.start, wall.params.end, wall.params.curve, Math.PI / 90);
-  const near = (q: Vec2, w: Wall) => Math.hypot(q.x - w.params.start.x, q.y - w.params.start.y) <= 1 || Math.hypot(q.x - w.params.end.x, q.y - w.params.end.y) <= 1;
   const out: ElementId[] = [];
+  const hw = halfThickness(doc, wall) ?? UNKNOWN_HALF_THICKNESS;
   for (const o of joinCandidates(doc, wall)) {
+    // Within either wall's half thickness of an end: a join or tee (a stem drawn to the far face), not a crossing.
+    const reach = Math.max(hw, halfThickness(doc, o) ?? UNKNOWN_HALF_THICKNESS) + 1;
+    const near = (q: Vec2, w: Wall) => Math.hypot(q.x - w.params.start.x, q.y - w.params.start.y) <= reach || Math.hypot(q.x - w.params.end.x, q.y - w.params.end.y) <= reach;
     const pb = arcPoints(o.params.start, o.params.end, o.params.curve, Math.PI / 90);
     let hit = false;
     for (let i = 0; i + 1 < pa.length && !hit; i++) {
@@ -168,7 +171,6 @@ function endDirection(wall: Wall, end: WallEnd): Vec2 {
   return tangentLine(wall, end === "start" ? 0 : arcLength(start, e, curve)).dir;
 }
 
-/** Other walls that overlap `wall` vertically (walls on different storeys never join). */
 /**
  * Walls near enough in plan (bounding boxes within a margin of the thickest wall type) and
  * sharing heights: the only ones a join, tee or crossing can involve. Cached per document revision.
@@ -180,6 +182,11 @@ const nearCache = new WeakMap<
   { rev: number; boxes: WallBox[]; byWall: Map<Wall, WallBox>; cells: Map<number, WallBox[]>; margin: number; near: Map<ElementId, Wall[]>; crossing: Map<ElementId, ElementId[]> }
 >();
 const cellKey = (i: number, j: number) => i * 1048576 + j;
+/** Plan box of a wall's location line (arcs sampled at 1°: under 0.004% of the radius short). */
+function lineBox(w: Wall): { x0: number; y0: number; x1: number; y1: number } {
+  const pts = arcPoints(w.params.start, w.params.end, w.params.curve, Math.PI / 180);
+  return { x0: Math.min(...pts.map((q) => q.x)), y0: Math.min(...pts.map((q) => q.y)), x1: Math.max(...pts.map((q) => q.x)), y1: Math.max(...pts.map((q) => q.y)) };
+}
 function wallIndex(doc: Document) {
   const rev = doc.revision;
   let c = nearCache.get(doc);
@@ -188,16 +195,7 @@ function wallIndex(doc: Document) {
     let thick = 0;
     for (const t of doc.byCategory<LayeredTypeParams>(Cat.WallType)) thick = Math.max(thick, totalThickness(t));
     const boxes = walls.map((w, i) => {
-      const pts = arcPoints(w.params.start, w.params.end, w.params.curve, Math.PI / 18);
-      return {
-        i,
-        wall: w,
-        x0: Math.min(...pts.map((q) => q.x)),
-        y0: Math.min(...pts.map((q) => q.y)),
-        x1: Math.max(...pts.map((q) => q.x)),
-        y1: Math.max(...pts.map((q) => q.y)),
-        z: zRange(doc, w),
-      };
+      return { i, wall: w, ...lineBox(w), z: zRange(doc, w) };
     });
     // A coarse grid over the boxes, so a wall only looks at walls near it.
     const cells = new Map<number, WallBox[]>();
@@ -223,8 +221,7 @@ function joinCandidates(doc: Document, wall: Wall): Wall[] {
   if (hit && doc.get(wall.id) === wall) return hit;
   const me = idx.byWall.get(wall);
   const range = me?.z ?? zRange(doc, wall);
-  const pts = me ? null : arcPoints(wall.params.start, wall.params.end, wall.params.curve, Math.PI / 18);
-  const box = me ?? { x0: Math.min(...pts!.map((q) => q.x)), y0: Math.min(...pts!.map((q) => q.y)), x1: Math.max(...pts!.map((q) => q.x)), y1: Math.max(...pts!.map((q) => q.y)) };
+  const box = me ?? lineBox(wall);
   const m = idx.margin;
   // Walls in the grid cells round this one's box (each once).
   const nearby = new Set<WallBox>();

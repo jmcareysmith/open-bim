@@ -87,10 +87,9 @@ export function skeletonFaces(boundary: Vec2[], slopes: (number | null)[]): Vec2
   };
 
   const arcs: Arc[] = [];
-  const end = (v: Vert, q: Vec2, t: number) => {
+  const end = (v: Vert, q: Vec2) => {
     v.alive = false;
     arcs.push({ a: at(v, v.t0), b: q, edges: [v.eL, v.eR] });
-    void t;
   };
   const make = (p: Vec2, t: number, eL: number, eR: number): Vert => {
     const { s, stuck } = velocity(eL, eR);
@@ -131,10 +130,10 @@ export function skeletonFaces(boundary: Vec2[], slopes: (number | null)[]): Vec2
           const [u, w] = vs as [Vert, Vert];
           const pu = at(u, now);
           const pw = at(w, now);
-          end(u, pu, now);
-          end(w, pw, now);
+          end(u, pu);
+          end(w, pw);
           if (Math.hypot(pu.x - pw.x, pu.y - pw.y) > eps) arcs.push({ a: pu, b: pw, edges: [u.eL, u.eR] });
-        } else for (const v of vs) end(v, at(v, now), now);
+        } else for (const v of vs) end(v, at(v, now));
       }
       loops = live;
       if (!loops.length) break;
@@ -189,13 +188,13 @@ export function skeletonFaces(boundary: Vec2[], slopes: (number | null)[]): Vec2
           const pc = at(c, now);
           if (Math.hypot(pc.x - q.x, pc.y - q.y) <= 1e-6 * scale) {
             // Triangle: all three meet at one point.
-            for (const v of [a, b, c]) end(v, q, now);
+            for (const v of [a, b, c]) end(v, q);
             loops.splice(loop, 1);
             continue;
           }
         }
-        end(a, q, now);
-        end(b, q, now);
+        end(a, q);
+        end(b, q);
         const v = make(q, now, a.eL, b.eR);
         v.prev = a.prev;
         v.next = b.next;
@@ -208,7 +207,7 @@ export function skeletonFaces(boundary: Vec2[], slopes: (number | null)[]): Vec2
         const e = x.eR;
         const q = at(v, now);
         const loop = loops.indexOf(loops.find((s) => loopOf(s).includes(v))!);
-        end(v, q, now);
+        end(v, q);
         // Two outlines: …P → V1 → Y… and …X → V2 → N….
         const v1 = make(q, now, v.eL, e);
         const v2 = make(q, now, e, v.eR);

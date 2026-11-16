@@ -64,6 +64,10 @@ type Tri = [V3, V3, V3];
 
 /** Occluding triangle with its projected bounding box. */
 interface Occluder {
+  /** Index in its grid (for de-duplicating lookups). */
+  n?: number;
+  /** Highest point: an occluder wholly below an edge can't hide it. */
+  maxZ: number;
   t: Tri;
   minX: number;
   maxX: number;
@@ -166,27 +170,47 @@ function normal(t: Tri): V3 {
 
 /** Boundary edges and creases between faces meeting at more than CREASE_DEG. */
 export function featureEdges(tris: Tri[]): [V3, V3][] {
-  const edges = new Map<string, { a: V3; b: V3; normals: V3[] }>();
-  for (const t of tris) {
+  // Weld vertices once (by position, to 0.001 mm), then key edges by vertex number pair.
+  // Hash of the rounded coordinates → candidate vertices (compared exactly on the rounded values).
+  const buckets = new Map<number, number[]>();
+  const pts: V3[] = [];
+  const q: number[] = [];
+  const vid = (p: V3) => {
+    const x = Math.round(p[0] * 1000);
+    const y = Math.round(p[1] * 1000);
+    const z = Math.round(p[2] * 1000);
+    const h = (Math.imul(x | 0, 73856093) ^ Math.imul(y | 0, 19349663) ^ Math.imul(z | 0, 83492791)) | 0;
+    const list = buckets.get(h);
+    if (list) for (const i of list) if (q[i * 3] === x && q[i * 3 + 1] === y && q[i * 3 + 2] === z) return i;
+    const i = pts.length;
+    pts.push(p);
+    q.push(x, y, z);
+    if (list) list.push(i);
+    else buckets.set(h, [i]);
+    return i;
+  };
+  const tv = tris.map((t) => [vid(t[0]), vid(t[1]), vid(t[2])] as const);
+  const N = pts.length + 1;
+  const edges = new Map<number, { a: number; b: number; n0: V3; n1: V3 | null; many: boolean }>();
+  tris.forEach((t, ti) => {
     const n = normal(t);
+    const v = tv[ti]!;
     for (let i = 0; i < 3; i++) {
-      const a = t[i]!;
-      const b = t[(i + 1) % 3]!;
-      const ka = KEY(...a);
-      const kb = KEY(...b);
-      if (ka === kb) continue;
-      const key = ka < kb ? `${ka}|${kb}` : `${kb}|${ka}`;
+      const a = v[i]!;
+      const b = v[(i + 1) % 3]!;
+      if (a === b) continue;
+      const key = a < b ? a * N + b : b * N + a;
       const e = edges.get(key);
-      if (e) e.normals.push(n);
-      else edges.set(key, { a, b, normals: [n] });
+      if (!e) edges.set(key, { a, b, n0: n, n1: null, many: false });
+      else if (!e.n1) e.n1 = n;
+      else e.many = true;
     }
-  }
+  });
   const cos = Math.cos((CREASE_DEG * Math.PI) / 180);
   const out: [V3, V3][] = [];
   for (const e of edges.values()) {
-    const [n0, n1] = e.normals;
-    const crease = !n1 || e.normals.length > 2 || n0![0] * n1[0] + n0![1] * n1[1] + n0![2] * n1[2] < cos;
-    if (crease) out.push([e.a, e.b]);
+    const crease = !e.n1 || e.many || e.n0[0] * e.n1[0] + e.n0[1] * e.n1[1] + e.n0[2] * e.n1[2] < cos;
+    if (crease) out.push([pts[e.a]!, pts[e.b]!]);
   }
   return out;
 }
@@ -349,40 +373,52 @@ function occluder(t: Tri): Occluder {
     maxX: Math.max(t[0][0], t[1][0], t[2][0]),
     minY: Math.min(t[0][1], t[1][1], t[2][1]),
     maxY: Math.max(t[0][1], t[1][1], t[2][1]),
+    maxZ: Math.max(t[0][2], t[1][2], t[2][2]),
   };
 }
 
 /** Uniform grid over occluder bounding boxes, for quick candidate lookup. */
 class OccluderGrid {
-  private cells = new Map<string, Occluder[]>();
+  private cells = new Map<number, Occluder[]>();
   private size: number;
+  private stamp = 0;
+  private seen: Uint32Array;
 
   constructor(private all: Occluder[]) {
     const span = all.reduce((s, o) => Math.max(s, o.maxX - o.minX, o.maxY - o.minY), 1);
     this.size = Math.max(250, Math.min(2000, span / 4));
-    for (const o of all) {
-      for (const key of this.keys(o.minX, o.minY, o.maxX, o.maxY)) {
-        const c = this.cells.get(key);
-        if (c) c.push(o);
-        else this.cells.set(key, [o]);
+    this.seen = new Uint32Array(all.length);
+    all.forEach((o, n) => {
+      o.n = n;
+      const s = this.size;
+      for (let i = Math.floor(o.minX / s); i <= Math.floor(o.maxX / s); i++) {
+        for (let j = Math.floor(o.minY / s); j <= Math.floor(o.maxY / s); j++) {
+          const key = i * 1048576 + j;
+          const c = this.cells.get(key);
+          if (c) c.push(o);
+          else this.cells.set(key, [o]);
+        }
       }
-    }
+    });
   }
 
-  private *keys(x0: number, y0: number, x1: number, y1: number): Generator<string> {
-    const s = this.size;
-    for (let i = Math.floor(x0 / s); i <= Math.floor(x1 / s); i++) {
-      for (let j = Math.floor(y0 / s); j <= Math.floor(y1 / s); j++) yield `${i},${j}`;
-    }
-  }
-
-  query(x0: number, y0: number, x1: number, y1: number): Set<Occluder> {
-    const out = new Set<Occluder>();
+  /** Occluders whose cells the box touches (each once). */
+  query(x0: number, y0: number, x1: number, y1: number): Occluder[] {
     // Long edges would visit many cells; fall back to scanning everything.
     const s = this.size;
-    if (((Math.abs(x1 - x0) / s + 1) * (Math.abs(y1 - y0) / s + 1)) > this.all.length) return new Set(this.all);
-    for (const key of this.keys(Math.min(x0, x1), Math.min(y0, y1), Math.max(x0, x1), Math.max(y0, y1))) {
-      for (const o of this.cells.get(key) ?? []) out.add(o);
+    if (((Math.abs(x1 - x0) / s + 1) * (Math.abs(y1 - y0) / s + 1)) > this.all.length) return this.all;
+    const stamp = ++this.stamp;
+    const out: Occluder[] = [];
+    for (let i = Math.floor(Math.min(x0, x1) / s); i <= Math.floor(Math.max(x0, x1) / s); i++) {
+      for (let j = Math.floor(Math.min(y0, y1) / s); j <= Math.floor(Math.max(y0, y1) / s); j++) {
+        const c = this.cells.get(i * 1048576 + j);
+        if (!c) continue;
+        for (const o of c) {
+          if (this.seen[o.n!] === stamp) continue;
+          this.seen[o.n!] = stamp;
+          out.push(o);
+        }
+      }
     }
     return out;
   }
@@ -427,7 +463,9 @@ function hiddenInterval(a: V3, b: V3, o: Occluder): [number, number] | null {
 
 function visibleIntervals(a: V3, b: V3, grid: OccluderGrid): [number, number][] {
   const hidden: [number, number][] = [];
+  const lowZ = Math.min(a[2], b[2]) + DEPTH_EPS;
   for (const o of grid.query(a[0], a[1], b[0], b[1])) {
+    if (o.maxZ < lowZ) continue;
     if (o.maxX < Math.min(a[0], b[0]) || o.minX > Math.max(a[0], b[0])) continue;
     if (o.maxY < Math.min(a[1], b[1]) || o.minY > Math.max(a[1], b[1])) continue;
     const h = hiddenInterval(a, b, o);

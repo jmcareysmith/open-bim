@@ -13,10 +13,18 @@ function plain(doc: Document, w: Wall): boolean {
   return !!t && !t.curtain && !t.stack?.length;
 }
 
+const orders = new WeakMap<Document, { rev: number; order: Map<string, number> }>();
+/** Walls' drawing order (ties go to the earlier), cached per document revision. */
+function wallOrder(doc: Document): Map<string, number> {
+  let c = orders.get(doc);
+  if (!c || c.rev !== doc.revision) orders.set(doc, (c = { rev: doc.revision, order: new Map(doc.byCategory(Cat.Wall).map((w, i) => [w.id, i])) }));
+  return c.order;
+}
+
 /** The footprints (with height ranges) of walls running through this one. */
 export function crossingCutters(doc: Document, wall: Wall): { loop: Vec2[]; z0: number; z1: number }[] {
   if (!plain(doc, wall)) return [];
-  const order = new Map(doc.byCategory(Cat.Wall).map((w, i) => [w.id, i]));
+  const order = wallOrder(doc);
   const own = wallThickness(doc, wall);
   const { bottom, top } = wallExtent(doc, wall);
   const out: { loop: Vec2[]; z0: number; z1: number }[] = [];

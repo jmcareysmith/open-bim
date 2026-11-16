@@ -48,8 +48,32 @@ export interface DocumentJSON {
   elements: Element[];
 }
 
+/** The element store: counts every change, so derived data can be cached per revision. */
+class ElementMap extends Map<ElementId, Element> {
+  rev = 0;
+  override set(k: ElementId, v: Element): this {
+    this.rev++;
+    return super.set(k, v);
+  }
+  override delete(k: ElementId): boolean {
+    this.rev++;
+    return super.delete(k);
+  }
+  override clear(): void {
+    this.rev++;
+    super.clear();
+  }
+}
+
 export class Document {
-  private elements = new Map<ElementId, Element>();
+  private elements = new ElementMap();
+  private revBase = 0;
+  private catIndex: { rev: number; map: Map<string, Element[]> } | null = null;
+
+  /** Changes with every edit (any element set or removed): a key for caches of derived data. */
+  get revision(): number {
+    return this.revBase + this.elements.rev;
+  }
   private undoStack: Committed[] = [];
   private redoStack: Committed[] = [];
   private listeners = new Set<ChangeListener>();
@@ -78,7 +102,18 @@ export class Document {
   }
 
   byCategory<P extends Params = Params>(category: string): Element<P>[] {
-    return this.all().filter((e) => e.category === category) as Element<P>[];
+    // One pass indexes every category; it holds until the next change.
+    const rev = this.revision;
+    if (!this.catIndex || this.catIndex.rev !== rev) {
+      const map = new Map<string, Element[]>();
+      for (const e of this.elements.values()) {
+        const list = map.get(e.category);
+        if (list) list.push(e);
+        else map.set(e.category, [e]);
+      }
+      this.catIndex = { rev, map };
+    }
+    return (this.catIndex.map.get(category)?.slice() ?? []) as Element<P>[];
   }
 
   get size(): number {
@@ -260,7 +295,8 @@ export class Document {
   load(json: DocumentJSON): void {
     const loaded = Document.fromJSON(json);
     const removed = [...this.elements.keys()];
-    this.elements = loaded.elements;
+    this.revBase += this.elements.rev + 1;
+    this.elements = new ElementMap(loaded.elements);
     this.undoStack = [];
     this.redoStack = [];
     const added = [...this.elements.keys()];
@@ -315,6 +351,7 @@ export class Document {
         assertLive();
         const el = this.require<P>(id);
         remember(id);
+        this.elements.rev++;
         el.params = { ...el.params, ...clone(patch) } as P;
         for (const dep of this.depsOf(el)) {
           if (!this.elements.has(dep)) throw new Error(`${el.category} depends on missing element ${dep}`);
@@ -326,6 +363,7 @@ export class Document {
         assertLive();
         const el = this.require(id);
         remember(id);
+        this.elements.rev++;
         if (name === undefined) delete el.name;
         else el.name = name;
       },
@@ -336,6 +374,7 @@ export class Document {
         const type = this.require(typeId);
         if (!getCategory(type.category).isType) throw new Error(`${type.category} is not a type`);
         remember(id);
+        this.elements.rev++;
         el.typeId = typeId;
       },
 

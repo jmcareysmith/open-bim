@@ -453,3 +453,37 @@ export function setWallClearance(tx: Transaction, doc: Document, id: ElementId, 
   const delta = side === "left" ? c.dist - dist : dist - c.dist;
   transformElements(tx, doc, [id], translation({ x: n.x * delta, y: n.y * delta }));
 }
+
+/**
+ * A column's or free-standing family's temporary dimensions: distance to the nearest straight grid
+ * line in each of up to two directions (Revit's), with the grid's unit normal pointing at the element.
+ */
+export function pointClearances(doc: Document, el: Element): { gridId: ElementId; dist: number; normal: Vec2 }[] {
+  const p = el.params as Record<string, unknown>;
+  const at = p.position as Vec2 | undefined;
+  if (!at || typeof at.x !== "number" || (el.category !== Cat.Column && !(el.category === Cat.FamilyInstance && !p.hostId))) return [];
+  const best: { gridId: ElementId; dist: number; normal: Vec2; dir: Vec2 }[] = [];
+  for (const g of doc.byCategory<{ start: Vec2; end: Vec2; curve?: number | null }>(Cat.Grid)) {
+    const { start, end, curve } = g.params;
+    if (curve) continue;
+    const L = Math.hypot(end.x - start.x, end.y - start.y);
+    if (L < 1) continue;
+    const dir = { x: (end.x - start.x) / L, y: (end.y - start.y) / L };
+    const v = -(at.x - start.x) * dir.y + (at.y - start.y) * dir.x;
+    const normal = { x: -dir.y * Math.sign(v || 1), y: dir.x * Math.sign(v || 1) };
+    // One grid per direction (parallel within 1°): the nearest.
+    const same = best.findIndex((b) => Math.abs(b.dir.x * dir.y - b.dir.y * dir.x) < 0.02);
+    if (same < 0) best.push({ gridId: g.id, dist: Math.abs(v), normal, dir });
+    else if (Math.abs(v) < best[same]!.dist) best[same] = { gridId: g.id, dist: Math.abs(v), normal, dir };
+  }
+  return best.sort((a, b) => a.dist - b.dist).slice(0, 2).map(({ gridId, dist, normal }) => ({ gridId, dist, normal }));
+}
+
+/** Move a column or free-standing family so it's `dist` from grid `gridId` (on its current side). */
+export function setPointClearance(tx: Transaction, doc: Document, id: ElementId, gridId: ElementId, dist: number): void {
+  const c = pointClearances(doc, doc.require(id)).find((x) => x.gridId === gridId);
+  if (!c) throw new Error("That grid isn't one of this element's nearest");
+  if (!(dist >= 0)) throw new Error("The distance can't be negative");
+  const d = dist - c.dist;
+  transformElements(tx, doc, [id], translation({ x: c.normal.x * d, y: c.normal.y * d }));
+}

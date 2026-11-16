@@ -16,6 +16,8 @@ import {
   setHostedClearance,
   wallClearances,
   setWallClearance,
+  pointClearances,
+  setPointClearance,
   floorExtent,
   lineLength,
   setLineLength,
@@ -130,6 +132,7 @@ export class GripLayer {
     if (sel.length === 1) this.addLength(sel[0]!);
     if (sel.length === 1 && this.ctx.viewport.viewMode !== "drawing") this.addClearances(sel[0]!);
     if (sel.length === 1 && this.ctx.viewport.viewMode === "plan" && sel[0]!.category === Cat.Wall) this.addWallClearances(sel[0] as Wall);
+    if (sel.length === 1 && this.ctx.viewport.viewMode !== "drawing") this.addPointClearances(sel[0]!);
     if (in3d && sel.length === 1 && sel[0]!.category === Cat.Wall && curtainOf(doc, sel[0]!)) this.addCurtainLines(sel[0] as Wall);
     if (sel.length === 1 && sel[0]!.category === Cat.View) this.showExtent(sel[0] as View);
     if (sel.length === 1 && sel[0]!.category === Cat.Wall && this.ctx.viewport.viewMode !== "drawing") this.addFlip(sel[0]!);
@@ -380,6 +383,45 @@ export class GripLayer {
       };
       this.root.append(label);
       this.placed.push({ el: label, at: () => at, z: () => z });
+    }
+  }
+
+  /** A column's or free-standing family's temporary dimensions: to the nearest grid each way. */
+  private addPointClearances(el: Element): void {
+    const { doc } = this.ctx;
+    const at = (el.params as { position?: Vec2 }).position;
+    if (!at) return;
+    const z = gripZ(doc, el);
+    for (const c of pointClearances(doc, el)) {
+      // Halfway between the element and the grid.
+      const mid = { x: at.x - (c.normal.x * c.dist) / 2, y: at.y - (c.normal.y * c.dist) / 2 };
+      const label = document.createElement("div");
+      label.className = "temp-dim";
+      label.textContent = `${Math.round(c.dist)}`;
+      label.title = "Distance to the grid: click to type a new one";
+      label.onpointerdown = (ev) => ev.stopPropagation();
+      label.onclick = () => {
+        const input = document.createElement("input");
+        input.type = "number";
+        input.value = String(Math.round(c.dist));
+        label.replaceChildren(input);
+        input.focus();
+        input.select();
+        input.onkeydown = (ev) => {
+          ev.stopPropagation();
+          if (ev.key === "Escape") return this.refresh();
+          if (ev.key !== "Enter") return;
+          try {
+            doc.transact("Change distance to grid", (tx) => setPointClearance(tx, doc, el.id, c.gridId, Number(input.value)));
+          } catch (e) {
+            this.ctx.status(`⚠ ${(e as Error).message}`);
+          }
+          this.refresh();
+        };
+        input.onblur = () => this.refresh();
+      };
+      this.root.append(label);
+      this.placed.push({ el: label, at: () => mid, z: () => z });
     }
   }
 

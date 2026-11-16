@@ -196,3 +196,20 @@ describe("temporary dimensions for walls", () => {
     expect(doc.require<{ start: { y: number } }>(m.id).params.start.y).toBeCloseTo(2500);
   });
 });
+
+describe("temporary dimensions for columns", () => {
+  it("distances to the nearest grid each way; typing one moves the column", async () => {
+    const { Document, applyResidentialTemplate, createGrid, createColumn, ensureStructuralTypes, pointClearances, setPointClearance } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const [g1] = doc.transact("G", (tx) => [createGrid(tx, doc, { x: 0, y: -1000 }, { x: 0, y: 9000 }, "1"), createGrid(tx, doc, { x: -1000, y: 0 }, { x: 9000, y: 0 }, "A")]);
+    const types = doc.transact("T", (tx) => ensureStructuralTypes(tx, doc));
+    const colType = (Array.isArray(types) ? types : Object.values(types as object)).flat().map((t: { id?: string }) => t?.id ?? t).find((id) => doc.get(id as string)?.params && (doc.get(id as string)!.params as { kind?: string }).kind === "column") as string | undefined;
+    const tid = colType ?? doc.byCategory("StructuralType")[0]!.id;
+    const c = doc.transact("C", (tx) => createColumn(tx, doc, tid, ids.levels.ground, ids.levels.first, { x: 600, y: 450 }));
+    const cl = pointClearances(doc, c);
+    expect(cl.map((x) => x.dist).sort((a, b) => a - b)).toEqual([450, 600]);
+    doc.transact("Move", (tx) => setPointClearance(tx, doc, c.id, g1!.id, 1000));
+    expect(doc.require<{ position: Vec2 }>(c.id).params.position.x).toBeCloseTo(1000);
+  });
+});

@@ -102,3 +102,30 @@ describe("IFC identity", () => {
     expect(exportIfc(doc, { timestamp: "t" })).toContain(`'${gid}'`);
   });
 });
+
+describe("IFC export fixes", () => {
+  it("copies of a converted element get their own GlobalIds; kept property sets go back out; one grid is valid", async () => {
+    const { createGrid, transformElements, translation } = await import("@open-bim/core");
+    const src = new Document();
+    const ids = applyResidentialTemplate(src);
+    src.transact("W", (tx) => createWall(tx, ids.wallTypes.exterior, p(0, 0), p(5000, 0), ids.levels.ground, { height: 2700 }));
+    const doc = new Document();
+    await importIfc(doc, new TextEncoder().encode(exportIfc(src, { timestamp: "t" })), api);
+    const shape = doc.byCategory<DirectShapeParams>(Cat.DirectShape).find((d) => d.params.ifcClass === "IfcWall")!;
+    // A property only the import had.
+    doc.transact("P", (tx) => tx.update(shape.id, { properties: { ...shape.params.properties, "Pset_Custom.FireRating": "FRL 60/60/60" } }));
+    const { created } = doc.transact("C", (tx) => convertDirectShapes(tx, doc, [shape.id]));
+    doc.transact("Copy", (tx) => transformElements(tx, doc, created, translation({ x: 0, y: 3000 }), { copy: true }));
+    doc.transact("G", (tx) => createGrid(tx, doc, p(0, -1000), p(0, 5000), "1"));
+    const text = exportIfc(doc, { timestamp: "t" });
+    const model = api.OpenModel(new TextEncoder().encode(text));
+    const walls = api.GetLineIDsWithType(model, 0 + (await import("web-ifc")).IFCWALL);
+    const gids = new Set<string>();
+    for (let i = 0; i < walls.size(); i++) gids.add(api.GetLine(model, walls.get(i)).GlobalId.value);
+    expect(gids.size).toBe(walls.size());
+    expect(walls.size()).toBe(2);
+    expect(text).toContain("'FRL 60/60/60'");
+    expect(text).not.toMatch(/IFCGRID\([^;]*,\(\),/);
+    api.CloseModel(model);
+  });
+});

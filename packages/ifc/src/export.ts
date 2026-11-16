@@ -147,21 +147,23 @@ function mapping(doc: Document, el: Element): Mapping | null {
 /** The level an element sits on (hosted elements: their wall's base level). */
 /** IFC4 element classes whose attributes are the element's own plus Tag and PredefinedType. */
 const PLAIN_CLASSES = new Set([
-  "IfcWall", "IfcSlab", "IfcRoof", "IfcCovering", "IfcColumn", "IfcBeam", "IfcMember", "IfcPlate", "IfcFooting", "IfcPile", "IfcRailing",
-  "IfcStair", "IfcStairFlight", "IfcRamp", "IfcRampFlight", "IfcCurtainWall", "IfcBuildingElementProxy", "IfcFurniture", "IfcChimney",
+  "IfcWall", "IfcSlab", "IfcRoof", "IfcCovering", "IfcColumn", "IfcBeam", "IfcMember", "IfcPlate", "IfcFooting", "IfcRailing",
+  "IfcStair", "IfcRamp", "IfcRampFlight", "IfcCurtainWall", "IfcBuildingElementProxy", "IfcFurniture", "IfcChimney",
   "IfcShadingDevice", "IfcGeographicElement", "IfcAirTerminal", "IfcSanitaryTerminal", "IfcLightFixture", "IfcOutlet", "IfcFireSuppressionTerminal",
   "IfcUnitaryEquipment", "IfcElectricDistributionBoard", "IfcDuctSegment", "IfcDuctFitting", "IfcPipeSegment", "IfcPipeFitting",
-  "IfcCableCarrierSegment", "IfcCableCarrierFitting", "IfcFlowTerminal", "IfcDiscreteAccessory", "IfcMechanicalFastener",
+  "IfcCableCarrierSegment", "IfcCableCarrierFitting", "IfcDiscreteAccessory",
 ]);
 
-function levelOf(doc: Document, el: Element): ElementId | undefined {
+function levelOf(doc: Document, el: Element, depth = 0): ElementId | undefined {
   const p = el.params as Record<string, unknown>;
   if (el.category === Cat.Wall) return (p as WallParams).baseLevelId;
   if (el.category === Cat.Column) return p.baseLevelId as ElementId;
   if (el.category === Cat.StripFooting) return doc.get<WallParams>(p.wallId as ElementId)?.params.baseLevelId;
-  const host = typeof p.hostId === "string" ? doc.get<WallParams>(p.hostId) : undefined;
-  if (host) return host.params.baseLevelId;
-  return typeof p.levelId === "string" ? p.levelId : undefined;
+  if (typeof p.levelId === "string") return p.levelId;
+  // Hosted (doors, windows, rebar, hosted families): the host's level, whatever the host is.
+  const host = typeof p.hostId === "string" ? doc.get(p.hostId) : undefined;
+  if (host && host.id !== el.id && depth < 5) return levelOf(doc, host, depth + 1);
+  return undefined;
 }
 
 export function exportIfc(doc: Document, opts: IfcExportOptions = {}): string {
@@ -169,8 +171,21 @@ export function exportIfc(doc: Document, opts: IfcExportOptions = {}): string {
   const w = new StepWriter();
   const info = projectSettings(doc)?.params.info;
   const guid = (key: string) => ifcGuid(key);
+  // Project-wide entities and relationships: GlobalIds seeded by this project (so two projects federate cleanly).
+  const seed = projectSettings(doc)?.id ?? doc.all()[0]?.id ?? "open-bim";
+  const fixed = (key: string) => ifcGuid(`${seed}:${key}`);
   let relN = 0;
-  const relGuid = (kind: string) => ifcGuid(`${kind}:${relN++}`);
+  const relGuid = (kind: string) => ifcGuid(`${seed}:${kind}:${relN++}`);
+  // Kept (imported) GlobalIds, each used once (copies of a converted element get their own).
+  const usedGids = new Set<string>();
+  const gidFor = (el: Element): string => {
+    const kept = (el.params as { ifc?: { globalId?: string } | null }).ifc?.globalId ?? (el.category === Cat.DirectShape ? (el.params as { globalId?: string }).globalId : undefined);
+    if (kept && /^[0-9A-Za-z_$]{22}$/.test(kept) && !usedGids.has(kept)) {
+      usedGids.add(kept);
+      return kept;
+    }
+    return guid(el.id);
+  };
 
   // ---- context and units ----------------------------------------------------------------
   const origin = w.add("IfcCartesianPoint", [real(0), real(0), real(0)]);
@@ -190,7 +205,7 @@ export function exportIfc(doc: Document, opts: IfcExportOptions = {}): string {
 
   // ---- spatial structure ------------------------------------------------------------------
   const projectName = info?.name || "Open-BIM project";
-  const project = w.add("IfcProject", guid("project"), null, projectName, info?.number || null, null, info?.name || null, null, [ctx], units);
+  const project = w.add("IfcProject", fixed("project"), null, projectName, info?.number || null, null, info?.name || null, null, [ctx], units);
   // Shared coordinates: georeference the model context (IFC4 IfcMapConversion, metres).
   const loc = projectLocation(doc);
   if (projectSettings(doc)?.params.location) {
@@ -200,10 +215,10 @@ export function exportIfc(doc: Document, opts: IfcExportOptions = {}): string {
     w.add("IfcMapConversion", ctx, target, real(loc.eastings), real(loc.northings), real(loc.height), real(Math.cos(loc.rotation)), real(Math.sin(loc.rotation)), real(0.001));
   }
   const sitePlacement = w.add("IfcLocalPlacement", null, world);
-  const site = w.add("IfcSite", guid("site"), null, "Site", null, null, sitePlacement, null, null, en("ELEMENT"), null, null, null, null, null);
+  const site = w.add("IfcSite", fixed("site"), null, "Site", null, null, sitePlacement, null, null, en("ELEMENT"), null, null, null, null, null);
   const buildingPlacement = w.add("IfcLocalPlacement", sitePlacement, world);
   const address = info?.address ? w.add("IfcPostalAddress", null, null, null, null, [info.address], null, null, null, null, "New Zealand") : null;
-  const building = w.add("IfcBuilding", guid("building"), null, projectName, null, null, buildingPlacement, null, null, en("ELEMENT"), null, null, address);
+  const building = w.add("IfcBuilding", fixed("building"), null, projectName, null, null, buildingPlacement, null, null, en("ELEMENT"), null, null, address);
   w.add("IfcRelAggregates", relGuid("agg"), null, null, null, project, [site]);
   w.add("IfcRelAggregates", relGuid("agg"), null, null, null, site, [building]);
 
@@ -284,7 +299,7 @@ export function exportIfc(doc: Document, opts: IfcExportOptions = {}): string {
     if (el.category === Cat.Wall && mesh?.parts?.length && (doc.get(el.typeId ?? "")?.params as { curtain?: unknown } | undefined)?.curtain) {
       const byKey = new Map<string, number[]>();
       for (const pt of mesh.parts) byKey.set(pt.key, [...(byKey.get(pt.key) ?? []), ...mesh.indices.subarray(pt.start, pt.start + pt.count)]);
-      const cw = w.add("IfcCurtainWall", guid(el.id), null, el.name ?? doc.get(el.typeId ?? "")?.name ?? "Curtain Wall", null, null, placement, null, elementMark(el) ?? null, en("NOTDEFINED"));
+      const cw = w.add("IfcCurtainWall", gidFor(el), null, el.name ?? doc.get(el.typeId ?? "")?.name ?? "Curtain Wall", null, null, placement, null, elementMark(el) ?? null, en("NOTDEFINED"));
       const parts: Ref[] = [];
       let n = 0;
       for (const [key, idx] of byKey) {
@@ -313,6 +328,7 @@ export function exportIfc(doc: Document, opts: IfcExportOptions = {}): string {
       }
       if (parts.length) w.add("IfcRelAggregates", relGuid("agg"), null, null, null, cw, parts);
       storey.elements.push(cw);
+      properties(w, doc, el, { entity: "IfcCurtainWall", predefined: "NOTDEFINED" }, cw, relGuid);
       continue;
     }
     let shape: Ref | null = null;
@@ -327,8 +343,7 @@ export function exportIfc(doc: Document, opts: IfcExportOptions = {}): string {
     const name = el.category === Cat.Room ? (el.params as { number: string }).number : (el.name ?? doc.get(el.typeId ?? "")?.name ?? typeLabel(el));
     const tag = elementMark(el) ?? null;
     // Elements converted from IFC (or still imported shapes) keep their original GlobalId.
-    const kept = (el.params as { ifc?: { globalId?: string } | null; globalId?: string }).ifc?.globalId ?? (el.category === Cat.DirectShape ? (el.params as { globalId?: string }).globalId : undefined);
-    const common = [kept && /^[0-9A-Za-z_$]{22}$/.test(kept) ? kept : guid(el.id), null, name, null, typeLabel(el, doc), placement, shape] as StepArg[];
+    const common = [gidFor(el), null, name, null, typeLabel(el, doc), placement, shape] as StepArg[];
     let ref: Ref;
     if (m.entity === "IfcReinforcingBar") {
       // Bar size, area and total length (all its bars).
@@ -337,7 +352,8 @@ export function exportIfc(doc: Document, opts: IfcExportOptions = {}): string {
       ref = w.add("IfcReinforcingBar", ...common, tag, null, real(d), real((Math.PI * d * d) / 4), real(rebarQuantities(doc, rb).length), en("MAIN"), en("TEXTURED"));
     } else if (m.entity === "IfcDoor" || m.entity === "IfcWindow") {
       const h = hostedPlacement(doc, el);
-      ref = w.add(m.entity, ...common, tag, real(h.height), real(h.width), en(m.predefined), null, null);
+      // Overall sizes must be positive (a free-standing door family has no opening): unset then.
+      ref = w.add(m.entity, ...common, tag, h.height > 0 ? real(h.height) : null, h.width > 0 ? real(h.width) : null, en(m.predefined), null, null);
     } else if (m.entity === "IfcSpace") {
       ref = w.add("IfcSpace", ...common.slice(0, 7), el.name ?? null, en("ELEMENT"), en("INTERNAL"), null);
     } else {
@@ -371,8 +387,11 @@ export function exportIfc(doc: Document, opts: IfcExportOptions = {}): string {
     // IFC wants axes in both lists: with grids one way only, split them between the two.
     if (!v.length && u.length > 1) [u, v] = [u.slice(0, Math.ceil(u.length / 2)), u.slice(Math.ceil(u.length / 2))];
     if (!u.length && v.length > 1) [u, v] = [v.slice(0, Math.ceil(v.length / 2)), v.slice(Math.ceil(v.length / 2))];
+    // A single grid line: it stands in both lists (each must have one).
+    if (!v.length) v = u;
+    if (!u.length) u = v;
     const gridPlacement = w.add("IfcLocalPlacement", lowest.placement, w.add("IfcAxis2Placement3D", origin, null, null));
-    const grid = w.add("IfcGrid", guid("grid"), null, "Grids", null, null, gridPlacement, null, u.length ? u : v, u.length ? v : u, null, null);
+    const grid = w.add("IfcGrid", fixed("grid"), null, "Grids", null, null, gridPlacement, null, u, v, null, null);
     lowest.elements.push(grid);
   }
 
@@ -540,6 +559,21 @@ function properties(w: StepWriter, doc: Document, el: Element, m: Mapping, targe
     else if (typeof v === "string") own.push(prop(p.name ?? "", typed("IFCLABEL", v)));
   }
   if (own.length) psets.push(["Open-BIM", own]);
+  // Property sets kept from an IFC import (converted elements and imported shapes), as text values:
+  // all but quantities (recomputed above) and sets we've just written ourselves.
+  const kept = (el.params as { ifc?: { properties?: Record<string, string> } | null }).ifc?.properties ?? (el.category === Cat.DirectShape ? (el.params as { properties?: Record<string, string> }).properties : undefined);
+  if (kept) {
+    const written = new Set(psets.map(([n]) => n));
+    const bySet = new Map<string, Ref[]>();
+    for (const [key, value] of Object.entries(kept)) {
+      const dot = key.indexOf(".");
+      if (dot < 1) continue;
+      const set = key.slice(0, dot);
+      if (set.startsWith("Qto_") || written.has(set)) continue;
+      bySet.set(set, [...(bySet.get(set) ?? []), prop(key.slice(dot + 1), typed("IFCLABEL", value))]);
+    }
+    for (const [set, props] of bySet) psets.push([set, props]);
+  }
 
   for (const [name, props] of psets) {
     const ps = w.add("IfcPropertySet", relGuid("pset"), null, name, null, props);

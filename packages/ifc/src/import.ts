@@ -152,7 +152,12 @@ function gridAxes(api: IfcApi, model: number, mm: number): { tag: string; a: { x
         if (!curve) continue;
         const pt = (r: { value: number }) => ((api.GetLine(model, r.value).Coordinates ?? []) as { value: number }[]).map((c) => Number(c.value));
         let ends: number[][] = [];
-        if (curve.Points) ends = (curve.Points as { value: number }[]).map(pt);
+        if (Array.isArray(curve.Points)) ends = (curve.Points as { value: number }[]).map(pt);
+        else if (curve.Points?.value) {
+          // IfcIndexedPolyCurve: a point list (CoordList) by reference.
+          const list = api.GetLine(model, curve.Points.value as number);
+          ends = ((list.CoordList ?? []) as { value: number }[][]).map((c) => c.map((x) => Number(x.value)));
+        }
         else if (curve.Pnt && curve.Dir) {
           const p0 = pt(curve.Pnt);
           const v = api.GetLine(model, curve.Dir.value as number);
@@ -248,7 +253,12 @@ export async function importIfc(doc: Document, data: Uint8Array, api: IfcApi): P
     const storeys: { id: number; name: string; elevation: number }[] = [];
     for (let i = 0; i < storeyLines.size(); i++) {
       const l = api.GetLine(model, storeyLines.get(i));
-      storeys.push({ id: l.expressID, name: label(l.Name) ?? `Level ${i + 1}`, elevation: Number(label(l.Elevation) ?? 0) * mm });
+      // Height in world Z (as the shapes are): from the storey's placement; its optional, building-relative
+      // Elevation only when the placement says nothing.
+      const placed = placement(api, model, l.ObjectPlacement?.value as number | undefined)[11]! * mm;
+      const stated = label(l.Elevation);
+      const elevation = Math.abs(placed) > 1e-6 || stated === undefined ? placed : Number(stated) * mm;
+      storeys.push({ id: l.expressID, name: label(l.Name) ?? `Level ${i + 1}`, elevation });
     }
     const where = storeyOf(api, model, new Set(storeys.map((s) => s.id)));
     const products = meshes(api, model);
@@ -310,7 +320,12 @@ export async function importIfc(doc: Document, data: Uint8Array, api: IfcApi): P
     })();
     // Grids: one per axis, named by its tag (a number added if the name is taken).
     let grids = 0;
-    const axes = gridAxes(api, model, mm);
+    let axes: ReturnType<typeof gridAxes> = [];
+    try {
+      axes = gridAxes(api, model, mm);
+    } catch {
+      // Grids we can't read don't stop the import.
+    }
     const shapes = doc.transact("Import IFC", (tx) => {
       // Levels: reuse one within 1 mm of the storey's elevation, else create it.
       const levelFor = new Map<number, ElementId>();

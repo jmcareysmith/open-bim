@@ -178,3 +178,21 @@ describe("temporary dimensions for doors and windows", () => {
     expect(doc.require<{ position: number }>(d.id).params.position).toBeCloseTo(face - 100 - half, 0);
   });
 });
+
+describe("temporary dimensions for walls", () => {
+  it("distances to parallel walls either side; typing one moves the wall across", async () => {
+    const { Document, applyResidentialTemplate, createWall, wallClearances, setWallClearance } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const t = ids.wallTypes.interior;
+    const a = doc.transact("A", (tx) => createWall(tx, t, { x: 0, y: 0 }, { x: 6000, y: 0 }, ids.levels.ground, { height: 2400 }));
+    const m = doc.transact("M", (tx) => createWall(tx, t, { x: 0, y: 3000 }, { x: 6000, y: 3000 }, ids.levels.ground, { height: 2400 }));
+    doc.transact("B", (tx) => createWall(tx, t, { x: 0, y: 7000 }, { x: 6000, y: 7000 }, ids.levels.ground, { height: 2400 }));
+    const c = wallClearances(doc, m as never);
+    expect(c.left?.dist).toBe(4000);
+    expect(c.right?.dist).toBe(3000);
+    expect(c.right?.otherId).toBe(a.id);
+    doc.transact("Move", (tx) => setWallClearance(tx, doc, m.id, "right", 2500));
+    expect(doc.require<{ start: { y: number } }>(m.id).params.start.y).toBeCloseTo(2500);
+  });
+});

@@ -14,6 +14,8 @@ import {
   setPinned,
   hostedClearances,
   setHostedClearance,
+  wallClearances,
+  setWallClearance,
   floorExtent,
   lineLength,
   setLineLength,
@@ -127,6 +129,7 @@ export class GripLayer {
     if (sel.length === 1 && isPinned(sel[0]!)) return this.position();
     if (sel.length === 1) this.addLength(sel[0]!);
     if (sel.length === 1 && this.ctx.viewport.viewMode !== "drawing") this.addClearances(sel[0]!);
+    if (sel.length === 1 && this.ctx.viewport.viewMode === "plan" && sel[0]!.category === Cat.Wall) this.addWallClearances(sel[0] as Wall);
     if (in3d && sel.length === 1 && sel[0]!.category === Cat.Wall && curtainOf(doc, sel[0]!)) this.addCurtainLines(sel[0] as Wall);
     if (sel.length === 1 && sel[0]!.category === Cat.View) this.showExtent(sel[0] as View);
     if (sel.length === 1 && sel[0]!.category === Cat.Wall && this.ctx.viewport.viewMode !== "drawing") this.addFlip(sel[0]!);
@@ -331,6 +334,52 @@ export class GripLayer {
         },
         z: () => z,
       });
+    }
+  }
+
+  /** A selected wall's temporary dimensions: centreline distance to the nearest parallel wall each side. */
+  private addWallClearances(wall: Wall): void {
+    const { doc } = this.ctx;
+    const c = wallClearances(doc, wall);
+    const { start, end } = wall.params;
+    const L = Math.hypot(end.x - start.x, end.y - start.y);
+    if (L < 1) return;
+    const n = { x: -(end.y - start.y) / L, y: (end.x - start.x) / L };
+    // A third of the way along (clear of the length label and flip arrow in the middle).
+    const base = { x: start.x + (end.x - start.x) / 3, y: start.y + (end.y - start.y) / 3 };
+    const z = gripZ(doc, wall);
+    for (const side of ["left", "right"] as const) {
+      const s = c[side];
+      if (!s) continue;
+      const sign = side === "left" ? 1 : -1;
+      const at = { x: base.x + n.x * sign * (s.dist / 2), y: base.y + n.y * sign * (s.dist / 2) };
+      const label = document.createElement("div");
+      label.className = "temp-dim";
+      label.textContent = `${Math.round(s.dist)}`;
+      label.title = "Distance to the parallel wall (centrelines): click to type a new one; this wall moves";
+      label.onpointerdown = (ev) => ev.stopPropagation();
+      label.onclick = () => {
+        const input = document.createElement("input");
+        input.type = "number";
+        input.value = String(Math.round(s.dist));
+        label.replaceChildren(input);
+        input.focus();
+        input.select();
+        input.onkeydown = (ev) => {
+          ev.stopPropagation();
+          if (ev.key === "Escape") return this.refresh();
+          if (ev.key !== "Enter") return;
+          try {
+            doc.transact("Change wall distance", (tx) => setWallClearance(tx, doc, wall.id, side, Number(input.value)));
+          } catch (e) {
+            this.ctx.status(`⚠ ${(e as Error).message}`);
+          }
+          this.refresh();
+        };
+        input.onblur = () => this.refresh();
+      };
+      this.root.append(label);
+      this.placed.push({ el: label, at: () => at, z: () => z });
     }
   }
 

@@ -410,3 +410,46 @@ export function setHostedClearance(tx: Transaction, doc: Document, id: ElementId
   validateHosted(doc, { ...hostedPlacement(doc, el), position });
   tx.update(id, { [alongKey(el)]: Math.round(position * 10) / 10 });
 }
+
+/**
+ * A straight wall's temporary dimensions (Revit's): centreline distance to the nearest parallel
+ * wall on each side (one overlapping it along its length), with that wall's id.
+ */
+export function wallClearances(doc: Document, wall: Wall): Partial<Record<"left" | "right", { otherId: ElementId; dist: number }>> {
+  const { start, end, curve } = wall.params;
+  const L = Math.hypot(end.x - start.x, end.y - start.y);
+  if (L < 1 || curve) return {};
+  const d = { x: (end.x - start.x) / L, y: (end.y - start.y) / L };
+  const out: Partial<Record<"left" | "right", { otherId: ElementId; dist: number }>> = {};
+  for (const w of doc.byCategory<WallParams>(Cat.Wall) as Wall[]) {
+    if (w.id === wall.id || w.params.curve) continue;
+    const a = w.params.start;
+    const b = w.params.end;
+    const l = Math.hypot(b.x - a.x, b.y - a.y);
+    if (l < 1) continue;
+    if (Math.abs(((b.x - a.x) / l) * d.y - ((b.y - a.y) / l) * d.x) > 1e-3) continue;
+    const ua = (a.x - start.x) * d.x + (a.y - start.y) * d.y;
+    const ub = (b.x - start.x) * d.x + (b.y - start.y) * d.y;
+    if (Math.max(ua, ub) <= 1 || Math.min(ua, ub) >= L - 1) continue;
+    const v = -(a.x - start.x) * d.y + (a.y - start.y) * d.x;
+    if (Math.abs(v) < 1) continue;
+    const side = v > 0 ? "left" : "right";
+    const cur = out[side];
+    if (!cur || Math.abs(v) < cur.dist) out[side] = { otherId: w.id, dist: Math.abs(v) };
+  }
+  return out;
+}
+
+/** Move a wall across so its `side` distance (centrelines) is `dist`; joined walls follow. */
+export function setWallClearance(tx: Transaction, doc: Document, id: ElementId, side: "left" | "right", dist: number): void {
+  const wall = doc.require<WallParams>(id) as Wall;
+  const c = wallClearances(doc, wall)[side];
+  if (!c) throw new Error("No parallel wall on that side");
+  if (!(dist > 0)) throw new Error("The distance must be more than 0");
+  const { start, end } = wall.params;
+  const L = Math.hypot(end.x - start.x, end.y - start.y);
+  const n = { x: -(end.y - start.y) / L, y: (end.x - start.x) / L };
+  // Left is +n: the other wall sits at +c.dist; moving by +δ along n shortens it.
+  const delta = side === "left" ? c.dist - dist : dist - c.dist;
+  transformElements(tx, doc, [id], translation({ x: n.x * delta, y: n.y * delta }));
+}

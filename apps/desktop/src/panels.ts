@@ -2383,8 +2383,13 @@ function projectSections(ctx: PanelContext): Record<string, HTMLElement> {
   for (const [title, list] of groups) {
     if (!list.length) continue;
     viewsSec.append(h("div", { class: "subhead" }, title));
-    for (const v of list) {
-      const div = h("div", { class: `list-item indent${v.id === ctx.activeViewId() ? " selected" : ""}` }, h("span", {}, v.name ?? v.id));
+    // Dependent views follow their parent, indented (Revit's tree).
+    const depOf = (x: (typeof list)[number]) => (x.params as { dependentOf?: string | null }).dependentOf;
+    const parents = list.filter((x) => !depOf(x) || !list.some((y) => y.id === depOf(x)));
+    const ordered = parents.flatMap((p) => [p, ...list.filter((x) => depOf(x) === p.id)]);
+    for (const v of ordered) {
+      const dep = !!depOf(v) && ordered.some((y) => y.id === depOf(v));
+      const div = h("div", { class: `list-item indent${dep ? " indent2" : ""}${v.id === ctx.activeViewId() ? " selected" : ""}` }, h("span", {}, `${dep ? "↳ " : ""}${v.name ?? v.id}`));
       div.onclick = () => ctx.setActiveView(v.id);
       // Revit's right-click on a view: Open, Duplicate View ▸, Rename, Delete.
       div.oncontextmenu = (ev) => {

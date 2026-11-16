@@ -464,3 +464,4 @@ body.pane-dragging canvas { pointer-events: none; }
 .purge-row { display: block; padding: 1px 0 1px 12px; }
 
 .snap-glyph { position: fixed; transform: translate(-50%, -50%); pointer-events: none; z-index: 30; color: #e0602c; font-size: 15px; font-weight: bold; line-height: 1; text-shadow: 0 0 2px #fff; }
+.browser-search { width: calc(100% - 12px); margin: 4px 6px; box-sizing: border-box; }

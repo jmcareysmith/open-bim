@@ -121,7 +121,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Each open view is a live window (a Viewport each, up to 9): drag the title bar, resize by the
   edges (snap to the area and each other), double-click to maximise, × closes. The active window
   holds the interactive viewport; click another to work in it.
-- Project Browser is Revit's: Views (all), Sheets (all) just below (Jeremy), Legends, Schedules, Families
+- Project Browser is Revit's (search box at the top filters items): Views (all), Sheets (all) just below (Jeremy), Legends, Schedules, Families
   (system families Walls/Floors/…/Ducts/Pipes and loadable ones, by category → family → type),
   Groups (model/detail), Links. Right-click a view: Open, Duplicate, Duplicate with Detailing (core `duplicateView` copies its
   annotation, refs remapped), Duplicate as Dependent (`dependentOf`: shows and edits the parent's annotation; new

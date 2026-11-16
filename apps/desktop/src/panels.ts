@@ -2313,10 +2313,24 @@ function browserDrag(div: HTMLElement, kind: "view" | "family", id: ElementId): 
  * settings (information, levels, materials, parameters, design options, revisions, filters, MEP
  * systems) open from the Manage tab as dialogs, like Revit's.
  */
+/** Project Browser search text (kept across refreshes). */
+let browserFilter = "";
+
 export function renderBrowser(root: HTMLElement, ctx: PanelContext): void {
   if (familyInfo(ctx.doc)) return renderFamilyBrowser(root, ctx);
   const s = projectSections(ctx);
-  root.replaceChildren(s.views!, s.sheets!, s.legends!, s.drafting!, s.schedules!, s.families!, s.groups!, s.links!);
+  // Search (Revit's browser search): hide items whose text doesn't match; headings stay.
+  const search = h("input", { type: "search", class: "browser-search", placeholder: "Search the browser", value: browserFilter });
+  const apply = () => {
+    const q = browserFilter.trim().toLowerCase();
+    for (const item of root.querySelectorAll<HTMLElement>(".list-item")) item.hidden = !!q && !(item.textContent ?? "").toLowerCase().includes(q);
+  };
+  search.oninput = () => {
+    browserFilter = search.value;
+    apply();
+  };
+  root.replaceChildren(search, s.views!, s.sheets!, s.legends!, s.drafting!, s.schedules!, s.families!, s.groups!, s.links!);
+  apply();
 }
 
 /** Manage-tab dialogs: which project section each shows. */

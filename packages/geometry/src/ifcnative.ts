@@ -4,6 +4,10 @@ import {
   createFloor,
   createWall,
   createWallOpening,
+  createDoor,
+  createWindow,
+  type DoorTypeParams,
+  type WindowTypeParams,
   type DirectShape,
   type DirectShapeParams,
   type Document,
@@ -100,6 +104,28 @@ function typeFor(tx: Transaction, doc: Document, category: string, label: string
   return tx.create<LayeredTypeParams>(category, { layers: [{ function: "structure", material: "Imported", thickness: r }] }, { name: `${label} ${r}` }).id;
 }
 
+/** A door type whose opening (leaf + frame) is this size, else a new "Imported Door W x H". */
+function doorTypeFor(tx: Transaction, doc: Document, width: number, height: number): ElementId {
+  const types = doc.byCategory<DoorTypeParams>(Cat.DoorType);
+  const have = types.find((t) => Math.abs(t.params.leafWidth + 2 * t.params.frameWidth - width) < 5 && Math.abs(t.params.leafHeight + t.params.frameWidth - height) < 5);
+  if (have) return have.id;
+  const f = types[0]?.params.frameWidth ?? 40;
+  const w = Math.round(width);
+  const h = Math.round(height);
+  return tx.create<DoorTypeParams>(Cat.DoorType, { leafWidth: Math.max(100, w - 2 * f), leafHeight: Math.max(100, h - f), frameWidth: f }, { name: `Imported Door ${w} x ${h}` }).id;
+}
+
+/** A window type of this size, else a new "Imported Window W x H". */
+function windowTypeFor(tx: Transaction, doc: Document, width: number, height: number): ElementId {
+  const types = doc.byCategory<WindowTypeParams>(Cat.WindowType);
+  const have = types.find((t) => Math.abs(t.params.width - width) < 5 && Math.abs(t.params.height - height) < 5);
+  if (have) return have.id;
+  const f = types[0]?.params.frameWidth ?? 50;
+  const w = Math.round(width);
+  const h = Math.round(height);
+  return tx.create<WindowTypeParams>(Cat.WindowType, { width: w, height: h, frameWidth: f, defaultSill: 900 }, { name: `Imported Window ${w} x ${h}` }).id;
+}
+
 /** Convert imported IFC shapes to native walls and floors. Returns the new elements' ids and what was left as it was. */
 export function convertDirectShapes(tx: Transaction, doc: Document, ids: ElementId[]): { created: ElementId[]; skipped: ElementId[] } {
   const created: ElementId[] = [];
@@ -160,7 +186,8 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
     }
     tx.delete(id);
   }
-  // Imported doors and windows in a converted wall open it up.
+  // Imported doors and windows in a converted wall become native ones (types matched by size, else
+  // new "Imported" types); if one won't fit, the wall is just opened up for the imported shape.
   for (const ds of doc.byCategory<DirectShapeParams>(Cat.DirectShape)) {
     if (!INSERT_CLASSES.has(ds.params.ifcClass)) continue;
     const { xy, z0, z1 } = bounds(ds.params);
@@ -172,10 +199,24 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
       const u0 = Math.max(-w.len / 2, Math.min(...us));
       const u1 = Math.min(w.len / 2, Math.max(...us));
       if (u1 - u0 < 50) continue;
+      const along = (u0 + u1) / 2 + w.len / 2;
+      const stated = (k: string) => Number(ds.params.properties[k]);
+      const width = stated("OverallWidth") > 0 ? stated("OverallWidth") : u1 - u0;
+      const height = stated("OverallHeight") > 0 ? stated("OverallHeight") : z1 - z0;
+      const door = ds.params.ifcClass === "IfcDoor";
       try {
-        created.push(createWallOpening(tx, doc, w.id, (u0 + u1) / 2 + w.len / 2, { width: u1 - u0, sillHeight: z0 - w.base, height: z1 - z0 }).id);
+        const id = door
+          ? createDoor(tx, doc, doorTypeFor(tx, doc, width, height), w.id, along).id
+          : createWindow(tx, doc, windowTypeFor(tx, doc, width, height), w.id, along, { sillHeight: Math.max(0, z0 - w.base) }).id;
+        if (ds.name) tx.setName(id, ds.name);
+        created.push(id);
+        tx.delete(ds.id);
       } catch {
-        // Doesn't fit the wall (runs past an end or over the top): leave it solid.
+        try {
+          created.push(createWallOpening(tx, doc, w.id, along, { width: u1 - u0, sillHeight: z0 - w.base, height: z1 - z0 }).id);
+        } catch {
+          // Doesn't fit the wall (runs past an end or over the top): leave it solid.
+        }
       }
       break;
     }

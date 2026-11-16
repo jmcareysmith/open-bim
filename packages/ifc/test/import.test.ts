@@ -77,7 +77,7 @@ describe("IFC import", () => {
 });
 
 describe("IFC import to native", () => {
-  it("round-trips walls and the door's opening as native elements", async () => {
+  it("round-trips walls and the door as native elements", async () => {
     const text = exportIfc(source(), { timestamp: "t" });
     const doc = new Document();
     await importIfc(doc, new TextEncoder().encode(text), api);
@@ -85,7 +85,11 @@ describe("IFC import to native", () => {
     const r = doc.transact("Convert", (tx) => convertDirectShapes(tx, doc, shapes));
     const walls = doc.byCategory(Cat.Wall);
     expect(walls).toHaveLength(5);
-    expect(doc.byCategory(Cat.WallOpening)).toHaveLength(1);
+    // The door comes back as a native door of the exported size (IFC OverallWidth/Height).
+    const doors = doc.byCategory(Cat.Door);
+    expect(doors).toHaveLength(1);
+    const t = doc.get(doors[0]!.typeId!)!.params as { leafWidth: number; frameWidth: number };
+    expect(t.leafWidth + 2 * t.frameWidth).toBeGreaterThan(800);
     expect(r.skipped.length).toBe(shapes.length - 5);
   });
 });

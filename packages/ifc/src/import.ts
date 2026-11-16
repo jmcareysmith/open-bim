@@ -156,11 +156,17 @@ export async function importIfc(doc: Document, data: Uint8Array, api: IfcApi): P
     const info = new Map<number, { cls: string; guid: string; name?: string; props: Record<string, string> }>();
     for (const p of products) {
       const line = api.GetLine(model, p.expressID);
+      const props = await properties(api, model, p.expressID);
+      // Doors and windows: their stated opening size (mm), truer than the shape (which has trims).
+      for (const k of ["OverallWidth", "OverallHeight"]) {
+        const v = Number(label(line[k]));
+        if (Number.isFinite(v) && v > 0) props[k] = String(Math.round(v * mm));
+      }
       info.set(p.expressID, {
         cls: api.GetNameFromTypeCode(api.GetLineType(model, p.expressID)),
         guid: label(line.GlobalId) ?? "",
         name: label(line.Name),
-        props: await properties(api, model, p.expressID),
+        props,
       });
     }
 

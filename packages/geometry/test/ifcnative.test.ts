@@ -14,7 +14,7 @@ const rect = (x0: number, y0: number, x1: number, y1: number) => [
 ];
 
 describe("IFC shapes to native elements", () => {
-  it("turns a boxy IfcWall into a wall with an opening for its window, and an IfcSlab into a floor", () => {
+  it("turns a boxy IfcWall into a wall with a native window, and an IfcSlab into a floor", () => {
     const doc = new Document();
     const ids = applyResidentialTemplate(doc);
     const lvl = ids.levels.ground;
@@ -30,14 +30,15 @@ describe("IFC shapes to native elements", () => {
     expect(walls).toHaveLength(1);
     expect(wallThickness(doc, walls[0] as Wall)).toBeCloseTo(190);
     expect(walls[0]!.params.height).toBeCloseTo(2700);
-    const opening = doc.byCategory("WallOpening").find((o) => (o.params as { hostId: string }).hostId === walls[0]!.id)!;
-    expect((opening.params as { width: number }).width).toBeCloseTo(1200);
-    expect((opening.params as { sillHeight: number }).sillHeight).toBeCloseTo(900);
+    // The imported window becomes a native window of the matching 1200 x 1200 type, at its sill.
+    const win2 = doc.byCategory("Window").find((o) => (o.params as { hostId: string }).hostId === walls[0]!.id)!;
+    expect(doc.get(win2.typeId!)!.params).toMatchObject({ width: 1200, height: 1200 });
+    expect((win2.params as { sillHeight: number }).sillHeight).toBeCloseTo(900);
     const floors = doc.byCategory<FloorParams>("Floor");
     const f = floors.find((x) => x.params.boundary.length === 6)!;
     expect(f).toBeDefined();
     expect(f.params.offset).toBeCloseTo(0);
     expect(doc.get(wall)).toBeUndefined();
-    expect(doc.get(win)).toBeDefined();
+    expect(doc.get(win)).toBeUndefined();
   });
 });

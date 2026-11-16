@@ -142,3 +142,15 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Area loads on floors (tributary width to beams, auto from neighbours), column axial checks (Rankine buckling)
 - [x] Point clouds: Insert → Point Cloud (LAS, XYZ/PTS/TXT/CSV; thinned to 200k; shared coordinates or centred), drawn in 3D, move
 - [x] Point clouds in plans (view range clips them) and sections/elevations (points between cut and far clip, cropped, jogs), snapping to scan points in plans
+
+## Phase 10 — Revit models in through IFC (current, 2026-11-16)
+
+RVT is closed (only the paid ODA BIM SDK reads it), so Revit projects come in as IFC and are converted
+to native elements where their shapes allow.
+
+- [x] Walls (boxy IfcWall → wall, type by thickness) and slabs (IfcSlab → floor from its top faces)
+- [x] Doors and windows → native hosted doors/windows in the converted walls (IFC OverallWidth/Height; types by size)
+- [ ] Columns and beams → native structural elements (rectangular/round sections by size)
+- [ ] Roofs (IfcRoof / roof slabs) → footprint roofs (slopes from the faces) or floors when flat
+- [ ] Names, marks and colours carried over (materials from the IFC colours)
+- [ ] Batch: convert everything on import (option), with a summary of what stayed as shapes

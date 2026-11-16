@@ -119,6 +119,7 @@ import {
 } from "@open-bim/core";
 import { curtainPart, partLabel, setCurtainPart } from "./curtainpart.ts";
 import { selectOptions } from "./selectopts.ts";
+import { snapOptions } from "./snapopts.ts";
 import { wallEnclosure, areaBoundary, buildGridLines, buildReferencePlaneLines, buildRoomLines, extrudePolygon, roomBoundary, wallFootprint, type LineData } from "@open-bim/geometry";
 import type { Viewport } from "./viewport.ts";
 
@@ -356,10 +357,15 @@ export interface Snapped {
  * 50 mm increment. `free` (Shift) turns off ortho.
  */
 export function snapPoint(ctx: ToolContext, p: Vec2, start: Vec2 | null, free: boolean, extra: Vec2[] = []): Snapped {
+  const so = snapOptions;
+  // Snaps off (SO): the point as picked.
+  if (!so.on) return { p: { ...p }, kind: "increment" };
   const grids = datumLines(ctx.doc); // grids and reference planes
+  // Snap distance: a fixed size on screen (Revit's), at least a few mm.
+  const reach = Math.max(5, so.pixels * ctx.viewport.mmPerPixel());
   const nearest = (pts: Vec2[]) => {
     let best: Vec2 | null = null;
-    let bestD = POINT_SNAP;
+    let bestD = reach;
     for (const q of pts) {
       const d = Math.hypot(q.x - p.x, q.y - p.y);
       if (d < bestD) [best, bestD] = [q, d];
@@ -367,17 +373,23 @@ export function snapPoint(ctx: ToolContext, p: Vec2, start: Vec2 | null, free: b
     return best;
   };
 
-  // 1. Endpoints
-  const ends: Vec2[] = [...extra, ...grids.flatMap((g) => [g.params.start, g.params.end])];
+  // 1. Endpoints (and midpoints)
+  const ends: Vec2[] = [...extra];
+  const mids: Vec2[] = [];
+  if (so.endpoints) ends.push(...grids.flatMap((g) => [g.params.start, g.params.end]));
   for (const w of ctx.doc.byCategory<WallParams>(Cat.Wall)) {
-    if (w.params.baseLevelId === ctx.activeLevelId()) ends.push(w.params.start, w.params.end);
+    if (w.params.baseLevelId !== ctx.activeLevelId()) continue;
+    if (so.endpoints) ends.push(w.params.start, w.params.end);
+    if (so.midpoints && !w.params.curve) mids.push({ x: (w.params.start.x + w.params.end.x) / 2, y: (w.params.start.y + w.params.end.y) / 2 });
   }
   const end = nearest(ends);
   if (end) return { p: { ...end }, kind: "endpoint" };
+  const mid = nearest(mids);
+  if (mid) return { p: mid, kind: "endpoint" };
 
   // 2. Grid intersections
   const crossings: Vec2[] = [];
-  for (let i = 0; i < grids.length; i++) {
+  for (let i = 0; so.intersections && i < grids.length; i++) {
     for (let j = i + 1; j < grids.length; j++) {
       const x = datumIntersection(grids[i]!, grids[j]!);
       if (x) crossings.push(x);
@@ -389,8 +401,8 @@ export function snapPoint(ctx: ToolContext, p: Vec2, start: Vec2 | null, free: b
   // 2b. Point cloud points (Revit snaps to scans), on this storey: level to 2300 above.
   const z0 = ctx.doc.get<LevelParams>(ctx.activeLevelId())?.params.elevation ?? 0;
   let scan: Vec2 | null = null;
-  let scanD = POINT_SNAP / 3;
-  for (const pc of ctx.doc.byCategory<PointCloudParams>(Cat.PointCloud)) {
+  let scanD = reach / 3;
+  for (const pc of so.scans ? ctx.doc.byCategory<PointCloudParams>(Cat.PointCloud) : []) {
     if (ctx.viewport.isHidden(pc)) continue;
     const pos = pointCloudPoints(pc as PointCloud).positions;
     for (let i = 0; i < pos.length; i += 3) {
@@ -405,7 +417,7 @@ export function snapPoint(ctx: ToolContext, p: Vec2, start: Vec2 | null, free: b
   // 3. Ortho to start point
   let q = { ...p };
   let locked: "x" | "y" | null = null; // coordinate held equal to the start point's
-  if (start && !free) {
+  if (start && !free && so.ortho) {
     const dx = p.x - start.x;
     const dy = p.y - start.y;
     const ang = Math.abs((Math.atan2(dy, dx) * 180) / Math.PI) % 90;
@@ -416,16 +428,17 @@ export function snapPoint(ctx: ToolContext, p: Vec2, start: Vec2 | null, free: b
   }
 
   // 4. Onto a grid line (along the ortho line when locked)
-  for (const g of grids) {
+  for (const g of so.gridLines ? grids : []) {
     const c = closestPointOnDatum(g, q);
-    if (Math.hypot(c.x - q.x, c.y - q.y) > LINE_SNAP) continue;
+    if (Math.hypot(c.x - q.x, c.y - q.y) > reach * (LINE_SNAP / POINT_SNAP)) continue;
     if (!locked) return { p: c, kind: "grid" };
     const on = orthoOnGrid(g, start!, locked);
-    if (on && Math.hypot(on.x - q.x, on.y - q.y) <= LINE_SNAP) return { p: on, kind: "grid" };
+    if (on && Math.hypot(on.x - q.x, on.y - q.y) <= reach * (LINE_SNAP / POINT_SNAP)) return { p: on, kind: "grid" };
   }
 
   // 5. Increment
-  const r = (v: number) => Math.round(v / INCREMENT) * INCREMENT;
+  const inc = so.increment > 0 ? so.increment : 0;
+  const r = (v: number) => (inc ? Math.round(v / inc) * inc : v);
   if (locked === "x") return { p: { x: q.x, y: r(q.y) }, kind: "increment" };
   if (locked === "y") return { p: { x: r(q.x), y: q.y }, kind: "increment" };
   return { p: { x: r(q.x), y: r(q.y) }, kind: "increment" };

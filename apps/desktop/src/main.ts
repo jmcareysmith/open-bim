@@ -20,6 +20,7 @@ import { selectOptions, setSelectOption } from "./selectopts.ts";
 import { openWorksetsDialog } from "./worksetsui.ts";
 import { openPurgeDialog } from "./purgeui.ts";
 import { openTransferDialog } from "./transferui.ts";
+import { openSnapsDialog, saveSnapOptions, snapOptions } from "./snapopts.ts";
 import { worksets, activeWorkset, setActiveWorkset, enableWorksetAssignment, ungroup, enablePinning, isPinned, setPinned, setElementOverrides, setCategoryOverride, type DirectShapeParams, enableSharedNested, enableBeamSystems, createImageUnderlay, planCrop, createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
   ceilingPlanFor,
   createCeilingPlan,
@@ -1115,6 +1116,15 @@ const commands: Record<string, () => void | Promise<void>> = {
     } catch (err) {
       status(`⚠ Could not read that project: ${(err as Error).message}`);
     }
+  },
+  snaps() {
+    openSnapsDialog(status);
+  },
+  /** SO: snapping on or off. */
+  toggleSnaps() {
+    snapOptions.on = !snapOptions.on;
+    saveSnapOptions();
+    status(snapOptions.on ? "Snaps on." : "Snaps off: points go exactly where you click (SO turns them back on).");
   },
   purgeUnused() {
     openPurgeDialog(doc, status, () => refreshAll());

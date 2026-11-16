@@ -41,6 +41,8 @@ export type DimRef =
   | { kind: "datum"; id: ElementId; pick: Vec2 }
   | { kind: "level"; id: ElementId; pick: Vec2 }
   | { kind: "point"; at: Vec2 }
+  /** An element's insertion point (columns, free-standing families), followed as it moves (plans). */
+  | { kind: "elementPoint"; id: ElementId }
   /** A fixed line in the view (e.g. a drawn edge picked in a section): a point on it and its direction. */
   | { kind: "line"; at: Vec2; dir: Vec2 };
 
@@ -187,6 +189,11 @@ export function resolveRef(doc: Document, ref: DimRef, viewId?: ElementId): Reso
   switch (ref.kind) {
     case "point":
       return { point: ref.at, dir: null };
+    case "elementPoint": {
+      const p = doc.require(ref.id).params as { position?: Vec2 };
+      if (!p.position) throw new Error("That element has no insertion point");
+      return { point: { ...p.position }, dir: null };
+    }
     case "line":
       return { point: ref.at, dir: unit(ref.dir) };
     case "wallFace": {
@@ -216,7 +223,7 @@ export function resolveRef(doc: Document, ref: DimRef, viewId?: ElementId): Reso
 /** The measured point of a reference: its pick projected onto where the reference is now. */
 export function refPoint(doc: Document, ref: DimRef, viewId?: ElementId): Vec2 {
   const r = resolveRef(doc, ref, viewId);
-  if (!r.dir || ref.kind === "point" || ref.kind === "line") return r.point;
+  if (!r.dir || ref.kind === "point" || ref.kind === "line" || ref.kind === "elementPoint") return r.point;
   const t = (ref.pick.x - r.point.x) * r.dir.x + (ref.pick.y - r.point.y) * r.dir.y;
   return { x: r.point.x + r.dir.x * t, y: r.point.y + r.dir.y * t };
 }

@@ -232,3 +232,20 @@ describe("clearance stops", () => {
     expect(c.right.stop).toBeCloseTo(5000 - wallThickness(doc, cross as never) / 2);
   });
 });
+
+describe("permanent dimensions to columns", () => {
+  it("an elementPoint reference follows the column", async () => {
+    const { Document, applyResidentialTemplate, createGrid, createColumn, ensureStructuralTypes, createDimension, dimensionLayout, floorPlanFor, transformElements, translation } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const g = doc.transact("G", (tx) => createGrid(tx, doc, { x: 0, y: -1000 }, { x: 0, y: 9000 }, "1"));
+    doc.transact("T", (tx) => ensureStructuralTypes(tx, doc));
+    const tid = doc.byCategory("StructuralType")[0]!.id;
+    const c = doc.transact("C", (tx) => createColumn(tx, doc, tid, ids.levels.ground, ids.levels.first, { x: 600, y: 450 }));
+    const plan = floorPlanFor(doc, ids.levels.ground)!;
+    const dim = doc.transact("D", (tx) => createDimension(tx, doc, plan.id, [{ kind: "datum", id: g.id, pick: { x: 0, y: 450 } }, { kind: "elementPoint", id: c.id }], { x: 300, y: 1000 }));
+    expect(dimensionLayout(doc, doc.require(dim.id) as never).values[0]).toBeCloseTo(600);
+    doc.transact("M", (tx) => transformElements(tx, doc, [c.id], translation({ x: 400, y: 0 })));
+    expect(dimensionLayout(doc, doc.require(dim.id) as never).values[0]).toBeCloseTo(1000);
+  });
+});

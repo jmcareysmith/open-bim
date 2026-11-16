@@ -386,7 +386,7 @@ export class GripLayer {
       this.placed.push({ el: label, at: () => mid, z: () => z });
       this.addPermanent(mid, [
         { kind: "datum", id: c.gridId, pick: { x: at.x - c.normal.x * c.dist, y: at.y - c.normal.y * c.dist } },
-        { kind: "point", at: { ...at } },
+        { kind: "elementPoint", id: el.id },
       ]);
     }
   }

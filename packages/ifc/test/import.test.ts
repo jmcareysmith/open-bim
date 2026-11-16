@@ -127,3 +127,20 @@ describe("IFC grids", () => {
     expect(got).toEqual(want);
   });
 });
+
+describe("IFC ceilings", () => {
+  it("round-trip: an IfcCovering CEILING converts back to a ceiling at its height", async () => {
+    const { createCeiling } = await import("@open-bim/core");
+    const src = source();
+    const ground = levels(src).sort((a, b) => a.params.elevation - b.params.elevation)[0]!.id;
+    const ct = src.byCategory("CeilingType")[0]!.id;
+    src.transact("C", (tx) => createCeiling(tx, ct, ground, [{ x: 0, y: 0 }, { x: 8000, y: 0 }, { x: 8000, y: 6000 }, { x: 0, y: 6000 }], { offset: 2400 }));
+    const doc = new Document();
+    await importIfc(doc, new TextEncoder().encode(exportIfc(src, { timestamp: "t" })), api);
+    const shapes = doc.byCategory<DirectShapeParams>(Cat.DirectShape).filter((s) => s.params.ifcClass === "IfcCovering").map((s) => s.id);
+    expect(shapes).toHaveLength(1);
+    doc.transact("C", (tx) => convertDirectShapes(tx, doc, shapes));
+    const c = doc.byCategory(Cat.Ceiling)[0]!;
+    expect((c.params as { offset: number }).offset).toBeCloseTo(2400, 0);
+  });
+});

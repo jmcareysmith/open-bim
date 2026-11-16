@@ -9,6 +9,7 @@ import {
   createColumn,
   createBeam,
   createRoof,
+  createCeiling,
   setWallCurve,
   setWallProfile,
   createStair,
@@ -60,6 +61,8 @@ import {
 const WALL_CLASSES = new Set(["IfcWall", "IfcWallStandardCase"]);
 const SLAB_CLASSES = new Set(["IfcSlab"]);
 const COLUMN_CLASSES = new Set(["IfcColumn"]);
+/** Coverings: ceilings (flat, like slabs). */
+const CEILING_CLASSES = new Set(["IfcCovering"]);
 const BEAM_CLASSES = new Set(["IfcBeam"]);
 const ROOF_CLASSES = new Set(["IfcRoof"]);
 const STAIR_CLASSES = new Set(["IfcStair", "IfcStairFlight"]);
@@ -85,7 +88,7 @@ const INSERT_CLASSES = new Set(["IfcDoor", "IfcWindow"]);
 export function convertible(el: { category: string; params: unknown }): boolean {
   if (el.category !== Cat.DirectShape) return false;
   const c = (el.params as DirectShapeParams).ifcClass;
-  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c) || ROOF_CLASSES.has(c) || STAIR_CLASSES.has(c) || RAILING_CLASSES.has(c) || PLATE_CLASSES.has(c) || c in FAMILY_OF;
+  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || CEILING_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c) || ROOF_CLASSES.has(c) || STAIR_CLASSES.has(c) || RAILING_CLASSES.has(c) || PLATE_CLASSES.has(c) || c in FAMILY_OF;
 }
 
 function hull(pts: Vec2[]): Vec2[] {
@@ -928,7 +931,11 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
       const beam = createBeam(tx, doc, typeId, p.levelId, start, end);
       tx.update<BeamParams>(beam.id, { offset: z1 - lvl });
       created.push(beam.id);
-    } else if (p.properties.PredefinedType === "ROOF" || facePlanes(p, true).some((pl) => Math.hypot(pl.a, pl.b) > 0.05)) {
+    } else if (CEILING_CLASSES.has(p.ifcClass) && p.properties.PredefinedType && p.properties.PredefinedType !== "CEILING") {
+      // Other coverings (cladding, flooring, roofing finishes) stay as shapes.
+      skipped.push(id);
+      continue;
+    } else if (!CEILING_CLASSES.has(p.ifcClass) && (p.properties.PredefinedType === "ROOF" || facePlanes(p, true).some((pl) => Math.hypot(pl.a, pl.b) > 0.05))) {
       // A roof slab (Revit exports roofs as slabs, or roof parts) or any sloped slab: a footprint roof.
       const roof = roofFromMesh(tx, doc, p, lvl, z0, mat);
       if (!roof) {
@@ -959,9 +966,15 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
         skipped.push(id);
         continue;
       }
-      const typeId = typeFor(tx, doc, Cat.FloorType, "Imported Floor", z1 - z0, mat);
-      const f = createFloor(tx, typeId, p.levelId, biggest[0]!, { offset: z1 - lvl, holes: biggest.slice(1) });
-      created.push(f.id);
+      if (CEILING_CLASSES.has(p.ifcClass)) {
+        // Ceiling: its underside above the level.
+        const typeId = typeFor(tx, doc, Cat.CeilingType, "Imported Ceiling", z1 - z0, mat);
+        created.push(createCeiling(tx, typeId, p.levelId, biggest[0]!, { offset: z0 - lvl, holes: biggest.slice(1) }).id);
+      } else {
+        const typeId = typeFor(tx, doc, Cat.FloorType, "Imported Floor", z1 - z0, mat);
+        const f = createFloor(tx, typeId, p.levelId, biggest[0]!, { offset: z1 - lvl, holes: biggest.slice(1) });
+        created.push(f.id);
+      }
     }
     for (const nid of created.slice(made)) carryOver(tx, doc, nid, ds);
     tx.delete(id);

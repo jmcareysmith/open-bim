@@ -108,7 +108,7 @@ export class GripLayer {
     // Sections and elevations: selected model elements get their top/base handles there too.
     if (this.ctx.viewport.viewMode === "drawing" && this.sectionView()) {
       const model = this.ctx.selection().map((id) => doc.get(id)).filter((e): e is Element => !!e && (e.params as { viewId?: unknown }).viewId === undefined && (e.params as { sheetId?: unknown }).sheetId === undefined);
-      if (model.length <= MAX_ELEMENTS) for (const el of model) this.addHeightHandles(el);
+      if (model.length <= MAX_ELEMENTS) for (const el of model) if (!isPinned(el)) this.addHeightHandles(el);
     }
     const sel = this.ctx.selection().map((id) => doc.get(id)).filter((e): e is Element => !!e && this.editable(e));
     if (!sel.length || sel.length > MAX_ELEMENTS) return;

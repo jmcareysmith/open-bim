@@ -114,7 +114,7 @@ export class ModifyTool implements Tool {
     this.typed = "";
     this.cursor = null;
     this.placingCentre = false;
-    if (this.startPickAxis) this.pickAxis = true;
+    this.pickAxis = this.startPickAxis;
     this.copy = this.mode === "copy" || this.mode === "mirror";
     this.multiple = this.mode === "copy";
     this.centre = this.mode === "rotate" ? selectionCentre(doc, this.ids) : null;
@@ -254,7 +254,9 @@ export class ModifyTool implements Tool {
     if (this.mode === "mirror" && this.pickAxis) {
       // The picked element's line is the axis.
       const id = this.ctx.viewport.pick(ev);
-      const el = id ? this.ctx.doc.get(id) : undefined;
+      let el = id ? this.ctx.doc.get(id) : undefined;
+      // In a section or elevation only this view's lines (drawing coordinates) can be the axis.
+      if (el && this.ctx.viewport.viewMode === "drawing" && (el.params as { viewId?: unknown }).viewId !== this.ctx.activeViewId()) el = undefined;
       const q = el?.params as { start?: Vec2; end?: Vec2 } | undefined;
       if (!q?.start || !q.end || Math.hypot(q.end.x - q.start.x, q.end.y - q.start.y) < 1) return this.ctx.status("Mirror: pick an element with a line (wall, grid, reference plane, beam, detail line).");
       return this.apply(mirrorAcross({ x: q.start.x, y: q.start.y }, { x: q.end.x, y: q.end.y }));
@@ -331,7 +333,9 @@ export class ModifyTool implements Tool {
       }
       const t = this.transform(this.cursor);
       if (!t) {
-        this.ctx.status(`${LABEL[this.mode]}: ${this.mode === "rotate" ? "" : "click a base point and point the cursor the way to go, then "}type the value and press Enter.`);
+        if (this.mode === "scale") this.ctx.status(Number(this.typed) > 0 ? "Scale: click the origin first, then type the factor and press Enter." : "Scale: the factor must be more than 0.");
+        else this.ctx.status(`${LABEL[this.mode]}: ${this.mode === "rotate" ? "" : "click a base point and point the cursor the way to go, then "}type the value and press Enter.`);
+        this.typed = "";
         return true;
       }
       this.apply(t);

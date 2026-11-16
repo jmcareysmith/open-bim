@@ -70,6 +70,14 @@ export class MatchTypeTool implements Tool {
     }
     const src = this.source;
     if (el.category !== src.category) return this.ctx.status(`Pick a ${src.category.toLowerCase()} (the same category as the source).`);
+    if (src.category === Cat.FamilyInstance) {
+      // Loadable families: the same family category (doors with doors, lights with lights), hosted alike.
+      const s = src.params as FamilyInstanceParams;
+      const e = el.params as FamilyInstanceParams;
+      const cat = (id: string) => (this.ctx.doc.get(id)?.params as { category?: string } | undefined)?.category;
+      if (cat(s.familyId) !== cat(e.familyId)) return this.ctx.status(`Pick another ${cat(s.familyId) ?? "family"} instance (the same family category as the source).`);
+      if (!!s.hostId !== !!e.hostId) return this.ctx.status(s.hostId ? "Pick an instance hosted in a wall, like the source." : "Pick a free-standing instance, like the source.");
+    }
     try {
       this.ctx.doc.transact("Match type", (tx) => {
         if (src.category === Cat.FamilyInstance) {
@@ -99,7 +107,7 @@ export class MatchTypeTool implements Tool {
   }
 }
 
-/** Zoom Region (Revit: ZR): drag a box; the view zooms to it, then the previous tool comes back. */
+/** Zoom Region (Revit: ZR): drag a box; the view zooms to it, then the tool in use before comes back. */
 export class ZoomRegionTool implements Tool {
   readonly name = "zoomregion";
   private from: { x: number; y: number } | null = null;

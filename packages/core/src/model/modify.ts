@@ -163,14 +163,22 @@ function transformed(c: Ctx, el: Element): Record<string, unknown> | null {
   const holes = () => {
     if (Array.isArray(p.holes)) p.holes = (p.holes as Vec2[][]).map((h) => mapPts(t, h, mirror));
   };
+  // Uniform scale factor (Scale, RE): 1 for moves, rotations and mirrors.
+  const k = Math.sqrt(Math.abs(t.xx * t.yy - t.xy * t.yx));
+  const scaled = Math.abs(k - 1) > 1e-9;
   const host = wallHost(el);
   if (host) {
-    const k = alongKey(el);
+    const key = alongKey(el);
     if (set.has(host)) {
+      // Scaled with its wall: its place along the wall scales too.
+      if (scaled && !mirror) {
+        p[key] = (p[key] as number) * k;
+        return p;
+      }
       // Rides on its wall. A mirrored wall swaps its ends, so measure from the other end.
       if (!mirror) return null;
       const len = wallLength(doc.require<WallParams>(host) as Wall);
-      p[k] = len - (p[k] as number);
+      p[key] = len * k - (p[key] as number) * k;
       if (typeof p.handFlipped === "boolean") p.handFlipped = !p.handFlipped;
       return p;
     }
@@ -178,7 +186,7 @@ function transformed(c: Ctx, el: Element): Record<string, unknown> | null {
     if (!isTranslation(t)) throw new Error("Doors, windows and openings move along their wall; they can't be rotated or mirrored on their own");
     const wall = doc.require<WallParams>(host) as Wall;
     const d = unit({ x: wall.params.end.x - wall.params.start.x, y: wall.params.end.y - wall.params.start.y });
-    p[k] = Math.min(wallLength(wall), Math.max(0, (p[k] as number) + t.tx * d.x + t.ty * d.y));
+    p[key] = Math.min(wallLength(wall), Math.max(0, (p[key] as number) + t.tx * d.x + t.ty * d.y));
     return p;
   }
   switch (el.category) {
@@ -193,6 +201,8 @@ function transformed(c: Ctx, el: Element): Record<string, unknown> | null {
       const b = applyAffine(t, p.end as Vec2);
       // Walls swap ends when mirrored so the exterior face is mirrored too.
       [p.start, p.end] = mirror && el.category === Cat.Wall ? [b, a] : [a, b];
+      // An arc's bow (mm) scales with it.
+      if (scaled && typeof p.curve === "number") p.curve = (p.curve as number) * k;
       return p;
     }
     case Cat.Floor:
@@ -462,6 +472,8 @@ export function transformElements(tx: Transaction, doc: Document, ids: ElementId
     for (const e of [...all].sort((a, b) => order(a) - order(b))) {
       const p = (transformed(c, e) ?? structuredClone(e.params)) as Record<string, unknown>;
       remapRefs(p, map);
+      // Copies start unpinned (as in Revit).
+      if (p.pinned) delete p.pinned;
       const copy = tx.create(e.category, p as Params, { ...(e.name !== undefined ? { name: e.name } : {}), ...(e.typeId ? { typeId: e.typeId } : {}) });
       map.set(e.id, copy.id);
       if (loose.some((l) => l.id === e.id)) out.push(copy.id);
@@ -469,8 +481,9 @@ export function transformElements(tx: Transaction, doc: Document, ids: ElementId
     return out;
   }
 
-  // In place: hosted elements in moved walls only change when mirrored; collect them first.
-  const riders = mirror ? dependants(doc, set) : [];
+  // In place: hosted elements in moved walls only change when mirrored or scaled; collect them first.
+  const scaled = Math.abs(Math.sqrt(Math.abs(t.xx * t.yy - t.xy * t.yx)) - 1) > 1e-9;
+  const riders = mirror ? dependants(doc, set) : scaled ? dependants(doc, set).filter((e) => wallHost(e)) : [];
   const walls = loose.filter((e) => e.category === Cat.Wall) as Wall[];
   const before = walls.map((w) => ({ ...w, params: structuredClone(w.params) }) as Wall);
   for (const e of [...riders, ...loose]) {

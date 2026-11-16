@@ -48,3 +48,21 @@ describe("wall chains (Tab)", () => {
     expect(wallChain(doc, stem as never)).toEqual([stem.id]);
   });
 });
+
+describe("scale and copy details", () => {
+  it("an arc wall scales its bow; a door in a scaled wall stays in proportion; copies of pinned elements aren't pinned", async () => {
+    const { scalingAbout, createDoor, isPinned } = await import("../src/index.ts");
+    const doc = new Document();
+    enablePinning(doc);
+    const ids = applyResidentialTemplate(doc);
+    const w = doc.transact("W", (tx) => createWall(tx, ids.wallTypes.exterior, { x: 0, y: 0 }, { x: 4000, y: 0 }, ids.levels.ground, { height: 2400 }));
+    doc.transact("Bow", (tx) => tx.update<WallParams>(w.id, { curve: 500 }));
+    const d = doc.transact("D", (tx) => createDoor(tx, doc, ids.doorTypes.single860, w.id, 2000));
+    doc.transact("Scale", (tx) => transformElements(tx, doc, [w.id], scalingAbout({ x: 0, y: 0 }, 2)));
+    expect(doc.require<WallParams>(w.id).params.curve).toBeCloseTo(1000);
+    expect(doc.require<{ position: number }>(d.id).params.position).toBeCloseTo(4000);
+    doc.transact("Pin", (tx) => setPinned(tx, doc, [w.id], true));
+    const [copy] = doc.transact("Copy", (tx) => transformElements(tx, doc, [w.id], translation({ x: 0, y: 6000 }), { copy: true }));
+    expect(isPinned(doc.require(copy!))).toBe(false);
+  });
+});

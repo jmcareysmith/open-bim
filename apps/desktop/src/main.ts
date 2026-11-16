@@ -618,7 +618,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   elevation: new ElevationTool(ctx),
   level: new LevelTool(ctx),
   matchtype: new MatchTypeTool(ctx),
-  zoomregion: new ZoomRegionTool(ctx, () => setTool("select")),
+  zoomregion: new ZoomRegionTool(ctx, () => setTool(toolBeforeZoom)),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
 const DRAWING_TOOLS = new Set(["zoomregion", "mirrorpick", "scale", "level", "matchtype", "select", "symbol", "detailcomponent", "repeatingdetail", "placegroup", "attach", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution", "angulardim", "callout"]);
@@ -783,6 +783,7 @@ let viewBar: ViewBar | undefined = new ViewBar(
 );
 
 function setTool(name: string): void {
+  if (name === "zoomregion" && tool.name !== "zoomregion") toolBeforeZoom = tool.name;
   if (viewport.viewMode === "drawing" && !DRAWING_TOOLS.has(name)) {
     status("That tool works in plan and 3D views. Open a floor plan or the 3D view to use it.");
     name = "select";
@@ -1747,6 +1748,8 @@ window.addEventListener("keydown", (ev) => {
 let shortcuts = shortcutTable();
 let lastKey: { key: string; at: number } | null = null;
 let pendingSingle: ReturnType<typeof setTimeout> | null = null;
+/** The tool to go back to after Zoom Region. */
+let toolBeforeZoom = "select";
 
 /** Options strip for the active tool (Copy, Disjoin, Number…), over the top of the view. */
 function renderToolOptions(options: ToolOption[] | null): void {

@@ -1626,6 +1626,9 @@ window.addEventListener("keydown", (ev) => {
   const two = pair ? shortcuts.get(pair) : undefined;
   if (two) {
     lastKey = null;
+    // The first letter's command was waiting for this one: it gives way.
+    if (pendingSingle) clearTimeout(pendingSingle);
+    pendingSingle = null;
     // A command (e.g. WT) shouldn't leave the first letter's tool (W = wall) running.
     if (two.startsWith("cmd:") && tool.name !== "select") setTool("select");
     return runShortcut(two);
@@ -1633,11 +1636,24 @@ window.addEventListener("keydown", (ev) => {
   if (tool.key?.(ev)) return ev.preventDefault();
   if (ev.key === "Escape") return setTool("select");
   const one = k ? shortcuts.get(ev.shiftKey ? `Shift+${k}` : k) : undefined;
+  // A one-letter command (H hides…) that also starts a two-letter shortcut (HI, HC, HR as in Revit)
+  // waits a moment for the second letter; tools switch at once (the second letter takes over).
+  if (one?.startsWith("cmd:") && !ev.shiftKey && [...shortcuts.keys()].some((x) => x.length === 2 && x[0] === k)) {
+    ev.preventDefault();
+    if (pendingSingle) clearTimeout(pendingSingle);
+    pendingSingle = setTimeout(() => {
+      pendingSingle = null;
+      lastKey = null;
+      void commands[one.slice(4)]?.();
+    }, 600);
+    return;
+  }
   if (one) return runShortcut(one);
 });
 
 let shortcuts = shortcutTable();
 let lastKey: { key: string; at: number } | null = null;
+let pendingSingle: ReturnType<typeof setTimeout> | null = null;
 
 /** Options strip for the active tool (Copy, Disjoin, Number…), over the top of the view. */
 function renderToolOptions(options: ToolOption[] | null): void {

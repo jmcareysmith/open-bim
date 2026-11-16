@@ -98,7 +98,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   or saving); View → 3D View ▾ → Camera: eye then target in a plan makes a perspective view at
   1750 eye height (eye/target elevation and field of view in Properties).
 - Keyboard Shortcuts (KS, or File menu): edit one/two-letter keys per command (apps/desktop/src/shortcuts.ts;
-  local storage). Single letters fire at once; a second letter within 1 s takes over.
+  local storage). Revit's defaults too (WA DR WN CM CL BM BR RT ZE ZA HH HI HC HR RR DE GP ME AT PX LF EE SK). Single-letter
+  tools fire at once and a second letter within 1 s takes over; single-letter commands that start a pair (H, F) wait 600 ms.
 - View windows (apps/desktop/src/panes.ts): Tile / Cascade / Tab Views (View → Windows, WT/WC/TW,
   or the ▦ ▾ at the end of the view tabs: Tile all / 2 / 3 / 4 most recent, Cascade, Tab Views).
   Each open view is a live window (a Viewport each, up to 9): drag the title bar, resize by the

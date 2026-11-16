@@ -15,6 +15,7 @@ import { type LevelParams, type ImageUnderlayParams, isAnnotationView, analytica
   PLAN_CUT_HEIGHT,
   TemporaryVisibility,
   annotationView,
+  viewShowsAnnotation,
   elementMaterial,
   isFormCategory,
   isDrawingView,
@@ -1114,7 +1115,7 @@ void main() {
   private isShown(el: { id: ElementId; category: string; params: unknown }): boolean {
     if (!this.showMass && graphicsCategory(this.doc, el as Element) === MASS_CATEGORY) return false;
     const owner = annotationView(el as never);
-    if (owner && owner !== this.annotationViewId) return false;
+    if (owner && !viewShowsAnnotation(this.doc, this.annotationViewId, owner)) return false;
     const lvl = planLevelOf(el as Element);
     if (lvl && lvl !== this.planLevelId) return false;
     if (this.revealHidden) return true;

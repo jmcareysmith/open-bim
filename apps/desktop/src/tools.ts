@@ -2242,7 +2242,9 @@ function requireAnnotView(ctx: ToolContext): ElementId | null {
     ctx.status("Annotations go in plans, sections and elevations. Open one first.");
     return null;
   }
-  return v.id;
+  // A dependent view's annotation is its parent's (shared by every dependent).
+  const parent = (v.params as { dependentOf?: ElementId | null }).dependentOf;
+  return parent && ctx.doc.get(parent) ? parent : v.id;
 }
 
 /** Detail lines: click points; lines chain until Esc. */

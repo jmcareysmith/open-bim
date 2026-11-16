@@ -12,6 +12,7 @@ import {
   flipWall,
   isPinned,
   setPinned,
+  viewShowsAnnotation,
   hostedClearances,
   setHostedClearance,
   wallClearances,
@@ -102,8 +103,9 @@ export class GripLayer {
     const p = el.params as { viewId?: unknown; sheetId?: unknown };
     const view = this.ctx.activeViewId();
     if (mode === "3d") return p.viewId === undefined && p.sheetId === undefined;
-    if (mode === "drawing") return p.viewId === view || p.sheetId === view;
-    return p.viewId === undefined || p.viewId === view;
+    const mine = typeof p.viewId === "string" && viewShowsAnnotation(this.ctx.doc, view, p.viewId);
+    if (mode === "drawing") return mine || p.sheetId === view;
+    return p.viewId === undefined || mine;
   }
 
   /** Rebuild for the current selection (after selection or model changes). */

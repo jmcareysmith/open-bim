@@ -85,3 +85,18 @@ describe("duplicate view", () => {
     expect(det.name).not.toBe(plain.name);
   });
 });
+
+describe("dependent views", () => {
+  it("show their parent's annotation", async () => {
+    const { createTextNote, duplicateView, viewShowsAnnotation } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const plan = floorPlanFor(doc, ids.levels.ground)!;
+    doc.transact("T", (tx) => createTextNote(tx, doc, plan.id, { x: 0, y: 0 }, "Hello"));
+    const dep = doc.transact("D", (tx) => duplicateView(tx, doc, plan.id, "dependent"));
+    expect(dep.params.dependentOf).toBe(plan.id);
+    expect(viewShowsAnnotation(doc, dep.id, plan.id)).toBe(true);
+    const plain = doc.transact("D", (tx) => duplicateView(tx, doc, plan.id));
+    expect(viewShowsAnnotation(doc, plain.id, plan.id)).toBe(false);
+  });
+});

@@ -110,6 +110,8 @@ export type ViewParams = {
   designOptions?: Record<string, string> | null;
   /** Worksets hidden in this view (V/G → Worksets). */
   hiddenWorksets?: ElementId[] | null;
+  /** Dependent view (Revit: Duplicate as Dependent): shows its parent's annotation; own crop. */
+  dependentOf?: ElementId | null;
   /** Area plans: their area scheme. */
   areaScheme?: "gross" | "rentable" | null;
 };
@@ -649,11 +651,16 @@ export function isPlanView(view: View): boolean {
  * (crop, range, graphics, camera); "detailing" copies the view's own annotation too (dimensions,
  * text, detail lines, tags, regions…), pointing at the new view.
  */
-export function duplicateView(tx: Transaction, doc: Document, id: ElementId, mode: "plain" | "detailing" = "plain"): View {
+export function duplicateView(tx: Transaction, doc: Document, id: ElementId, mode: "plain" | "detailing" | "dependent" = "plain"): View {
   const v = doc.require<ViewParams>(id) as View;
   if (v.category !== Cat.View) throw new Error("Only views can be duplicated here");
-  const name = uniqueName(doc, v.params.kind, `${v.name ?? "View"} Copy 1`);
-  const copy = tx.create<ViewParams>(Cat.View, structuredClone(v.params), { name }) as View;
+  // A dependent of a dependent hangs off the same parent.
+  const parent = v.params.dependentOf && doc.get(v.params.dependentOf) ? v.params.dependentOf : id;
+  const name = uniqueName(doc, v.params.kind, mode === "dependent" ? `${doc.get(parent)?.name ?? "View"} - Dependent 1` : `${v.name ?? "View"} Copy 1`);
+  const params = structuredClone(v.params);
+  if (mode === "dependent") params.dependentOf = parent;
+  else params.dependentOf = null;
+  const copy = tx.create<ViewParams>(Cat.View, params, { name }) as View;
   if (mode === "detailing") {
     const owned = doc.all().filter((e) => (e.params as { viewId?: unknown }).viewId === id);
     const map = new Map<ElementId, ElementId>([[id, copy.id]]);

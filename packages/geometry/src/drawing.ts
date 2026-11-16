@@ -1,6 +1,7 @@
 import {
   Cat,
   annotationView,
+  viewShowsAnnotation,
   effectiveGraphics,
   elementGraphics,
   elementMaterial,
@@ -118,7 +119,7 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
     if (el.category === Cat.View && el.id === view.id) return false; // a view doesn't show its own marker
     if (graphicsCategory(doc, el) === MASS_CATEGORY) return false; // masses are a design aid, not drawn
     const owner = annotationView(el);
-    if (owner && owner !== view.id) return false;
+    if (owner && !viewShowsAnnotation(doc, view.id, owner)) return false;
     // Rooms and separators: only in plans of their level.
     const lvl = planLevelOf(el);
     if (lvl && (!isPlanView(view) || view.params.kind === "areaPlan" || (view.params as ViewParams).levelId !== lvl)) return false;
@@ -135,7 +136,7 @@ export function viewDrawing(doc: Document, kernel: GeometryKernel, view: View): 
   const section = isDrawingView(view);
   if (isAnnotationView(view)) {
     // Legends and drafting views hold no model: only their own annotation (and legend components).
-    for (const el of els.filter((e) => annotationView(e) === view.id)) {
+    for (const el of els.filter((e) => { const o = annotationView(e); return !!o && viewShowsAnnotation(doc, view.id, o); })) {
       const lines = kernel.buildLines(doc, el, g.scale, g.detailLevel);
       const r = elementGraphics(doc, g, el);
       if (lines) addLineData(out, lines, "annotation", { color: r.color ?? undefined, halftone: r.halftone, id: el.id });

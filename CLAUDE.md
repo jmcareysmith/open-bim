@@ -124,7 +124,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Project Browser is Revit's: Views (all), Sheets (all) just below (Jeremy), Legends, Schedules, Families
   (system families Walls/Floors/…/Ducts/Pipes and loadable ones, by category → family → type),
   Groups (model/detail), Links. Right-click a view: Open, Duplicate, Duplicate with Detailing (core `duplicateView` copies its
-  annotation, refs remapped), Rename, Delete. Project Information, Materials, Project Parameters, Levels,
+  annotation, refs remapped), Duplicate as Dependent (`dependentOf`: shows and edits the parent's annotation; new
+  annotation there goes to the parent — core `viewShowsAnnotation` used by drawing.ts, viewport, grips, modify), Rename, Delete. Project Information, Materials, Project Parameters, Levels,
   Filters & Templates, Design Options, Revisions, System Browser (F9) and Model Statistics are
   Manage-tab dialogs (`projectSection` in panels.ts). Manage → Purge Unused (core purge.ts `unusedElements`: types without instances,
   unreferenced materials (by id or layer name)/families/templates/filters; one type of each kind kept; purgeui.ts). Manage → Transfer

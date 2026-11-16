@@ -5,6 +5,7 @@ import {
   isModifiable,
   mirrorAcross,
   scalingAbout,
+  viewShowsAnnotation,
   planPoints,
   rotationAbout,
   selectionCentre,
@@ -106,7 +107,7 @@ export class ModifyTool implements Tool {
       // In sections, elevations and sheets only this view's annotations (and viewports) move.
       if (!drawing) return true;
       const p = el.params as { viewId?: unknown; sheetId?: unknown };
-      return p.viewId === viewId || p.sheetId === viewId;
+      return (typeof p.viewId === "string" && viewShowsAnnotation(doc, viewId, p.viewId)) || p.sheetId === viewId;
     };
     const sel = this.ctx.selection().map((id) => doc.get(id)).filter((e): e is Element => !!e);
     this.ids = sel.filter(usable).map((e) => e.id);

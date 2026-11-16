@@ -105,6 +105,14 @@ export function annotationView(el: Element): ElementId | undefined {
   return (ANNOTATION_CATEGORIES as readonly string[]).includes(el.category) ? (el.params as { viewId: ElementId }).viewId : undefined;
 }
 
+/** Does view `viewId` show annotation owned by `owner`: its own, or (a dependent view) its parent's. */
+export function viewShowsAnnotation(doc: Document, viewId: ElementId | undefined, owner: ElementId): boolean {
+  if (!viewId) return false;
+  if (owner === viewId) return true;
+  const dep = (doc.get(viewId)?.params as { dependentOf?: ElementId | null } | undefined)?.dependentOf;
+  return !!dep && dep === owner;
+}
+
 function requireView(doc: Document, viewId: ElementId): Element<ViewParams> {
   const v = doc.require<ViewParams>(viewId);
   if (v.category !== Cat.View) throw new Error("Annotations belong to a view");

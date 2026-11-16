@@ -2389,9 +2389,9 @@ function projectSections(ctx: PanelContext): Record<string, HTMLElement> {
       // Revit's right-click on a view: Open, Duplicate View ▸, Rename, Delete.
       div.oncontextmenu = (ev) => {
         ev.preventDefault();
-        const dup = (mode: "plain" | "detailing") => {
+        const dup = (mode: "plain" | "detailing" | "dependent") => {
           let id = "";
-          edit(ctx, mode === "plain" ? "Duplicate view" : "Duplicate view with detailing", (tx) => (id = duplicateView(tx, doc, v.id, mode).id));
+          edit(ctx, mode === "plain" ? "Duplicate view" : mode === "detailing" ? "Duplicate view with detailing" : "Duplicate view as dependent", (tx) => (id = duplicateView(tx, doc, v.id, mode).id));
           if (id) ctx.setActiveView(id);
         };
         showContextMenu(ev.clientX, ev.clientY, [
@@ -2399,6 +2399,7 @@ function projectSections(ctx: PanelContext): Record<string, HTMLElement> {
           { label: "Open", action: () => ctx.setActiveView(v.id) },
           { label: "Duplicate", action: () => dup("plain") },
           { label: "Duplicate with Detailing", action: () => dup("detailing") },
+          { label: "Duplicate as Dependent", action: () => dup("dependent") },
           {
             label: "Rename…",
             action: () => {

@@ -520,3 +520,37 @@ describe("ramps from IFC", () => {
     expect(run.end.x).toBeCloseTo(6000, -1);
   });
 });
+
+describe("ducts and pipes from IFC", () => {
+  it("segments become native runs meeting at the corner, and the fitting hook makes the elbow", async () => {
+    const { createDuct, ensureDuctTypes, enableDuctFittings, createPipe, ensurePipeTypes } = await import("@open-bim/core");
+    const { SimpleKernel } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    enableDuctFittings(doc);
+    const [round] = doc.transact("T", (tx) => ensureDuctTypes(tx, doc));
+    const [pex] = doc.transact("T", (tx) => ensurePipeTypes(tx, doc));
+    doc.transact("D", (tx) => {
+      createDuct(tx, doc, round!, ids.levels.ground, { x: 0, y: 0, z: 2700 }, { x: 3000, y: 0, z: 2700 }, { diameter: 250 });
+      createDuct(tx, doc, round!, ids.levels.ground, { x: 3000, y: 0, z: 2700 }, { x: 3000, y: 2000, z: 2700 }, { diameter: 250 });
+      createPipe(tx, doc, pex!, ids.levels.ground, { x: 0, y: 1000, z: 500 }, { x: 4000, y: 1000, z: 500 }, { diameter: 25 });
+    });
+    const k = new SimpleKernel();
+    const cls: Record<string, string> = { Duct: "IfcDuctSegment", DuctFitting: "IfcDuctFitting", Pipe: "IfcPipeSegment" };
+    const parts = [...doc.byCategory("Duct"), ...doc.byCategory("DuctFitting"), ...doc.byCategory("Pipe")].map((e) => ({ cls: cls[e.category]!, m: k.build(doc, e)! }));
+    const shapes = doc.transact("I", (tx) => {
+      for (const c of ["DuctFitting", "Duct", "Pipe"]) for (const e of doc.byCategory(c)) if (doc.has(e.id)) tx.delete(e.id);
+      return parts.map(({ cls: c, m }) => createDirectShape(tx, { levelId: ids.levels.ground, ifcClass: c, globalId: c, positions: [...m.positions], indices: [...m.indices], color: 0x999999, properties: {} }).id);
+    });
+    expect(doc.byCategory("Duct")).toHaveLength(0);
+    const r = doc.transact("C", (tx) => convertDirectShapes(tx, doc, shapes));
+    expect(r.skipped).toEqual([]);
+    const ducts = doc.byCategory<{ start: { x: number; y: number; z: number }; end: { x: number; y: number; z: number }; diameter: number }>("Duct");
+    expect(ducts).toHaveLength(2);
+    expect(ducts.every((d) => d.params.diameter === 250)).toBe(true);
+    expect(ducts.every((d) => [d.params.start, d.params.end].some((q) => Math.hypot(q.x - 3000, q.y) < 1 && Math.abs(q.z - 2700) < 1))).toBe(true);
+    expect(doc.byCategory<{ kind: string }>("DuctFitting").map((f) => f.params.kind)).toEqual(["elbow"]);
+    const pipe = doc.byCategory<{ diameter: number }>("Pipe")[0]!;
+    expect(pipe.params.diameter).toBe(25);
+  });
+});

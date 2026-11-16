@@ -171,4 +171,5 @@ to native elements where their shapes allow.
 - [x] Footings: under a converted wall → its strip footing; otherwise a pad (size, depth, top, rotation)
 - [x] Members (rafters, purlins, braces): level → beams; sloped → sloped beams marked brace (end tops kept)
 - [x] Straight ramps (one sloping top plane) → native ramps
+- [x] Duct and pipe segments → native runs (axis by principal direction; round vs rectangular; DN by size); ends snapped together so the fitting hook remakes elbows/tees/transitions; imported fittings dropped
 - [ ] Still shapes: non-rectangular curtain panels; anything whose rebuilt version wouldn't match its mesh

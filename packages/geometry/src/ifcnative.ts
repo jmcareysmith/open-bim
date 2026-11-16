@@ -10,6 +10,11 @@ import {
   createBeam,
   createRoof,
   createCeiling,
+  createDuct,
+  createPipe,
+  ensureDuctTypes,
+  ensurePipeTypes,
+  PIPE_SIZES,
   createRamp,
   type RampParams,
   type RampTypeParams,
@@ -73,6 +78,9 @@ const BEAM_CLASSES = new Set(["IfcBeam", "IfcMember"]);
 const ROOF_CLASSES = new Set(["IfcRoof"]);
 const STAIR_CLASSES = new Set(["IfcStair", "IfcStairFlight"]);
 const RAMP_CLASSES = new Set(["IfcRamp", "IfcRampFlight"]);
+/** MEP runs (fittings are remade by the fitting hook where the converted runs meet). */
+const RUN_CLASSES = new Set(["IfcDuctSegment", "IfcPipeSegment"]);
+const FITTING_CLASSES = new Set(["IfcDuctFitting", "IfcPipeFitting"]);
 const RAILING_CLASSES = new Set(["IfcRailing"]);
 /** Loadable-family categories an imported class stands for (furniture, fixtures, equipment, generic). */
 const FAMILY_OF: Record<string, FamilyCategory> = {
@@ -95,7 +103,7 @@ const INSERT_CLASSES = new Set(["IfcDoor", "IfcWindow"]);
 export function convertible(el: { category: string; params: unknown }): boolean {
   if (el.category !== Cat.DirectShape) return false;
   const c = (el.params as DirectShapeParams).ifcClass;
-  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || CEILING_CLASSES.has(c) || FOOTING_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c) || ROOF_CLASSES.has(c) || STAIR_CLASSES.has(c) || RAMP_CLASSES.has(c) || RAILING_CLASSES.has(c) || PLATE_CLASSES.has(c) || c in FAMILY_OF;
+  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || CEILING_CLASSES.has(c) || FOOTING_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c) || ROOF_CLASSES.has(c) || STAIR_CLASSES.has(c) || RAMP_CLASSES.has(c) || RUN_CLASSES.has(c) || FITTING_CLASSES.has(c) || RAILING_CLASSES.has(c) || PLATE_CLASSES.has(c) || c in FAMILY_OF;
 }
 
 function hull(pts: Vec2[]): Vec2[] {
@@ -644,6 +652,135 @@ function curtainFromPanels(tx: Transaction, doc: Document, g: Panel[]): ElementI
   return w.id;
 }
 
+type P3 = { x: number; y: number; z: number };
+
+/**
+ * Run ends near another run meet it: where the axes cross (elbows, tees: within reach of the end
+ * and on or near the other run), or, for runs in line (transitions), at the middle of the gap.
+ * Positions are absolute here; run params are level-relative.
+ */
+function snapRunEnds(tx: Transaction, doc: Document, ids: ElementId[]): void {
+  type R = { id: ElementId; a: P3; b: P3; size: number; lz: number };
+  const runs: R[] = ids.map((id) => {
+    const e = doc.require(id);
+    const q = e.params as { levelId: string; start: P3; end: P3; diameter?: number; width?: number; height?: number };
+    const lz = doc.get<LevelParams>(q.levelId)?.params.elevation ?? 0;
+    return { id, a: { ...q.start, z: q.start.z + lz }, b: { ...q.end, z: q.end.z + lz }, size: Math.max(q.diameter ?? 0, q.width ?? 0, q.height ?? 0), lz };
+  });
+  const sub3 = (u: P3, w: P3) => ({ x: u.x - w.x, y: u.y - w.y, z: u.z - w.z });
+  const dot3 = (u: P3, w: P3) => u.x * w.x + u.y * w.y + u.z * w.z;
+  const len3 = (u: P3) => Math.hypot(u.x, u.y, u.z);
+  const moved = new Map<ElementId, { start?: P3; end?: P3 }>();
+  for (const r of runs) {
+    for (const end of ["a", "b"] as const) {
+      const e = r[end];
+      const dirR = sub3(r.b, r.a);
+      let best: P3 | null = null;
+      let bestD = Infinity;
+      for (const o of runs) {
+        if (o === r) continue;
+        const reach = 1.5 * Math.max(r.size, o.size) + 50;
+        const dirO = sub3(o.b, o.a);
+        const lo = len3(dirO);
+        // Closest points of the two axes.
+        const w0 = sub3(r.a, o.a);
+        const A = dot3(dirR, dirR), B = dot3(dirR, dirO), Cc = dot3(dirO, dirO), D = dot3(dirR, w0), E = dot3(dirO, w0);
+        const den = A * Cc - B * B;
+        let x: P3;
+        if (den < 1e-9 * A * Cc) {
+          // In line: meet the other run's nearer end halfway across the gap.
+          const near = len3(sub3(o.a, e)) < len3(sub3(o.b, e)) ? o.a : o.b;
+          if (len3(sub3(near, e)) > reach) continue;
+          const off = len3(sub3(sub3(near, e), { x: (dirR.x / Math.sqrt(A)) * dot3(sub3(near, e), dirR) / Math.sqrt(A), y: (dirR.y / Math.sqrt(A)) * dot3(sub3(near, e), dirR) / Math.sqrt(A), z: (dirR.z / Math.sqrt(A)) * dot3(sub3(near, e), dirR) / Math.sqrt(A) }));
+          if (off > 5) continue;
+          x = { x: (near.x + e.x) / 2, y: (near.y + e.y) / 2, z: (near.z + e.z) / 2 };
+        } else {
+          const s = (B * E - Cc * D) / den;
+          const t = (A * E - B * D) / den;
+          const pr = { x: r.a.x + dirR.x * s, y: r.a.y + dirR.y * s, z: r.a.z + dirR.z * s };
+          const po = { x: o.a.x + dirO.x * t, y: o.a.y + dirO.y * t, z: o.a.z + dirO.z * t };
+          if (len3(sub3(pr, po)) > 5) continue;
+          if (t * lo < -reach || t * lo > lo + reach) continue;
+          x = pr;
+        }
+        const d = len3(sub3(x, e));
+        if (d <= reach && d < bestD) [best, bestD] = [x, d];
+      }
+      if (best && bestD > 0.5) {
+        const m = moved.get(r.id) ?? {};
+        m[end === "a" ? "start" : "end"] = { x: best.x, y: best.y, z: best.z - r.lz };
+        moved.set(r.id, m);
+      }
+    }
+  }
+  for (const [id, m] of moved) tx.update(id, m);
+}
+
+/**
+ * A duct or pipe from its mesh: its axis is the points' main direction (the run's length dwarfs its
+ * section); round when every point sits at one distance from the axis, else rectangular (width
+ * across, height up). Ends extend to the axis' extremes so neighbours meet for fittings.
+ */
+function runFromMesh(tx: Transaction, doc: Document, p: DirectShapeParams, lvl: number): ElementId | null {
+  const P = p.positions;
+  const n = P.length / 3;
+  if (n < 6) return null;
+  const c = [0, 0, 0];
+  for (let i = 0; i < n; i++) for (let k = 0; k < 3; k++) c[k]! += P[i * 3 + k]! / n;
+  // Main axis by power iteration on the covariance.
+  const C = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+  for (let i = 0; i < n; i++) {
+    const d = [P[i * 3]! - c[0]!, P[i * 3 + 1]! - c[1]!, P[i * 3 + 2]! - c[2]!];
+    for (let r = 0; r < 3; r++) for (let k = 0; k < 3; k++) C[r * 3 + k]! += d[r]! * d[k]!;
+  }
+  let v = [1, 0.3, 0.1];
+  for (let it = 0; it < 60; it++) {
+    const w = [0, 1, 2].map((r) => C[r * 3]! * v[0]! + C[r * 3 + 1]! * v[1]! + C[r * 3 + 2]! * v[2]!);
+    const l = Math.hypot(w[0]!, w[1]!, w[2]!) || 1;
+    v = w.map((x) => x / l);
+  }
+  // Snap near-axis directions (runs are usually level or vertical).
+  v = v.map((x) => (Math.abs(x) < 1e-3 ? 0 : x));
+  const ts = Array.from({ length: n }, (_, i) => (P[i * 3]! - c[0]!) * v[0]! + (P[i * 3 + 1]! - c[1]!) * v[1]! + (P[i * 3 + 2]! - c[2]!) * v[2]!);
+  const t0 = Math.min(...ts);
+  const t1 = Math.max(...ts);
+  // Section axes: horizontal across, and up (a vertical run: x and y).
+  const vertical = Math.abs(v[2]!) > 0.99;
+  let side = vertical ? [1, 0, 0] : [-v[1]!, v[0]!, 0];
+  const sl = Math.hypot(side[0]!, side[1]!, side[2]!) || 1;
+  side = side.map((x) => x / sl);
+  const up = [v[1]! * side[2]! - v[2]! * side[1]!, v[2]! * side[0]! - v[0]! * side[2]!, v[0]! * side[1]! - v[1]! * side[0]!];
+  let s0 = Infinity, s1 = -Infinity, u0 = Infinity, u1 = -Infinity, rMax = 0;
+  for (let i = 0; i < n; i++) {
+    const d = [P[i * 3]! - c[0]!, P[i * 3 + 1]! - c[1]!, P[i * 3 + 2]! - c[2]!];
+    const s = d[0]! * side[0]! + d[1]! * side[1]! + d[2]! * side[2]!;
+    const u = d[0]! * up[0]! + d[1]! * up[1]! + d[2]! * up[2]!;
+    s0 = Math.min(s0, s); s1 = Math.max(s1, s); u0 = Math.min(u0, u); u1 = Math.max(u1, u);
+    const r = Math.hypot(s, u);
+    rMax = Math.max(rMax, r);
+  }
+  const width = s1 - s0;
+  const height = u1 - u0;
+  if (t1 - t0 < 2 * Math.max(width, height)) return null;
+  // Round: no corners standing out (a rectangle's reach √2 × its half-size).
+  const round = Math.abs(width - height) < 0.05 * width && rMax < 1.1 * (Math.max(width, height) / 2);
+  const mid = [c[0]! + side[0]! * (s0 + s1) / 2 + up[0]! * (u0 + u1) / 2, c[1]! + side[1]! * (s0 + s1) / 2 + up[1]! * (u0 + u1) / 2, c[2]! + side[2]! * (s0 + s1) / 2 + up[2]! * (u0 + u1) / 2];
+  const at = (t: number) => ({ x: mid[0]! + v[0]! * t, y: mid[1]! + v[1]! * t, z: mid[2]! + v[2]! * t - lvl });
+  const start = at(t0);
+  const end = at(t1);
+  if (p.ifcClass === "IfcPipeSegment") {
+    const dia = 2 * rMax;
+    const dn = PIPE_SIZES.reduce((b, s) => (Math.abs(s - dia) < Math.abs(b - dia) ? s : b), PIPE_SIZES[0]!);
+    const types = ensurePipeTypes(tx, doc);
+    return createPipe(tx, doc, types[0]!, p.levelId, start, end, { diameter: dn }).id;
+  }
+  const types = ensureDuctTypes(tx, doc);
+  const typeOf = (shape: string) => types.find((id) => (doc.get(id)?.params as { shape?: string } | undefined)?.shape === shape) ?? types[0]!;
+  return round
+    ? createDuct(tx, doc, typeOf("round"), p.levelId, start, end, { diameter: Math.round(2 * rMax) }).id
+    : createDuct(tx, doc, typeOf("rectangular"), p.levelId, start, end, { width: Math.round(width), height: Math.round(height) }).id;
+}
+
 /**
  * A straight ramp from its mesh: one sloping top plane over a plan rectangle; it runs uphill along
  * the rectangle, from its low end's top to its high end's, with the slab's thickness and width.
@@ -872,6 +1009,7 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
   const familyShapes = ids.filter((id) => ((doc.get(id)?.params as DirectShapeParams | undefined)?.ifcClass ?? "") in FAMILY_OF);
   created.push(...familiesFromShapes(tx, doc, familyShapes));
   const pendingRails: ElementId[] = [];
+  const fittingShapes: ElementId[] = [];
   const footings: ElementId[] = [];
   for (const id of ids) {
     if (plates.includes(id) || familyShapes.includes(id)) continue;
@@ -951,6 +1089,17 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
         continue;
       }
       created.push(rail);
+    } else if (FITTING_CLASSES.has(p.ifcClass)) {
+      // Dropped once runs are converted: the fitting hook makes native ones where they meet.
+      fittingShapes.push(id);
+      continue;
+    } else if (RUN_CLASSES.has(p.ifcClass)) {
+      const run = runFromMesh(tx, doc, p, lvl);
+      if (!run) {
+        skipped.push(id);
+        continue;
+      }
+      created.push(run);
     } else if (RAMP_CLASSES.has(p.ifcClass)) {
       const ramp = rampFromMesh(tx, doc, p, lvl);
       if (!ramp) {
@@ -1051,6 +1200,25 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
   // Converted straight walls meet at corners and tees: each end that stops near another wall's
   // centreline moves onto it (the imported shapes run to the outer corner of their mitres).
   snapWallEnds(tx, doc, walls.map((w) => w.id));
+  // Converted runs stop short of their (imported) fittings: close the gaps so native fittings form.
+  snapRunEnds(tx, doc, created.filter((cid) => doc.get(cid)?.category === Cat.Duct || doc.get(cid)?.category === Cat.Pipe));
+  // Imported fittings go if a converted run ends in them (else they stay, joining nothing native).
+  for (const id of fittingShapes) {
+    const ds = doc.get<DirectShapeParams>(id);
+    if (!ds) continue;
+    const { xy, z0, z1 } = bounds(ds.params);
+    const x0 = Math.min(...xy.map((q) => q.x)) - 50, x1 = Math.max(...xy.map((q) => q.x)) + 50;
+    const y0 = Math.min(...xy.map((q) => q.y)) - 50, y1 = Math.max(...xy.map((q) => q.y)) + 50;
+    const touched = created.some((cid) => {
+      const el = doc.get(cid);
+      if (el?.category !== Cat.Duct && el?.category !== Cat.Pipe) return false;
+      const rp = el.params as { levelId: string; start: { x: number; y: number; z: number }; end: { x: number; y: number; z: number } };
+      const lz = doc.get<LevelParams>(rp.levelId)?.params.elevation ?? 0;
+      return [rp.start, rp.end].some((q) => q.x >= x0 && q.x <= x1 && q.y >= y0 && q.y <= y1 && q.z + lz >= z0 - 50 && q.z + lz <= z1 + 50);
+    });
+    if (touched) tx.delete(id);
+    else skipped.push(id);
+  }
   // Footings: under a converted wall and along it, its strip footing; else a pad.
   for (const id of footings) {
     const ds = doc.get<DirectShapeParams>(id) as DirectShape | undefined;

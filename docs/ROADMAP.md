@@ -161,4 +161,5 @@ to native elements where their shapes allow.
 - [x] Furniture, fixtures, equipment and generic models → loadable families with a mesh form (one per distinct shape and
       Revit name; turned copies share it), placed as instances
 - [x] Sloped railings over a converted stair → its left/right railings
-- [ ] Still shapes: winder stairs, non-rectangular curtain panels
+- [x] Winder stairs (turning treads between straight runs; same count at each turn)
+- [ ] Still shapes: non-rectangular curtain panels; anything whose rebuilt version wouldn't match its mesh

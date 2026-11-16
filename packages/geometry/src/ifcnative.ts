@@ -601,28 +601,70 @@ function stairFromMesh(tx: Transaction, doc: Document, p: DirectShapeParams, lvl
   const risers = steps.length + 1;
   const riser = (z1 - z0) / risers;
   if (steps.some((t, i) => Math.abs(t.z - (z0 + riser * (i + 1))) > 3)) return null;
-  // Treads and landings (much bigger than a tread); runs of treads between landings.
+  type Step = (typeof steps)[0];
+  /** Straight, evenly spaced runs: their line and spacing, or null. */
+  const fit = (runs: Step[][]) => {
+    if (runs.some((r) => r.length < 2)) return null;
+    let g0 = 0;
+    const ls = runs.map((r) => {
+      const first = r[0]!.c;
+      const last = r[r.length - 1]!.c;
+      const span = Math.hypot(last.x - first.x, last.y - first.y);
+      g0 = Math.max(g0, span / (r.length - 1));
+      return { first, dir: { x: (last.x - first.x) / span, y: (last.y - first.y) / span }, r };
+    });
+    for (const { first, dir, r } of ls) {
+      const g = Math.hypot(r[r.length - 1]!.c.x - first.x, r[r.length - 1]!.c.y - first.y) / (r.length - 1);
+      if (Math.abs(g - g0) > 3 || r.some((t, i) => Math.hypot(t.c.x - (first.x + dir.x * g * i), t.c.y - (first.y + dir.y * g * i)) > 5)) return null;
+    }
+    return { lines: ls, going: g0 };
+  };
+  // Treads and landings (much bigger than a tread): runs of treads between landings.
   const median = [...steps].sort((x, y) => x.a - y.a)[Math.floor(steps.length / 2)]!.a;
-  const runs: (typeof steps)[] = [[]];
+  let runs: Step[][] = [[]];
   for (const st of steps) {
     if (st.a > 1.6 * median) runs.push([]);
     else runs[runs.length - 1]!.push(st);
   }
-  if (runs.some((r) => r.length < 2)) return null;
-  // Going: from the runs' tread spacing; each run straight and even.
-  let going = 0;
-  const lines = runs.map((r) => {
-    const first = r[0]!.c;
-    const last = r[r.length - 1]!.c;
-    const span = Math.hypot(last.x - first.x, last.y - first.y);
-    const dir = { x: (last.x - first.x) / span, y: (last.y - first.y) / span };
-    going = Math.max(going, span / (r.length - 1));
-    return { first, dir, r };
-  });
-  for (const { first, dir, r } of lines) {
-    const g = Math.hypot(r[r.length - 1]!.c.x - first.x, r[r.length - 1]!.c.y - first.y) / (r.length - 1);
-    if (Math.abs(g - going) > 3 || r.some((t, i) => Math.hypot(t.c.x - (first.x + dir.x * g * i), t.c.y - (first.y + dir.y * g * i)) > 5)) return null;
+  let winders = 0;
+  let fitted = fit(runs);
+  if (!fitted) {
+    // Winders instead: straight runs, and between them the same number of turning treads at each turn.
+    runs = [];
+    let i = 0;
+    const counts: number[] = [];
+    while (i < steps.length) {
+      const run: Step[] = [steps[i]!, ...(steps[i + 1] ? [steps[i + 1]!] : [])];
+      i += run.length;
+      const g = run.length > 1 ? Math.hypot(run[1]!.c.x - run[0]!.c.x, run[1]!.c.y - run[0]!.c.y) : 0;
+      const dir = run.length > 1 ? { x: (run[1]!.c.x - run[0]!.c.x) / g, y: (run[1]!.c.y - run[0]!.c.y) / g } : { x: 0, y: 0 };
+      while (i < steps.length) {
+        const last = run[run.length - 1]!.c;
+        const nx = steps[i]!.c;
+        if (Math.hypot(nx.x - (last.x + dir.x * g), nx.y - (last.y + dir.y * g)) > 5) break;
+        run.push(steps[i]!);
+        i++;
+      }
+      runs.push(run);
+      if (i >= steps.length) break;
+      // The next run starts where two treads at the going head off square to this one.
+      let j = i;
+      for (; j + 1 < steps.length; j++) {
+        const a = steps[j]!.c;
+        const b2 = steps[j + 1]!.c;
+        const d = Math.hypot(b2.x - a.x, b2.y - a.y);
+        if (Math.abs(d - g) < 3 && Math.abs(((b2.x - a.x) * dir.x + (b2.y - a.y) * dir.y) / d) < 0.05) break;
+      }
+      if (j + 1 >= steps.length) return null;
+      counts.push(j - i);
+      i = j;
+    }
+    if (!counts.length || counts.some((k) => k !== counts[0] || k < 2 || k > 4)) return null;
+    winders = counts[0]!;
+    fitted = fit(runs);
+    if (!fitted) return null;
   }
+  const { lines, going } = fitted;
   const across0 = { x: -lines[0]!.dir.y, y: lines[0]!.dir.x };
   const ws = lines[0]!.r[0]!.pts.map((q) => (q.x - lines[0]!.first.x) * across0.x + (q.y - lines[0]!.first.y) * across0.y);
   const width = Math.max(...ws) - Math.min(...ws);
@@ -643,7 +685,7 @@ function stairFromMesh(tx: Transaction, doc: Document, p: DirectShapeParams, lvl
   const top = above[0];
   if (!top) return null;
   const s = createStair(tx, doc, type, p.levelId, top.id, stairRuns);
-  tx.update<StairParams>(s.id, { baseOffset: z0 - lvl, topOffset: z1 - top.params.elevation });
+  tx.update<StairParams>(s.id, { baseOffset: z0 - lvl, topOffset: z1 - top.params.elevation, ...(winders ? { winders } : {}) });
   // The rebuilt stair must climb the same way: same risers, same treads per run.
   const lay = stairLayout(doc, doc.require(s.id) as Stair);
   if (lay.risers !== risers || lay.runs.some((r, i) => r.treads !== runs[i]!.length)) {

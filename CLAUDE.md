@@ -58,7 +58,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   library "Title Block - A1 Simple"), viewports, and vector PDF export (`geometry/src/pdf.ts`).
 - UI: box select, type selector, temporary hide/isolate (H/I/U), properties for everything, browser.
 - Modify: Move/Copy/Rotate/Mirror/Array (MV, CO, RO, MM, AR; toolbar). Type a value + Enter; options
-  strip (Copy, Multiple, Disjoin, Number) top-left of the view. Mirror by drawn axis only.
+  strip (Copy, Multiple, Disjoin, Number) top-left of the view. Mirror by drawn axis, or Pick axis (options strip: click a wall/grid/ref plane/beam/line).
   Align (AL), Offset (OF), Trim/Extend (TR; corner or to boundary), Split (SL) — plans/3D only.
   Grips on the selection (Select tool, plans/sections/sheets): drag ends/vertices; click a line's
   length label to type a new length; press on a selected element and drag to move it. Selected

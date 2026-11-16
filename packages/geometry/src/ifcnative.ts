@@ -168,21 +168,56 @@ function snapWallEnds(tx: Transaction, doc: Document, ids: ElementId[]): void {
       if (best && bestD > 0.5) patch[end] = best;
     }
     if (patch.start || patch.end) {
-      // An elevation profile follows: edge points to the new ends, the rest by how far the start moved.
       const prof = w.params.profile;
-      if (prof?.length) {
-        const s0 = w.params.start;
-        const oldLen = Math.hypot(w.params.end.x - s0.x, w.params.end.y - s0.y);
-        const u = { x: (w.params.end.x - s0.x) / oldLen, y: (w.params.end.y - s0.y) / oldLen };
-        const ns = patch.start ?? s0;
-        const ne = patch.end ?? w.params.end;
-        const newLen = Math.hypot(ne.x - ns.x, ne.y - ns.y);
-        const shift = (ns.x - s0.x) * u.x + (ns.y - s0.y) * u.y;
-        patch.profile = prof.map((q) => ({ x: q.x <= 0.5 ? 0 : q.x >= oldLen - 0.5 ? newLen : q.x - shift, y: q.y }));
-      }
       tx.update<WallParams>(w.id, patch);
+      if (prof?.length) {
+        const remapped = remapProfile(prof, w.params.start, w.params.end, patch.start ?? w.params.start, patch.end ?? w.params.end);
+        // Validated as any edited profile; an end snap that leaves no sensible outline drops it.
+        try {
+          setWallProfile(tx, doc, w.id, remapped);
+        } catch {
+          setWallProfile(tx, doc, w.id, null);
+        }
+      }
     }
   }
+}
+
+/**
+ * A wall's elevation profile (x along from its start) after its ends move along its line: points keep
+ * their place on the wall; points on an end continue their edge's slope (a rake carries on) to the
+ * new end; anything past a new end is pulled back onto it. Null if the wall turned round or vanished.
+ */
+export function remapProfile(prof: Vec2[], s0: Vec2, e0: Vec2, s1: Vec2, e1: Vec2): Vec2[] | null {
+  const oldLen = Math.hypot(e0.x - s0.x, e0.y - s0.y);
+  const newLen = Math.hypot(e1.x - s1.x, e1.y - s1.y);
+  if (oldLen < 1 || newLen < 1) return null;
+  const u = { x: (e0.x - s0.x) / oldLen, y: (e0.y - s0.y) / oldLen };
+  if ((e1.x - s1.x) * u.x + (e1.y - s1.y) * u.y <= 0) return null;
+  const shift = (s1.x - s0.x) * u.x + (s1.y - s0.y) * u.y;
+  const n = prof.length;
+  const out = prof.map((q, i) => {
+    const onStart = q.x <= 0.5;
+    const onEnd = q.x >= oldLen - 0.5;
+    let x = q.x - shift;
+    let y = q.y;
+    if (onStart || onEnd) {
+      const target = onStart ? 0 : newLen;
+      // Continue along the neighbouring edge that leaves this end (the top or bottom, not the end itself).
+      const nb = [prof[(i - 1 + n) % n]!, prof[(i + 1) % n]!].find((o) => (onStart ? o.x > 0.5 : o.x < oldLen - 0.5));
+      if (nb) {
+        const ox = nb.x - shift;
+        if (Math.abs(ox - x) > 1e-6) y = q.y + ((nb.y - q.y) * (target - x)) / (ox - x);
+      }
+      x = target;
+    }
+    return { x: Math.max(0, Math.min(newLen, x)), y };
+  });
+  // Drop repeats (points pulled onto the same spot).
+  return out.filter((q, i) => {
+    const o = out[(i + 1) % out.length]!;
+    return Math.hypot(o.x - q.x, o.y - q.y) > 0.01;
+  });
 }
 
 /** A coarse plan grid over boxes, so lookups only see what's near. */
@@ -1308,7 +1343,19 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
   }
   // Converted straight walls meet at corners and tees: each end that stops near another wall's
   // centreline moves onto it (the imported shapes run to the outer corner of their mitres).
+  // Doors and windows are matched against each wall's shape as imported (a tee stem extended into its
+  // through wall mustn't claim the through wall's openings), then placed along the wall as snapped.
+  const original = new Map(walls.map((w) => [w.id, { c: { ...w.c }, len: w.len }]));
   snapWallEnds(tx, doc, walls.map((w) => w.id));
+  for (const w of walls) {
+    const q = doc.get<WallParams>(w.id)?.params;
+    if (!q) continue;
+    const len = Math.hypot(q.end.x - q.start.x, q.end.y - q.start.y);
+    if (len < 1) continue;
+    w.len = len;
+    w.u = { x: (q.end.x - q.start.x) / len, y: (q.end.y - q.start.y) / len };
+    w.c = { x: (q.start.x + q.end.x) / 2, y: (q.start.y + q.end.y) / 2 };
+  }
   // Converted runs stop short of their (imported) fittings: close the gaps so native fittings form.
   snapRunEnds(tx, doc, created.filter((cid) => doc.get(cid)?.category === Cat.Duct || doc.get(cid)?.category === Cat.Pipe));
   // Imported fittings go if a converted run ends in them (else they stay, joining nothing native).
@@ -1394,20 +1441,20 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
     const bx0 = Math.min(...xy.map((q) => q.x)), bx1 = Math.max(...xy.map((q) => q.x));
     const by0 = Math.min(...xy.map((q) => q.y)), by1 = Math.max(...xy.map((q) => q.y));
     for (const w of wallGrid.near(bx0, by0, bx1, by1).sort((a, b) => wallOrder.get(a)! - wallOrder.get(b)!)) {
-      // Measured from the wall as it is now (its ends may have been snapped to its neighbours).
+      // Matched against the wall as imported (its original centre and length along the same line)…
       const cur = doc.get<WallParams>(w.id)?.params;
-      if (!cur) continue;
-      const len = Math.hypot(cur.end.x - cur.start.x, cur.end.y - cur.start.y);
-      const ux = (cur.end.x - cur.start.x) / len;
-      const uy = (cur.end.y - cur.start.y) / len;
-      const us = xy.map((q) => (q.x - cur.start.x) * ux + (q.y - cur.start.y) * uy);
-      const vs = xy.map((q) => -(q.x - cur.start.x) * uy + (q.y - cur.start.y) * ux);
+      const o = original.get(w.id);
+      if (!cur || !o || w.len < 1) continue;
+      const us = xy.map((q) => (q.x - o.c.x) * w.u.x + (q.y - o.c.y) * w.u.y);
+      const vs = xy.map((q) => -(q.x - o.c.x) * w.u.y + (q.y - o.c.y) * w.u.x);
       const mid = (Math.min(...vs) + Math.max(...vs)) / 2;
       if (Math.abs(mid) > w.wid / 2 + 100) continue;
-      const u0 = Math.max(0, Math.min(...us));
-      const u1 = Math.min(len, Math.max(...us));
+      const u0 = Math.max(-o.len / 2, Math.min(...us));
+      const u1 = Math.min(o.len / 2, Math.max(...us));
       if (u1 - u0 < 50) continue;
-      const along = (u0 + u1) / 2;
+      // …and placed along it as it is now (from its snapped start).
+      const centre = { x: o.c.x + w.u.x * (u0 + u1) / 2, y: o.c.y + w.u.y * (u0 + u1) / 2 };
+      const along = (centre.x - cur.start.x) * w.u.x + (centre.y - cur.start.y) * w.u.y;
       const stated = (k: string) => Number(ds.params.properties[k]);
       const width = stated("OverallWidth") > 0 ? stated("OverallWidth") : u1 - u0;
       const height = stated("OverallHeight") > 0 ? stated("OverallHeight") : z1 - z0;

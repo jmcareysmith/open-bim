@@ -84,6 +84,8 @@ export class ModifyTool implements Tool {
   private multiple = false;
   private disjoin = false;
   private count = 3;
+  /** Mirror – Pick Axis (Revit): click a line-like element to mirror about it. */
+  private pickAxis = false;
 
   constructor(
     private ctx: ModifyToolContext,
@@ -130,6 +132,7 @@ export class ModifyTool implements Tool {
       opts.push({ kind: "check", label: "Copy", value: this.copy, set: (v) => (this.copy = v) });
     }
     if (this.mode === "copy") opts.push({ kind: "check", label: "Multiple", value: this.multiple, set: (v) => (this.multiple = v) });
+    if (this.mode === "mirror") opts.push({ kind: "check", label: "Pick axis", value: this.pickAxis, set: (v) => ((this.pickAxis = v), (this.pts = []), this.prompt()) });
     if (this.mode === "move" || this.mode === "rotate") {
       opts.push({ kind: "check", label: "Disjoin", value: this.disjoin, set: (v) => (this.disjoin = v) });
     }
@@ -150,6 +153,7 @@ export class ModifyTool implements Tool {
           if (this.placingCentre) return "click the centre of rotation.";
           return this.pts.length ? "click the end of the rotation, or type an angle." : "click the start of the rotation, or type an angle. Press C to move the centre.";
         case "mirror":
+          if (this.pickAxis) return "click a wall, grid, reference plane, beam or line to mirror about.";
           return this.pts.length ? "click the second point of the mirror axis." : "click the first point of the mirror axis.";
       }
     })();
@@ -229,6 +233,14 @@ export class ModifyTool implements Tool {
     const from = this.mode === "rotate" ? (this.placingCentre ? null : this.centre) : (this.pts[0] ?? null);
     const p = viewPoint(this.ctx, ev, from);
     if (!p) return;
+    if (this.mode === "mirror" && this.pickAxis) {
+      // The picked element's line is the axis.
+      const id = this.ctx.viewport.pick(ev);
+      const el = id ? this.ctx.doc.get(id) : undefined;
+      const q = el?.params as { start?: Vec2; end?: Vec2 } | undefined;
+      if (!q?.start || !q.end || Math.hypot(q.end.x - q.start.x, q.end.y - q.start.y) < 1) return this.ctx.status("Mirror: pick an element with a line (wall, grid, reference plane, beam, detail line).");
+      return this.apply(mirrorAcross({ x: q.start.x, y: q.start.y }, { x: q.end.x, y: q.end.y }));
+    }
     if (this.placingCentre) {
       this.centre = p;
       this.placingCentre = false;

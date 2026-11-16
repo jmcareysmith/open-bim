@@ -608,3 +608,49 @@ describe("doors in snapped walls", () => {
     expect((got.min[0] + got.max[0]) / 2).toBeCloseTo((want.min[0] + want.max[0]) / 2, -1);
   });
 });
+
+describe("profiles follow snapped wall ends", () => {
+  it("a rake carries on to a new end; points past a trimmed end are pulled back; a reversed wall drops it", async () => {
+    const { remapProfile } = await import("../src/index.ts");
+    // Skillion 6000 long: 2400 high at the start rising to 3000 at the end.
+    const prof = [{ x: 0, y: 0 }, { x: 6000, y: 0 }, { x: 6000, y: 3000 }, { x: 0, y: 2400 }];
+    const slope = 600 / 6000;
+    // Start pulled 150 back (wall now starts at x = −150): the top continues down the slope.
+    const ext = remapProfile(prof, { x: 0, y: 0 }, { x: 6000, y: 0 }, { x: -150, y: 0 }, { x: 6000, y: 0 })!;
+    const top0 = ext.find((q) => q.x === 0 && q.y > 0)!;
+    expect(top0.y).toBeCloseTo(2400 - 150 * slope, 6);
+    const top1 = ext.find((q) => q.x > 6000 && q.y > 0)!;
+    expect(top1.x).toBeCloseTo(6150, 6);
+    expect(top1.y).toBeCloseTo(3000, 6);
+    // End trimmed by 100: nothing past the new end, and the rake still meets it on the line.
+    const trim = remapProfile(prof, { x: 0, y: 0 }, { x: 6000, y: 0 }, { x: 0, y: 0 }, { x: 5900, y: 0 })!;
+    expect(Math.max(...trim.map((q) => q.x))).toBeCloseTo(5900, 6);
+    expect(trim.find((q) => q.x === 5900 && q.y > 0)!.y).toBeCloseTo(3000 - 100 * slope, 6);
+    // Turned round: no profile.
+    expect(remapProfile(prof, { x: 0, y: 0 }, { x: 6000, y: 0 }, { x: 6000, y: 0 }, { x: 0, y: 0 })).toBeNull();
+  });
+
+  it("a door in a through wall stays there, not taken by the tee stem extended into it", async () => {
+    const { createWall, createDoor } = await import("@open-bim/core");
+    const { SimpleKernel } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    doc.transact("W", (tx) => {
+      // The stem first, so it would be tried first.
+      createWall(tx, ids.wallTypes.interior, { x: 3000, y: 0 }, { x: 3000, y: 4000 }, ids.levels.ground, { height: 2700 });
+      const a = createWall(tx, ids.wallTypes.exterior, { x: 0, y: 0 }, { x: 6000, y: 0 }, ids.levels.ground, { height: 2700 });
+      createDoor(tx, doc, ids.doorTypes.single860, a.id, 3000);
+    });
+    const k = new SimpleKernel();
+    const parts = [...doc.byCategory("Wall"), ...doc.byCategory("Door")].map((e) => ({ cls: e.category === "Door" ? "IfcDoor" : "IfcWall", m: k.build(doc, e)! }));
+    const shapes = doc.transact("I", (tx) => {
+      for (const c of ["Door", "Wall"]) for (const e of doc.byCategory(c)) if (doc.has(e.id)) tx.delete(e.id);
+      return parts.map(({ cls, m }, i) => createDirectShape(tx, { levelId: ids.levels.ground, ifcClass: cls, globalId: `${cls}${i}`, positions: [...m.positions], indices: [...m.indices], color: 0x999999, properties: {} }).id);
+    });
+    doc.transact("C", (tx) => convertDirectShapes(tx, doc, shapes));
+    const door = doc.byCategory<{ hostId: string }>("Door")[0]!;
+    expect(door).toBeDefined();
+    const host = doc.require<WallParams>(door.params.hostId);
+    expect(Math.abs(host.params.end.y - host.params.start.y)).toBeLessThan(1); // the wall along x
+  });
+});

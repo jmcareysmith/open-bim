@@ -67,8 +67,14 @@ export function enableWorksetAssignment(doc: Document): () => void {
     if (!ws.length) return;
     const main = activeWorkset(doc);
     const datums = ws.find((w) => w.name === "Shared Levels and Grids")?.id ?? main;
+    const hiddenByDefault = ws.filter((w) => !w.params.visibleByDefault).map((w) => w.id);
     for (const id of doc.createdInTransaction()) {
       const el = doc.get(id);
+      // New views hide worksets that aren't visible by default.
+      if (el?.category === "View" && hiddenByDefault.length && !(el.params as { hiddenWorksets?: unknown }).hiddenWorksets) {
+        tx.update(id, { hiddenWorksets: hiddenByDefault });
+        continue;
+      }
       if (!el || (el.params as { worksetId?: unknown }).worksetId || !isWorksetElement(el)) continue;
       const target = DATUMS.has(el.category) ? datums : main;
       if (target) tx.update(id, { worksetId: target });

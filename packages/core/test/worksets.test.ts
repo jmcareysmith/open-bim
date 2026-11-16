@@ -40,3 +40,17 @@ describe("worksets", () => {
     expect(worksets(doc).map((w) => w.name).sort()).toEqual(["Shared Levels and Grids", "Workset1"]);
   });
 });
+
+describe("workset default visibility", () => {
+  it("new views hide worksets that aren't visible by default", async () => {
+    const { createSection } = await import("../src/index.ts");
+    const doc = new Document();
+    enableWorksetAssignment(doc);
+    applyResidentialTemplate(doc);
+    doc.transact("On", (tx) => enableWorksets(tx, doc));
+    const ws = doc.transact("WS", (tx) => createWorkset(tx, doc, "Furniture"));
+    doc.transact("Off", (tx) => tx.update(ws.id, { visibleByDefault: false }));
+    const s = doc.transact("S", (tx) => createSection(tx, doc, { x: 0, y: 0 }, { x: 5000, y: 0 }));
+    expect(doc.require<{ hiddenWorksets?: string[] }>(s.id).params.hiddenWorksets).toEqual([ws.id]);
+  });
+});

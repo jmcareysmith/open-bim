@@ -34,7 +34,7 @@ export function openWorksetsDialog(doc: Document, status: (s: string) => void, c
     }
     const table = document.createElement("table");
     table.className = "worksets-table";
-    table.innerHTML = "<tr><th>Active</th><th>Name</th><th>Elements</th><th></th></tr>";
+    table.innerHTML = "<tr><th>Active</th><th>Name</th><th>Elements</th><th>Visible in all views</th><th></th></tr>";
     for (const w of list) {
       const tr = document.createElement("tr");
       const radio = Object.assign(document.createElement("input"), { type: "radio", name: "active-workset", checked: w.id === act });
@@ -52,7 +52,9 @@ export function openWorksetsDialog(doc: Document, status: (s: string) => void, c
         if (!confirm(`Delete “${w.name}” and move its ${counts.get(w.id) ?? 0} element(s) to “${to.name}”?`)) return;
         run("Delete workset", (tx) => deleteWorkset(tx, doc, w.id, to.id));
       };
-      const cells = [radio, name, document.createTextNode(String(counts.get(w.id) ?? 0)), del];
+      const vis = Object.assign(document.createElement("input"), { type: "checkbox", checked: w.params.visibleByDefault, title: "Off: new views start with this workset hidden" });
+      vis.onchange = () => run("Workset visibility", (tx) => void tx.update(w.id, { visibleByDefault: vis.checked }));
+      const cells = [radio, name, document.createTextNode(String(counts.get(w.id) ?? 0)), vis, del];
       for (const c of cells) {
         const td = document.createElement("td");
         td.append(c);

@@ -98,3 +98,53 @@ export class MatchTypeTool implements Tool {
     return false;
   }
 }
+
+/** Zoom Region (Revit: ZR): drag a box; the view zooms to it, then the previous tool comes back. */
+export class ZoomRegionTool implements Tool {
+  readonly name = "zoomregion";
+  private from: { x: number; y: number } | null = null;
+  private band: HTMLDivElement | null = null;
+  constructor(
+    private ctx: ToolContext,
+    private done: () => void,
+  ) {}
+
+  activate(): void {
+    this.ctx.status("Zoom Region: drag a box round what to zoom to.");
+  }
+
+  deactivate(): void {
+    this.band?.remove();
+    this.band = null;
+    this.from = null;
+  }
+
+  pointerDown(ev: PointerEvent): void {
+    if (ev.button === 0) this.from = { x: ev.clientX, y: ev.clientY };
+  }
+
+  pointerMove(ev: PointerEvent): void {
+    if (!this.from || !(ev.buttons & 1)) return;
+    if (!this.band) {
+      this.band = document.createElement("div");
+      this.band.className = "select-band";
+      document.body.append(this.band);
+    }
+    Object.assign(this.band.style, {
+      left: `${Math.min(this.from.x, ev.clientX)}px`,
+      top: `${Math.min(this.from.y, ev.clientY)}px`,
+      width: `${Math.abs(ev.clientX - this.from.x)}px`,
+      height: `${Math.abs(ev.clientY - this.from.y)}px`,
+    });
+  }
+
+  pointerUp(ev: PointerEvent): void {
+    const f = this.from;
+    this.band?.remove();
+    this.band = null;
+    this.from = null;
+    if (!f) return;
+    this.ctx.viewport.zoomRegion({ x0: f.x, y0: f.y, x1: ev.clientX, y1: ev.clientY });
+    this.done();
+  }
+}

@@ -106,6 +106,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   RE Scale (ModifyTool "scale": origin, reference, new point, or type a factor; core `scalingAbout`), MM pick-axis
   Mirror (DM draws), CS Create Similar (tool + type of the selection), UG Ungroup; right-click has CS/SA/Pin.
   Tab over a wall selects its chain (core joins.ts `wallChain`: L corners carry on, tees/junctions stop; Shift+Tab adds).
+  ZR/ZZ Zoom Region (drag a box; viewport `zoomRegion`, then back to Select).
 - View windows (apps/desktop/src/panes.ts): Tile / Cascade / Tab Views (View → Windows, WT/WC/TW,
   or the ▦ ▾ at the end of the view tabs: Tile all / 2 / 3 / 4 most recent, Cascade, Tab Views).
   Each open view is a live window (a Viewport each, up to 9): drag the title bar, resize by the

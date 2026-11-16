@@ -15,7 +15,7 @@ import { addRecentFile, fileName, recentFiles, removeRecentFile } from "./recent
 import { CameraTool } from "./cameratool.ts";
 import { FloorPointTool, SlopeArrowTool } from "./slopetool.ts";
 import { WallProfileTool } from "./profiletool.ts";
-import { LevelTool, MatchTypeTool } from "./revittools.ts";
+import { LevelTool, MatchTypeTool, ZoomRegionTool } from "./revittools.ts";
 import { ungroup, enablePinning, isPinned, setPinned, setElementOverrides, setCategoryOverride, type DirectShapeParams, enableSharedNested, enableBeamSystems, createImageUnderlay, planCrop, createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
   ceilingPlanFor,
   createCeilingPlan,
@@ -618,9 +618,10 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   elevation: new ElevationTool(ctx),
   level: new LevelTool(ctx),
   matchtype: new MatchTypeTool(ctx),
+  zoomregion: new ZoomRegionTool(ctx, () => setTool("select")),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
-const DRAWING_TOOLS = new Set(["mirrorpick", "scale", "level", "matchtype", "select", "symbol", "detailcomponent", "repeatingdetail", "placegroup", "attach", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution", "angulardim", "callout"]);
+const DRAWING_TOOLS = new Set(["zoomregion", "mirrorpick", "scale", "level", "matchtype", "select", "symbol", "detailcomponent", "repeatingdetail", "placegroup", "attach", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution", "angulardim", "callout"]);
 let tool: Tool = tools.select!;
 /** Grips and temporary dimensions for the selection (Select tool only). */
 let grips: GripLayer | undefined = new GripLayer(ctx, $("#viewport"));

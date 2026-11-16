@@ -1648,6 +1648,37 @@ void main() {
     this.needsRender = true;
   }
 
+  /** Zoom Region (ZR): fill the view with the client rectangle dragged. */
+  zoomRegion(r: { x0: number; y0: number; x1: number; y1: number }): void {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const rw = Math.abs(r.x1 - r.x0);
+    const rh = Math.abs(r.y1 - r.y0);
+    if (rw < 4 || rh < 4) return;
+    const f = Math.min(rect.width / rw, rect.height / rh);
+    const controls = this.controls;
+    // The point under the rectangle's middle, on the plane through the orbit target facing the camera.
+    const cam = this.mode === "3d" ? this.camera3d : (this.camera as THREE.OrthographicCamera);
+    this.setRay({ clientX: (r.x0 + r.x1) / 2, clientY: (r.y0 + r.y1) / 2 });
+    const dir = new THREE.Vector3();
+    this.camera.getWorldDirection(dir);
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(dir, controls.target);
+    const p = this.raycaster.ray.intersectPlane(plane, new THREE.Vector3());
+    if (!p) return;
+    const shift = p.clone().sub(controls.target);
+    controls.target.add(shift);
+    cam.position.add(shift);
+    if (cam instanceof THREE.OrthographicCamera) {
+      cam.zoom *= f;
+      cam.updateProjectionMatrix();
+    } else {
+      // Perspective (and the 3D orthographic view, which follows it): closer by the factor.
+      const off = cam.position.clone().sub(controls.target).divideScalar(f);
+      cam.position.copy(controls.target).add(off);
+    }
+    controls.update();
+    this.needsRender = true;
+  }
+
   zoomToFit(): void {
     if (this.mode === "drawing" && this.sheet) {
       const size = this.sheet.params.size;

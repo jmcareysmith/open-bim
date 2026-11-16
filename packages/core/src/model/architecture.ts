@@ -51,6 +51,7 @@ export const Cat = {
   Blend: "Blend",
   Revolution: "Revolution",
   Sweep: "Sweep",
+  MeshForm: "MeshForm",
   FamilyDef: "FamilyDef",
   FamilyInstance: "FamilyInstance",
   ProjectParameter: "ProjectParameter",

@@ -156,4 +156,8 @@ to native elements where their shapes allow.
 - [x] Batch: after Import IFC, offer to convert everything (one undo step), with a summary of what was made and what stayed as shapes
 - [x] Roof slabs (PredefinedType ROOF) and sloped slabs → roofs; curved IfcWalls → arc walls (centre from the curved faces' normals)
 - [x] Straight stairs (IfcStair/IfcStairFlight) → native stairs (even risers from the tread faces, going, width, run)
-- [ ] Still shapes: stairs with turns/winders, railings, curtain walls, furniture/MEP (could become in-place families)
+- [x] Level railings (path from the top rail), stairs with landings (runs between landings, checked against the risers)
+- [x] Curtain walls from their panels (IfcPlate; grid where panels meet, mullions absorbed)
+- [x] Furniture, fixtures, equipment and generic models → loadable families with a mesh form (one per distinct shape and
+      Revit name; turned copies share it), placed as instances
+- [ ] Still shapes: winders, sloped (stair) railings, non-rectangular curtain panels

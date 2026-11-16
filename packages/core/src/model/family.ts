@@ -119,7 +119,13 @@ export type SweepParams = FormBase & {
   endProfile?: NumPt[] | null;
 };
 
-export const FORM_CATEGORIES = [Cat.Extrusion, Cat.Blend, Cat.Revolution, Cat.Sweep] as const;
+/**
+ * Mesh form: fixed geometry in family coordinates (from an imported shape — Revit furniture and
+ * equipment come in this way); it doesn't flex with parameters.
+ */
+export type MeshFormParams = FormBase & { positions: number[]; indices: number[] };
+
+export const FORM_CATEGORIES = [Cat.Extrusion, Cat.Blend, Cat.Revolution, Cat.Sweep, Cat.MeshForm] as const;
 
 for (const name of FORM_CATEGORIES) {
   registerCategory({ name, dependencies: () => [], cascadeDelete: false, isType: false });

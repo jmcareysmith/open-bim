@@ -169,7 +169,10 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   converted walls → native doors/windows (IFC OverallWidth/Height kept on import; types by size), IfcColumn/IfcBeam → columns/beams
   (rect/round sections by size), IfcRoof → footprint roof (`roofFromMesh`: top-face outline, per-eave slopes, gables), names +
   "….Mark" + colour materials carried; roof slabs/sloped slabs → roofs; curved walls → arcs (`arcWall`); straight stairs
-  (`stairFromMesh`); Import IFC offers to convert everything and reports what stayed as shapes.
+  (`stairFromMesh`, runs between landings), level railings (`railingFromMesh`), curtain walls from IfcPlate panels
+  (`curtainFromPanels`), furniture/fixtures/equipment/proxies → families with a MeshForm (new family form category: fixed
+  mesh in family coords; `familiesFromShapes` fingerprints shapes in their own frame so turned copies share a family);
+  Import IFC offers to convert everything and reports what stayed as shapes.
 - DXF/DWG: Export DXF/DWG (open view/sheet) and Import DXF/DWG (into the open view as a CadImport).
   DWG is desktop-only via an installed ODA File Converter or LibreDWG (src-tauri/src/cad.rs);
   not tested with a real converter (none installed here).

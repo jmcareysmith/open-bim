@@ -10,6 +10,7 @@ import {
   type ExtrusionParams,
   type RevolutionParams,
   type SweepParams,
+  type MeshFormParams,
   type Values,
   type Vec2,
   type WorkPlane,
@@ -262,6 +263,29 @@ export function sweepMesh(p: SweepParams, values: Values): MeshData {
   return t.finish();
 }
 
+/** A mesh form's triangles, each with its own flat normal. */
+function meshFormMesh(p: MeshFormParams): MeshData {
+  const P = p.positions;
+  const pos = new Float32Array(p.indices.length * 3);
+  const nor = new Float32Array(p.indices.length * 3);
+  const idx = new Uint32Array(p.indices.length);
+  for (let t = 0; t < p.indices.length; t += 3) {
+    const v = [0, 1, 2].map((k) => p.indices[t + k]! * 3);
+    const [a, b, c] = v as [number, number, number];
+    const u = [P[b]! - P[a]!, P[b + 1]! - P[a + 1]!, P[b + 2]! - P[a + 2]!];
+    const w = [P[c]! - P[a]!, P[c + 1]! - P[a + 1]!, P[c + 2]! - P[a + 2]!];
+    const n = [u[1]! * w[2]! - u[2]! * w[1]!, u[2]! * w[0]! - u[0]! * w[2]!, u[0]! * w[1]! - u[1]! * w[0]!];
+    const l = Math.hypot(n[0]!, n[1]!, n[2]!) || 1;
+    for (let k = 0; k < 3; k++) {
+      const s = v[k]!;
+      pos.set([P[s]!, P[s + 1]!, P[s + 2]!], (t + k) * 3);
+      nor.set([n[0]! / l, n[1]! / l, n[2]! / l], (t + k) * 3);
+      idx[t + k] = t + k;
+    }
+  }
+  return { positions: pos, normals: nor, indices: idx };
+}
+
 /** Mesh of any family form element, with the given parameter values. */
 export function formMesh(el: Element, values: Values): MeshData {
   switch (el.category) {
@@ -273,6 +297,8 @@ export function formMesh(el: Element, values: Values): MeshData {
       return revolutionMesh(el.params as RevolutionParams, values);
     case Cat.Sweep:
       return sweepMesh(el.params as SweepParams, values);
+    case Cat.MeshForm:
+      return meshFormMesh(el.params as MeshFormParams);
   }
   throw new Error(`${el.category} is not a family form`);
 }

@@ -304,6 +304,7 @@ export class SimpleKernel implements GeometryKernel {
     [Cat.Blend, buildForm],
     [Cat.Revolution, buildForm],
     [Cat.Sweep, buildForm],
+    [Cat.MeshForm, buildForm],
     [Cat.FamilyInstance, (doc, el) => buildFamilyInstance(doc, el, this.mesher)],
   ]);
 

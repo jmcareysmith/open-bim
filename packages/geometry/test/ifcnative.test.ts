@@ -281,3 +281,42 @@ describe("curtain walls from IFC panels", () => {
     expect(doc.byCategory("DirectShape")).toHaveLength(0);
   });
 });
+
+describe("furniture and equipment from IFC", () => {
+  it("makes one family per distinct shape (turned copies share it) and places instances where the shapes were", async () => {
+    const { SimpleKernel, boundingBox } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const lvl = ids.levels.ground;
+    const turn = (m: { positions: number[]; indices: number[] }, a: number, dx: number, dy: number) => {
+      const p = [...m.positions];
+      for (let i = 0; i < p.length; i += 3) {
+        const [x, y] = [p[i]!, p[i + 1]!];
+        p[i] = x * Math.cos(a) - y * Math.sin(a) + dx;
+        p[i + 1] = x * Math.sin(a) + y * Math.cos(a) + dy;
+      }
+      return { positions: p, indices: m.indices };
+    };
+    // A "chair": seat box plus a back, so it isn't symmetric.
+    const seat = box(rect(-250, -250, 250, 250), 0, 450);
+    const back = box(rect(-250, 200, 250, 250), 450, 900);
+    const chair = { positions: [...seat.positions, ...back.positions], indices: [...seat.indices, ...back.indices.map((i) => i + seat.positions.length / 3)] };
+    const mk = (ifcClass: string, name: string, mesh: { positions: number[]; indices: number[] }) =>
+      doc.transact("I", (tx) => createDirectShape(tx, { levelId: lvl, ifcClass, globalId: name, ...mesh, color: 0x996633, properties: {} }, name).id);
+    const a = mk("IfcFurniture", "Chair-Desk:Chair-Desk:1001", turn(chair, 0, 1000, 1000));
+    const b = mk("IfcFurniture", "Chair-Desk:Chair-Desk:1002", turn(chair, Math.PI / 2, 3000, 1000));
+    const t = mk("IfcFurniture", "Table-Round:900:1003", box(rect(4500, 500, 5400, 1400), 0, 750));
+    const want = [a, b, t].map((id) => boundingBox(new SimpleKernel().build(doc, doc.require(id))!));
+    const r = doc.transact("C", (tx) => convertDirectShapes(tx, doc, [a, b, t]));
+    expect(r.created).toHaveLength(3);
+    expect(doc.byCategory("FamilyDef").filter((d) => (d.params as { category: string }).category === "Furniture").map((d) => d.name).sort()).toEqual(["Chair-Desk:Chair-Desk", "Table-Round:900"]);
+    r.created.forEach((id, i) => {
+      const bb = boundingBox(new SimpleKernel().build(doc, doc.require(id))!);
+      const w = want[[a, b, t].indexOf([a, b, t][i]!)]!;
+      for (let k = 0; k < 3; k++) {
+        expect(bb.min[k]).toBeCloseTo(w.min[k]!, 0);
+        expect(bb.max[k]).toBeCloseTo(w.max[k]!, 0);
+      }
+    });
+  });
+});

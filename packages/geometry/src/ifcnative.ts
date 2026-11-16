@@ -23,6 +23,14 @@ import {
   type ColumnParams,
   type StructuralSectionParams,
   type DoorTypeParams,
+  type FamilyCategory,
+  type MeshFormParams,
+  Document as BimDocument,
+  applyFamilyTemplate,
+  familyDefs,
+  familyTypeNames,
+  loadFamily,
+  placeFamilyInstance,
   type WallParams,
   type Material,
   type MaterialParams,
@@ -52,6 +60,19 @@ const BEAM_CLASSES = new Set(["IfcBeam"]);
 const ROOF_CLASSES = new Set(["IfcRoof"]);
 const STAIR_CLASSES = new Set(["IfcStair", "IfcStairFlight"]);
 const RAILING_CLASSES = new Set(["IfcRailing"]);
+/** Loadable-family categories an imported class stands for (furniture, fixtures, equipment, generic). */
+const FAMILY_OF: Record<string, FamilyCategory> = {
+  IfcFurniture: "Furniture",
+  IfcFurnishingElement: "Furniture",
+  IfcBuildingElementProxy: "GenericModel",
+  IfcAirTerminal: "AirTerminal",
+  IfcUnitaryEquipment: "MechanicalEquipment",
+  IfcSanitaryTerminal: "PlumbingFixture",
+  IfcFireSuppressionTerminal: "Sprinkler",
+  IfcLightFixture: "LightingFixture",
+  IfcOutlet: "ElectricalFixture",
+  IfcElectricDistributionBoard: "ElectricalEquipment",
+};
 /** Curtain wall parts (Revit exports a curtain wall as its panels and mullions). */
 const PLATE_CLASSES = new Set(["IfcPlate"]);
 const INSERT_CLASSES = new Set(["IfcDoor", "IfcWindow"]);
@@ -60,7 +81,7 @@ const INSERT_CLASSES = new Set(["IfcDoor", "IfcWindow"]);
 export function convertible(el: { category: string; params: unknown }): boolean {
   if (el.category !== Cat.DirectShape) return false;
   const c = (el.params as DirectShapeParams).ifcClass;
-  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c) || ROOF_CLASSES.has(c) || STAIR_CLASSES.has(c) || RAILING_CLASSES.has(c) || PLATE_CLASSES.has(c);
+  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c) || ROOF_CLASSES.has(c) || STAIR_CLASSES.has(c) || RAILING_CLASSES.has(c) || PLATE_CLASSES.has(c) || c in FAMILY_OF;
 }
 
 function hull(pts: Vec2[]): Vec2[] {
@@ -402,6 +423,73 @@ function railingFromMesh(tx: Transaction, doc: Document, p: DirectShapeParams, l
   return r.id;
 }
 
+/**
+ * Imported furniture/fixtures/equipment as loadable families. Each shape is taken into its own
+ * frame (origin at its plan centre and base, X along its longer side; the other way round tried
+ * too) and fingerprinted, so copies — even turned — share one family; the family holds the shape as
+ * a mesh form and gets the Revit "Family:Type" name. Returns the instances made.
+ */
+function familiesFromShapes(tx: Transaction, doc: Document, ids: ElementId[]): ElementId[] {
+  type Shape = { ds: DirectShape; c: Vec2; z0: number; angle: number; local: number[]; key: string };
+  const shapes: Shape[] = [];
+  for (const id of ids) {
+    const ds = doc.get<DirectShapeParams>(id) as DirectShape | undefined;
+    if (!ds) continue;
+    const { xy, z0 } = bounds(ds.params);
+    const r = minRect(xy);
+    const base = r ? Math.atan2(r.u.y, r.u.x) : 0;
+    const c = r?.c ?? { x: xy.reduce((s, q) => s + q.x, 0) / xy.length, y: xy.reduce((s, q) => s + q.y, 0) / xy.length };
+    const square = !!r && Math.abs(r.len - r.wid) < 2;
+    const angles = square ? [0, 1, 2, 3].map((k) => base + (k * Math.PI) / 2) : [base, base + Math.PI];
+    let best: Omit<Shape, "ds" | "c" | "z0"> | null = null;
+    for (const a of angles) {
+      const ca = Math.cos(-a);
+      const sa = Math.sin(-a);
+      const P = ds.params.positions;
+      const local: number[] = [];
+      for (let i = 0; i < P.length; i += 3) {
+        const x = P[i]! - c.x;
+        const y = P[i + 1]! - c.y;
+        local.push(x * ca - y * sa, x * sa + y * ca, P[i + 2]! - z0);
+      }
+      const key = local.map((v) => Math.round(v / 2)).join(",") + "|" + ds.params.indices.length;
+      if (!best || key < best.key) best = { angle: a, local, key };
+    }
+    shapes.push({ ds, c, z0, ...best! });
+  }
+  // One family per Revit name and fingerprint.
+  const nameOf = (ds: DirectShape) => (ds.name ?? ds.params.ifcClass).replace(/:\d+$/, "");
+  const families = new Map<string, Shape[]>();
+  for (const s of shapes) {
+    const k = `${nameOf(s.ds)}|${s.key}`;
+    families.set(k, [...(families.get(k) ?? []), s]);
+  }
+  const out: ElementId[] = [];
+  const taken = new Set(familyDefs(doc).map((d) => d.name));
+  for (const group of families.values()) {
+    const first = group[0]!;
+    const category = FAMILY_OF[first.ds.params.ifcClass]!;
+    let name = nameOf(first.ds);
+    for (let k = 2; taken.has(name); k++) name = `${nameOf(first.ds)} (${k})`;
+    taken.add(name);
+    const fam = new BimDocument();
+    applyFamilyTemplate(fam, category, name);
+    fam.transact("Imported shape", (ftx) => {
+      ftx.create<MeshFormParams>(Cat.MeshForm, { isVoid: false, plane: { kind: "XY", offset: 0 }, positions: first.local.map((v) => Math.round(v * 100) / 100), indices: [...first.ds.params.indices] });
+    });
+    const def = loadFamily(tx, doc, fam, name);
+    const typeName = familyTypeNames(def)[0] ?? "Default";
+    for (const s of group) {
+      const lvl = doc.get<LevelParams>(s.ds.params.levelId)?.params.elevation ?? 0;
+      const inst = placeFamilyInstance(tx, doc, def.id, typeName, { levelId: s.ds.params.levelId, position: s.c, rotation: s.angle, offset: s.z0 - lvl });
+      carryOver(tx, doc, inst.id, s.ds);
+      out.push(inst.id);
+      tx.delete(s.ds.id);
+    }
+  }
+  return out;
+}
+
 type Panel = { id: ElementId; levelId: ElementId; c: Vec2; u: Vec2; u0: number; u1: number; z0: number; z1: number; thick: number };
 
 /** Imported panels as thin vertical rectangles, grouped by the plane they lie in. */
@@ -629,8 +717,11 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
     }
     created.push(made);
   }
+  // Furniture, fixtures and equipment: families (one per distinct shape and name), placed as instances.
+  const familyShapes = ids.filter((id) => ((doc.get(id)?.params as DirectShapeParams | undefined)?.ifcClass ?? "") in FAMILY_OF);
+  created.push(...familiesFromShapes(tx, doc, familyShapes));
   for (const id of ids) {
-    if (plates.includes(id)) continue;
+    if (plates.includes(id) || familyShapes.includes(id)) continue;
     const ds = doc.get<DirectShapeParams>(id) as DirectShape | undefined;
     if (!ds || !convertible(ds)) {
       skipped.push(id);

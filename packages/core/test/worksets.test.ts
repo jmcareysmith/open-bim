@@ -54,3 +54,17 @@ describe("workset default visibility", () => {
     expect(doc.require<{ hiddenWorksets?: string[] }>(s.id).params.hiddenWorksets).toEqual([ws.id]);
   });
 });
+
+describe("renamed datums workset", () => {
+  it("new levels still go into it after it's renamed", async () => {
+    const { createLevel } = await import("../src/index.ts");
+    const doc = new Document();
+    enableWorksetAssignment(doc);
+    applyResidentialTemplate(doc);
+    const { datums } = doc.transact("On", (tx) => enableWorksets(tx, doc));
+    doc.transact("Rename", (tx) => tx.setName(datums, "Datums"));
+    const l = doc.transact("L", (tx) => createLevel(tx, "Level 9", 9000));
+    expect(doc.require<{ worksetId: string }>(l.id).params.worksetId).toBe(datums);
+    expect(activeWorkset(doc)).not.toBe(datums);
+  });
+});

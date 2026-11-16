@@ -154,17 +154,17 @@ export class Document {
     return () => this.listeners.delete(listener);
   }
 
-  /**
-   * Run `hook` at the end of every transaction, before it commits, so its edits join the same
-   * undo step (used by families to flex reference planes to their constraints). If it throws,
-   * the whole transaction rolls back.
-   */
   /** Ids created in the transaction running now (for commit hooks); empty outside one. */
   createdInTransaction(): ElementId[] {
     if (!this.active) return [];
     return [...this.active].filter(([id, before]) => before === undefined && this.elements.has(id)).map(([id]) => id);
   }
 
+  /**
+   * Run `hook` at the end of every transaction, before it commits, so its edits join the same
+   * undo step (used by families to flex reference planes to their constraints). If it throws,
+   * the whole transaction rolls back.
+   */
   addCommitHook(hook: (tx: Transaction) => void): () => void {
     this.commitHooks.add(hook);
     return () => this.commitHooks.delete(hook);

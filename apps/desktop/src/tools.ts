@@ -360,8 +360,11 @@ function showGlyph(ctx: ToolContext, s: Snapped): void {
     glyph = document.createElement("div");
     glyph.className = "snap-glyph";
     document.body.append(glyph);
-    // Gone when the cursor leaves the view or a click lands.
+    // Gone when a click lands or the cursor leaves the view.
     window.addEventListener("pointerdown", () => glyph && (glyph.hidden = true));
+    window.addEventListener("pointermove", (e) => {
+      if (glyph && !(e.target instanceof HTMLCanvasElement)) glyph.hidden = true;
+    });
   }
   const g = GLYPH[s.kind];
   glyph.hidden = !g;
@@ -410,7 +413,8 @@ function snapPointRaw(ctx: ToolContext, p: Vec2, start: Vec2 | null, free: boole
   };
 
   // 1. Endpoints (and midpoints)
-  const ends: Vec2[] = [...extra];
+  // The tool's own points (sketch vertices…) count as endpoints.
+  const ends: Vec2[] = so.endpoints ? [...extra] : [];
   const mids: Vec2[] = [];
   if (so.endpoints) ends.push(...grids.flatMap((g) => [g.params.start, g.params.end]));
   for (const w of ctx.doc.byCategory<WallParams>(Cat.Wall)) {
@@ -2214,14 +2218,20 @@ export function viewPoint(ctx: ToolContext, ev: PointerEvent, start: Vec2 | null
   }
   const p = ctx.viewport.pickDrawing(ev);
   if (!p) return null;
-  for (const q of extra) if (Math.hypot(q.x - p.x, q.y - p.y) < POINT_SNAP) return { ...q };
+  // Sections, elevations and sheets: the same Snaps settings (and SE override) as plans.
+  const so = snapOptions;
+  if (!so.on) return { ...p };
+  const reach = Math.max(1, so.pixels * ctx.viewport.mmPerPixel());
+  if (so.endpoints || snapOverride === "endpoint") for (const q of extra) if (Math.hypot(q.x - p.x, q.y - p.y) < reach) return { ...q };
+  if (snapOverride) return { ...p };
   let x = p.x;
   let y = p.y;
-  if (start && !ev.shiftKey) {
+  if (start && !ev.shiftKey && so.ortho) {
     if (Math.abs(p.x - start.x) > Math.abs(p.y - start.y)) y = start.y;
     else x = start.x;
   }
-  const r = (v: number) => Math.round(v / INCREMENT) * INCREMENT;
+  const inc = so.increment > 0 ? so.increment : 0;
+  const r = (v: number) => (inc ? Math.round(v / inc) * inc : v);
   return { x: start && y === start.y ? r(x) : start && x === start.x ? x : r(x), y: start && x === start.x ? r(y) : start && y === start.y ? y : r(y) };
 }
 

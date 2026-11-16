@@ -6,7 +6,9 @@ import type { Element, ElementId } from "../element.ts";
 // families, view templates and view filters that nothing refers to. The last type of each kind is
 // kept (tools need one). Purging can free more (a type's material): run it again.
 
-const OTHERS = new Set(["Material", "FamilyDef", "ViewTemplate", "ViewFilter", "GroupType"]);
+const OTHERS = new Set(["Material", "ViewTemplate", "ViewFilter"]);
+/** Type-like categories no tool needs one of (all can go when unused). */
+const NO_KEEP = new Set(["FamilyDef", "GroupType"]);
 
 /** Every element id that appears anywhere in another element's params, type or host. */
 function referencedIds(doc: Document): Set<string> {
@@ -34,7 +36,7 @@ export function unusedElements(doc: Document): Element[] {
     if (used.has(el.id) || doc.dependents(el.id).length) continue;
     // Layers and families name their materials (and families can be loaded by name).
     if ((el.category === "Material" || el.category === "FamilyDef") && el.name && used.has(el.name)) continue;
-    if (isType) byCat.set(el.category, [...(byCat.get(el.category) ?? []), el]);
+    if (isType && !NO_KEEP.has(el.category)) byCat.set(el.category, [...(byCat.get(el.category) ?? []), el]);
     else out.push(el);
   }
   // Types: keep at least one of each kind.

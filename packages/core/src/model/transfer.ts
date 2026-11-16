@@ -52,7 +52,14 @@ export function transferStandards(tx: Transaction, doc: Document, src: Document,
           skipped++;
           continue;
         }
-        tx.update(same.id, remap(structuredClone(el.params)) as Params);
+        // Theirs replaces ours whole (keys only ours had go), with what it needs brought along.
+        if (getCategory(el.category).dependencies(el).some((d) => !bring(d))) {
+          skipped++;
+          continue;
+        }
+        const next = remap(structuredClone(el.params)) as Record<string, unknown>;
+        for (const k of Object.keys(same.params as object)) if (!(k in next)) next[k] = undefined;
+        tx.update(same.id, next as Params);
         overwritten++;
         continue;
       }

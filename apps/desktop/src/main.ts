@@ -815,6 +815,7 @@ let viewBar: ViewBar | undefined = new ViewBar(
 
 function setTool(name: string): void {
   hideSnapGlyph();
+  setSnapOverride(null);
   if (name === "zoomregion" && tool.name !== "zoomregion") toolBeforeZoom = tool.name;
   if (viewport.viewMode === "drawing" && !DRAWING_TOOLS.has(name)) {
     status("That tool works in plan and 3D views. Open a floor plan or the 3D view to use it.");
@@ -849,7 +850,9 @@ window.addEventListener("pointerup", (ev) => {
   if (dragPlace?.started && ev.button === 0) {
     dragPlace = null;
     downAt = null;
-    return tool.click?.(ev);
+    tool.click?.(ev);
+    setSnapOverride(null);
+    return;
   }
   dragPlace = null;
   tool.pointerUp?.(ev);
@@ -1833,25 +1836,37 @@ window.addEventListener("keydown", (ev) => {
     pendingSingle = null;
     // A command (WT, SE…) shouldn't leave the first letter's tool (W = wall, S = section) running:
     // back to the tool from before that letter (e.g. still drawing walls after SE).
-    if (two.startsWith("cmd:")) {
+    if (two.startsWith("cmd:") && !KEEP_TOOL.has(two)) {
       const back = toolBeforeSingle ?? tool.name;
       if (tool.name !== back) setTool(back);
     }
     toolBeforeSingle = null;
     return runShortcut(two);
   }
+  // Esc also drops a pending one-pick snap override (and its glyph).
+  if (ev.key === "Escape") {
+    setSnapOverride(null);
+    hideSnapGlyph();
+  }
   if (tool.key?.(ev)) return ev.preventDefault();
-  if (ev.key === "Escape") return setTool("select");
+  if (ev.key === "Escape") {
+    setSnapOverride(null);
+    return setTool("select");
+  }
   const one = k ? shortcuts.get(ev.shiftKey ? `Shift+${k}` : k) : undefined;
   // A one-letter command (H hides…) that also starts a two-letter shortcut (HI, HC, HR as in Revit)
   // waits a moment for the second letter; tools switch at once (the second letter takes over).
-  if (one?.startsWith("cmd:") && !ev.shiftKey && [...shortcuts.keys()].some((x) => x.length === 2 && x[0] === k)) {
+  // A one-letter tool (S = section) waits too when it starts a command meant to run inside the current
+  // tool (SE, SM… snap overrides, SO), so typing those mid-wall doesn't end the wall.
+  const startsKeepTool = [...shortcuts].some(([x, a]) => x.length === 2 && x[0] === k && KEEP_TOOL.has(a));
+  if (one && !ev.shiftKey && (one.startsWith("cmd:") || startsKeepTool) && [...shortcuts.keys()].some((x) => x.length === 2 && x[0] === k)) {
     ev.preventDefault();
     if (pendingSingle) clearTimeout(pendingSingle);
     pendingSingle = setTimeout(() => {
       pendingSingle = null;
       lastKey = null;
-      void commands[one.slice(4)]?.();
+      if (one.startsWith("cmd:")) void commands[one.slice(4)]?.();
+      else setTool(one.slice(5));
     }, 600);
     return;
   }
@@ -1865,6 +1880,8 @@ window.addEventListener("keydown", (ev) => {
 let shortcuts = shortcutTable();
 let lastKey: { key: string; at: number } | null = null;
 let pendingSingle: ReturnType<typeof setTimeout> | null = null;
+/** Two-letter commands that work inside the running tool (it carries on, mid-wall too). */
+const KEEP_TOOL = new Set(["cmd:snapEndpoint", "cmd:snapMidpoint", "cmd:snapIntersection", "cmd:snapNearest", "cmd:toggleSnaps"]);
 /** The tool running before a single-letter tool shortcut (restored if it turns into a two-letter command). */
 let toolBeforeSingle: string | null = null;
 /** The tool to go back to after Zoom Region. */

@@ -21,3 +21,16 @@ describe("transfer project standards", () => {
     expect(doc.require<LayeredTypeParams>(mine.id).params.layers.length).toBe(1);
   });
 });
+
+describe("overwrite replaces whole", () => {
+  it("keys only ours had are dropped", () => {
+    const src = new Document();
+    applyResidentialTemplate(src);
+    const doc = new Document();
+    applyResidentialTemplate(doc);
+    const mine = doc.byCategory<LayeredTypeParams>(Cat.WallType)[0]!;
+    doc.transact("Extra", (tx) => tx.update(mine.id, { coarseFill: { pattern: "solid", color: 0xff0000 } } as never));
+    doc.transact("T", (tx) => transferStandards(tx, doc, src, [Cat.WallType], "overwrite"));
+    expect((doc.require(mine.id).params as { coarseFill?: unknown }).coarseFill).toBeUndefined();
+  });
+});

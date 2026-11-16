@@ -12,6 +12,8 @@ export const WORKSET = "Workset";
 export type WorksetParams = {
   /** Visible in views by default (Revit's "Visible in all views"). */
   visibleByDefault: boolean;
+  /** The workset levels, grids and reference planes go into (whatever it's renamed to). */
+  datums?: boolean;
 };
 export type Workset = Element<WorksetParams>;
 
@@ -24,7 +26,7 @@ export function worksets(doc: Document): Workset[] {
 /** Turn worksets on: "Shared Levels and Grids" (levels, grids, reference planes) and "Workset1" (the rest). */
 export function enableWorksets(tx: Transaction, doc: Document): { main: ElementId; datums: ElementId } {
   if (worksets(doc).length) throw new Error("Worksets are already on in this project");
-  const datums = tx.create<WorksetParams>(WORKSET, { visibleByDefault: true }, { name: "Shared Levels and Grids" }).id;
+  const datums = tx.create<WorksetParams>(WORKSET, { visibleByDefault: true, datums: true }, { name: "Shared Levels and Grids" }).id;
   const main = tx.create<WorksetParams>(WORKSET, { visibleByDefault: true }, { name: "Workset1" }).id;
   for (const el of doc.all()) {
     if (!isWorksetElement(el)) continue;
@@ -46,13 +48,16 @@ export function isWorksetElement(el: Element): boolean {
   return ["levelId", "baseLevelId", "hostId", "start", "boundary", "position", "path", "runs", "elevation", "wallId", "points"].some((k) => k in p);
 }
 
+/** The levels-and-grids workset (flagged; older projects by its default name). */
+const isDatums = (w: Workset) => w.params.datums === true || (w.params.datums === undefined && w.name === "Shared Levels and Grids");
+
 const active = new WeakMap<Document, ElementId>();
 
 /** The workset new elements go into (this user's choice; the first workset by default). */
 export function activeWorkset(doc: Document): ElementId | undefined {
   const id = active.get(doc);
   if (id && doc.get(id)?.category === WORKSET) return id;
-  return worksets(doc).find((w) => w.name !== "Shared Levels and Grids")?.id ?? worksets(doc)[0]?.id;
+  return worksets(doc).find((w) => !isDatums(w))?.id ?? worksets(doc)[0]?.id;
 }
 
 export function setActiveWorkset(doc: Document, id: ElementId): void {
@@ -66,7 +71,7 @@ export function enableWorksetAssignment(doc: Document): () => void {
     const ws = worksets(doc);
     if (!ws.length) return;
     const main = activeWorkset(doc);
-    const datums = ws.find((w) => w.name === "Shared Levels and Grids")?.id ?? main;
+    const datums = ws.find(isDatums)?.id ?? main;
     const hiddenByDefault = ws.filter((w) => !w.params.visibleByDefault).map((w) => w.id);
     for (const id of doc.createdInTransaction()) {
       const el = doc.get(id);

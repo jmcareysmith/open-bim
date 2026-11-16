@@ -232,6 +232,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Worksets (core/model/worksets.ts; worksetsui.ts): Collaborate → Worksets (enable: "Shared Levels and Grids" + "Workset1";
   new/rename/delete moving elements), element `worksetId`, active workset per user (status bar picker; commit hook
   `enableWorksetAssignment` via doc `createdInTransaction`), view `hiddenWorksets` (view Properties → Worksets) in `elementGraphics`.
+  Visible in all views (off: new views hide it), schedule field Workset; while collaborating an Editable column borrows a
+  whole workset (collab binding `borrow`, refuses what others hold). The Editable column is untested in the app (needs a server).
 - Render (toolbar, from a 3D view; render.ts `worldUvs` gives the tracer real UVs for material textures): path traced, sun from site/date/time, Save PNG. Materials have
   roughness/metalness/transparency. Realistic style shows textures (Material Browser → Texture: an image,
   else drawn from colour + surface pattern; world-position mapping in viewport, apps/desktop/src/textures.ts); no AI render (needs a service decision).

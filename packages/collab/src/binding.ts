@@ -37,6 +37,11 @@ export interface Binding {
   borrowed(): ElementId[];
   /** Give back everything this editor has borrowed (Revit: Relinquish All Mine). Returns how many. */
   relinquishAll(): number;
+  /**
+   * Borrow elements without editing them (Revit: make a workset editable). Ones another active
+   * editor holds are refused. Returns what was taken and what was refused.
+   */
+  borrow(ids: ElementId[]): { taken: ElementId[]; refused: ElementId[] };
 }
 
 const json = (v: unknown): unknown => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
@@ -173,6 +178,22 @@ export function bindDocument(doc: Document, ydoc: Y.Doc, opts: BindingOptions = 
     },
     borrower,
     borrowed: () => (opts.user ? [...owners.entries()].filter(([, o]) => o.key === opts.user!.key).map(([id]) => id) : []),
+    borrow(ids) {
+      const taken: ElementId[] = [];
+      const refused: ElementId[] = [];
+      if (!opts.user) return { taken, refused: [...ids] };
+      ydoc.transact(() => {
+        for (const id of ids) {
+          const o = borrower(id);
+          if (o && o.key !== opts.user!.key) refused.push(id);
+          else {
+            if (!o) owners.set(id, { ...opts.user! });
+            taken.push(id);
+          }
+        }
+      }, LOCAL_ORIGIN);
+      return { taken, refused };
+    },
     relinquishAll() {
       if (!opts.user) return 0;
       const mine = [...owners.entries()].filter(([, o]) => o.key === opts.user!.key).map(([id]) => id);

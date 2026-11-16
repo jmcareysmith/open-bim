@@ -184,3 +184,25 @@ describe("element borrowing", () => {
     expect(wallLength(b.require(w.id) as Wall)).toBe(3000);
   });
 });
+
+describe("borrowing without editing (editable worksets)", () => {
+  it("borrow takes what's free and refuses what someone else holds", () => {
+    const a = new Document();
+    const ids = applyResidentialTemplate(a);
+    const ya = new Y.Doc();
+    const yb = new Y.Doc();
+    ya.on("update", (u: Uint8Array, o: unknown) => o !== "net" && Y.applyUpdate(yb, u, "net"));
+    yb.on("update", (u: Uint8Array, o: unknown) => o !== "net" && Y.applyUpdate(ya, u, "net"));
+    const isActive = () => true;
+    const ba = bindDocument(a, ya, { user: { key: "ann", name: "Ann" }, isActive });
+    const b = new Document();
+    const bb = bindDocument(b, yb, { user: { key: "bob", name: "Bob" }, isActive });
+    const w1 = a.transact("W", (tx) => createWall(tx, ids.wallTypes.exterior, { x: 0, y: 0 }, { x: 3000, y: 0 }, ids.levels.ground));
+    ba.relinquishAll();
+    const w2 = b.transact("W", (tx) => createWall(tx, ids.wallTypes.exterior, { x: 0, y: 3000 }, { x: 3000, y: 3000 }, ids.levels.ground));
+    const r = ba.borrow([w1.id, w2.id]);
+    expect(r.taken).toEqual([w1.id]);
+    expect(r.refused).toEqual([w2.id]);
+    expect(bb.borrower(w1.id)?.name).toBe("Ann");
+  });
+});

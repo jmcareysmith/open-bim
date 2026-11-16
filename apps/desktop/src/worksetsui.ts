@@ -4,7 +4,14 @@ import { openDialog } from "./dialog.ts";
 // Worksets dialog (Revit: Collaborate → Worksets): turn worksets on, add, rename and delete them
 // (moving their elements), and choose the active one (where new elements go).
 
-export function openWorksetsDialog(doc: Document, status: (s: string) => void, changed: () => void): void {
+/** Borrowing while collaborating (Revit's Editable column). */
+export interface WorksetSharing {
+  borrow(ids: string[]): { taken: string[]; refused: string[] };
+  /** Who holds an element: you, someone else (by name), or nobody. */
+  holder(id: string): { name: string; mine: boolean } | null;
+}
+
+export function openWorksetsDialog(doc: Document, status: (s: string) => void, changed: () => void, sharing?: () => WorksetSharing | null): void {
   const run = (name: string, fn: Parameters<Document["transact"]>[1]) => {
     try {
       doc.transact(name, fn);
@@ -34,7 +41,8 @@ export function openWorksetsDialog(doc: Document, status: (s: string) => void, c
     }
     const table = document.createElement("table");
     table.className = "worksets-table";
-    table.innerHTML = "<tr><th>Active</th><th>Name</th><th>Elements</th><th>Visible in all views</th><th></th></tr>";
+    const share = sharing?.() ?? null;
+    table.innerHTML = `<tr><th>Active</th><th>Name</th><th>Elements</th><th>Visible in all views</th>${share ? "<th>Editable</th>" : ""}<th></th></tr>`;
     for (const w of list) {
       const tr = document.createElement("tr");
       const radio = Object.assign(document.createElement("input"), { type: "radio", name: "active-workset", checked: w.id === act });
@@ -54,7 +62,28 @@ export function openWorksetsDialog(doc: Document, status: (s: string) => void, c
       };
       const vis = Object.assign(document.createElement("input"), { type: "checkbox", checked: w.params.visibleByDefault, title: "Off: new views start with this workset hidden" });
       vis.onchange = () => run("Workset visibility", (tx) => void tx.update(w.id, { visibleByDefault: vis.checked }));
-      const cells = [radio, name, document.createTextNode(String(counts.get(w.id) ?? 0)), vis, del];
+      const cells: Node[] = [radio, name, document.createTextNode(String(counts.get(w.id) ?? 0)), vis];
+      if (share) {
+        // Editable: take every element in it (others' stay theirs).
+        const members = doc.all().filter((e) => (e.params as { worksetId?: string }).worksetId === w.id).map((e) => e.id);
+        const holders = members.map((id) => share.holder(id));
+        const others = [...new Set(holders.filter((x) => x && !x.mine).map((x) => x!.name))];
+        const mineAll = members.length > 0 && holders.every((x) => x?.mine);
+        const cell = document.createElement("span");
+        if (mineAll) cell.textContent = "Yes";
+        else {
+          const take = Object.assign(document.createElement("button"), { textContent: "Make editable", title: "Borrow every element in this workset" });
+          take.onclick = () => {
+            const r = share.borrow(members);
+            status(r.refused.length ? `Took ${r.taken.length}; ${r.refused.length} are held by others.` : `Workset “${w.name}” is editable by you.`);
+            dlg.refresh();
+          };
+          cell.append(take);
+          if (others.length) cell.append(` (${others.join(", ")} editing)`);
+        }
+        cells.push(cell);
+      }
+      cells.push(del);
       for (const c of cells) {
         const td = document.createElement("td");
         td.append(c);

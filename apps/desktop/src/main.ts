@@ -1103,7 +1103,17 @@ const commands: Record<string, () => void | Promise<void>> = {
     status(`Ungrouped ${groups.length} group(s).`);
   },
   worksets() {
-    openWorksetsDialog(doc, status, () => refreshAll());
+    openWorksetsDialog(doc, status, () => refreshAll(), () =>
+      collab
+        ? {
+            borrow: (ids) => collab!.binding.borrow(ids),
+            holder: (id) => {
+              const b = collab!.binding.borrower(id);
+              return b ? { name: b.name, mine: b.key === String(collab!.client.ydoc.clientID) } : null;
+            },
+          }
+        : null,
+    );
   },
   pin() {
     const ids = selection.filter((id) => doc.has(id));

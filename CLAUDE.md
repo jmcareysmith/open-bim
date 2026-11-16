@@ -164,6 +164,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   first), tee stems' cores run to the through wall's core, crossing walls clean (thicker wins), no
   lines between joined walls of the same material. Wrapping at ends and at inserts (wall type Properties): the exterior/
   interior finish layers carry round free ends, and into door/window/opening jambs the plan cuts (exterior/interior/both halves), at Medium/Fine. Disallow Join per end (Properties / right-click).
+  Corner join per end (wall Properties: Miter / Butt — this wall runs through, the other stops at its face; both butt → lower id
+  runs / Square off; `joinStyle`, geometry joins.ts `endCap`).
 - 3D crossings: the thinner wall (tie: drawn later) is cut by the other's footprint over shared heights (geometry
   wallcrossings.ts `crossingCutters`/`cutWallBody`; OCCT cuts a prism; core joins.ts `crossingWalls` also in `relatedWalls`).
 - Known gaps / notes:

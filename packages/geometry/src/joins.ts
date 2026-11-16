@@ -118,6 +118,24 @@ function endCap(doc: Document, wall: Wall, end: WallEnd, join: WallJoin | null):
   }
 
   const frames = [f, ...join.others.map((o) => frame(doc, doc.require(o.wallId) as Wall, o.end))];
+  // L corners: the join style set on either wall's end (Revit's Wall Joins: butt / square off).
+  if (frames.length === 2) {
+    const other = join.others[0]!;
+    const ow = doc.require(other.wallId) as Wall;
+    const mine = wall.params.joinStyle?.[end] ?? "miter";
+    const theirs = ow.params.joinStyle?.[other.end] ?? "miter";
+    const g = frames[1]!;
+    if (mine === "square" || theirs === "square") return [face(f, 1).p, face(f, -1).p];
+    if (mine === "butt" || theirs === "butt") {
+      // Of the other wall's faces: the near one (towards this wall's body) and the far (outer) one.
+      const faces = [face(g, 1), face(g, -1)].sort((l1, l2) => (l1.p.x - f.p.x) * f.a.x + (l1.p.y - f.p.y) * f.a.y - ((l2.p.x - f.p.x) * f.a.x + (l2.p.y - f.p.y) * f.a.y));
+      // This one runs through (to the far face) when it's the butt (both set: the lower id); else it stops at the near face.
+      const runs = mine === "butt" && (theirs !== "butt" || wall.id < ow.id);
+      const target = runs ? faces[0]! : faces[1]!;
+      const lim = MITRE_LIMIT * Math.max(f.h, g.h);
+      return [meet(f, 1, target, lim), meet(f, -1, target, lim)];
+    }
+  }
   const base = Math.atan2(f.a.y, f.a.x);
   const rel = (g: EndFrame) => {
     const r = (Math.atan2(g.a.y, g.a.x) - base) % (2 * Math.PI);

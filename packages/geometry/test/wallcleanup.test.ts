@@ -325,3 +325,21 @@ describe("crossings vs tees, and stable ties", () => {
 
 
 });
+
+describe("wall join styles", () => {
+  it("butt: one runs through, the other stops at its face; the corner is shared, not doubled", async () => {
+    const { joinedWallFootprint } = await import("../src/index.ts");
+    const area = (l: { x: number; y: number }[]) => Math.abs(l.reduce((s, q, i) => s + q.x * l[(i + 1) % l.length]!.y - l[(i + 1) % l.length]!.x * q.y, 0)) / 2;
+    const { doc, wall, types } = setup();
+    const a = wall(p(0, 0), p(4000, 0), types.t200);
+    const b = wall(p(0, 0), p(0, 3000), types.t200);
+    const mitre = area(joinedWallFootprint(doc, doc.require(a.id) as Wall)) + area(joinedWallFootprint(doc, doc.require(b.id) as Wall));
+    doc.transact("Butt", (tx) => tx.update(a.id, { joinStyle: { start: "butt" } }));
+    const fa = joinedWallFootprint(doc, doc.require(a.id) as Wall);
+    const fb = joinedWallFootprint(doc, doc.require(b.id) as Wall);
+    expect(area(fa) + area(fb)).toBeCloseTo(mitre, 0);
+    // A runs to B's outer face (x = −100); B stops at A's face (y = 100).
+    expect(Math.min(...fa.map((q) => q.x))).toBeCloseTo(-100, 3);
+    expect(Math.min(...fb.map((q) => q.y))).toBeCloseTo(100, 3);
+  });
+});

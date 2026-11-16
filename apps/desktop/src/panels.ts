@@ -3060,6 +3060,20 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         cb.onchange = () => update<WallParams>(cb.checked ? "Disallow join" : "Allow join", { disallowJoin: { ...p.disallowJoin, [end]: cb.checked } });
         sec.append(row(end === "start" ? "Disallow join at start" : "Disallow join at end", cb));
       }
+      // Wall Joins (Revit): how an L corner at each end is made.
+      for (const end of ["start", "end"] as const) {
+        const opts = [
+          { value: "miter", label: "Miter" },
+          { value: "butt", label: "Butt (this wall runs through)" },
+          { value: "square", label: "Square off" },
+        ];
+        sec.append(
+          row(
+            end === "start" ? "Corner join at start" : "Corner join at end",
+            select(opts, p.joinStyle?.[end] ?? "miter", (v) => update<WallParams>("Change wall join", { joinStyle: { ...p.joinStyle, [end]: v as "miter" | "butt" | "square" } })),
+          ),
+        );
+      }
       // Attach Top/Base (Modify tab or right-click to attach; detach here).
       for (const end of ["top", "base"] as const) {
         const id = end === "top" ? p.topAttachId : p.baseAttachId;

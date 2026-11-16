@@ -358,6 +358,11 @@ export type WallParams = {
   baseAttachId?: ElementId | null;
   /** Disallow Join (Revit): these ends stay square and don't join other walls. */
   disallowJoin?: { start?: boolean; end?: boolean } | null;
+  /**
+   * How an L corner at each end is made (Revit: Modify → Wall Joins): "miter" (default), "butt" (this
+   * wall runs through to the other's outer face; the other stops at its face), "square" (squared off).
+   */
+  joinStyle?: { start?: "miter" | "butt" | "square"; end?: "miter" | "butt" | "square" } | null;
   /** This wall's own sweeps and reveals (the type's come first; see model/sweeps.ts). */
   sweeps?: WallSweep[] | null;
   /** Curved walls: the arc's sagitta, mm, positive to the left of start → end (see model/arcs.ts). */

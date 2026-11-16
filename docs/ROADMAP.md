@@ -153,4 +153,4 @@ to native elements where their shapes allow.
 - [x] Columns and beams → native structural elements (rectangular/round sections by size; I-sections come in as their envelope)
 - [x] Roofs (IfcRoof) → footprint roofs: outline of the top faces, slope per eave from the face inside it (gables where none rises), type by thickness
 - [x] Names, marks ("….Mark" properties) and colours carried over (new types get an "Imported #RRGGBB" material)
-- [ ] Batch: convert everything on import (option), with a summary of what stayed as shapes
+- [x] Batch: after Import IFC, offer to convert everything (one undo step), with a summary of what was made and what stayed as shapes

@@ -165,7 +165,10 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - IFC: Export IFC (File → Export → IFC4 or IFC4X3, packages/ifc `schema` option) and Import IFC (web-ifc → DirectShapes on matching levels;
   they show/style as their IFC class's category — core `ifcClassCategory`). DirectShape Properties → Convert to native / Convert all
   (geometry/ifcnative.ts `convertDirectShapes`: boxy IfcWall → Wall by min-area rectangle, IfcSlab → Floor from its top faces,
-  types matched by thickness or "Imported Wall/Floor <t>"; IfcDoor/IfcWindow shapes in them become WallOpenings).
+  types matched by thickness or "Imported Wall/Floor <t>"). Phase 10 (Revit via IFC; RVT itself is closed): IfcDoor/IfcWindow in
+  converted walls → native doors/windows (IFC OverallWidth/Height kept on import; types by size), IfcColumn/IfcBeam → columns/beams
+  (rect/round sections by size), IfcRoof → footprint roof (`roofFromMesh`: top-face outline, per-eave slopes, gables), names +
+  "….Mark" + colour materials carried; Import IFC offers to convert everything and reports what stayed as shapes.
 - DXF/DWG: Export DXF/DWG (open view/sheet) and Import DXF/DWG (into the open view as a CadImport).
   DWG is desktop-only via an installed ODA File Converter or LibreDWG (src-tauri/src/cad.rs);
   not tested with a real converter (none installed here).

@@ -15,7 +15,7 @@ import { addRecentFile, fileName, recentFiles, removeRecentFile } from "./recent
 import { CameraTool } from "./cameratool.ts";
 import { FloorPointTool, SlopeArrowTool } from "./slopetool.ts";
 import { WallProfileTool } from "./profiletool.ts";
-import { enableSharedNested, enableBeamSystems, createImageUnderlay, planCrop, createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
+import { type DirectShapeParams, enableSharedNested, enableBeamSystems, createImageUnderlay, planCrop, createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
   ceilingPlanFor,
   createCeilingPlan,
   Cat,
@@ -121,7 +121,7 @@ import { enableSharedNested, enableBeamSystems, createImageUnderlay, planCrop, c
   createCircuit,
   panels,
 } from "@open-bim/core";
-import { OcctKernel, SimpleKernel, findClashes, exportGlb, exportObj, exportParts, areaLoopsFromWalls, drawingDxf, parseDxf, viewDrawing, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
+import { convertDirectShapes, convertible, OcctKernel, SimpleKernel, findClashes, exportGlb, exportObj, exportParts, areaLoopsFromWalls, drawingDxf, parseDxf, viewDrawing, scheduleTable, createPlaneSolver, sheetDrawing, writePdf } from "@open-bim/geometry";
 import occtWasmUrl from "replicad-opencascadejs/wasm?url";
 import gcsWasmUrl from "@salusoft89/planegcs/dist/planegcs_dist/planegcs.wasm?url";
 import { LIBRARY } from "@open-bim/library";
@@ -1107,6 +1107,21 @@ const commands: Record<string, () => void | Promise<void>> = {
       const r = await ifc.importIfc(doc, file.bytes, ifcApi);
       status(`Imported ${r.shapes} element(s) from ${file.name}${r.levelsCreated ? `, ${r.levelsCreated} new level(s)` : ""}. Undo removes the import.`);
       viewport.zoomToFit();
+      // Offer to turn what can be into native elements straight away (a separate undo step).
+      const shapes = doc.byCategory(Cat.DirectShape).filter((d) => convertible(d)).map((d) => d.id);
+      if (shapes.length && confirm(`Convert ${shapes.length} imported wall(s), slab(s), column(s), beam(s) and roof(s) to native elements? Doors and windows in converted walls come across too.`)) {
+        let made: string[] = [];
+        doc.transact("Convert imported IFC", (tx) => (made = convertDirectShapes(tx, doc, shapes).created));
+        const counts = new Map<string, number>();
+        for (const id of made) {
+          const c = doc.get(id)?.category;
+          if (c) counts.set(c, (counts.get(c) ?? 0) + 1);
+        }
+        const left = new Map<string, number>();
+        for (const d of doc.byCategory<DirectShapeParams>(Cat.DirectShape)) left.set(d.params.ifcClass, (left.get(d.params.ifcClass) ?? 0) + 1);
+        const list = (m: Map<string, number>) => [...m].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${n} ${k}`).join(", ");
+        status(`Converted: ${list(counts) || "nothing"}. Still imported shapes: ${list(left) || "none"}.`);
+      }
     } catch (err) {
       status(`\u26a0 IFC import failed: ${(err as Error).message}`);
     }

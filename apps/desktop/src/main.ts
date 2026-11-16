@@ -19,6 +19,7 @@ import { LevelTool, MatchTypeTool, ZoomRegionTool } from "./revittools.ts";
 import { selectOptions, setSelectOption } from "./selectopts.ts";
 import { openWorksetsDialog } from "./worksetsui.ts";
 import { openPurgeDialog } from "./purgeui.ts";
+import { openTransferDialog } from "./transferui.ts";
 import { worksets, activeWorkset, setActiveWorkset, enableWorksetAssignment, ungroup, enablePinning, isPinned, setPinned, setElementOverrides, setCategoryOverride, type DirectShapeParams, enableSharedNested, enableBeamSystems, createImageUnderlay, planCrop, createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
   ceilingPlanFor,
   createCeilingPlan,
@@ -1102,6 +1103,18 @@ const commands: Record<string, () => void | Promise<void>> = {
     });
     ctx.setSelection(ids);
     status(`Ungrouped ${groups.length} group(s).`);
+  },
+  async transferStandards() {
+    if (projectSession) return status("Transfer Project Standards: close the family editor first.");
+    try {
+      const r = await openProject();
+      if (!r) return;
+      const src = new Document();
+      src.load(r.json);
+      openTransferDialog(doc, src, r.path.split(/[\\/]/).pop() ?? "project", status, () => refreshAll());
+    } catch (err) {
+      status(`⚠ Could not read that project: ${(err as Error).message}`);
+    }
   },
   purgeUnused() {
     openPurgeDialog(doc, status, () => refreshAll());

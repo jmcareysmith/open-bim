@@ -958,8 +958,8 @@ void main() {
     const lines = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(size.x, size.y, size.z)), new THREE.LineBasicMaterial({ color: 0x3a7bd5 }));
     lines.position.copy(centre);
     this.boxScene.add(lines);
-    // A blue arrow on each face, pointing out, to drag that face.
-    const r = Math.max(150, Math.min(size.x, size.y, size.z) * 0.04);
+    // A blue arrow on each face, pointing out, to drag that face (a constant size on screen: see sizeBoxHandles).
+    const r = 1;
     const faces: [THREE.Vector3, "min" | "max", "x" | "y" | "z"][] = [
       [new THREE.Vector3(1, 0, 0), "max", "x"],
       [new THREE.Vector3(-1, 0, 0), "min", "x"],
@@ -975,9 +975,19 @@ void main() {
       cone.position.copy(at).addScaledVector(n, r * 1.4);
       cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), n);
       cone.renderOrder = 10;
-      cone.userData = { side, axis };
+      cone.userData = { side, axis, at: at.clone(), n: n.clone() };
       this.boxScene.add(cone);
       this.boxHandles.push(cone);
+    }
+  }
+
+  /** Section box arrows about 10 px across wherever the camera is (Revit's are screen-sized). */
+  private sizeBoxHandles(): void {
+    const r = 10 * this.mmPerPixel();
+    for (const c of this.boxHandles) {
+      const { at, n } = c.userData as { at: THREE.Vector3; n: THREE.Vector3 };
+      c.scale.setScalar(r);
+      c.position.copy(at).addScaledVector(n, r * 1.4);
     }
   }
 
@@ -1698,6 +1708,8 @@ void main() {
     if (this.mode === "plan" && this.planCrop) return this.fitOrtho(this.cameraPlan, this.controlsPlan, this.planCrop, PLAN_CAMERA_HEIGHT);
     const box = new THREE.Box3();
     for (const g of this.objects.values()) box.expandByObject(g);
+    // 3D with a section box: fit what it shows.
+    if (this.mode === "3d" && this.sectionBox) box.intersect(this.sectionBox);
     if (box.isEmpty()) return;
     if (this.mode === "plan") {
       return this.fitOrtho(this.cameraPlan, this.controlsPlan, { min: { x: box.min.x, y: box.min.y }, max: { x: box.max.x, y: box.max.y } }, PLAN_CAMERA_HEIGHT);
@@ -1788,6 +1800,7 @@ void main() {
         else this.renderer.render(this.scene, this.camera);
         if (in3d) this.drawSilhouettes(this.camera);
         if (in3d && this.sectionBox) {
+          this.sizeBoxHandles();
           // The section box's outline and arrows, unclipped, over the model.
           const clip = this.renderer.clippingPlanes;
           this.renderer.clippingPlanes = [];

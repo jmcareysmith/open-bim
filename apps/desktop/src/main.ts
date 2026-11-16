@@ -1347,6 +1347,34 @@ const commands: Record<string, () => void | Promise<void>> = {
   cascadeViews: () => setPaneLayout("cascade"),
   tabViews: () => setPaneLayout("tab"),
   keyboardShortcuts: () => openShortcutEditor(() => (shortcuts = shortcutTable())),
+  /** Selection Box (BX): the default 3D view, its section box round the selection (300 mm clear). */
+  selectionBox() {
+    const kernel = viewport.geometryKernel;
+    let min = [Infinity, Infinity, Infinity];
+    let max = [-Infinity, -Infinity, -Infinity];
+    for (const id of selection) {
+      const el = doc.get(id);
+      const m = el && kernel.build(doc, el);
+      if (!m) continue;
+      const P = m.positions;
+      for (let i = 0; i < P.length; i += 3) {
+        for (let k = 0; k < 3; k++) {
+          min[k] = Math.min(min[k]!, P[i + k]!);
+          max[k] = Math.max(max[k]!, P[i + k]!);
+        }
+      }
+    }
+    if (!Number.isFinite(min[0]!)) return status("Selection Box: select model elements first.");
+    min = min.map((v) => v - 300);
+    max = max.map((v) => v + 300);
+    const v3 = activeView()?.params.kind === "3d" ? activeView()! : views(doc).find((x) => x.params.kind === "3d");
+    if (!v3) return status("⚠ No 3D view in this project");
+    const box = { min: { x: min[0]!, y: min[1]!, z: min[2]! }, max: { x: max[0]!, y: max[1]!, z: max[2]! } };
+    edit("Selection box", (tx) => tx.update<ViewParams>(v3.id, { sectionBox: box }));
+    ctx.setActiveView(v3.id);
+    viewport.zoomToFit();
+    status("Section box set round the selection (view Properties → Section box to turn it off).");
+  },
   view3d() {
     const v = views(doc).find((x) => x.params.kind === "3d");
     if (v) ctx.setActiveView(v.id);
@@ -1857,6 +1885,7 @@ function openCanvasMenu(ev: MouseEvent): void {
       { label: "Array", hint: "AR", action: () => setTool("array") },
       { label: "Create Similar", hint: "CS", action: () => void commands.createSimilar?.() },
       { label: "Select All Instances (Visible in View)", hint: "SA", action: () => void commands.selectAllInstances?.() },
+      { label: "Selection Box", hint: "BX", action: () => void commands.selectionBox?.() },
       selection.some((s) => isPinned(doc.get(s))) ? { label: "Unpin", hint: "UP", action: () => void commands.unpin?.() } : { label: "Pin", hint: "PN", action: () => void commands.pin?.() },
     );
     // MEP: put the selection in a system (Revit: Create Duct/Piping/Power System), or an existing one.

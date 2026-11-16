@@ -78,6 +78,7 @@ export const COMMANDS: Command[] = [
   { action: "cmd:tabViews", label: "Tab Views", keys: "TW" },
   { action: "cmd:delete", label: "Delete", keys: "DE" },
   { action: "cmd:pin", label: "Pin", keys: "PN" },
+  { action: "cmd:selectionBox", label: "Selection Box", keys: "BX" },
   { action: "tool:zoomregion", label: "Zoom Region", keys: "ZR ZZ" },
   { action: "cmd:createSimilar", label: "Create Similar", keys: "CS" },
   { action: "cmd:ungroupSelection", label: "Ungroup", keys: "UG" },

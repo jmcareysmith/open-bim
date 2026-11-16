@@ -1105,7 +1105,7 @@ const commands: Record<string, () => void | Promise<void>> = {
       const ifc = await import("@open-bim/ifc");
       ifcApi ??= await ifc.createIfcApi(() => ifcWasmUrl);
       const r = await ifc.importIfc(doc, file.bytes, ifcApi);
-      status(`Imported ${r.shapes} element(s) from ${file.name}${r.levelsCreated ? `, ${r.levelsCreated} new level(s)` : ""}. Undo removes the import.`);
+      status(`Imported ${r.shapes} element(s)${r.rooms ? ` and ${r.rooms} room(s)` : ""} from ${file.name}${r.levelsCreated ? `, ${r.levelsCreated} new level(s)` : ""}. Undo removes the import.`);
       viewport.zoomToFit();
       // Offer to turn what can be into native elements straight away (a separate undo step).
       const shapes = doc.byCategory(Cat.DirectShape).filter((d) => convertible(d)).map((d) => d.id);

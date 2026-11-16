@@ -1,5 +1,5 @@
 import * as WebIFC from "web-ifc";
-import { createDirectShape, createLevel, levels, type DirectShapeParams, type Document, type ElementId, type LevelParams } from "@open-bim/core";
+import { createDirectShape, createLevel, createRoom, levels, type DirectShapeParams, type Document, type ElementId, type LevelParams } from "@open-bim/core";
 
 // IFC import via web-ifc. Storeys become levels (matched to existing levels by elevation), and each
 // product with a body becomes a DirectShape carrying its IFC class, GlobalId, name, colour and
@@ -19,6 +19,8 @@ export interface IfcImportResult {
   shapes: number;
   levelsCreated: number;
   skipped: number;
+  /** IfcSpaces brought in as rooms (number from Name, name from LongName). */
+  rooms: number;
   project: string;
 }
 
@@ -52,7 +54,7 @@ function lengthScale(api: IfcApi, model: number): number {
 
 function meshes(api: IfcApi, model: number): Product[] {
   const out: Product[] = [];
-  api.StreamAllMeshes(model, (fm) => {
+  const take = (fm: WebIFC.FlatMesh) => {
     const positions: number[] = [];
     const indices: number[] = [];
     let color = 0xcccccc;
@@ -80,7 +82,14 @@ function meshes(api: IfcApi, model: number): Product[] {
       g.delete();
     }
     if (indices.length) out.push({ expressID: fm.expressID, positions, indices, color });
-  });
+  };
+  api.StreamAllMeshes(model, take);
+  // Spaces (rooms) aren't in the default stream.
+  try {
+    api.StreamAllMeshesWithTypes(model, [WebIFC.IFCSPACE], take);
+  } catch {
+    // Older web-ifc without typed streaming: no rooms.
+  }
   return out;
 }
 
@@ -162,6 +171,9 @@ export async function importIfc(doc: Document, data: Uint8Array, api: IfcApi): P
         const v = Number(label(line[k]));
         if (Number.isFinite(v) && v > 0) props[k] = String(Math.round(v * mm));
       }
+      // Spaces: the room name (Revit puts the number in Name and the name in LongName).
+      const longName = label(line.LongName);
+      if (longName) props.LongName = longName;
       // Predefined type (e.g. a slab that is part of a roof: ROOF).
       const pre = label(line.PredefinedType);
       if (pre && pre !== "NOTDEFINED" && pre !== "USERDEFINED") props.PredefinedType = pre;
@@ -175,6 +187,7 @@ export async function importIfc(doc: Document, data: Uint8Array, api: IfcApi): P
 
     let created = 0;
     let skipped = 0;
+    let rooms = 0;
     const shapes = doc.transact("Import IFC", (tx) => {
       // Levels: reuse one within 1 mm of the storey's elevation, else create it.
       const levelFor = new Map<number, ElementId>();
@@ -191,7 +204,7 @@ export async function importIfc(doc: Document, data: Uint8Array, api: IfcApi): P
       let n = 0;
       for (const p of products) {
         const meta = info.get(p.expressID)!;
-        if (meta.cls === "IfcOpeningElement" || meta.cls === "IfcSpace") {
+        if (meta.cls === "IfcOpeningElement") {
           skipped++;
           continue;
         }
@@ -201,6 +214,30 @@ export async function importIfc(doc: Document, data: Uint8Array, api: IfcApi): P
           let zMin = Infinity;
           for (let i = 2; i < p.positions.length; i += 3) zMin = Math.min(zMin, p.positions[i]!);
           levelId = (sorted.filter((l) => (l.params as LevelParams).elevation <= zMin + 1).at(-1) ?? sorted[0]!).id;
+        }
+        if (meta.cls === "IfcSpace") {
+          // A room at a point surely inside the space: the middle of its biggest floor triangle.
+          let best = { a: -1, x: 0, y: 0 };
+          let z0 = Infinity;
+          let z1 = -Infinity;
+          for (let i = 2; i < p.positions.length; i += 3) {
+            z0 = Math.min(z0, p.positions[i]!);
+            z1 = Math.max(z1, p.positions[i]!);
+          }
+          for (let i = 0; i < p.indices.length; i += 3) {
+            const v = [p.indices[i]! * 3, p.indices[i + 1]! * 3, p.indices[i + 2]! * 3];
+            if (v.some((k) => Math.abs(p.positions[k + 2]! - z0) > 1)) continue;
+            const [a, b, c] = v as [number, number, number];
+            const area = Math.abs((p.positions[b]! - p.positions[a]!) * (p.positions[c + 1]! - p.positions[a + 1]!) - (p.positions[b + 1]! - p.positions[a + 1]!) * (p.positions[c]! - p.positions[a]!)) / 2;
+            if (area > best.a) best = { a: area, x: (p.positions[a]! + p.positions[b]! + p.positions[c]!) / 3, y: (p.positions[a + 1]! + p.positions[b + 1]! + p.positions[c + 1]!) / 3 };
+          }
+          if (best.a > 0) {
+            const lvl = (doc.get<LevelParams>(levelId)?.params.elevation ?? 0);
+            const r = createRoom(tx, doc, levelId, { x: best.x, y: best.y }, { number: meta.name ?? "", name: meta.props.LongName ?? meta.name ?? "Room", upperLevelId: null, limitOffset: Math.max(100, z1 - lvl) });
+            if (Math.abs(z0 - lvl) > 1) tx.update(r.id, { baseOffset: z0 - lvl });
+            rooms++;
+          } else skipped++;
+          continue;
         }
         const params: DirectShapeParams = {
           levelId,
@@ -216,7 +253,7 @@ export async function importIfc(doc: Document, data: Uint8Array, api: IfcApi): P
       }
       return n;
     });
-    return { shapes, levelsCreated: created, skipped, project };
+    return { shapes, levelsCreated: created, skipped, rooms, project };
   } finally {
     api.CloseModel(model);
   }

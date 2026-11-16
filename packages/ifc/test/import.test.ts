@@ -93,3 +93,18 @@ describe("IFC import to native", () => {
     expect(r.skipped.length).toBe(shapes.length - 5);
   });
 });
+
+describe("IFC spaces", () => {
+  it("come in as rooms with their number and name, bounded once the walls are native", async () => {
+    const { createRoom } = await import("@open-bim/core");
+    const src = source();
+    const ground = levels(src).sort((a, b) => a.params.elevation - b.params.elevation)[0]!.id;
+    src.transact("Room", (tx) => createRoom(tx, src, ground, { x: 2000, y: 1500 }, { number: "1", name: "Lounge" }));
+    const doc = new Document();
+    const r = await importIfc(doc, new TextEncoder().encode(exportIfc(src, { timestamp: "t" })), api);
+    expect(r.rooms).toBe(1);
+    const room = doc.byCategory(Cat.Room)[0]!;
+    expect(room.name).toBe("Lounge");
+    expect((room.params as { number: string }).number).toBe("1");
+  });
+});

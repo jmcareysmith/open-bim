@@ -443,3 +443,11 @@ body.pane-dragging canvas { pointer-events: none; }
 .key-table { border-collapse: collapse; width: 100%; font-size: 12px; }
 .key-table th, .key-table td { border-bottom: 1px solid var(--line); padding: 2px; text-align: left; }
 .key-table input { width: 100%; box-sizing: border-box; }
+
+/* 3D shape handles: arrows on a wall's or column's top and base. */
+.shape-handle {
+  position: absolute; pointer-events: auto; cursor: ns-resize;
+  color: var(--accent); font-size: 16px; line-height: 1; text-shadow: 0 0 2px #fff, 0 0 2px #fff; user-select: none;
+}
+.shape-top { transform: translate(-50%, -100%); }
+.shape-base { transform: translate(-50%, 0); }

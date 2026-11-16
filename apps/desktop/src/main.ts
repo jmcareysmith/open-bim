@@ -1610,8 +1610,8 @@ window.addEventListener("keydown", (ev) => {
   if (ev.key === "`") return run(ev, "console");
   if (ev.key === "F9") return run(ev, "systemBrowser");
   if (mod) return;
-  // Arrow keys nudge the selection (plans, sections, sheets); Shift nudges ten times further.
-  if (ev.key.startsWith("Arrow") && tool.name === "select" && selection.length && viewport.viewMode !== "3d") {
+  // Arrow keys nudge the selection (plans, 3D, sections, sheets); Shift nudges ten times further.
+  if (ev.key.startsWith("Arrow") && tool.name === "select" && selection.length) {
     ev.preventDefault();
     return nudge(ev.key, ev.shiftKey);
   }
@@ -1885,7 +1885,9 @@ function nudgeStep(): number {
 
 function nudge(key: string, far: boolean): void {
   const d = nudgeStep() * (far ? 10 : 1);
-  const move = { ArrowLeft: { x: -d, y: 0 }, ArrowRight: { x: d, y: 0 }, ArrowUp: { x: 0, y: d }, ArrowDown: { x: 0, y: -d } }[key];
+  // Along the screen (in 3D, the plan axes nearest the camera's right and forward).
+  const { right: r, up: u } = viewport.screenAxes();
+  const move = { ArrowLeft: { x: -r.x * d, y: -r.y * d }, ArrowRight: { x: r.x * d, y: r.y * d }, ArrowUp: { x: u.x * d, y: u.y * d }, ArrowDown: { x: -u.x * d, y: -u.y * d } }[key];
   if (!move) return;
   const ids = selection.filter((id) => doc.has(id));
   try {

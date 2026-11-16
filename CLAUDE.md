@@ -61,7 +61,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   strip (Copy, Multiple, Disjoin, Number) top-left of the view. Mirror by drawn axis, or Pick axis (options strip: click a wall/grid/ref plane/beam/line).
   Align (AL), Offset (OF), Trim/Extend (TR; corner or to boundary), Split (SL) — plans/3D only.
   Grips on the selection (Select tool, plans/sections/sheets): drag ends/vertices; click a line's
-  length label to type a new length; press on a selected element and drag to move it. Selected
+  length label to type a new length; press on a selected element and drag to move it. In 3D too: grips sit at the element's base
+  (grips.ts `gripZ`, viewport `toScreen3`), walls/columns get ▲▼ top/base shape handles (core `setVerticalEdge`,
+  viewport `pickVertical`; 10 mm and level snaps, Shift free), flip arrows; arrow keys nudge along the screen (`screenAxes`). Selected
   walls show a flip arrow (exterior side). Right-click (no drag): element menu, or on empty space
   the view menu with Visibility/Graphics (dialog; also VV). In 3D, orbit pivots on the selection.
 - Panels: Project Browser / Properties dock left or right (drag the title), tab together (drop on

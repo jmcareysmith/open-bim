@@ -109,3 +109,20 @@ describe("grips", () => {
     expect(doc.require<{ end: Vec2 }>(g.id).params.end).toEqual({ x: 0, y: 6000 });
   });
 });
+
+describe("3D shape handles: top and base", () => {
+  it("drag a wall's top and base; unconnected walls keep their top when the base moves", async () => {
+    const { Document, applyResidentialTemplate, createWall, setVerticalEdge, verticalHandles, wallExtent } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const w = doc.transact("W", (tx) => createWall(tx, ids.wallTypes.exterior, { x: 0, y: 0 }, { x: 4000, y: 0 }, ids.levels.ground, { height: 2400 }));
+    expect(verticalHandles(doc, w)!.top).toBe(2400);
+    doc.transact("Top", (tx) => setVerticalEdge(tx, doc, w.id, "top", 3100));
+    expect(wallExtent(doc, doc.require(w.id) as never)).toEqual({ bottom: 0, top: 3100 });
+    doc.transact("Base", (tx) => setVerticalEdge(tx, doc, w.id, "base", 300));
+    expect(wallExtent(doc, doc.require(w.id) as never)).toEqual({ bottom: 300, top: 3100 });
+    // Base can't pass the top.
+    doc.transact("Base", (tx) => setVerticalEdge(tx, doc, w.id, "base", 5000));
+    expect(wallExtent(doc, doc.require(w.id) as never)).toEqual({ bottom: 3090, top: 3100 });
+  });
+});

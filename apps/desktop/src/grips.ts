@@ -1,10 +1,53 @@
-import { arcMid, arcLength, Cat, dragGrip, elementGrips, flipWall, lineLength, setLineLength, viewFrame, wallThickness, type View, type ViewParams, type Element, type ElementId, type Grip, type Vec2 } from "@open-bim/core";
-import { viewPoint, type ToolContext } from "./tools.ts";
+import {
+  arcMid,
+  arcLength,
+  Cat,
+  columnExtent,
+  dragGrip,
+  elementGrips,
+  flipWall,
+  floorExtent,
+  lineLength,
+  setLineLength,
+  setVerticalEdge,
+  verticalHandles,
+  viewFrame,
+  wallExtent,
+  wallThickness,
+  type Column,
+  type Document,
+  type Floor,
+  type LevelParams,
+  type View,
+  type ViewParams,
+  type Wall,
+  type Element,
+  type ElementId,
+  type Grip,
+  type Vec2,
+} from "@open-bim/core";
+import { snapPoint, viewPoint, type ToolContext } from "./tools.ts";
 
 // Grips and temporary dimensions over the viewport (Revit's drag controls). Shown for the
 // selection while the Select tool is active, in plans (model elements and the plan's annotations)
-// and in sections/sheets (that view's annotations and viewports). Drag a grip to reshape; click a
-// wall's or line's length to type a new one.
+// and in sections/sheets (that view's annotations and viewports), and in 3D (model elements: grips on
+// their base, plus shape handles to drag a wall's or column's top and base up and down).
+// Drag a grip to reshape; click a wall's or line's length to type a new one.
+
+/** Height (mm) a plan grip of `el` sits at in 3D: its base (a floor's top), or a run end's own height. */
+function gripZ(doc: Document, el: Element, key?: string): number {
+  const p = el.params as Record<string, unknown>;
+  const level = (id: unknown) => (typeof id === "string" ? (doc.get<LevelParams>(id)?.params.elevation ?? 0) : 0);
+  if (el.category === Cat.Wall) return wallExtent(doc, el as Wall).bottom;
+  if (el.category === Cat.Column) return columnExtent(doc, el as Column).bottom;
+  if (el.category === Cat.Floor) return floorExtent(doc, el as Floor).top;
+  const host = typeof p.hostId === "string" ? doc.get(p.hostId) : undefined;
+  if (host && host.id !== el.id && host.category === Cat.Wall) return wallExtent(doc, host as Wall).bottom + Number(p.sillHeight ?? 0);
+  const end = key === "start" || key === "end" ? (p[key] as { z?: number } | undefined) : undefined;
+  if (typeof end?.z === "number") return level(p.levelId) + end.z;
+  const off = [p.offset, p.baseOffset, p.heightOffset].find((v) => typeof v === "number") as number | undefined;
+  return level(p.levelId ?? p.baseLevelId) + (off ?? 0);
+}
 
 /** More selected than this and grips are left off (as Revit does for big selections). */
 const MAX_ELEMENTS = 30;
@@ -12,6 +55,8 @@ const MAX_ELEMENTS = 30;
 interface Placed {
   el: HTMLElement;
   at: () => Vec2;
+  /** Height in 3D views (plans and drawings use the work plane). */
+  z?: () => number;
 }
 
 export class GripLayer {
@@ -40,7 +85,7 @@ export class GripLayer {
     const mode = this.ctx.viewport.viewMode;
     const p = el.params as { viewId?: unknown; sheetId?: unknown };
     const view = this.ctx.activeViewId();
-    if (mode === "3d") return false;
+    if (mode === "3d") return p.viewId === undefined && p.sheetId === undefined;
     if (mode === "drawing") return p.viewId === view || p.sheetId === view;
     return p.viewId === undefined || p.viewId === view;
   }
@@ -55,18 +100,25 @@ export class GripLayer {
     const { doc } = this.ctx;
     const sel = this.ctx.selection().map((id) => doc.get(id)).filter((e): e is Element => !!e && this.editable(e));
     if (!sel.length || sel.length > MAX_ELEMENTS) return;
+    const in3d = this.ctx.viewport.viewMode === "3d";
     for (const el of sel) {
       for (const g of elementGrips(doc, el)) this.addGrip(el.id, g);
+      if (in3d) this.addHeightHandles(el);
     }
     if (sel.length === 1) this.addLength(sel[0]!);
     if (sel.length === 1 && sel[0]!.category === Cat.View) this.showExtent(sel[0] as View);
-    if (sel.length === 1 && sel[0]!.category === Cat.Wall && this.ctx.viewport.viewMode === "plan") this.addFlip(sel[0]!);
+    if (sel.length === 1 && sel[0]!.category === Cat.Wall && this.ctx.viewport.viewMode !== "drawing") this.addFlip(sel[0]!);
     this.position();
+  }
+
+  /** Client point of a grip: on the work plane, or at its own height in 3D. */
+  private screen(at: Vec2, z?: number): { x: number; y: number } {
+    return this.ctx.viewport.viewMode === "3d" && z !== undefined ? this.ctx.viewport.toScreen3(at, z) : this.ctx.viewport.toScreen(at);
   }
 
   private position(): void {
     for (const p of this.placed) {
-      const s = this.ctx.viewport.toScreen(p.at());
+      const s = this.screen(p.at(), p.z?.());
       const r = this.root.getBoundingClientRect();
       p.el.style.left = `${s.x - r.left}px`;
       p.el.style.top = `${s.y - r.top}px`;
@@ -78,6 +130,9 @@ export class GripLayer {
     el.className = `grip grip-${g.kind}`;
     el.title = g.kind === "move" ? "Drag to move" : "Drag to reshape";
     let at = g.point;
+    const owner = this.ctx.doc.get(id);
+    const z = owner ? gripZ(this.ctx.doc, owner, g.key) : 0;
+    const in3d = this.ctx.viewport.viewMode === "3d";
     el.onpointerdown = (ev) => {
       if (ev.button !== 0) return;
       ev.stopPropagation();
@@ -86,11 +141,13 @@ export class GripLayer {
       this.dragging = true;
       const from = g.point;
       el.onpointermove = (mv) => {
-        const p = viewPoint(this.ctx, mv, null);
+        // 3D: on the horizontal plane through the grip (its base), snapped as in plans.
+        const raw = in3d ? this.ctx.viewport.pickPlane(mv, z) : null;
+        const p = in3d ? raw && snapPoint(this.ctx, raw, null, mv.shiftKey).p : viewPoint(this.ctx, mv, null);
         if (!p) return;
         at = p;
         this.position();
-        this.ctx.viewport.setPreviewLines({ segments: new Float32Array([from.x, from.y, 0, p.x, p.y, 0]), labels: [] });
+        if (!in3d) this.ctx.viewport.setPreviewLines({ segments: new Float32Array([from.x, from.y, 0, p.x, p.y, 0]), labels: [] });
         this.ctx.status(`Drag: ${Math.round(Math.hypot(p.x - from.x, p.y - from.y))} mm`);
       };
       el.onpointerup = () => {
@@ -111,7 +168,53 @@ export class GripLayer {
       };
     };
     this.root.append(el);
-    this.placed.push({ el, at: () => at });
+    this.placed.push({ el, at: () => at, z: () => z });
+  }
+
+  /** Shape handles in 3D: arrows on a wall's or column's top and base; drag up or down. */
+  private addHeightHandles(target: Element): void {
+    const h = verticalHandles(this.ctx.doc, target);
+    if (!h) return;
+    for (const edge of ["top", "base"] as const) {
+      const el = document.createElement("div");
+      el.className = `shape-handle shape-${edge}`;
+      el.textContent = edge === "top" ? "\u25B2" : "\u25BC";
+      el.title = edge === "top" ? "Drag to change the top" : "Drag to change the base";
+      let z = edge === "top" ? h.top : h.bottom;
+      el.onpointerdown = (ev) => {
+        if (ev.button !== 0) return;
+        ev.stopPropagation();
+        ev.preventDefault();
+        el.setPointerCapture(ev.pointerId);
+        this.dragging = true;
+        const from = z;
+        el.onpointermove = (mv) => {
+          const v = this.ctx.viewport.pickVertical(mv, h.at);
+          if (v === null) return;
+          // Snap to 10 mm (Shift: free), and to levels within 150 mm.
+          let q = mv.shiftKey ? v : Math.round(v / 10) * 10;
+          for (const l of this.ctx.doc.byCategory<LevelParams>(Cat.Level)) if (!mv.shiftKey && Math.abs(l.params.elevation - v) < 150) q = l.params.elevation;
+          z = q;
+          this.position();
+          this.ctx.status(`${edge === "top" ? "Top" : "Base"}: ${Math.round(q)} (${q - from >= 0 ? "+" : ""}${Math.round(q - from)} mm). Shift: no snapping.`);
+        };
+        el.onpointerup = () => {
+          el.onpointermove = null;
+          el.onpointerup = null;
+          this.dragging = false;
+          if (Math.abs(z - from) < 0.5) return this.refresh();
+          try {
+            this.ctx.doc.transact(edge === "top" ? "Drag top" : "Drag base", (tx) => setVerticalEdge(tx, this.ctx.doc, target.id, edge, z));
+            this.ctx.status("Changed. Ctrl+Z to undo.");
+          } catch (e) {
+            this.ctx.status(`\u26A0 ${(e as Error).message}`);
+          }
+          this.refresh();
+        };
+      };
+      this.root.append(el);
+      this.placed.push({ el, at: () => h.at, z: () => z });
+    }
   }
 
   /** A section's or elevation's view extent: dashed outline (line to far clip) with a light hatch. */
@@ -172,11 +275,12 @@ export class GripLayer {
       return { x: mid.x + n.x * off, y: mid.y + n.y * off };
     };
     // Point the arrows across the wall, as drawn on screen.
-    const a = this.ctx.viewport.toScreen(mid);
-    const c = this.ctx.viewport.toScreen({ x: mid.x + n.x * 1000, y: mid.y + n.y * 1000 });
+    const z = gripZ(this.ctx.doc, wall);
+    const a = this.screen(mid, z);
+    const c = this.screen({ x: mid.x + n.x * 1000, y: mid.y + n.y * 1000 }, z);
     b.style.rotate = `${Math.atan2(c.y - a.y, c.x - a.x) * (180 / Math.PI) + 90}deg`;
     this.root.append(b);
-    this.placed.push({ el: b, at });
+    this.placed.push({ el: b, at, z: () => z });
   }
 
   /** Temporary dimension: the length at the line's midpoint; click to type a new length. */
@@ -219,8 +323,10 @@ export class GripLayer {
     const n = wall ? { x: -(end.y - start.y) / L, y: (end.x - start.x) / L } : { x: 0, y: 0 };
     const half = wall ? wallThickness(this.ctx.doc, el as never) / 2 : 0;
     if (wall) label.classList.add("temp-dim-side");
+    const lz = gripZ(this.ctx.doc, el);
     this.placed.push({
       el: label,
+      z: () => lz,
       at: () => {
         const off = half + 16 * this.ctx.viewport.mmPerPixel();
         return { x: mid.x - n.x * off, y: mid.y - n.y * off };

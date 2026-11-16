@@ -1946,6 +1946,45 @@ void main() {
     return () => this.frameListeners.delete(fn);
   }
 
+  /**
+   * Plan directions for screen right and up (3D: the camera's right and its forward along the
+   * ground, each snapped to the nearest world axis; plans: x and y).
+   */
+  screenAxes(): { right: Vec2; up: Vec2 } {
+    if (this.mode !== "3d") return { right: { x: 1, y: 0 }, up: { x: 0, y: 1 } };
+    const snap = (v: THREE.Vector3): Vec2 => (Math.abs(v.x) >= Math.abs(v.y) ? { x: Math.sign(v.x) || 1, y: 0 } : { x: 0, y: Math.sign(v.y) || 1 });
+    const fwd = new THREE.Vector3();
+    this.camera.getWorldDirection(fwd);
+    const right = new THREE.Vector3().crossVectors(fwd, new THREE.Vector3(0, 0, 1));
+    fwd.z = 0;
+    // Looking straight down: forward is the camera's up.
+    if (fwd.lengthSq() < 1e-9) fwd.copy(this.camera.up).applyQuaternion(this.camera.quaternion);
+    return { right: snap(right), up: snap(fwd) };
+  }
+
+  /** Client (page) coordinates of a model point at height z (3D grips). */
+  toScreen3(p: Vec2, z: number): { x: number; y: number } {
+    const r = this.renderer.domElement.getBoundingClientRect();
+    const v = new THREE.Vector3(p.x, p.y, z).project(this.camera);
+    return { x: r.left + ((v.x + 1) / 2) * r.width, y: r.top + ((1 - v.y) / 2) * r.height };
+  }
+
+  /**
+   * Height under the cursor on the vertical line through `at` (Revit's shape-handle drag up/down):
+   * the ray meets the upright plane through that line facing the camera.
+   */
+  pickVertical(ev: { clientX: number; clientY: number }, at: Vec2): number | null {
+    this.setRay(ev);
+    const d = new THREE.Vector3();
+    this.camera.getWorldDirection(d);
+    d.z = 0;
+    if (d.lengthSq() < 1e-9) return null;
+    d.normalize();
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(d, new THREE.Vector3(at.x, at.y, 0));
+    const p = this.raycaster.ray.intersectPlane(plane, new THREE.Vector3());
+    return p ? p.z : null;
+  }
+
   /** Client (page) coordinates of a plan point on the work plane, or a drawing/sheet point. */
   toScreen(p: Vec2): { x: number; y: number } {
     const r = this.renderer.domElement.getBoundingClientRect();

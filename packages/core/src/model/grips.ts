@@ -1,6 +1,7 @@
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Params, Vec2 } from "../element.ts";
-import { Cat, type Wall, type WallParams } from "./architecture.ts";
+import { Cat, wallExtentRaw, type LevelParams, type Wall, type WallParams } from "./architecture.ts";
+import { columnExtent, type Column, type ColumnParams } from "./structure.ts";
 import { elementLine, isLinear, setLineEnds } from "./edits.ts";
 import { JOIN_TOLERANCE } from "./joins.ts";
 import { transformElements, translation } from "./modify.ts";
@@ -272,4 +273,59 @@ export function setLineLength(tx: Transaction, doc: Document, id: ElementId, len
     const w = doc.require<WallParams>(f.wall.id) as Wall;
     setLineEnds(tx, doc, w, f.end === "start" ? to : w.params.start, f.end === "end" ? to : w.params.end);
   }
+}
+
+// ---- shape handles (3D): drag a wall's or column's top or base up and down ------------------
+
+/** Heights a selected element's top/base handles sit at (walls and columns), or null. */
+export function verticalHandles(doc: Document, el: Element): { at: Vec2; top: number; bottom: number } | null {
+  if (el.category === Cat.Wall) {
+    const w = el as Wall;
+    const { start, end, curve } = w.params;
+    const { bottom, top } = wallExtentRaw(doc, w);
+    return { at: curve ? arcMid(start, end, curve) : { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 }, top, bottom };
+  }
+  if (el.category === Cat.Column) {
+    const c = el as Column;
+    const { bottom, top } = columnExtent(doc, c);
+    return { at: c.params.position, top, bottom };
+  }
+  return null;
+}
+
+/**
+ * Move a wall's or column's top or base to height `z` (absolute mm). Tops on a level change their
+ * offset from it; an unconnected wall top changes its height. A base changes its offset, and an
+ * unconnected wall keeps its top where it was. At least 10 mm stays between base and top.
+ */
+export function setVerticalEdge(tx: Transaction, doc: Document, id: ElementId, edge: "top" | "base", z: number): void {
+  const el = doc.require(id);
+  const MIN = 10;
+  if (el.category === Cat.Wall) {
+    const w = el as Wall;
+    const p = w.params;
+    const { bottom, top } = wallExtentRaw(doc, w);
+    if (edge === "top") {
+      const t = Math.max(z, bottom + MIN);
+      if (p.topAttachId) throw new Error("The top is attached: detach it first (Properties → Detach)");
+      if (p.topLevelId) tx.update<WallParams>(id, { topOffset: Math.round(t - doc.require<LevelParams>(p.topLevelId).params.elevation) });
+      else tx.update<WallParams>(id, { height: Math.round(t - bottom) });
+    } else {
+      const b = Math.min(z, top - MIN);
+      if (p.baseAttachId) throw new Error("The base is attached: detach it first (Properties → Detach)");
+      const base = doc.require<LevelParams>(p.baseLevelId).params.elevation;
+      const patch: Partial<WallParams> = { baseOffset: Math.round(b - base) };
+      if (!p.topLevelId) patch.height = Math.round(top - (base + patch.baseOffset!));
+      tx.update<WallParams>(id, patch);
+    }
+    return;
+  }
+  if (el.category === Cat.Column) {
+    const c = el as Column;
+    const { bottom, top } = columnExtent(doc, c);
+    if (edge === "top") tx.update<ColumnParams>(id, { topOffset: Math.round(Math.max(z, bottom + MIN) - doc.require<LevelParams>(c.params.topLevelId).params.elevation) });
+    else tx.update<ColumnParams>(id, { baseOffset: Math.round(Math.min(z, top - MIN) - doc.require<LevelParams>(c.params.baseLevelId).params.elevation) });
+    return;
+  }
+  throw new Error("Only walls and columns have top and base handles");
 }

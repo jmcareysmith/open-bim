@@ -17,3 +17,18 @@ describe("pinning", () => {
     expect(doc.require<WallParams>(w.id).params.start.x).toBe(100);
   });
 });
+
+describe("scale", () => {
+  it("scaling a wall about its start doubles its length and keeps its thickness", async () => {
+    const { scalingAbout, wallThickness } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const w = doc.transact("W", (tx) => createWall(tx, ids.wallTypes.exterior, { x: 1000, y: 0 }, { x: 4000, y: 0 }, ids.levels.ground, { height: 2400 }));
+    const t0 = wallThickness(doc, w as never);
+    doc.transact("Scale", (tx) => transformElements(tx, doc, [w.id], scalingAbout({ x: 1000, y: 0 }, 2)));
+    const p = doc.require<WallParams>(w.id).params;
+    expect(p.start.x).toBeCloseTo(1000);
+    expect(p.end.x).toBeCloseTo(7000);
+    expect(wallThickness(doc, doc.require(w.id) as never)).toBe(t0);
+  });
+});

@@ -37,6 +37,12 @@ export function rotationAbout(about: Vec2, angle: number): Affine {
   return { xx: c, xy: -s, yx: s, yy: c, tx: about.x - c * about.x + s * about.y, ty: about.y - s * about.x - c * about.y };
 }
 
+/** Scale by `k` (> 0) about `about` (Revit's Scale, RE: positions and lengths; thicknesses and sizes stay). */
+export function scalingAbout(about: Vec2, k: number): Affine {
+  if (!(k > 0) || !Number.isFinite(k)) throw new Error("The scale factor must be a positive number");
+  return { xx: k, xy: 0, yx: 0, yy: k, tx: about.x - k * about.x, ty: about.y - k * about.y };
+}
+
 /** Reflect across the line through `a` and `b`. */
 export function mirrorAcross(a: Vec2, b: Vec2): Affine {
   const len = Math.hypot(b.x - a.x, b.y - a.y);

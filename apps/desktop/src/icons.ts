@@ -78,6 +78,7 @@ const P: Record<string, string> = {
   pin: "M9 3h6l-1 6 3 3H7l3-3zM12 12v9",
   unpin: "M9 3h6l-1 6 3 3H7l3-3zM12 12v9M4 4l16 16",
   match: "M4 20l7-7M14 4l6 6-7 7-6-6zM4 20h4",
+  scale: "M4 20h8v-8H4zM12 12l8-8M14 4h6v6",
   mass: "M4 8l8-4 8 4v9l-8 4-8-4zM4 8l8 4 8-4M12 12v9",
   tree: "M12 22v-7M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12z",
   parking: "M5 3h14v18H5zM10 17V7h3a3 3 0 0 1 0 6h-3",

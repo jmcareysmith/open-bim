@@ -16,7 +16,7 @@ import { CameraTool } from "./cameratool.ts";
 import { FloorPointTool, SlopeArrowTool } from "./slopetool.ts";
 import { WallProfileTool } from "./profiletool.ts";
 import { LevelTool, MatchTypeTool } from "./revittools.ts";
-import { enablePinning, isPinned, setPinned, setElementOverrides, setCategoryOverride, type DirectShapeParams, enableSharedNested, enableBeamSystems, createImageUnderlay, planCrop, createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
+import { ungroup, enablePinning, isPinned, setPinned, setElementOverrides, setCategoryOverride, type DirectShapeParams, enableSharedNested, enableBeamSystems, createImageUnderlay, planCrop, createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
   ceilingPlanFor,
   createCeilingPlan,
   Cat,
@@ -575,6 +575,8 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   move: new ModifyTool(ctx, "move"),
   copy: new ModifyTool(ctx, "copy"),
   rotate: new ModifyTool(ctx, "rotate"),
+  scale: new ModifyTool(ctx, "scale"),
+  mirrorpick: new ModifyTool(ctx, "mirror", true),
   mirror: new ModifyTool(ctx, "mirror"),
   array: new ModifyTool(ctx, "array"),
   align: new AlignTool(ctx),
@@ -618,7 +620,7 @@ const tools: Record<string, Tool> = { select: new SelectTool(ctx), wall: new Wal
   matchtype: new MatchTypeTool(ctx),
 };
 /** Tools that work in sections/elevations (the rest need a plan or 3D work plane). */
-const DRAWING_TOOLS = new Set(["level", "matchtype", "select", "symbol", "detailcomponent", "repeatingdetail", "placegroup", "attach", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution", "angulardim", "callout"]);
+const DRAWING_TOOLS = new Set(["mirrorpick", "scale", "level", "matchtype", "select", "symbol", "detailcomponent", "repeatingdetail", "placegroup", "attach", "move", "copy", "rotate", "mirror", "array", "detailline", "region", "cloud", "text", "tag", "keynote", "extrusion", "blend", "revolution", "angulardim", "callout"]);
 let tool: Tool = tools.select!;
 /** Grips and temporary dimensions for the selection (Select tool only). */
 let grips: GripLayer | undefined = new GripLayer(ctx, $("#viewport"));
@@ -1038,6 +1040,38 @@ const commands: Record<string, () => void | Promise<void>> = {
     viewport.visibility.hideCategories(cats);
     afterVisibility(`Hid ${cats.join(", ")}`);
     ctx.setSelection([]);
+  },
+  /** Create Similar (CS): start the tool that makes the selected element, with its type. */
+  createSimilar() {
+    const el = selection.map((id) => doc.get(id)).find((e) => !!e);
+    if (!el) return status("Create Similar: select an element first.");
+    const TOOL_OF: Record<string, string> = {
+      [Cat.Wall]: "wall", [Cat.Floor]: "floor", [Cat.Ceiling]: "ceiling", [Cat.Roof]: "roof", [Cat.Door]: "door", [Cat.Window]: "window",
+      [Cat.Column]: "column", [Cat.Beam]: "beam", [Cat.Duct]: "duct", [Cat.Pipe]: "pipe", [Cat.Stair]: "stair", [Cat.Railing]: "railing",
+      [Cat.Grid]: "grid", [Cat.ReferencePlane]: "refplane", [Cat.Room]: "room", [Cat.TextNote]: "text", [Cat.DetailLine]: "detailline",
+      [Cat.Dimension]: "dimension", [Cat.Tag]: "tag", [Cat.FamilyInstance]: "component", [Cat.FilledRegion]: "region", [Cat.WallOpening]: "opening",
+    };
+    const name = TOOL_OF[el.category];
+    if (!name || !tools[name]) return status(`Create Similar: no tool makes a ${el.category.toLowerCase()} here.`);
+    if (el.category === Cat.FamilyInstance) {
+      const p = el.params as FamilyInstanceParams;
+      activeComponentKey = `${p.familyId}|${p.typeName}`;
+    } else if (el.typeId) {
+      const tc = typeCategoryOf(el.category);
+      if (tc) activeTypes.set(tc, el.typeId);
+    }
+    // Beams marked as braces come back as braces.
+    setTool(el.category === Cat.Beam && (el.params as { brace?: boolean }).brace ? "brace" : name);
+  },
+  ungroupSelection() {
+    const groups = selection.map((id) => doc.get(id)).filter((e): e is NonNullable<typeof e> => e?.category === Cat.Group);
+    if (!groups.length) return status("Ungroup: select a group first.");
+    let ids: ElementId[] = [];
+    edit("Ungroup", (tx) => {
+      for (const g of groups) ids = [...ids, ...ungroup(tx, doc, g.id)];
+    });
+    ctx.setSelection(ids);
+    status(`Ungrouped ${groups.length} group(s).`);
   },
   pin() {
     const ids = selection.filter((id) => doc.has(id));
@@ -1815,8 +1849,11 @@ function openCanvasMenu(ev: MouseEvent): void {
       { label: "Move", hint: "MV", action: () => setTool("move") },
       { label: "Copy", hint: "CO", action: () => setTool("copy") },
       { label: "Rotate", hint: "RO", action: () => setTool("rotate") },
-      { label: "Mirror", hint: "MM", action: () => setTool("mirror") },
+      { label: "Mirror", hint: "MM", action: () => setTool("mirrorpick") },
       { label: "Array", hint: "AR", action: () => setTool("array") },
+      { label: "Create Similar", hint: "CS", action: () => void commands.createSimilar?.() },
+      { label: "Select All Instances (Visible in View)", hint: "SA", action: () => void commands.selectAllInstances?.() },
+      selection.some((s) => isPinned(doc.get(s))) ? { label: "Unpin", hint: "UP", action: () => void commands.unpin?.() } : { label: "Pin", hint: "PN", action: () => void commands.pin?.() },
     );
     // MEP: put the selection in a system (Revit: Create Duct/Piping/Power System), or an existing one.
     const conns = selection.map((s) => doc.get(s)).filter((e): e is ModelElement => !!e).map((e) => connectableClassifications(doc, e));

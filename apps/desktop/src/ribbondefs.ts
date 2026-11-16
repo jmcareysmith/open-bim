@@ -36,7 +36,9 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
     { label: "Move", icon: "move", tool: "move", title: "Move (MV)" },
     { label: "Copy", icon: "copy", tool: "copy", title: "Copy (CO)" },
     { label: "Rotate", icon: "rotate", tool: "rotate", title: "Rotate (RO)" },
-    { label: "Mirror", icon: "mirror", tool: "mirror", title: "Mirror — draw axis (MM)" },
+    { label: "Mirror", icon: "mirror", tool: "mirrorpick", title: "Mirror — pick axis (MM): click a wall, grid, plane or line" },
+    { label: "Mirror Draw", icon: "mirror", tool: "mirror", title: "Mirror — draw axis (DM)" },
+    { label: "Scale", icon: "scale", tool: "scale", title: "Scale (RE): origin, reference point, new point — or type a factor" },
     { label: "Array", icon: "array", tool: "array", title: "Array (AR)" },
     { label: "Delete", icon: "delete", cmd: "delete", title: "Delete the selection (Del)" },
     { label: "Align", icon: "align", tool: "align", title: "Align (AL)" },
@@ -45,6 +47,7 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
     { label: "Split", icon: "split", tool: "split", title: "Split element (SL)" },
     { label: "Pin", icon: "pin", cmd: "pin", title: "Pin (PN): the selection can't be moved or deleted until unpinned" },
     { label: "Unpin", icon: "unpin", cmd: "unpin", title: "Unpin (UP)" },
+    { label: "Create Similar", icon: "copy", cmd: "createSimilar", title: "Create Similar (CS): the selected element's tool and type" },
     { label: "Match Type", icon: "match", tool: "matchtype", title: "Match Type Properties (MA): click the source, then the elements to change" },
   ];
 

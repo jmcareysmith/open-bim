@@ -4,6 +4,7 @@ import {
   arrayElements,
   isModifiable,
   mirrorAcross,
+  scalingAbout,
   planPoints,
   rotationAbout,
   selectionCentre,
@@ -22,7 +23,7 @@ import { viewPoint, type Tool, type ToolContext } from "./tools.ts";
 // pick points. Type a number and press Enter for an exact distance (Move/Copy/Array), angle
 // (Rotate, degrees anticlockwise) or, for Array, the number of items.
 
-export type ModifyMode = "move" | "copy" | "rotate" | "mirror" | "array";
+export type ModifyMode = "move" | "copy" | "rotate" | "mirror" | "array" | "scale";
 
 /** A tool option shown in the options strip (Revit's options bar). */
 export type ToolOption =
@@ -34,7 +35,7 @@ export interface ModifyToolContext extends ToolContext {
   setToolOptions(options: ToolOption[] | null): void;
 }
 
-const LABEL: Record<ModifyMode, string> = { move: "Move", copy: "Copy", rotate: "Rotate", mirror: "Mirror", array: "Array" };
+const LABEL: Record<ModifyMode, string> = { move: "Move", copy: "Copy", rotate: "Rotate", mirror: "Mirror", array: "Array", scale: "Scale" };
 const deg = (r: number) => (r * 180) / Math.PI;
 
 /** Outline of the selection, for the drag preview. */
@@ -90,8 +91,10 @@ export class ModifyTool implements Tool {
   constructor(
     private ctx: ModifyToolContext,
     private mode: ModifyMode,
+    /** Start in Pick Axis (Revit's MM; DM draws the axis). */
+    private startPickAxis = false,
   ) {
-    this.name = mode;
+    this.name = startPickAxis ? "mirrorpick" : mode;
   }
 
   activate(): void {
@@ -111,6 +114,7 @@ export class ModifyTool implements Tool {
     this.typed = "";
     this.cursor = null;
     this.placingCentre = false;
+    if (this.startPickAxis) this.pickAxis = true;
     this.copy = this.mode === "copy" || this.mode === "mirror";
     this.multiple = this.mode === "copy";
     this.centre = this.mode === "rotate" ? selectionCentre(doc, this.ids) : null;
@@ -152,6 +156,10 @@ export class ModifyTool implements Tool {
         case "rotate":
           if (this.placingCentre) return "click the centre of rotation.";
           return this.pts.length ? "click the end of the rotation, or type an angle." : "click the start of the rotation, or type an angle. Press C to move the centre.";
+        case "scale":
+          if (!this.pts.length) return "click the origin (the point that stays put).";
+          if (this.pts.length === 1) return "click a reference point, or type a factor (e.g. 2 or 0.5) and press Enter.";
+          return "click where the reference point goes.";
         case "mirror":
           if (this.pickAxis) return "click a wall, grid, reference plane, beam or line to mirror about.";
           return this.pts.length ? "click the second point of the mirror axis." : "click the first point of the mirror axis.";
@@ -188,6 +196,15 @@ export class ModifyTool implements Tool {
       case "mirror":
         if (!a || !cursor || Math.hypot(cursor.x - a.x, cursor.y - a.y) < 1) return null;
         return mirrorAcross(a, cursor);
+      case "scale": {
+        if (!a) return null;
+        if (Number.isFinite(typed)) return typed > 0 ? scalingAbout(a, typed) : null;
+        const b = this.pts[1];
+        if (!b || !cursor) return null;
+        const ref = Math.hypot(b.x - a.x, b.y - a.y);
+        const k = Math.hypot(cursor.x - a.x, cursor.y - a.y) / ref;
+        return ref > 1 && k > 1e-3 ? scalingAbout(a, k) : null;
+      }
     }
   }
 
@@ -225,6 +242,7 @@ export class ModifyTool implements Tool {
     const t = this.transform(this.cursor);
     if (!t || this.typed) return;
     if (this.mode === "rotate") this.ctx.status(`${LABEL.rotate}: ${deg(Math.atan2(t.yx, t.xx)).toFixed(1)}° — click to finish, or type an angle.`);
+    else if (this.mode === "scale") this.ctx.status(`${LABEL.scale}: × ${t.xx.toFixed(3)} — click to finish, or type a factor.`);
     else if (this.mode !== "mirror") this.ctx.status(`${LABEL[this.mode]}: ${Math.round(Math.hypot(t.tx, t.ty))} mm — click to finish, or type a distance.`);
   }
 
@@ -250,6 +268,11 @@ export class ModifyTool implements Tool {
     if (!this.pts.length) {
       this.pts = [p];
       this.cursor = p;
+      return this.prompt();
+    }
+    // Scale: origin, then the reference point, then where it goes.
+    if (this.mode === "scale" && this.pts.length === 1) {
+      this.pts.push(p);
       return this.prompt();
     }
     this.apply(this.transform(p));

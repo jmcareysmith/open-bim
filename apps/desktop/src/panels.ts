@@ -1,4 +1,5 @@
 import { convertDirectShapes, convertible, areaBoundary, curtainExtent, curtainGridLines, areaLoopsFromWalls, massFloorArea, massTotals, roomBoundary, scheduleFields, scheduleTable } from "@open-bim/geometry";
+import { showContextMenu } from "./dialog.ts";
 import { openColorSchemes } from "./colorschemes.ts";
 import { curtainPart, partLabel, setCurtainPart } from "./curtainpart.ts";
 import {
@@ -155,6 +156,7 @@ import {
   roofBaseElevation,
   renameGrid,
   renameView,
+  duplicateView,
   validateViewRange,
   dimensionLayout,
   flipWall,
@@ -2384,6 +2386,30 @@ function projectSections(ctx: PanelContext): Record<string, HTMLElement> {
     for (const v of list) {
       const div = h("div", { class: `list-item indent${v.id === ctx.activeViewId() ? " selected" : ""}` }, h("span", {}, v.name ?? v.id));
       div.onclick = () => ctx.setActiveView(v.id);
+      // Revit's right-click on a view: Open, Duplicate View ▸, Rename, Delete.
+      div.oncontextmenu = (ev) => {
+        ev.preventDefault();
+        const dup = (mode: "plain" | "detailing") => {
+          let id = "";
+          edit(ctx, mode === "plain" ? "Duplicate view" : "Duplicate view with detailing", (tx) => (id = duplicateView(tx, doc, v.id, mode).id));
+          if (id) ctx.setActiveView(id);
+        };
+        showContextMenu(ev.clientX, ev.clientY, [
+          { heading: v.name ?? "View" },
+          { label: "Open", action: () => ctx.setActiveView(v.id) },
+          { label: "Duplicate", action: () => dup("plain") },
+          { label: "Duplicate with Detailing", action: () => dup("detailing") },
+          {
+            label: "Rename…",
+            action: () => {
+              const n = prompt("View name:", v.name ?? "");
+              if (n) edit(ctx, "Rename view", (tx) => renameView(tx, doc, v.id, n.trim()));
+            },
+          },
+          "-",
+          { label: "Delete", action: () => edit(ctx, "Delete view", (tx) => tx.delete(v.id)) },
+        ]);
+      };
       if (v.params.kind !== "3d") browserDrag(div, "view", v.id);
       viewsSec.append(div);
     }

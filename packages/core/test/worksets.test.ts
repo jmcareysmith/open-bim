@@ -68,3 +68,20 @@ describe("renamed datums workset", () => {
     expect(activeWorkset(doc)).not.toBe(datums);
   });
 });
+
+describe("duplicate view", () => {
+  it("plain copies settings only; with detailing copies the view's annotation", async () => {
+    const { createTextNote, duplicateView } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const plan = floorPlanFor(doc, ids.levels.ground)!;
+    doc.transact("T", (tx) => createTextNote(tx, doc, plan.id, { x: 0, y: 0 }, "Hello"));
+    const plain = doc.transact("D", (tx) => duplicateView(tx, doc, plan.id));
+    const det = doc.transact("D", (tx) => duplicateView(tx, doc, plan.id, "detailing"));
+    const owned = (vid: string) => doc.all().filter((e) => (e.params as { viewId?: string }).viewId === vid).length;
+    expect(plain.name).not.toBe(plan.name);
+    expect(owned(plain.id)).toBe(0);
+    expect(owned(det.id)).toBe(owned(plan.id));
+    expect(det.name).not.toBe(plain.name);
+  });
+});

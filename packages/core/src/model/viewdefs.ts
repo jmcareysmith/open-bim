@@ -643,3 +643,32 @@ export function isDrawingView(view: View): boolean {
 export function isPlanView(view: View): boolean {
   return view.params.kind === "floorPlan" || view.params.kind === "ceilingPlan" || view.params.kind === "callout" || view.params.kind === "areaPlan";
 }
+
+/**
+ * Duplicate View (Revit): a copy of the view with its own name — model views copy their settings
+ * (crop, range, graphics, camera); "detailing" copies the view's own annotation too (dimensions,
+ * text, detail lines, tags, regions…), pointing at the new view.
+ */
+export function duplicateView(tx: Transaction, doc: Document, id: ElementId, mode: "plain" | "detailing" = "plain"): View {
+  const v = doc.require<ViewParams>(id) as View;
+  if (v.category !== Cat.View) throw new Error("Only views can be duplicated here");
+  const name = uniqueName(doc, v.params.kind, `${v.name ?? "View"} Copy 1`);
+  const copy = tx.create<ViewParams>(Cat.View, structuredClone(v.params), { name }) as View;
+  if (mode === "detailing") {
+    const owned = doc.all().filter((e) => (e.params as { viewId?: unknown }).viewId === id);
+    const map = new Map<ElementId, ElementId>([[id, copy.id]]);
+    // Annotation that points at other annotation (tags on regions, leaders) comes after what it points at.
+    const order = (e: { category: string }) => (e.category === "Tag" || e.category === "Dimension" ? 1 : 0);
+    const remap = (x: unknown): unknown => {
+      if (typeof x === "string") return map.get(x) ?? x;
+      if (Array.isArray(x)) return x.map(remap);
+      if (x && typeof x === "object") return Object.fromEntries(Object.entries(x).map(([k, y]) => [k, remap(y)]));
+      return x;
+    };
+    for (const e of owned.sort((a, b) => order(a) - order(b))) {
+      const c = tx.create(e.category, remap(structuredClone(e.params)) as typeof e.params, { ...(e.name !== undefined ? { name: e.name } : {}), ...(e.typeId ? { typeId: e.typeId } : {}) });
+      map.set(e.id, c.id);
+    }
+  }
+  return copy;
+}

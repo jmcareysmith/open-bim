@@ -170,3 +170,30 @@ describe("curved walls from IFC", () => {
     expect(wallThickness(doc, w as never)).toBeCloseTo(t, 0);
   });
 });
+
+describe("stairs from IFC", () => {
+  it("recovers a straight stair's run, risers, going and width from its mesh", async () => {
+    const { createStair, ensureStairType, stairLayout } = await import("@open-bim/core");
+    const { SimpleKernel } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const st = doc.transact("S", (tx) => createStair(tx, doc, ensureStairType(tx, doc), ids.levels.ground, ids.levels.first, [{ start: { x: 1000, y: 500 }, end: { x: 5000, y: 500 } }]));
+    const before = stairLayout(doc, doc.require(st.id) as never);
+    const m = new SimpleKernel().build(doc, doc.require(st.id))!;
+    const ds = doc.transact("I", (tx) => {
+      tx.delete(st.id);
+      return createDirectShape(tx, { levelId: ids.levels.ground, ifcClass: "IfcStair", globalId: "s", positions: [...m.positions], indices: [...m.indices], color: 0x999999, properties: {} }).id;
+    });
+    const r = doc.transact("C", (tx) => convertDirectShapes(tx, doc, [ds]));
+    expect(r.skipped).toEqual([]);
+    const s2 = doc.byCategory("Stair")[0]!;
+    const after = stairLayout(doc, s2 as never);
+    expect(after.risers).toBe(before.risers);
+    expect(after.going).toBeCloseTo(before.going, 0);
+    expect(after.height).toBeCloseTo(before.height, 0);
+    const run = (s2.params as { runs: { start: { x: number; y: number } }[] }).runs[0]!;
+    expect(run.start.x).toBeCloseTo(1000, -1);
+    expect(run.start.y).toBeCloseTo(500, -1);
+    expect((doc.get(s2.typeId!)!.params as { width: number }).width).toBeCloseTo(900, -1);
+  });
+});

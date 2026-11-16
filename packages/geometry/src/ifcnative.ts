@@ -10,6 +10,10 @@ import {
   createBeam,
   createRoof,
   setWallCurve,
+  createStair,
+  createStairType,
+  type StairParams,
+  type StairTypeParams,
   type BeamParams,
   type ColumnParams,
   type StructuralSectionParams,
@@ -40,13 +44,14 @@ const SLAB_CLASSES = new Set(["IfcSlab"]);
 const COLUMN_CLASSES = new Set(["IfcColumn"]);
 const BEAM_CLASSES = new Set(["IfcBeam"]);
 const ROOF_CLASSES = new Set(["IfcRoof"]);
+const STAIR_CLASSES = new Set(["IfcStair", "IfcStairFlight"]);
 const INSERT_CLASSES = new Set(["IfcDoor", "IfcWindow"]);
 
 /** Can this imported shape become a native element? */
 export function convertible(el: { category: string; params: unknown }): boolean {
   if (el.category !== Cat.DirectShape) return false;
   const c = (el.params as DirectShapeParams).ifcClass;
-  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c) || ROOF_CLASSES.has(c);
+  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c) || ROOF_CLASSES.has(c) || STAIR_CLASSES.has(c);
 }
 
 function hull(pts: Vec2[]): Vec2[] {
@@ -292,6 +297,66 @@ function arcWall(p: DirectShapeParams): { start: Vec2; end: Vec2; curve: number;
   return { start, end, curve, thick: r1 - r0 };
 }
 
+/**
+ * A straight stair from its mesh: the treads are its upward faces at evenly spaced heights; their
+ * centres give the direction of travel and the going, their spread across it the width. Null for
+ * anything else (turns, winders, uneven risers).
+ */
+function stairFromMesh(tx: Transaction, doc: Document, p: DirectShapeParams, lvl: number, z0: number, z1: number): ElementId | null {
+  const P = p.positions;
+  // Upward horizontal faces, grouped by height: area-weighted centre and the points of each tread.
+  const levels = new Map<number, { a: number; cx: number; cy: number; pts: Vec2[] }>();
+  for (let i = 0; i < p.indices.length; i += 3) {
+    const [a, b, c] = [p.indices[i]! * 3, p.indices[i + 1]! * 3, p.indices[i + 2]! * 3];
+    const u = [P[b]! - P[a]!, P[b + 1]! - P[a + 1]!];
+    const w = [P[c]! - P[a]!, P[c + 1]! - P[a + 1]!];
+    const area = (u[0]! * w[1]! - u[1]! * w[0]!) / 2;
+    if (area <= 1 || Math.abs(P[a + 2]! - P[b + 2]!) > 0.5 || Math.abs(P[a + 2]! - P[c + 2]!) > 0.5) continue;
+    const z = Math.round(P[a + 2]!);
+    if (z <= z0 + 1) continue;
+    const g = levels.get(z) ?? { a: 0, cx: 0, cy: 0, pts: [] };
+    g.a += area;
+    g.cx += (area * (P[a]! + P[b]! + P[c]!)) / 3;
+    g.cy += (area * (P[a + 1]! + P[b + 1]! + P[c + 1]!)) / 3;
+    for (const k of [a, b, c]) g.pts.push({ x: P[k]!, y: P[k + 1]! });
+    levels.set(z, g);
+  }
+  const treads = [...levels.entries()].sort((x, y) => x[0] - y[0]).map(([z, g]) => ({ z, c: { x: g.cx / g.a, y: g.cy / g.a }, pts: g.pts }));
+  // The topmost face at the stair's top is the landing/floor it arrives at, not a tread.
+  if (treads.length && Math.abs(treads[treads.length - 1]!.z - z1) < 1) treads.pop();
+  if (treads.length < 2) return null;
+  const risers = treads.length + 1;
+  const riser = (z1 - z0) / risers;
+  // Even risers, treads in a straight line at an even going.
+  if (treads.some((t, i) => Math.abs(t.z - (z0 + riser * (i + 1))) > 3)) return null;
+  const first = treads[0]!.c;
+  const last = treads[treads.length - 1]!.c;
+  const span = Math.hypot(last.x - first.x, last.y - first.y);
+  if (span < 1) return null;
+  const dir = { x: (last.x - first.x) / span, y: (last.y - first.y) / span };
+  const going = span / (treads.length - 1);
+  if (treads.some((t, i) => Math.hypot(t.c.x - (first.x + dir.x * going * i), t.c.y - (first.y + dir.y * going * i)) > 5)) return null;
+  const across = { x: -dir.y, y: dir.x };
+  const ws = treads[0]!.pts.map((q) => (q.x - first.x) * across.x + (q.y - first.y) * across.y);
+  const width = Math.max(...ws) - Math.min(...ws);
+  const centreOff = (Math.max(...ws) + Math.min(...ws)) / 2;
+  // The run starts half a going before the first tread's centre, on the stair's centreline.
+  const start = { x: first.x - (dir.x * going) / 2 + across.x * centreOff, y: first.y - (dir.y * going) / 2 + across.y * centreOff };
+  const end = { x: start.x + dir.x * going * treads.length, y: start.y + dir.y * going * treads.length };
+  const typeName = `Imported Stair ${Math.round(width)} wide ${Math.round(going)} going`;
+  const type =
+    doc.byCategory<StairTypeParams>(Cat.StairType).find((t) => Math.abs(t.params.going - going) < 2 && Math.abs(t.params.width - width) < 2 && Math.ceil((z1 - z0) / t.params.maxRiser - 1e-9) === risers)?.id ??
+    createStairType(tx, typeName, { going: Math.round(going * 10) / 10, width: Math.round(width), maxRiser: riser + 0.01 }).id;
+  // Top: the level at the stair's top, else the base level with an offset.
+  // Top: the level at the stair's top, else the nearest above its base (with an offset).
+  const above = doc.byCategory<LevelParams>(Cat.Level).filter((l) => l.params.elevation > lvl + 1).sort((a, b) => Math.abs(a.params.elevation - z1) - Math.abs(b.params.elevation - z1));
+  const top = above[0];
+  if (!top) return null;
+  const s = createStair(tx, doc, type, p.levelId, top.id, [{ start, end }]);
+  tx.update<StairParams>(s.id, { baseOffset: z0 - lvl, topOffset: z1 - top.params.elevation });
+  return s.id;
+}
+
 /** A structural section of this shape and size (b across, d deep), else a new "Imported <what> b x d". */
 function sectionFor(tx: Transaction, doc: Document, shape: "rect" | "circle", b: number, d: number, what: string, color?: number): ElementId {
   const B = Math.round(shape === "circle" ? Math.max(b, d) : b);
@@ -408,6 +473,13 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
       const col = createColumn(tx, doc, typeId, p.levelId, top.id === p.levelId ? p.levelId : top.id, r.c, round ? 0 : Math.atan2(r.u.y, r.u.x) - Math.PI / 2);
       tx.update<ColumnParams>(col.id, { baseOffset: z0 - lvl, topOffset: z1 - top.params.elevation });
       created.push(col.id);
+    } else if (STAIR_CLASSES.has(p.ifcClass)) {
+      const stair = stairFromMesh(tx, doc, p, lvl, z0, z1);
+      if (!stair) {
+        skipped.push(id);
+        continue;
+      }
+      created.push(stair);
     } else if (ROOF_CLASSES.has(p.ifcClass)) {
       const roof = roofFromMesh(tx, doc, p, lvl, z0, mat);
       if (!roof) {

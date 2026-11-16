@@ -6,6 +6,11 @@ import {
   createWallOpening,
   createDoor,
   createWindow,
+  createColumn,
+  createBeam,
+  type BeamParams,
+  type ColumnParams,
+  type StructuralSectionParams,
   type DoorTypeParams,
   type WindowTypeParams,
   type DirectShape,
@@ -26,13 +31,15 @@ import {
 
 const WALL_CLASSES = new Set(["IfcWall", "IfcWallStandardCase"]);
 const SLAB_CLASSES = new Set(["IfcSlab"]);
+const COLUMN_CLASSES = new Set(["IfcColumn"]);
+const BEAM_CLASSES = new Set(["IfcBeam"]);
 const INSERT_CLASSES = new Set(["IfcDoor", "IfcWindow"]);
 
 /** Can this imported shape become a native element? */
 export function convertible(el: { category: string; params: unknown }): boolean {
   if (el.category !== Cat.DirectShape) return false;
   const c = (el.params as DirectShapeParams).ifcClass;
-  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c);
+  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c);
 }
 
 function hull(pts: Vec2[]): Vec2[] {
@@ -104,6 +111,16 @@ function typeFor(tx: Transaction, doc: Document, category: string, label: string
   return tx.create<LayeredTypeParams>(category, { layers: [{ function: "structure", material: "Imported", thickness: r }] }, { name: `${label} ${r}` }).id;
 }
 
+/** A structural section of this shape and size (b across, d deep), else a new "Imported <what> b x d". */
+function sectionFor(tx: Transaction, doc: Document, shape: "rect" | "circle", b: number, d: number, what: string): ElementId {
+  const B = Math.round(shape === "circle" ? Math.max(b, d) : b);
+  const D = Math.round(shape === "circle" ? Math.max(b, d) : d);
+  const have = doc.byCategory<StructuralSectionParams>(Cat.StructuralType).find((t) => t.params.shape === shape && Math.abs(t.params.b - B) < 2 && Math.abs(t.params.d - D) < 2);
+  if (have) return have.id;
+  const name = shape === "circle" ? `Imported ${what} Ø${D}` : `Imported ${what} ${B} x ${D}`;
+  return tx.create<StructuralSectionParams>(Cat.StructuralType, { shape, b: B, d: D, tf: 0, tw: 0 }, { name }).id;
+}
+
 /** A door type whose opening (leaf + frame) is this size, else a new "Imported Door W x H". */
 function doorTypeFor(tx: Transaction, doc: Document, width: number, height: number): ElementId {
   const types = doc.byCategory<DoorTypeParams>(Cat.DoorType);
@@ -157,6 +174,42 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
       const w = createWall(tx, typeId, start, end, p.levelId, { baseOffset: z0 - lvl, height: z1 - z0 });
       walls.push({ id: w.id, c: r.c, u: r.u, len: r.len, wid: r.wid, base: z0 });
       created.push(w.id);
+    } else if (COLUMN_CLASSES.has(p.ifcClass)) {
+      // Column: a rectangular or round section (by how much of its box the plan fills), base to top.
+      const r = minRect(xy);
+      if (!r || r.wid < 1) {
+        skipped.push(id);
+        continue;
+      }
+      const fill = r.hullArea / (r.len * r.wid);
+      const round = Math.abs(r.len - r.wid) < 0.05 * r.len && fill > 0.7 && fill < 0.85;
+      if (!round && fill < 0.9) {
+        skipped.push(id);
+        continue;
+      }
+      // Round: the diameter to its farthest points (a faceted circle's box is across the flats).
+      const dia = round ? 2 * Math.max(...xy.map((q) => Math.hypot(q.x - r.c.x, q.y - r.c.y))) : 0;
+      const typeId = round ? sectionFor(tx, doc, "circle", dia, dia, "Column") : sectionFor(tx, doc, "rect", r.wid, r.len, "Column");
+      // Top: the level at or just above the column's top, else its base level.
+      const levels = doc.byCategory<LevelParams>(Cat.Level).sort((a, b) => a.params.elevation - b.params.elevation);
+      const top = levels.find((l) => l.params.elevation >= z1 - 1) ?? doc.require<LevelParams>(p.levelId);
+      // Section depth runs along the column's local y: turn it to the long side.
+      const col = createColumn(tx, doc, typeId, p.levelId, top.id === p.levelId ? p.levelId : top.id, r.c, round ? 0 : Math.atan2(r.u.y, r.u.x) - Math.PI / 2);
+      tx.update<ColumnParams>(col.id, { baseOffset: z0 - lvl, topOffset: z1 - top.params.elevation });
+      created.push(col.id);
+    } else if (BEAM_CLASSES.has(p.ifcClass)) {
+      // Beam: along its plan box's long side, top at its highest point, section width × depth.
+      const r = minRect(xy);
+      if (!r || r.wid < 1 || r.len < 2 * r.wid || r.hullArea < 0.9 * r.len * r.wid) {
+        skipped.push(id);
+        continue;
+      }
+      const typeId = sectionFor(tx, doc, "rect", r.wid, z1 - z0, "Beam");
+      const start = { x: r.c.x - (r.u.x * r.len) / 2, y: r.c.y - (r.u.y * r.len) / 2 };
+      const end = { x: r.c.x + (r.u.x * r.len) / 2, y: r.c.y + (r.u.y * r.len) / 2 };
+      const beam = createBeam(tx, doc, typeId, p.levelId, start, end);
+      tx.update<BeamParams>(beam.id, { offset: z1 - lvl });
+      created.push(beam.id);
     } else {
       // Slab: its outline is the union of its upward faces seen in plan.
       const tris: Polygon[] = [];

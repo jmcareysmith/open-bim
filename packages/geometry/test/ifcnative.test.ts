@@ -42,3 +42,31 @@ describe("IFC shapes to native elements", () => {
     expect(doc.get(win)).toBeUndefined();
   });
 });
+
+describe("IFC columns and beams to native", () => {
+  it("makes columns (rectangular, turned to the long side; round) and beams with matching sections", async () => {
+    const { columnExtent } = await import("@open-bim/core");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const lvl = ids.levels.ground;
+    const mk = (ifcClass: string, mesh: { positions: number[]; indices: number[] }) =>
+      doc.transact("I", (tx) => createDirectShape(tx, { levelId: lvl, ifcClass, globalId: ifcClass, ...mesh, color: 0x999999, properties: {} }).id);
+    // 300 across x, 500 along y; base 0, top 2700 (the first floor level).
+    const rect = mk("IfcColumn", box([{ x: 850, y: 750 }, { x: 1150, y: 750 }, { x: 1150, y: 1250 }, { x: 850, y: 1250 }], 0, 2700));
+    const circle = Array.from({ length: 24 }, (_, i) => ({ x: 5000 + 200 * Math.cos((i / 24) * 2 * Math.PI), y: 1000 + 200 * Math.sin((i / 24) * 2 * Math.PI) }));
+    const round = mk("IfcColumn", box(circle, 0, 2700));
+    const beam = mk("IfcBeam", box([{ x: 1000, y: 950 }, { x: 5000, y: 950 }, { x: 5000, y: 1050 }, { x: 1000, y: 1050 }], 2400, 2700));
+    const r = doc.transact("C", (tx) => convertDirectShapes(tx, doc, [rect, round, beam]));
+    expect(r.skipped).toEqual([]);
+    const cols = doc.byCategory("Column");
+    expect(cols).toHaveLength(2);
+    const rc = cols.find((c) => Math.abs((c.params as { position: { x: number } }).position.x - 1000) < 1)!;
+    expect(doc.get(rc.typeId!)!.params).toMatchObject({ shape: "rect", b: 300, d: 500 });
+    expect(columnExtent(doc, rc as never)).toEqual({ bottom: 0, top: 2700 });
+    const cc = cols.find((c) => c !== rc)!;
+    expect(doc.get(cc.typeId!)!.params).toMatchObject({ shape: "circle", d: 400 });
+    const b = doc.byCategory("Beam")[0]!;
+    expect(doc.get(b.typeId!)!.params).toMatchObject({ shape: "rect", b: 100, d: 300 });
+    expect((b.params as { offset: number }).offset).toBeCloseTo(2700);
+  });
+});

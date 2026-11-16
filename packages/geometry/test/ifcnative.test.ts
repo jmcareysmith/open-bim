@@ -97,3 +97,25 @@ describe("IFC roofs to native", () => {
     }
   });
 });
+
+describe("IFC names, marks and colours", () => {
+  it("keeps the imported name and Mark, and gives new types a material of the shape's colour", () => {
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const ds = doc.transact("I", (tx) =>
+      createDirectShape(
+        tx,
+        { levelId: ids.levels.ground, ifcClass: "IfcWall", globalId: "w", ...box(rect(0, 0, 4000, 333), 0, 2700), color: 0x8a3324, properties: { "Identity Data.Mark": "W-07" } },
+        "Basic Wall:Brick 333",
+      ).id,
+    );
+    const { created } = doc.transact("C", (tx) => convertDirectShapes(tx, doc, [ds]));
+    const w = doc.require(created[0]!);
+    expect(w.name).toBe("Basic Wall:Brick 333");
+    expect((w.params as { mark?: string }).mark).toBe("W-07");
+    const t = doc.require<{ layers: { materialId?: string }[] }>(w.typeId!);
+    expect(t.name).toBe("Imported Wall 333");
+    const m = doc.require<{ color: number }>(t.params.layers[0]!.materialId!);
+    expect(m.params.color).toBe(0x8a3324);
+  });
+});

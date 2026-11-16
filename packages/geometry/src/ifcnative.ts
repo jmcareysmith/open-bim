@@ -13,6 +13,10 @@ import {
   type ColumnParams,
   type StructuralSectionParams,
   type DoorTypeParams,
+  type Material,
+  type MaterialParams,
+  createMaterial,
+  materialByName,
   type WindowTypeParams,
   type DirectShape,
   type DirectShapeParams,
@@ -106,11 +110,13 @@ function bounds(p: DirectShapeParams) {
 const typeThickness = (t: LayeredTypeParams) => t.layers.reduce((s, l) => s + l.thickness, 0);
 
 /** A layered type of this category and total thickness, or a new single-layer one. */
-function typeFor(tx: Transaction, doc: Document, category: string, label: string, t: number): ElementId {
+function typeFor(tx: Transaction, doc: Document, category: string, label: string, t: number, color?: number): ElementId {
   const have = doc.byCategory<LayeredTypeParams>(category).find((x) => !x.params.curtain && !x.params.stack?.length && Math.abs(typeThickness(x.params) - t) < 0.5);
   if (have) return have.id;
   const r = Math.round(t);
-  return tx.create<LayeredTypeParams>(category, { layers: [{ function: "structure", material: "Imported", thickness: r }] }, { name: `${label} ${r}` }).id;
+  const mat = color !== undefined ? materialFor(tx, doc, color) : undefined;
+  const layer = { function: "structure" as const, material: mat?.name ?? "Imported", thickness: r, ...(mat ? { materialId: mat.id } : {}) };
+  return tx.create<LayeredTypeParams>(category, { layers: [layer] }, { name: `${label} ${r}` }).id;
 }
 
 type Plane = { tri: [Vec2, Vec2, Vec2]; a: number; b: number; c: number };
@@ -155,7 +161,7 @@ function planeAt(planes: Plane[], q: Vec2, highest: boolean): Plane | null {
  * Roof: a footprint roof from an imported roof's shape — the outline of its top faces, each eave's
  * slope from the face just inside it (none rising from it: a gable), thickness from top to bottom.
  */
-function roofFromMesh(tx: Transaction, doc: Document, p: DirectShapeParams, lvl: number, z0: number): ElementId | null {
+function roofFromMesh(tx: Transaction, doc: Document, p: DirectShapeParams, lvl: number, z0: number, mat?: number): ElementId | null {
   const tops = facePlanes(p, true);
   if (!tops.length) return null;
   let outline: Polygon[] = [];
@@ -200,18 +206,19 @@ function roofFromMesh(tx: Transaction, doc: Document, p: DirectShapeParams, lvl:
   }
   const t = thick.length ? thick.sort((x, y) => x - y)[Math.floor(thick.length / 2)]! : 200;
   if (!(t > 1)) return null;
-  const typeId = typeFor(tx, doc, Cat.RoofType, "Imported Roof", t);
+  const typeId = typeFor(tx, doc, Cat.RoofType, "Imported Roof", t, mat);
   return createRoof(tx, typeId, p.levelId, ring, { slopes, baseOffset: z0 - lvl }).id;
 }
 
 /** A structural section of this shape and size (b across, d deep), else a new "Imported <what> b x d". */
-function sectionFor(tx: Transaction, doc: Document, shape: "rect" | "circle", b: number, d: number, what: string): ElementId {
+function sectionFor(tx: Transaction, doc: Document, shape: "rect" | "circle", b: number, d: number, what: string, color?: number): ElementId {
   const B = Math.round(shape === "circle" ? Math.max(b, d) : b);
   const D = Math.round(shape === "circle" ? Math.max(b, d) : d);
   const have = doc.byCategory<StructuralSectionParams>(Cat.StructuralType).find((t) => t.params.shape === shape && Math.abs(t.params.b - B) < 2 && Math.abs(t.params.d - D) < 2);
   if (have) return have.id;
   const name = shape === "circle" ? `Imported ${what} Ø${D}` : `Imported ${what} ${B} x ${D}`;
-  return tx.create<StructuralSectionParams>(Cat.StructuralType, { shape, b: B, d: D, tf: 0, tw: 0 }, { name }).id;
+  const mat = color !== undefined ? materialFor(tx, doc, color) : undefined;
+  return tx.create<StructuralSectionParams>(Cat.StructuralType, { shape, b: B, d: D, tf: 0, tw: 0, materialId: mat?.id ?? null }, { name }).id;
 }
 
 /** A door type whose opening (leaf + frame) is this size, else a new "Imported Door W x H". */
@@ -236,6 +243,22 @@ function windowTypeFor(tx: Transaction, doc: Document, width: number, height: nu
   return tx.create<WindowTypeParams>(Cat.WindowType, { width: w, height: h, frameWidth: f, defaultSill: 900 }, { name: `Imported Window ${w} x ${h}` }).id;
 }
 
+/** A material for an imported colour: one of that colour already, else "Imported #RRGGBB". */
+function materialFor(tx: Transaction, doc: Document, color: number): Material {
+  const have = doc.byCategory<MaterialParams>(Cat.Material).find((m) => m.params.color === color) as Material | undefined;
+  if (have) return have;
+  const name = `Imported #${color.toString(16).padStart(6, "0").toUpperCase()}`;
+  return (materialByName(doc, name) ?? createMaterial(tx, doc, name, { color })) as Material;
+}
+
+/** The imported element's name, and its Mark (a "….Mark" property, as Revit exports it). */
+function carryOver(tx: Transaction, doc: Document, id: ElementId, ds: { name?: string; params: DirectShapeParams }): void {
+  if (ds.name) tx.setName(id, ds.name);
+  const mark = Object.entries(ds.params.properties).find(([k]) => /(^|\.)Mark$/.test(k))?.[1];
+  if (mark) tx.update(id, { mark });
+  void doc;
+}
+
 /** Convert imported IFC shapes to native walls and floors. Returns the new elements' ids and what was left as it was. */
 export function convertDirectShapes(tx: Transaction, doc: Document, ids: ElementId[]): { created: ElementId[]; skipped: ElementId[] } {
   const created: ElementId[] = [];
@@ -250,6 +273,8 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
     const p = ds.params;
     const lvl = doc.get<LevelParams>(p.levelId)?.params.elevation ?? 0;
     const { xy, z0, z1 } = bounds(p);
+    const mat = p.color;
+    const made = created.length;
     if (z1 - z0 < 1) {
       skipped.push(id);
       continue;
@@ -261,7 +286,7 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
         skipped.push(id);
         continue;
       }
-      const typeId = typeFor(tx, doc, Cat.WallType, "Imported Wall", r.wid);
+      const typeId = typeFor(tx, doc, Cat.WallType, "Imported Wall", r.wid, mat);
       const start = { x: r.c.x - (r.u.x * r.len) / 2, y: r.c.y - (r.u.y * r.len) / 2 };
       const end = { x: r.c.x + (r.u.x * r.len) / 2, y: r.c.y + (r.u.y * r.len) / 2 };
       const w = createWall(tx, typeId, start, end, p.levelId, { baseOffset: z0 - lvl, height: z1 - z0 });
@@ -282,7 +307,7 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
       }
       // Round: the diameter to its farthest points (a faceted circle's box is across the flats).
       const dia = round ? 2 * Math.max(...xy.map((q) => Math.hypot(q.x - r.c.x, q.y - r.c.y))) : 0;
-      const typeId = round ? sectionFor(tx, doc, "circle", dia, dia, "Column") : sectionFor(tx, doc, "rect", r.wid, r.len, "Column");
+      const typeId = round ? sectionFor(tx, doc, "circle", dia, dia, "Column", mat) : sectionFor(tx, doc, "rect", r.wid, r.len, "Column", mat);
       // Top: the level at or just above the column's top, else its base level.
       const levels = doc.byCategory<LevelParams>(Cat.Level).sort((a, b) => a.params.elevation - b.params.elevation);
       const top = levels.find((l) => l.params.elevation >= z1 - 1) ?? doc.require<LevelParams>(p.levelId);
@@ -291,7 +316,7 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
       tx.update<ColumnParams>(col.id, { baseOffset: z0 - lvl, topOffset: z1 - top.params.elevation });
       created.push(col.id);
     } else if (ROOF_CLASSES.has(p.ifcClass)) {
-      const roof = roofFromMesh(tx, doc, p, lvl, z0);
+      const roof = roofFromMesh(tx, doc, p, lvl, z0, mat);
       if (!roof) {
         skipped.push(id);
         continue;
@@ -304,7 +329,7 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
         skipped.push(id);
         continue;
       }
-      const typeId = sectionFor(tx, doc, "rect", r.wid, z1 - z0, "Beam");
+      const typeId = sectionFor(tx, doc, "rect", r.wid, z1 - z0, "Beam", mat);
       const start = { x: r.c.x - (r.u.x * r.len) / 2, y: r.c.y - (r.u.y * r.len) / 2 };
       const end = { x: r.c.x + (r.u.x * r.len) / 2, y: r.c.y + (r.u.y * r.len) / 2 };
       const beam = createBeam(tx, doc, typeId, p.levelId, start, end);
@@ -333,10 +358,11 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
         skipped.push(id);
         continue;
       }
-      const typeId = typeFor(tx, doc, Cat.FloorType, "Imported Floor", z1 - z0);
+      const typeId = typeFor(tx, doc, Cat.FloorType, "Imported Floor", z1 - z0, mat);
       const f = createFloor(tx, typeId, p.levelId, biggest[0]!, { offset: z1 - lvl, holes: biggest.slice(1) });
       created.push(f.id);
     }
+    for (const nid of created.slice(made)) carryOver(tx, doc, nid, ds);
     tx.delete(id);
   }
   // Imported doors and windows in a converted wall become native ones (types matched by size, else
@@ -361,7 +387,7 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
         const id = door
           ? createDoor(tx, doc, doorTypeFor(tx, doc, width, height), w.id, along).id
           : createWindow(tx, doc, windowTypeFor(tx, doc, width, height), w.id, along, { sillHeight: Math.max(0, z0 - w.base) }).id;
-        if (ds.name) tx.setName(id, ds.name);
+        carryOver(tx, doc, id, ds);
         created.push(id);
         tx.delete(ds.id);
       } catch {

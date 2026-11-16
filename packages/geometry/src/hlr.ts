@@ -85,7 +85,10 @@ export function planLinework(
   const surfaceById = new Map<ElementId, [V3, V3][]>();
 
   for (const { id, mesh, surface } of items) {
-    const tris = triangles(mesh);
+    // Per mesh (kept while the mesh is): its triangles and feature edges.
+    let cached = meshCache.get(mesh);
+    if (!cached) meshCache.set(mesh, (cached = { tris: triangles(mesh) }));
+    const tris = cached.tris;
     const cutLoops = chainLoops(cutSegments(tris, range.cut));
     out.push({ id, cutLoops, projection: [], surface: [] });
     if (surface?.length) surfaceById.set(id, surfaceSegments(tris, surface, range));
@@ -99,7 +102,8 @@ export function planLinework(
     // Caps: the cut faces themselves hide whatever is inside a cut element.
     for (const tri of fillLoops(cutLoops)) occluders.push(occluder(tri.map((p) => [p.x, p.y, range.cut]) as Tri));
 
-    edgesById.set(id, featureEdges(tris).flatMap((e) => clipEdge(e, range)));
+    cached.edges ??= featureEdges(tris);
+    edgesById.set(id, cached.edges.flatMap((e) => clipEdge(e, range)));
   }
 
   const grid = new OccluderGrid(occluders);
@@ -146,6 +150,9 @@ function surfaceSegments(tris: Tri[], families: LineFamily[], range: PlanRange):
 }
 
 // ---- mesh helpers --------------------------------------------------------------
+
+/** Triangles and feature edges per mesh: meshes the viewport keeps between edits aren't redone. */
+const meshCache = new WeakMap<MeshData, { tris: Tri[]; edges?: [V3, V3][] }>();
 
 function triangles(m: MeshData): Tri[] {
   const p = m.positions;

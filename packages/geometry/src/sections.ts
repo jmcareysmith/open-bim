@@ -35,8 +35,40 @@ export interface Rect {
   max: Vec2;
 }
 
-/** Copy of a mesh in view coordinates (a rotation, so winding is kept). */
+const viewCopies = new WeakMap<MeshData, { key: string; out: MeshData }>();
+type Box3 = { min: [number, number, number]; max: [number, number, number] };
+const boxes = new WeakMap<MeshData, Box3>();
+
+/** A mesh's bounding box (kept per mesh). */
+function meshBox(m: MeshData): Box3 {
+  let b = boxes.get(m);
+  if (!b) {
+    const min: Box3["min"] = [Infinity, Infinity, Infinity];
+    const max: Box3["max"] = [-Infinity, -Infinity, -Infinity];
+    const p = m.positions;
+    for (let i = 0; i < p.length; i += 3) {
+      for (let k = 0; k < 3; k++) {
+        const v = p[i + k]!;
+        if (v < min[k]!) min[k] = v;
+        if (v > max[k]!) max[k] = v;
+      }
+    }
+    boxes.set(m, (b = { min, max }));
+  }
+  return b;
+}
+
+/** Copy of a mesh in view coordinates (a rotation, so winding is kept); kept per mesh and view frame. */
 export function meshToView(mesh: MeshData, f: ViewFrame): MeshData {
+  const key = JSON.stringify(f);
+  const hit = viewCopies.get(mesh);
+  if (hit && hit.key === key) return hit.out;
+  const out = meshToViewUncached(mesh, f);
+  viewCopies.set(mesh, { key, out });
+  return out;
+}
+
+function meshToViewUncached(mesh: MeshData, f: ViewFrame): MeshData {
   const p = mesh.positions;
   const out = new Float32Array(p.length);
   for (let i = 0; i < p.length; i += 3) {
@@ -56,7 +88,13 @@ export function sectionLinework(items: { id: ElementId; mesh: MeshData; surface?
   const segments = sectionSegments(view);
   const inView = items.map((it) => ({ id: it.id, mesh: meshToView(it.mesh, f), surface: it.surface ?? null }));
   if (segments.length <= 1) {
-    const lw = planLinework(inView, { bottom: -far, cut: 0 });
+    // Only what lies within the crop, behind the cut and before the far clip can show or hide anything
+    // (the view is orthographic along z).
+    const near = inView.filter((it) => {
+      const b = meshBox(it.mesh);
+      return b.max[0] >= crop.min.x && b.min[0] <= crop.max.x && b.max[1] >= crop.min.y && b.min[1] <= crop.max.y && b.min[2] <= 1e-6 && b.max[2] >= -far;
+    });
+    const lw = planLinework(near, { bottom: -far, cut: 0 });
     return lw.map((l) => cropLinework(l, crop)).filter((l) => l.cutLoops.length || l.projection.length || l.surface.length);
   }
   // Jogged: each segment cut on its own plane (the far clip stays put), cropped to its stretch.

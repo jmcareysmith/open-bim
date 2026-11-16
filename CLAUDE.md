@@ -392,7 +392,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - 2026-11-16 review pass (4 code reviews, all fixed): IFC export validity/GlobalIds/kept psets, import grids/storeys; tees vs
   crossings, stable equal-thickness winner (lower id) in plan and 3D; cached reverse-dependency index; Bind Link moves
   flex bends/origins; wall rebar mats stop at inserts; return/exhaust pressure from equipment inlets; LAZ refused.
-  SimpleKernel cuts sloped-top walls at crossings (wallcrossings `cutSlopedWall`); Edit Profile walls only in OCCT.
+  SimpleKernel cuts sloped-top walls at crossings (wallcrossings `cutSlopedWall`) and Edit Profile walls crossed square
+  (`profileCrossCuts` → rectangles out of the outline); oblique crossings of profile walls only in OCCT.
   MEP sizing and pressure share one network (mep.ts `systemNetwork`).
   Curtain walls take Edit Profile (curtain.ts: panels clipped, mullions kept inside both faces, border mullions along
   off-grid edges, parts `e:<i>`; grid to the profile top, `curtainExtent`); IFC gable curtain walls convert with it.

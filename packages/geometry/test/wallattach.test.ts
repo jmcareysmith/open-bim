@@ -73,3 +73,18 @@ describe("crossings through walls under sloped roofs (SimpleKernel)", () => {
     expect((whole - cut) / (tx * t * 2400)).toBeCloseTo(1, 2);
   });
 });
+
+describe("crossings through Edit Profile walls (SimpleKernel)", () => {
+  it("a thicker wall running square through takes its footprint out up to its own height", async () => {
+    const { setWallProfile } = await import("@open-bim/core");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const w = doc.transact("W", (tx) => createWall(tx, ids.wallTypes.interior, { x: 0, y: 0 }, { x: 4000, y: 0 }, ids.levels.ground, { height: 2400 })) as Wall;
+    doc.transact("P", (tx) => setWallProfile(tx, doc, w.id, [{ x: 0, y: 0 }, { x: 4000, y: 0 }, { x: 4000, y: 2400 }, { x: 2000, y: 3400 }, { x: 0, y: 2400 }]));
+    const k = new SimpleKernel();
+    const whole = meshVolume(k.build(doc, doc.require(w.id))!);
+    const x = doc.transact("X", (tx) => createWall(tx, ids.wallTypes.exterior, { x: 1000, y: -2000 }, { x: 1000, y: 2000 }, ids.levels.ground, { height: 2400 })) as Wall;
+    const cut = meshVolume(k.build(doc, doc.require(w.id))!);
+    expect((whole - cut) / (wallThickness(doc, x) * wallThickness(doc, w) * 2400)).toBeCloseTo(1, 2);
+  });
+});

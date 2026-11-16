@@ -1,5 +1,6 @@
 import earcut from "earcut";
-import polygonClipping from "polygon-clipping";
+import polygonClipping, { type Polygon } from "polygon-clipping";
+import { mergeMeshes } from "./doors.ts";
 import { arcInfo, sweepProfile, wallCuts, wallDirection, wallExtent, wallLength, wallSweeps, wallThickness, type Document, type Vec2, type Wall } from "@open-bim/core";
 import { joinedWallFootprint } from "./joins.ts";
 import { extrudePolygon, meshVolume, type MeshData } from "./mesh.ts";
@@ -203,17 +204,33 @@ function withFaceNormals(m: MeshData): MeshData {
 }
 
 /** Edit Profile: the wall as its elevation outline through its thickness (joins don't trim it). */
-export function wallProfileMesh(doc: Document, wall: Wall): MeshData | null {
+export function wallProfileMesh(doc: Document, wall: Wall, cuts: { u0: number; u1: number; z0: number; z1: number }[] = []): MeshData | null {
   const prof = wall.params.profile;
   if (!prof || prof.length < 3) return null;
   if (wall.params.curve) return arcProfileMesh(doc, wall, prof);
+  if (cuts.length) {
+    // Walls crossing square through it: rectangles out of the outline (u along, z from the base).
+    const ring = (l: Vec2[]): [number, number][] => [...l.map((q): [number, number] => [q.x, q.y]), [l[0]!.x, l[0]!.y]];
+    const rects = cuts.map((c) => [ring([{ x: c.u0, y: c.z0 }, { x: c.u1, y: c.z0 }, { x: c.u1, y: c.z1 }, { x: c.u0, y: c.z1 }])] as Polygon);
+    const parts = polygonClipping
+      .difference([ring(prof)], ...rects)
+      .map((poly) => profileSolid(doc, wall, poly[0]!.slice(0, -1).map(([x, y]) => ({ x, y })), poly.slice(1).map((h) => h.slice(0, -1).map(([x, y]) => ({ x, y })))))
+      .filter((m): m is MeshData => !!m);
+    return parts.length ? mergeMeshes(parts) : null;
+  }
+  return profileSolid(doc, wall, prof, []);
+}
+
+/** A straight wall's elevation outline (u along, z up from its base; with holes) through its thickness. */
+function profileSolid(doc: Document, wall: Wall, prof: Vec2[], holes: Vec2[][]): MeshData | null {
+  if (prof.length < 3) return null;
   const { bottom } = wallExtent(doc, wall);
   const d = wallDirection(wall);
   const nl = { x: -d.y, y: d.x };
   const half = wallThickness(doc, wall) / 2;
   const { start } = wall.params;
   // Local (u, z, v) → world; the map mirrors, so the winding is swapped back.
-  const m = extrudePolygon(prof, [], -half, half);
+  const m = extrudePolygon(prof, holes, -half, half);
   const P = m.positions;
   const N = m.normals;
   for (let i = 0; i < P.length; i += 3) {

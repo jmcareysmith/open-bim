@@ -90,3 +90,34 @@ export function cutSlopedWall(doc: Document, wall: Wall, cutters: { loop: Vec2[]
   }
   return parts.length ? mergeMeshes(parts) : null;
 }
+
+/**
+ * For an Edit Profile wall: the walls running square through it as rectangles in its elevation
+ * (u along from its start, z up from its base). Oblique crossings are left out (OCCT cuts those exactly).
+ */
+export function profileCrossCuts(doc: Document, wall: Wall): { u0: number; u1: number; z0: number; z1: number }[] {
+  const { start, end } = wall.params;
+  const len = Math.hypot(end.x - start.x, end.y - start.y);
+  if (len < 1 || wall.params.curve) return [];
+  const d = { x: (end.x - start.x) / len, y: (end.y - start.y) / len };
+  const half = wallThickness(doc, wall) / 2;
+  const { bottom } = wallExtent(doc, wall);
+  // Where the line v = c (across the wall) is inside the loop, as a u interval.
+  const span = (loop: Vec2[], c: number): [number, number] | null => {
+    const uv = loop.map((q) => ({ u: (q.x - start.x) * d.x + (q.y - start.y) * d.y, v: -(q.x - start.x) * d.y + (q.y - start.y) * d.x }));
+    const xs: number[] = [];
+    uv.forEach((a, i) => {
+      const b = uv[(i + 1) % uv.length]!;
+      if (a.v > c !== b.v > c) xs.push(a.u + ((c - a.v) * (b.u - a.u)) / (b.v - a.v));
+    });
+    return xs.length >= 2 ? [Math.min(...xs), Math.max(...xs)] : null;
+  };
+  const out: { u0: number; u1: number; z0: number; z1: number }[] = [];
+  for (const c of crossingCutters(doc, wall)) {
+    const a = span(c.loop, half - 0.5);
+    const b = span(c.loop, -half + 0.5);
+    if (!a || !b || Math.abs(a[0] - b[0]) > 2 || Math.abs(a[1] - b[1]) > 2) continue;
+    out.push({ u0: Math.min(a[0], b[0]), u1: Math.max(a[1], b[1]), z0: c.z0 - bottom, z1: c.z1 - bottom });
+  }
+  return out;
+}

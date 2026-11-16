@@ -162,6 +162,9 @@ export async function importIfc(doc: Document, data: Uint8Array, api: IfcApi): P
         const v = Number(label(line[k]));
         if (Number.isFinite(v) && v > 0) props[k] = String(Math.round(v * mm));
       }
+      // Predefined type (e.g. a slab that is part of a roof: ROOF).
+      const pre = label(line.PredefinedType);
+      if (pre && pre !== "NOTDEFINED" && pre !== "USERDEFINED") props.PredefinedType = pre;
       info.set(p.expressID, {
         cls: api.GetNameFromTypeCode(api.GetLineType(model, p.expressID)),
         guid: label(line.GlobalId) ?? "",

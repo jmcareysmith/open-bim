@@ -335,6 +335,14 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
       const beam = createBeam(tx, doc, typeId, p.levelId, start, end);
       tx.update<BeamParams>(beam.id, { offset: z1 - lvl });
       created.push(beam.id);
+    } else if (p.properties.PredefinedType === "ROOF" || facePlanes(p, true).some((pl) => Math.hypot(pl.a, pl.b) > 0.05)) {
+      // A roof slab (Revit exports roofs as slabs, or roof parts) or any sloped slab: a footprint roof.
+      const roof = roofFromMesh(tx, doc, p, lvl, z0, mat);
+      if (!roof) {
+        skipped.push(id);
+        continue;
+      }
+      created.push(roof);
     } else {
       // Slab: its outline is the union of its upward faces seen in plan.
       const tris: Polygon[] = [];

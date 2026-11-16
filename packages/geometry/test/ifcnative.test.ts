@@ -119,3 +119,25 @@ describe("IFC names, marks and colours", () => {
     expect(m.params.color).toBe(0x8a3324);
   });
 });
+
+describe("roof slabs", () => {
+  it("a sloped IfcSlab (a roof part) becomes a mono-pitch roof, not a floor", async () => {
+    const { createRoof } = await import("@open-bim/core");
+    const { SimpleKernel } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    // A lean-to: only the first edge slopes (25°), the rest are gables/verges.
+    const r = doc.transact("R", (tx) => createRoof(tx, ids.roofTypes.steel, ids.levels.ground, rect(0, 0, 6000, 4000), { slopes: [(25 * Math.PI) / 180, null, null, null], baseOffset: 2400 }));
+    const m = new SimpleKernel().build(doc, r)!;
+    const ds = doc.transact("I", (tx) => {
+      tx.delete(r.id);
+      return createDirectShape(tx, { levelId: ids.levels.ground, ifcClass: "IfcSlab", globalId: "s", positions: [...m.positions], indices: [...m.indices], color: 0x666666, properties: {} }).id;
+    });
+    const floors = doc.byCategory("Floor").length;
+    doc.transact("C", (tx) => convertDirectShapes(tx, doc, [ds]));
+    expect(doc.byCategory("Floor")).toHaveLength(floors);
+    const roofs = doc.byCategory<{ slopes: (number | null)[] }>("Roof");
+    expect(roofs).toHaveLength(1);
+    expect(roofs[0]!.params.slopes.filter((s) => s !== null).map((s) => Math.round((s! * 180) / Math.PI))).toEqual([25]);
+  });
+});

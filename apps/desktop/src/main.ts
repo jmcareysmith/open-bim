@@ -1139,6 +1139,24 @@ const commands: Record<string, () => void | Promise<void>> = {
     saveSnapOptions();
     status(snapOptions.on ? "Snaps on." : "Snaps off: points go exactly where you click (SO turns them back on).");
   },
+  startingView() {
+    const s = projectSettings(doc);
+    if (!s) return status("⚠ This project has no settings element.");
+    const list = [...views(doc), ...doc.byCategory(Cat.Sheet)];
+    const dlg = openDialog("Starting View", () => {
+      const box = document.createElement("div");
+      const sel = document.createElement("select");
+      sel.append(new Option("(the 3D view)", ""), ...list.map((v) => new Option(`${v.category === Cat.Sheet ? "Sheet: " : ""}${v.name ?? v.id}`, v.id, false, v.id === s.params.startingViewId)));
+      const ok = Object.assign(document.createElement("button"), { textContent: "OK" });
+      ok.onclick = () => {
+        edit("Starting view", (tx) => tx.update(s.id, { startingViewId: sel.value || null }));
+        status(sel.value ? `The project opens in ${doc.get(sel.value)?.name}.` : "The project opens in the 3D view.");
+        dlg.close();
+      };
+      box.append("Open the project in ", sel, " ", ok);
+      return box;
+    });
+  },
   purgeUnused() {
     openPurgeDialog(doc, status, () => refreshAll());
   },
@@ -1679,7 +1697,9 @@ function loadInto(json: ReturnType<Document["toJSON"]>, path: string | null): vo
   selection = [];
   activeLevelId = levels(doc)[0]?.id ?? "";
   activeTypes.clear();
-  activeViewId = views(doc).find((v) => v.params.kind === "3d")?.id;
+  // The project's Starting View if it has one, else the 3D view.
+  const start = projectSettings(doc)?.params.startingViewId;
+  activeViewId = start && doc.get(start) ? start : views(doc).find((v) => v.params.kind === "3d")?.id;
   viewport.visibility.reset();
   viewport.refreshVisibility();
   viewport.setSelection([]);

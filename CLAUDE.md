@@ -132,6 +132,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Standards (core transfer.ts: pick categories from another project file, skip/overwrite same names, needed materials/filters
   come along, refs remapped; transferui.ts). Manage → Snaps (snapopts.ts, local storage: endpoints, midpoints, intersections,
   grid lines, scans, ortho, length increment, snap distance in screen px — tools.ts `snapPoint`); SO toggles snapping;
+  Manage → Starting View (settings `startingViewId`, used when a project loads);
   SE/SM/SI/SN snap only to endpoints/midpoints/intersections/nearest line for the next pick (`snapOverride`). Two-letter
   commands go back to the tool from before their first letter (`toolBeforeSingle`); S waits 600 ms because it starts
   snap commands that run inside the current tool (`KEEP_TOOL`), so SE mid-wall keeps the wall. Snaps also apply in sections. Snap glyphs

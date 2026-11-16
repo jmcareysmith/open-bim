@@ -28,6 +28,8 @@ export type ProjectInfo = {
 export type ProjectSettingsParams = {
   units: UnitsSettings;
   info: ProjectInfo;
+  /** The view (or sheet) the project opens in (Revit: Manage → Starting View). */
+  startingViewId?: string | null;
   /** Keynote table (keynotes.ts). */
   keynotes?: { key: string; text: string; parent: string | null }[] | null;
   /** Shared coordinates (survey point) — see `toShared`. */

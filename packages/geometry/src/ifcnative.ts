@@ -168,6 +168,18 @@ function snapWallEnds(tx: Transaction, doc: Document, ids: ElementId[]): void {
       if (best && bestD > 0.5) patch[end] = best;
     }
     if (patch.start || patch.end) {
+      // An elevation profile follows: edge points to the new ends, the rest by how far the start moved.
+      const prof = w.params.profile;
+      if (prof?.length) {
+        const s0 = w.params.start;
+        const oldLen = Math.hypot(w.params.end.x - s0.x, w.params.end.y - s0.y);
+        const u = { x: (w.params.end.x - s0.x) / oldLen, y: (w.params.end.y - s0.y) / oldLen };
+        const ns = patch.start ?? s0;
+        const ne = patch.end ?? w.params.end;
+        const newLen = Math.hypot(ne.x - ns.x, ne.y - ns.y);
+        const shift = (ns.x - s0.x) * u.x + (ns.y - s0.y) * u.y;
+        patch.profile = prof.map((q) => ({ x: q.x <= 0.5 ? 0 : q.x >= oldLen - 0.5 ? newLen : q.x - shift, y: q.y }));
+      }
       tx.update<WallParams>(w.id, patch);
     }
   }

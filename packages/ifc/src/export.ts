@@ -104,6 +104,12 @@ function mapping(doc: Document, el: Element): Mapping | null {
       if (c && mep[c]) return { entity: mep[c]![0], predefined: mep[c]![1] };
       return { entity: "IfcBuildingElementProxy", predefined: "NOTDEFINED" };
     }
+    case Cat.Stair:
+      return { entity: "IfcStair", predefined: "NOTDEFINED" };
+    case Cat.Ramp:
+      return { entity: "IfcRamp", predefined: "NOTDEFINED" };
+    case Cat.Railing:
+      return { entity: "IfcRailing", predefined: "GUARDRAIL" };
     case Cat.Duct:
       return { entity: "IfcDuctSegment", predefined: "RIGIDSEGMENT" };
     case Cat.Pipe:

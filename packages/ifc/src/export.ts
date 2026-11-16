@@ -366,10 +366,13 @@ export function exportIfc(doc: Document, opts: IfcExportOptions = {}): string {
       );
     // U: running closer to x; V: the rest (IFC wants both; one direction only goes all in U).
     const isU = (g: (typeof straight)[0]) => Math.abs(g.params.end.x - g.params.start.x) >= Math.abs(g.params.end.y - g.params.start.y);
-    const u = straight.filter(isU).map(axis);
-    const v = straight.filter((g) => !isU(g)).map(axis);
+    let u = straight.filter(isU).map(axis);
+    let v = straight.filter((g) => !isU(g)).map(axis);
+    // IFC wants axes in both lists: with grids one way only, split them between the two.
+    if (!v.length && u.length > 1) [u, v] = [u.slice(0, Math.ceil(u.length / 2)), u.slice(Math.ceil(u.length / 2))];
+    if (!u.length && v.length > 1) [u, v] = [v.slice(0, Math.ceil(v.length / 2)), v.slice(Math.ceil(v.length / 2))];
     const gridPlacement = w.add("IfcLocalPlacement", lowest.placement, w.add("IfcAxis2Placement3D", origin, null, null));
-    const grid = w.add("IfcGrid", guid("grid"), null, "Grids", null, null, gridPlacement, null, u.length ? u : v, u.length ? v : [], null, null);
+    const grid = w.add("IfcGrid", guid("grid"), null, "Grids", null, null, gridPlacement, null, u.length ? u : v, u.length ? v : u, null, null);
     lowest.elements.push(grid);
   }
 

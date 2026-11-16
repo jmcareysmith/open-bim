@@ -320,3 +320,31 @@ describe("furniture and equipment from IFC", () => {
     });
   });
 });
+
+describe("stair railings from IFC", () => {
+  it("sloped railings over a converted stair become its left and right railings", async () => {
+    const { createStair, ensureStairType, createStairRailings, ensureRailingType } = await import("@open-bim/core");
+    const { SimpleKernel } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const st = doc.transact("S", (tx) => createStair(tx, doc, ensureStairType(tx, doc), ids.levels.ground, ids.levels.first, [{ start: { x: 1000, y: 500 }, end: { x: 5000, y: 500 } }]));
+    const rails = doc.transact("R", (tx) => createStairRailings(tx, doc, ensureRailingType(tx, doc), doc.require(st.id) as never));
+    const k = new SimpleKernel();
+    const shapes = doc.transact("I", (tx) => {
+      const out = [st, ...rails].map((e) => {
+        const m = k.build(doc, doc.require(e.id))!;
+        const cls = e.category === "Stair" ? "IfcStair" : "IfcRailing";
+        return { cls, m };
+      });
+      for (const r of rails) tx.delete(r.id);
+      tx.delete(st.id);
+      return out.map(({ cls, m }) => createDirectShape(tx, { levelId: ids.levels.ground, ifcClass: cls, globalId: cls, positions: [...m.positions], indices: [...m.indices], color: 0x999999, properties: {} }).id);
+    });
+    // Railings listed first: they still find the stair converted after them.
+    const r = doc.transact("C", (tx) => convertDirectShapes(tx, doc, [shapes[1]!, shapes[2]!, shapes[0]!]));
+    expect(r.skipped).toEqual([]);
+    const stair = doc.byCategory("Stair")[0]!;
+    const hosted = doc.byCategory<{ hostId: string | null; side: string }>("Railing").filter((x) => x.params.hostId === stair.id);
+    expect(hosted.map((x) => x.params.side).sort()).toEqual(["left", "right"]);
+  });
+});

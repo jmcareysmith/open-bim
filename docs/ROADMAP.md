@@ -160,4 +160,5 @@ to native elements where their shapes allow.
 - [x] Curtain walls from their panels (IfcPlate; grid where panels meet, mullions absorbed)
 - [x] Furniture, fixtures, equipment and generic models → loadable families with a mesh form (one per distinct shape and
       Revit name; turned copies share it), placed as instances
-- [ ] Still shapes: winders, sloped (stair) railings, non-rectangular curtain panels
+- [x] Sloped railings over a converted stair → its left/right railings
+- [ ] Still shapes: winder stairs, non-rectangular curtain panels

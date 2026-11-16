@@ -720,6 +720,7 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
   // Furniture, fixtures and equipment: families (one per distinct shape and name), placed as instances.
   const familyShapes = ids.filter((id) => ((doc.get(id)?.params as DirectShapeParams | undefined)?.ifcClass ?? "") in FAMILY_OF);
   created.push(...familiesFromShapes(tx, doc, familyShapes));
+  const pendingRails: ElementId[] = [];
   for (const id of ids) {
     if (plates.includes(id) || familyShapes.includes(id)) continue;
     const ds = doc.get<DirectShapeParams>(id) as DirectShape | undefined;
@@ -786,7 +787,8 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
     } else if (RAILING_CLASSES.has(p.ifcClass)) {
       const rail = railingFromMesh(tx, doc, p, lvl, z0, z1);
       if (!rail) {
-        skipped.push(id);
+        // Maybe a stair's railing: tried once the stairs are converted.
+        pendingRails.push(id);
         continue;
       }
       created.push(rail);
@@ -854,6 +856,36 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
     }
     for (const nid of created.slice(made)) carryOver(tx, doc, nid, ds);
     tx.delete(id);
+  }
+  // Sloped railings over a stair become that stair's railing on the side they're on.
+  for (const id of pendingRails) {
+    const ds = doc.get<DirectShapeParams>(id) as DirectShape | undefined;
+    if (!ds) continue;
+    const { xy, z0 } = bounds(ds.params);
+    const mid = { x: xy.reduce((s, q) => s + q.x, 0) / xy.length, y: xy.reduce((s, q) => s + q.y, 0) / xy.length };
+    let done = false;
+    for (const st of doc.byCategory<StairParams>(Cat.Stair) as Stair[]) {
+      const lay = stairLayout(doc, st);
+      if (z0 < lay.bottom - 200 || z0 > lay.top) continue;
+      // Over the stair: within half its width (plus a margin) of a run's line, along its length.
+      for (const run of lay.runs) {
+        const d = { x: mid.x - run.start.x, y: mid.y - run.start.y };
+        const along = d.x * run.dir.x + d.y * run.dir.y;
+        const across = run.dir.x * d.y - run.dir.y * d.x;
+        if (along < -lay.going || along > run.length + lay.going || Math.abs(across) > lay.width / 2 + 300) continue;
+        const side: "left" | "right" = across > 0 ? "left" : "right";
+        if (doc.byCategory<RailingParams>(Cat.Railing).some((r) => r.params.hostId === st.id && r.params.side === side)) continue;
+        const type = doc.byCategory(Cat.RailingType)[0]?.id ?? tx.create<RailingTypeParams>(Cat.RailingType, { height: 1000, railSize: 50, balusterSize: 25, balusterGap: 100 }, { name: "Imported Railing 1000" }).id;
+        const rail = tx.create<RailingParams>(Cat.Railing, { levelId: st.params.baseLevelId, baseOffset: 0, path: [], hostId: st.id, side }, { typeId: type });
+        carryOver(tx, doc, rail.id, ds);
+        created.push(rail.id);
+        tx.delete(id);
+        done = true;
+        break;
+      }
+      if (done) break;
+    }
+    if (!done) skipped.push(id);
   }
   // Imported doors and windows in a converted wall become native ones (types matched by size, else
   // new "Imported" types); if one won't fit, the wall is just opened up for the imported shape.

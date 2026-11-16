@@ -402,3 +402,31 @@ describe("gable walls from IFC", () => {
     expect(boundingBox(m2).max[2]).toBeCloseTo(4000, 0);
   });
 });
+
+describe("imported walls join", () => {
+  it("corner and tee walls snap their ends onto each other's centrelines", async () => {
+    const { createWall, wallJoins } = await import("@open-bim/core");
+    const { SimpleKernel } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const [a0, b0, c0] = doc.transact("W", (tx) => [
+      createWall(tx, ids.wallTypes.exterior, { x: 0, y: 0 }, { x: 6000, y: 0 }, ids.levels.ground, { height: 2700 }),
+      createWall(tx, ids.wallTypes.exterior, { x: 6000, y: 0 }, { x: 6000, y: 4000 }, ids.levels.ground, { height: 2700 }),
+      createWall(tx, ids.wallTypes.interior, { x: 3000, y: 0 }, { x: 3000, y: 4000 }, ids.levels.ground, { height: 2700 }),
+    ]);
+    const k = new SimpleKernel();
+    const meshes = [a0!, b0!, c0!].map((w) => k.build(doc, doc.require(w.id))!);
+    const shapes = doc.transact("I", (tx) => {
+      for (const w of [a0!, b0!, c0!]) tx.delete(w.id);
+      return meshes.map((m, i) => createDirectShape(tx, { levelId: ids.levels.ground, ifcClass: "IfcWall", globalId: `w${i}`, positions: [...m.positions], indices: [...m.indices], color: 0x999999, properties: {} }).id);
+    });
+    const r = doc.transact("C", (tx) => convertDirectShapes(tx, doc, shapes));
+    const [a, b, c] = r.created.map((id) => doc.require<WallParams>(id) as Wall);
+    const has = (w: Wall, x: number, y: number) => [w.params.start, w.params.end].some((q) => Math.hypot(q.x - x, q.y - y) < 1);
+    expect(has(a!, 6000, 0) && has(b!, 6000, 0)).toBe(true);
+    expect(has(c!, 3000, 0)).toBe(true);
+    const j = wallJoins(doc, a!);
+    expect(Object.values(j).some((x) => x?.kind === "corner")).toBe(true);
+    expect(Object.values(wallJoins(doc, c!)).some((x) => x?.kind === "tee")).toBe(true);
+  });
+});

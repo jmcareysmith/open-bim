@@ -33,6 +33,8 @@ import {
   loadFamily,
   placeFamilyInstance,
   type WallParams,
+  type Wall,
+  wallThickness,
   type Material,
   type MaterialParams,
   createMaterial,
@@ -103,6 +105,44 @@ function hull(pts: Vec2[]): Vec2[] {
 }
 
 const polyArea = (l: Vec2[]) => Math.abs(l.reduce((s, q, i) => s + q.x * l[(i + 1) % l.length]!.y - l[(i + 1) % l.length]!.x * q.y, 0)) / 2;
+
+function snapWallEnds(tx: Transaction, doc: Document, ids: ElementId[]): void {
+  const ws = () => ids.map((id) => doc.get<WallParams>(id) as Wall | undefined).filter((w): w is Wall => !!w && !w.params.curve);
+  for (const w0 of ws()) {
+    const w = doc.require<WallParams>(w0.id) as Wall;
+    const tw = wallThickness(doc, w);
+    const patch: Partial<WallParams> = {};
+    for (const end of ["start", "end"] as const) {
+      const e = w.params[end];
+      let best: Vec2 | null = null;
+      let bestD = Infinity;
+      for (const o of ws()) {
+        if (o.id === w.id) continue;
+        const to = wallThickness(doc, o);
+        const reach = Math.max(tw, to);
+        const a = w.params.start;
+        const b = w.params.end;
+        const c = o.params.start;
+        const d = o.params.end;
+        const r = { x: b.x - a.x, y: b.y - a.y };
+        const s2 = { x: d.x - c.x, y: d.y - c.y };
+        const den = r.x * s2.y - r.y * s2.x;
+        if (Math.abs(den) < 1e-6 * Math.hypot(r.x, r.y) * Math.hypot(s2.x, s2.y)) continue;
+        const t = ((c.x - a.x) * s2.y - (c.y - a.y) * s2.x) / den;
+        const x = { x: a.x + r.x * t, y: a.y + r.y * t };
+        const dist = Math.hypot(x.x - e.x, x.y - e.y);
+        // On (or just past the ends of) the other wall.
+        const lo = Math.hypot(s2.x, s2.y);
+        const v = ((x.x - c.x) * s2.x + (x.y - c.y) * s2.y) / lo;
+        if (dist <= reach && v >= -reach && v <= lo + reach && dist < bestD) [best, bestD] = [x, dist];
+      }
+      if (best && bestD > 0.5) patch[end] = best;
+    }
+    if (patch.start || patch.end) {
+      tx.update<WallParams>(w.id, patch);
+    }
+  }
+}
 
 /** Mesh points as (distance along a line from `start` in direction `u`, height). */
 function xyzAlong(p: DirectShapeParams, start: Vec2, u: Vec2): Vec2[] {
@@ -910,6 +950,9 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
     for (const nid of created.slice(made)) carryOver(tx, doc, nid, ds);
     tx.delete(id);
   }
+  // Converted straight walls meet at corners and tees: each end that stops near another wall's
+  // centreline moves onto it (the imported shapes run to the outer corner of their mitres).
+  snapWallEnds(tx, doc, walls.map((w) => w.id));
   // Sloped railings over a stair become that stair's railing on the side they're on.
   for (const id of pendingRails) {
     const ds = doc.get<DirectShapeParams>(id) as DirectShape | undefined;

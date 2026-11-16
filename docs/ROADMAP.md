@@ -169,4 +169,5 @@ to native elements where their shapes allow.
 - [x] Wall types split exterior/interior from Pset_WallCommon.IsExternal (H1 uses it)
 - [x] Ceilings (IfcCovering CEILING) → ceilings at their underside height; other coverings stay shapes
 - [x] Footings: under a converted wall → its strip footing; otherwise a pad (size, depth, top, rotation)
+- [x] Members (rafters, purlins, braces): level → beams; sloped → sloped beams marked brace (end tops kept)
 - [ ] Still shapes: non-rectangular curtain panels; anything whose rebuilt version wouldn't match its mesh

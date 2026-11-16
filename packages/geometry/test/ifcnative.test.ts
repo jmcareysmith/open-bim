@@ -467,3 +467,28 @@ describe("footings from IFC", () => {
     expect(pf.params.position.x).toBeCloseTo(10000, 0);
   });
 });
+
+describe("braces and rafters from IFC", () => {
+  it("a sloped member becomes a sloped beam (brace) with each end's top height", async () => {
+    const { createBrace, ensureStructuralTypes } = await import("@open-bim/core");
+    const { SimpleKernel } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const types = doc.transact("T", (tx) => ensureStructuralTypes(tx, doc));
+    const sec = types.find((t) => doc.require<{ shape: string }>(t).params.shape === "rect")!;
+    const br = doc.transact("B", (tx) => createBrace(tx, doc, sec, ids.levels.ground, { x: 0, y: 0 }, { x: 4000, y: 0 }));
+    const before = doc.require<{ offset: number; endOffset: number }>(br.id).params;
+    const m = new SimpleKernel().build(doc, doc.require(br.id))!;
+    const ds = doc.transact("I", (tx) => {
+      tx.delete(br.id);
+      return createDirectShape(tx, { levelId: ids.levels.ground, ifcClass: "IfcMember", globalId: "m", positions: [...m.positions], indices: [...m.indices], color: 0x999999, properties: {} }).id;
+    });
+    const r = doc.transact("C", (tx) => convertDirectShapes(tx, doc, [ds]));
+    expect(r.skipped).toEqual([]);
+    const b = doc.require<{ offset: number; endOffset: number; brace?: boolean; start: Vec2 }>(r.created[0]!).params;
+    expect(b.brace).toBe(true);
+    expect(b.offset).toBeCloseTo(before.offset, -1);
+    expect(b.endOffset).toBeCloseTo(before.endOffset, -1);
+    expect(b.start.x).toBeCloseTo(0, -1);
+  });
+});

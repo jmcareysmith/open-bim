@@ -66,7 +66,7 @@ const COLUMN_CLASSES = new Set(["IfcColumn"]);
 const FOOTING_CLASSES = new Set(["IfcFooting"]);
 /** Coverings: ceilings (flat, like slabs). */
 const CEILING_CLASSES = new Set(["IfcCovering"]);
-const BEAM_CLASSES = new Set(["IfcBeam"]);
+const BEAM_CLASSES = new Set(["IfcBeam", "IfcMember"]);
 const ROOF_CLASSES = new Set(["IfcRoof"]);
 const STAIR_CLASSES = new Set(["IfcStair", "IfcStairFlight"]);
 const RAILING_CLASSES = new Set(["IfcRailing"]);
@@ -837,7 +837,8 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
   for (const id of ids) {
     if (plates.includes(id) || familyShapes.includes(id)) continue;
     const ds = doc.get<DirectShapeParams>(id) as DirectShape | undefined;
-    if (!ds || !convertible(ds)) {
+    if (!ds) continue; // already taken into something else (a curtain wall's mullions)
+    if (!convertible(ds)) {
       skipped.push(id);
       continue;
     }
@@ -932,11 +933,26 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
         skipped.push(id);
         continue;
       }
-      const typeId = sectionFor(tx, doc, "rect", r.wid, z1 - z0, "Beam", mat);
-      const start = { x: r.c.x - (r.u.x * r.len) / 2, y: r.c.y - (r.u.y * r.len) / 2 };
-      const end = { x: r.c.x + (r.u.x * r.len) / 2, y: r.c.y + (r.u.y * r.len) / 2 };
+      let start = { x: r.c.x - (r.u.x * r.len) / 2, y: r.c.y - (r.u.y * r.len) / 2 };
+      let end = { x: r.c.x + (r.u.x * r.len) / 2, y: r.c.y + (r.u.y * r.len) / 2 };
+      // Each end's top (points within a twentieth of the length of it): level, or sloped (a brace/rafter).
+      const along = xy.map((q) => (q.x - start.x) * r.u.x + (q.y - start.y) * r.u.y);
+      const zs = (near: (u: number) => boolean) => {
+        const z: number[] = [];
+        for (let i = 0; i < xy.length; i++) if (near(along[i]!)) z.push(p.positions[i * 3 + 2]!);
+        return z.length ? { lo: Math.min(...z), hi: Math.max(...z) } : { lo: z0, hi: z1 };
+      };
+      let a = zs((u) => u < r.len / 20);
+      let b2 = zs((u) => u > r.len * 0.95);
+      const rise = b2.hi - a.hi;
+      const sloped = Math.abs(rise) > 50;
+      if (sloped && rise < 0) [start, end, a, b2] = [end, start, b2, a];
+      // Depth square to the member (the end cuts are plumb: their height is depth / cos(slope)).
+      const slope = Math.atan2(Math.abs(rise), r.len);
+      const depth = sloped ? (a.hi - a.lo) * Math.cos(slope) : z1 - z0;
+      const typeId = sectionFor(tx, doc, "rect", r.wid, depth, "Beam", mat);
       const beam = createBeam(tx, doc, typeId, p.levelId, start, end);
-      tx.update<BeamParams>(beam.id, { offset: z1 - lvl });
+      tx.update<BeamParams>(beam.id, sloped ? { offset: a.hi - lvl, endOffset: b2.hi - lvl, brace: true } : { offset: z1 - lvl });
       created.push(beam.id);
     } else if (CEILING_CLASSES.has(p.ifcClass) && p.properties.PredefinedType && p.properties.PredefinedType !== "CEILING") {
       // Other coverings (cladding, flooring, roofing finishes) stay as shapes.

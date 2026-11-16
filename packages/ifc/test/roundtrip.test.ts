@@ -47,6 +47,9 @@ describe("IFC round trip of a whole house", () => {
     src.transact("House", (tx) => {
       const w = pts.map((q, i) => createWall(tx, ids.wallTypes.exterior, q, pts[(i + 1) % 4]!, ids.levels.ground, { topLevelId: ids.levels.first }));
       createWall(tx, ids.wallTypes.interior, p(5000, 0), p(5000, 8000), ids.levels.ground, { topLevelId: ids.levels.first });
+      // A curtain wall on the first floor.
+      const cwType = src.byCategory("WallType").find((t) => (t.params as { curtain?: unknown }).curtain)!.id;
+      createWall(tx, cwType, p(0, 12000), p(6000, 12000), ids.levels.first, { height: 3000 });
       createDoor(tx, src, ids.doorTypes.single860, w[0]!.id, 2500);
       createWindow(tx, src, ids.windowTypes.w1200x1200, w[2]!.id, 3000);
       createFloor(tx, ids.floorTypes.slab, ids.levels.ground, pts);
@@ -68,7 +71,9 @@ describe("IFC round trip of a whole house", () => {
     doc.transact("C", (tx) => convertDirectShapes(tx, doc, shapes));
     const left = doc.byCategory<DirectShapeParams>(Cat.DirectShape).map((d) => d.params.ifcClass);
     const count = (c: string) => doc.byCategory(c).length;
-    expect(count("Wall")).toBe(5);
+    expect(count("Wall")).toBe(6);
+    const cw = doc.byCategory("Wall").find((x) => (doc.get(x.typeId!)?.params as { curtain?: unknown }).curtain);
+    expect(cw).toBeDefined();
     expect(count("Door")).toBe(1);
     expect(count("Window")).toBe(1);
     expect(count("Roof")).toBe(1);

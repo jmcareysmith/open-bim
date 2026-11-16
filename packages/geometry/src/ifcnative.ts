@@ -623,8 +623,17 @@ function cluster(vals: number[], gap: number): number[] {
  */
 function curtainFromPanels(tx: Transaction, doc: Document, g: Panel[]): ElementId | null {
   const ref = g[0]!;
-  const type = doc.byCategory<LayeredTypeParams>(Cat.WallType).find((t) => t.params.curtain);
-  if (!type) return null;
+  // The project's curtain wall type, else a new one (panel thickness from the panels, 50 × 100 mullions).
+  const type =
+    doc.byCategory<LayeredTypeParams>(Cat.WallType).find((t) => t.params.curtain) ??
+    tx.create<LayeredTypeParams>(
+      Cat.WallType,
+      {
+        layers: [{ function: "structure", material: "Aluminium", thickness: 100 }],
+        curtain: { uSpacing: 1200, vSpacing: 1500, mullionWidth: 50, mullionDepth: 100, panelThickness: Math.round(Math.max(6, ref.thick)) },
+      },
+      { name: "Imported Curtain Wall" },
+    );
   // Panel ends along the reference line.
   const along = (p: Panel, s: number) => (p.c.x + p.u.x * s - ref.c.x) * ref.u.x + (p.c.y + p.u.y * s - ref.c.y) * ref.u.y;
   const ends = g.map((p) => [along(p, p.u0), along(p, p.u1)].sort((a, b) => a - b) as [number, number]);

@@ -259,6 +259,41 @@ export function exportIfc(doc: Document, opts: IfcExportOptions = {}): string {
       mesh = null;
     }
     const placement = w.add("IfcLocalPlacement", storey.placement, w.add("IfcAxis2Placement3D", origin, null, null));
+    // Curtain walls as Revit writes them: an IfcCurtainWall made of its panels (IfcPlate) and mullions (IfcMember).
+    if (el.category === Cat.Wall && mesh?.parts?.length && (doc.get(el.typeId ?? "")?.params as { curtain?: unknown } | undefined)?.curtain) {
+      const byKey = new Map<string, number[]>();
+      for (const pt of mesh.parts) byKey.set(pt.key, [...(byKey.get(pt.key) ?? []), ...mesh.indices.subarray(pt.start, pt.start + pt.count)]);
+      const cw = w.add("IfcCurtainWall", guid(el.id), null, el.name ?? doc.get(el.typeId ?? "")?.name ?? "Curtain Wall", null, null, placement, null, elementMark(el) ?? null, en("NOTDEFINED"));
+      const parts: Ref[] = [];
+      let n = 0;
+      for (const [key, idx] of byKey) {
+        // Just this part's vertices.
+        const remap = new Map<number, number>();
+        const pos: number[] = [];
+        const nor: number[] = [];
+        const ix = idx.map((v) => {
+          let k = remap.get(v);
+          if (k === undefined) {
+            k = remap.size;
+            remap.set(v, k);
+            pos.push(mesh!.positions[v * 3]!, mesh!.positions[v * 3 + 1]!, mesh!.positions[v * 3 + 2]!);
+            nor.push(mesh!.normals[v * 3]!, mesh!.normals[v * 3 + 1]!, mesh!.normals[v * 3 + 2]!);
+          }
+          return k;
+        });
+        const sub: MeshData = { positions: new Float32Array(pos), normals: new Float32Array(nor), indices: new Uint32Array(ix) };
+        const panel = key.startsWith("p:");
+        const entity = panel ? "IfcPlate" : "IfcMember";
+        const item = faceSet(w, sub, storey.elevation);
+        w.add("IfcStyledItem", item, [surfaceStyle(entity, panel ? 0x9cc3e6 : 0x8a8f96)], null);
+        const shape2 = w.add("IfcProductDefinitionShape", null, null, [w.add("IfcShapeRepresentation", body, "Body", "Tessellation", [item])]);
+        const pl = w.add("IfcLocalPlacement", placement, w.add("IfcAxis2Placement3D", origin, null, null));
+        parts.push(w.add(entity, guid(`${el.id}:${key}:${n++}`), null, key, null, null, pl, shape2, null, en(panel ? "CURTAIN_PANEL" : "MULLION")));
+      }
+      if (parts.length) w.add("IfcRelAggregates", relGuid("agg"), null, null, null, cw, parts);
+      storey.elements.push(cw);
+      continue;
+    }
     let shape: Ref | null = null;
     if (mesh && mesh.indices.length) {
       const item = faceSet(w, mesh, storey.elevation);

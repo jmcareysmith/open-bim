@@ -1468,6 +1468,22 @@ function formRows(ctx: PanelContext, el: Element): HTMLElement[] {
       }
       break;
     }
+    case Cat.MeshForm: {
+      // Fixed geometry (from an imported shape): its size, not editable by parameters.
+      const pos = p.positions as number[];
+      const ext = (k: number) => {
+        let lo = Infinity;
+        let hi = -Infinity;
+        for (let i = k; i < pos.length; i += 3) {
+          lo = Math.min(lo, pos[i]!);
+          hi = Math.max(hi, pos[i]!);
+        }
+        return Math.round(hi - lo);
+      };
+      rows.push(row("Triangles", String((p.indices as number[]).length / 3)), row("Size (x × y × z)", `${ext(0)} × ${ext(1)} × ${ext(2)} mm`));
+      rows.push(h("p", { class: "muted" }, "An imported shape: fixed geometry that doesn't flex with parameters."));
+      break;
+    }
   }
   return rows;
 }
@@ -3644,7 +3660,8 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
     case Cat.Extrusion:
     case Cat.Blend:
     case Cat.Revolution:
-    case Cat.Sweep: {
+    case Cat.Sweep:
+    case Cat.MeshForm: {
       sec.append(...formRows(ctx, el));
       break;
     }

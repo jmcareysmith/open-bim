@@ -224,3 +224,34 @@ describe("railings from IFC", () => {
     }
   });
 });
+
+describe("stairs with landings from IFC", () => {
+  it("recovers an L stair's two runs round a landing", async () => {
+    const { createStair, ensureStairType, stairLayout } = await import("@open-bim/core");
+    const { SimpleKernel } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const st = doc.transact("S", (tx) =>
+      createStair(tx, doc, ensureStairType(tx, doc), ids.levels.ground, ids.levels.first, [
+        { start: { x: 0, y: 0 }, end: { x: 1680, y: 0 } },
+        { start: { x: 2130, y: 450 }, end: { x: 2130, y: 2000 } },
+      ]),
+    );
+    const before = stairLayout(doc, doc.require(st.id) as never);
+    const m = new SimpleKernel().build(doc, doc.require(st.id))!;
+    const ds = doc.transact("I", (tx) => {
+      tx.delete(st.id);
+      return createDirectShape(tx, { levelId: ids.levels.ground, ifcClass: "IfcStair", globalId: "s", positions: [...m.positions], indices: [...m.indices], color: 0x999999, properties: {} }).id;
+    });
+    const r = doc.transact("C", (tx) => convertDirectShapes(tx, doc, [ds]));
+    expect(r.skipped).toEqual([]);
+    const after = stairLayout(doc, doc.byCategory("Stair")[0] as never);
+    expect(after.risers).toBe(before.risers);
+    expect(after.runs.map((x) => x.treads)).toEqual(before.runs.map((x) => x.treads));
+    expect(after.landings).toHaveLength(before.landings.length);
+    for (let i = 0; i < 2; i++) {
+      expect(after.runs[i]!.start.x).toBeCloseTo(before.runs[i]!.start.x, -1);
+      expect(after.runs[i]!.start.y).toBeCloseTo(before.runs[i]!.start.y, -1);
+    }
+  });
+});

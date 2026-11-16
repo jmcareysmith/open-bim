@@ -12,6 +12,8 @@ import {
   setWallCurve,
   createStair,
   createStairType,
+  stairLayout,
+  type Stair,
   createRailing,
   type RailingParams,
   type RailingTypeParams,
@@ -421,39 +423,62 @@ function stairFromMesh(tx: Transaction, doc: Document, p: DirectShapeParams, lvl
     for (const k of [a, b, c]) g.pts.push({ x: P[k]!, y: P[k + 1]! });
     levels.set(z, g);
   }
-  const treads = [...levels.entries()].sort((x, y) => x[0] - y[0]).map(([z, g]) => ({ z, c: { x: g.cx / g.a, y: g.cy / g.a }, pts: g.pts }));
-  // The topmost face at the stair's top is the landing/floor it arrives at, not a tread.
-  if (treads.length && Math.abs(treads[treads.length - 1]!.z - z1) < 1) treads.pop();
-  if (treads.length < 2) return null;
-  const risers = treads.length + 1;
+  const steps = [...levels.entries()].sort((x, y) => x[0] - y[0]).map(([z, g]) => ({ z, a: g.a, c: { x: g.cx / g.a, y: g.cy / g.a }, pts: g.pts }));
+  // The topmost face at the stair's top is the floor it arrives at, not a step.
+  if (steps.length && Math.abs(steps[steps.length - 1]!.z - z1) < 1) steps.pop();
+  if (steps.length < 2) return null;
+  const risers = steps.length + 1;
   const riser = (z1 - z0) / risers;
-  // Even risers, treads in a straight line at an even going.
-  if (treads.some((t, i) => Math.abs(t.z - (z0 + riser * (i + 1))) > 3)) return null;
-  const first = treads[0]!.c;
-  const last = treads[treads.length - 1]!.c;
-  const span = Math.hypot(last.x - first.x, last.y - first.y);
-  if (span < 1) return null;
-  const dir = { x: (last.x - first.x) / span, y: (last.y - first.y) / span };
-  const going = span / (treads.length - 1);
-  if (treads.some((t, i) => Math.hypot(t.c.x - (first.x + dir.x * going * i), t.c.y - (first.y + dir.y * going * i)) > 5)) return null;
-  const across = { x: -dir.y, y: dir.x };
-  const ws = treads[0]!.pts.map((q) => (q.x - first.x) * across.x + (q.y - first.y) * across.y);
+  if (steps.some((t, i) => Math.abs(t.z - (z0 + riser * (i + 1))) > 3)) return null;
+  // Treads and landings (much bigger than a tread); runs of treads between landings.
+  const median = [...steps].sort((x, y) => x.a - y.a)[Math.floor(steps.length / 2)]!.a;
+  const runs: (typeof steps)[] = [[]];
+  for (const st of steps) {
+    if (st.a > 1.6 * median) runs.push([]);
+    else runs[runs.length - 1]!.push(st);
+  }
+  if (runs.some((r) => r.length < 2)) return null;
+  // Going: from the runs' tread spacing; each run straight and even.
+  let going = 0;
+  const lines = runs.map((r) => {
+    const first = r[0]!.c;
+    const last = r[r.length - 1]!.c;
+    const span = Math.hypot(last.x - first.x, last.y - first.y);
+    const dir = { x: (last.x - first.x) / span, y: (last.y - first.y) / span };
+    going = Math.max(going, span / (r.length - 1));
+    return { first, dir, r };
+  });
+  for (const { first, dir, r } of lines) {
+    const g = Math.hypot(r[r.length - 1]!.c.x - first.x, r[r.length - 1]!.c.y - first.y) / (r.length - 1);
+    if (Math.abs(g - going) > 3 || r.some((t, i) => Math.hypot(t.c.x - (first.x + dir.x * g * i), t.c.y - (first.y + dir.y * g * i)) > 5)) return null;
+  }
+  const across0 = { x: -lines[0]!.dir.y, y: lines[0]!.dir.x };
+  const ws = lines[0]!.r[0]!.pts.map((q) => (q.x - lines[0]!.first.x) * across0.x + (q.y - lines[0]!.first.y) * across0.y);
   const width = Math.max(...ws) - Math.min(...ws);
-  const centreOff = (Math.max(...ws) + Math.min(...ws)) / 2;
-  // The run starts half a going before the first tread's centre, on the stair's centreline.
-  const start = { x: first.x - (dir.x * going) / 2 + across.x * centreOff, y: first.y - (dir.y * going) / 2 + across.y * centreOff };
-  const end = { x: start.x + dir.x * going * treads.length, y: start.y + dir.y * going * treads.length };
+  // Each run starts half a going before its first tread, on its centreline; it's its treads long.
+  const stairRuns = lines.map(({ first, dir, r }) => {
+    const across = { x: -dir.y, y: dir.x };
+    const off = r[0]!.pts.map((q) => (q.x - first.x) * across.x + (q.y - first.y) * across.y);
+    const mid = (Math.max(...off) + Math.min(...off)) / 2;
+    const start = { x: first.x - (dir.x * going) / 2 + across.x * mid, y: first.y - (dir.y * going) / 2 + across.y * mid };
+    return { start, end: { x: start.x + dir.x * going * r.length, y: start.y + dir.y * going * r.length } };
+  });
   const typeName = `Imported Stair ${Math.round(width)} wide ${Math.round(going)} going`;
   const type =
     doc.byCategory<StairTypeParams>(Cat.StairType).find((t) => Math.abs(t.params.going - going) < 2 && Math.abs(t.params.width - width) < 2 && Math.ceil((z1 - z0) / t.params.maxRiser - 1e-9) === risers)?.id ??
     createStairType(tx, typeName, { going: Math.round(going * 10) / 10, width: Math.round(width), maxRiser: riser + 0.01 }).id;
-  // Top: the level at the stair's top, else the base level with an offset.
   // Top: the level at the stair's top, else the nearest above its base (with an offset).
   const above = doc.byCategory<LevelParams>(Cat.Level).filter((l) => l.params.elevation > lvl + 1).sort((a, b) => Math.abs(a.params.elevation - z1) - Math.abs(b.params.elevation - z1));
   const top = above[0];
   if (!top) return null;
-  const s = createStair(tx, doc, type, p.levelId, top.id, [{ start, end }]);
+  const s = createStair(tx, doc, type, p.levelId, top.id, stairRuns);
   tx.update<StairParams>(s.id, { baseOffset: z0 - lvl, topOffset: z1 - top.params.elevation });
+  // The rebuilt stair must climb the same way: same risers, same treads per run.
+  const lay = stairLayout(doc, doc.require(s.id) as Stair);
+  if (lay.risers !== risers || lay.runs.some((r, i) => r.treads !== runs[i]!.length)) {
+    tx.delete(s.id);
+    return null;
+  }
   return s.id;
 }
 

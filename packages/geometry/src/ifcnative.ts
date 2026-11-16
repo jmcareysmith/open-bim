@@ -15,6 +15,8 @@ import {
   ensureDuctTypes,
   ensurePipeTypes,
   PIPE_SIZES,
+  pipeTypeFor,
+  type SystemClassification,
   createRamp,
   type RampParams,
   type RampTypeParams,
@@ -716,6 +718,16 @@ function snapRunEnds(tx: Transaction, doc: Document, ids: ElementId[]): void {
   for (const [id, m] of moved) tx.update(id, m);
 }
 
+/** Our system classification from an imported system's name/type (Revit: "Supply Air 1 (SUPPLYAIR)"). */
+function classificationOf(p: DirectShapeParams, pipe: boolean): SystemClassification | undefined {
+  const t = (p.properties.System ?? "").toUpperCase().replace(/[^A-Z]/g, "");
+  if (!t) return undefined;
+  const rules: [RegExp, SystemClassification][] = pipe
+    ? [[/SPRINK|FIRE/, "fireProtection"], [/SANIT|WASTE|SEWAGE|SOIL/, "sanitary"], [/VENT/, "vent"], [/STORM|RAIN/, "stormwater"], [/GAS/, "gas"], [/HOT/, "hotWater"], [/COLD|WATER|DOMESTIC/, "coldWater"]]
+    : [[/RETURN/, "returnAir"], [/EXHAUST|EXTRACT/, "exhaustAir"], [/OUTSIDE|FRESH|OUTDOOR/, "outsideAir"], [/SUPPLY/, "supplyAir"]];
+  return rules.find(([re]) => re.test(t))?.[1];
+}
+
 /**
  * A duct or pipe from its mesh: its axis is the points' main direction (the run's length dwarfs its
  * section); round when every point sits at one distance from the axis, else rectangular (width
@@ -772,13 +784,16 @@ function runFromMesh(tx: Transaction, doc: Document, p: DirectShapeParams, lvl: 
     const dia = 2 * rMax;
     const dn = PIPE_SIZES.reduce((b, s) => (Math.abs(s - dia) < Math.abs(b - dia) ? s : b), PIPE_SIZES[0]!);
     const types = ensurePipeTypes(tx, doc);
-    return createPipe(tx, doc, types[0]!, p.levelId, start, end, { diameter: dn }).id;
+    const cls = classificationOf(p, true);
+    return createPipe(tx, doc, (cls && pipeTypeFor(doc, cls)) || types[0]!, p.levelId, start, end, { diameter: dn, ...(cls ? { classification: cls } : {}) }).id;
   }
   const types = ensureDuctTypes(tx, doc);
   const typeOf = (shape: string) => types.find((id) => (doc.get(id)?.params as { shape?: string } | undefined)?.shape === shape) ?? types[0]!;
+  const cls = classificationOf(p, false);
+  const sys = cls ? { classification: cls } : {};
   return round
-    ? createDuct(tx, doc, typeOf("round"), p.levelId, start, end, { diameter: Math.round(2 * rMax) }).id
-    : createDuct(tx, doc, typeOf("rectangular"), p.levelId, start, end, { width: Math.round(width), height: Math.round(height) }).id;
+    ? createDuct(tx, doc, typeOf("round"), p.levelId, start, end, { diameter: Math.round(2 * rMax), ...sys }).id
+    : createDuct(tx, doc, typeOf("rectangular"), p.levelId, start, end, { width: Math.round(width), height: Math.round(height), ...sys }).id;
 }
 
 /**

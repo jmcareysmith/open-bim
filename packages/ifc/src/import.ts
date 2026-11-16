@@ -237,6 +237,18 @@ export async function importIfc(doc: Document, data: Uint8Array, api: IfcApi): P
     }
     const where = storeyOf(api, model, new Set(storeys.map((s) => s.id)));
     const products = meshes(api, model);
+    // Systems (ducts/pipes assigned to an IfcDistributionSystem or IfcSystem): "name (TYPE)" per element.
+    const systemOf = new Map<number, string>();
+    const groups = api.GetLineIDsWithType(model, WebIFC.IFCRELASSIGNSTOGROUP);
+    for (let i = 0; i < groups.size(); i++) {
+      const rel = api.GetLine(model, groups.get(i));
+      const g = rel.RelatingGroup?.value ? api.GetLine(model, rel.RelatingGroup.value as number) : null;
+      if (!g) continue;
+      const kind = api.GetNameFromTypeCode(api.GetLineType(model, rel.RelatingGroup.value as number));
+      if (kind !== "IfcDistributionSystem" && kind !== "IfcSystem" && kind !== "IfcDistributionCircuit") continue;
+      const text = [label(g.Name), label(g.PredefinedType), label(g.ObjectType)].filter(Boolean).join(" ");
+      for (const o of (rel.RelatedObjects ?? []) as { value: number }[]) systemOf.set(o.value, text);
+    }
     const info = new Map<number, { cls: string; guid: string; name?: string; props: Record<string, string> }>();
     for (const p of products) {
       const line = api.GetLine(model, p.expressID);
@@ -246,6 +258,8 @@ export async function importIfc(doc: Document, data: Uint8Array, api: IfcApi): P
         const v = Number(label(line[k]));
         if (Number.isFinite(v) && v > 0) props[k] = String(Math.round(v * mm));
       }
+      const sys = systemOf.get(p.expressID);
+      if (sys) props.System = sys;
       // Spaces: the room name (Revit puts the number in Name and the name in LongName).
       const longName = label(line.LongName);
       if (longName) props.LongName = longName;

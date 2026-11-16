@@ -172,4 +172,5 @@ to native elements where their shapes allow.
 - [x] Members (rafters, purlins, braces): level → beams; sloped → sloped beams marked brace (end tops kept)
 - [x] Straight ramps (one sloping top plane) → native ramps
 - [x] Duct and pipe segments → native runs (axis by principal direction; round vs rectangular; DN by size); ends snapped together so the fitting hook remakes elbows/tees/transitions; imported fittings dropped
+- [x] MEP systems: IfcRelAssignsToGroup → System property → run classification (supply/return/exhaust/outside air; cold/hot water, sanitary, vent, stormwater, fire, gas)
 - [ ] Still shapes: non-rectangular curtain panels; anything whose rebuilt version wouldn't match its mesh

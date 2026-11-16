@@ -554,3 +554,29 @@ describe("ducts and pipes from IFC", () => {
     expect(pipe.params.diameter).toBe(25);
   });
 });
+
+describe("MEP systems from IFC", () => {
+  it("runs take their classification from the imported system", async () => {
+    const { createDuct, ensureDuctTypes, createPipe, ensurePipeTypes } = await import("@open-bim/core");
+    const { SimpleKernel } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const [round] = doc.transact("T", (tx) => ensureDuctTypes(tx, doc));
+    const [pex] = doc.transact("T", (tx) => ensurePipeTypes(tx, doc));
+    const d = doc.transact("D", (tx) => createDuct(tx, doc, round!, ids.levels.ground, { x: 0, y: 0, z: 2700 }, { x: 3000, y: 0, z: 2700 }, { diameter: 250 }));
+    const pp = doc.transact("P", (tx) => createPipe(tx, doc, pex!, ids.levels.ground, { x: 0, y: 2000, z: 500 }, { x: 3000, y: 2000, z: 500 }, { diameter: 20 }));
+    const k = new SimpleKernel();
+    const [dm, pm] = [k.build(doc, doc.require(d.id))!, k.build(doc, doc.require(pp.id))!];
+    const shapes = doc.transact("I", (tx) => {
+      tx.delete(d.id);
+      tx.delete(pp.id);
+      return [
+        createDirectShape(tx, { levelId: ids.levels.ground, ifcClass: "IfcDuctSegment", globalId: "d", positions: [...dm.positions], indices: [...dm.indices], color: 0x999999, properties: { System: "Return Air 2 RETURNAIR" } }).id,
+        createDirectShape(tx, { levelId: ids.levels.ground, ifcClass: "IfcPipeSegment", globalId: "p", positions: [...pm.positions], indices: [...pm.indices], color: 0x999999, properties: { System: "Domestic Hot Water 1 DOMESTICHOTWATER" } }).id,
+      ];
+    });
+    doc.transact("C", (tx) => convertDirectShapes(tx, doc, shapes));
+    expect((doc.byCategory("Duct")[0]!.params as { classification: string }).classification).toBe("returnAir");
+    expect((doc.byCategory("Pipe")[0]!.params as { classification: string }).classification).toBe("hotWater");
+  });
+});

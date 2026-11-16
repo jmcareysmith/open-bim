@@ -23,6 +23,7 @@ import {
   type ColumnParams,
   type StructuralSectionParams,
   type DoorTypeParams,
+  type WallParams,
   type Material,
   type MaterialParams,
   createMaterial,
@@ -51,13 +52,15 @@ const BEAM_CLASSES = new Set(["IfcBeam"]);
 const ROOF_CLASSES = new Set(["IfcRoof"]);
 const STAIR_CLASSES = new Set(["IfcStair", "IfcStairFlight"]);
 const RAILING_CLASSES = new Set(["IfcRailing"]);
+/** Curtain wall parts (Revit exports a curtain wall as its panels and mullions). */
+const PLATE_CLASSES = new Set(["IfcPlate"]);
 const INSERT_CLASSES = new Set(["IfcDoor", "IfcWindow"]);
 
 /** Can this imported shape become a native element? */
 export function convertible(el: { category: string; params: unknown }): boolean {
   if (el.category !== Cat.DirectShape) return false;
   const c = (el.params as DirectShapeParams).ifcClass;
-  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c) || ROOF_CLASSES.has(c) || STAIR_CLASSES.has(c) || RAILING_CLASSES.has(c);
+  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c) || ROOF_CLASSES.has(c) || STAIR_CLASSES.has(c) || RAILING_CLASSES.has(c) || PLATE_CLASSES.has(c);
 }
 
 function hull(pts: Vec2[]): Vec2[] {
@@ -399,6 +402,86 @@ function railingFromMesh(tx: Transaction, doc: Document, p: DirectShapeParams, l
   return r.id;
 }
 
+type Panel = { id: ElementId; levelId: ElementId; c: Vec2; u: Vec2; u0: number; u1: number; z0: number; z1: number; thick: number };
+
+/** Imported panels as thin vertical rectangles, grouped by the plane they lie in. */
+function curtainGroups(doc: Document, ids: ElementId[]): Panel[][] {
+  const panels: Panel[] = [];
+  for (const id of ids) {
+    const ds = doc.get<DirectShapeParams>(id);
+    if (!ds) continue;
+    const { xy, z0, z1 } = bounds(ds.params);
+    const r = minRect(xy);
+    if (!r || r.wid > 150 || r.len < r.wid * 2 || z1 - z0 < 50) continue;
+    panels.push({ id, levelId: ds.params.levelId, c: r.c, u: r.u, u0: -r.len / 2, u1: r.len / 2, z0, z1, thick: r.wid });
+  }
+  const groups: Panel[][] = [];
+  for (const p of panels) {
+    const g = groups.find((gr) => {
+      const q = gr[0]!;
+      const par = Math.abs(q.u.x * p.u.y - q.u.y * p.u.x) < 0.02;
+      const off = Math.abs(-q.u.y * (p.c.x - q.c.x) + q.u.x * (p.c.y - q.c.y));
+      return par && off < 100 && q.levelId === p.levelId;
+    });
+    if (g) g.push(p);
+    else groups.push([p]);
+  }
+  return groups;
+}
+
+/** Positions that sit together (within `gap`) become one, at their middle. */
+function cluster(vals: number[], gap: number): number[] {
+  const s = [...vals].sort((a, b) => a - b);
+  const out: number[][] = [];
+  for (const v of s) {
+    const last = out[out.length - 1];
+    if (last && v - last[last.length - 1]! <= gap) last.push(v);
+    else out.push([v]);
+  }
+  return out.map((c) => (c[0]! + c[c.length - 1]!) / 2);
+}
+
+/**
+ * A curtain wall from its panels: the plane's line from the panels' extent along it, base to top
+ * from their heights, and grid lines where neighbouring panels meet (the gap between them is the
+ * mullion). The imported mullions in that plane go too. Type: the project's first curtain wall type.
+ */
+function curtainFromPanels(tx: Transaction, doc: Document, g: Panel[]): ElementId | null {
+  const ref = g[0]!;
+  const type = doc.byCategory<LayeredTypeParams>(Cat.WallType).find((t) => t.params.curtain);
+  if (!type) return null;
+  // Panel ends along the reference line.
+  const along = (p: Panel, s: number) => (p.c.x + p.u.x * s - ref.c.x) * ref.u.x + (p.c.y + p.u.y * s - ref.c.y) * ref.u.y;
+  const ends = g.map((p) => [along(p, p.u0), along(p, p.u1)].sort((a, b) => a - b) as [number, number]);
+  const gap = 200;
+  const us = cluster(ends.flat(), gap);
+  const zs = cluster(g.flatMap((p) => [p.z0, p.z1]), gap);
+  if (us.length < 2 || zs.length < 2) return null;
+  const uMin = Math.min(...ends.map((e) => e[0]));
+  const uMax = Math.max(...ends.map((e) => e[1]));
+  const zMin = Math.min(...g.map((p) => p.z0));
+  const zMax = Math.max(...g.map((p) => p.z1));
+  const off = g.reduce((s, p) => s + (-ref.u.y * (p.c.x - ref.c.x) + ref.u.x * (p.c.y - ref.c.y)), 0) / g.length;
+  const n = { x: -ref.u.y, y: ref.u.x };
+  const at = (u: number) => ({ x: ref.c.x + ref.u.x * u + n.x * off, y: ref.c.y + ref.u.y * u + n.y * off });
+  const lvl = doc.get<LevelParams>(ref.levelId)?.params.elevation ?? 0;
+  const w = createWall(tx, type.id, at(uMin), at(uMax), ref.levelId, { baseOffset: zMin - lvl, height: zMax - zMin });
+  // Interior grid lines (the outermost clusters are the wall's edges).
+  const uLines = us.slice(1, -1).map((u) => Math.round(u - uMin));
+  const zLines = zs.slice(1, -1).map((z) => Math.round(z - zMin));
+  tx.update<WallParams>(w.id, { curtainEdits: { uLines, zLines } });
+  // The panels, and mullions lying in the same plane within the wall's extent, are now the wall's.
+  for (const p of g) tx.delete(p.id);
+  for (const m of doc.byCategory<DirectShapeParams>(Cat.DirectShape)) {
+    if (m.params.ifcClass !== "IfcMember") continue;
+    const { xy, z0, z1 } = bounds(m.params);
+    const inPlane = xy.every((q) => Math.abs(-ref.u.y * (q.x - ref.c.x) + ref.u.x * (q.y - ref.c.y) - off) < 200);
+    const us2 = xy.map((q) => (q.x - ref.c.x) * ref.u.x + (q.y - ref.c.y) * ref.u.y);
+    if (inPlane && Math.min(...us2) >= uMin - 200 && Math.max(...us2) <= uMax + 200 && z0 >= zMin - 200 && z1 <= zMax + 200) tx.delete(m.id);
+  }
+  return w.id;
+}
+
 /**
  * A straight stair from its mesh: the treads are its upward faces at evenly spaced heights; their
  * centres give the direction of travel and the going, their spread across it the width. Null for
@@ -536,7 +619,18 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
   const created: ElementId[] = [];
   const skipped: ElementId[] = [];
   const walls: { id: ElementId; c: Vec2; u: Vec2; len: number; wid: number; base: number }[] = [];
+  // Curtain walls first: panels in one vertical plane become one curtain wall (their mullions go with them).
+  const plates = ids.filter((id) => PLATE_CLASSES.has((doc.get(id)?.params as DirectShapeParams | undefined)?.ifcClass ?? ""));
+  for (const g of curtainGroups(doc, plates)) {
+    const made = curtainFromPanels(tx, doc, g);
+    if (!made) {
+      skipped.push(...g.map((x) => x.id));
+      continue;
+    }
+    created.push(made);
+  }
   for (const id of ids) {
+    if (plates.includes(id)) continue;
     const ds = doc.get<DirectShapeParams>(id) as DirectShape | undefined;
     if (!ds || !convertible(ds)) {
       skipped.push(id);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Document, applyResidentialTemplate, createDirectShape, wallThickness, type FloorParams, type Wall, type WallParams } from "@open-bim/core";
+import { Document, applyResidentialTemplate, createDirectShape, wallThickness, type FloorParams, type Vec2, type Wall, type WallParams } from "@open-bim/core";
 import { convertDirectShapes, extrudePolygon } from "../src/index.ts";
 
 const box = (pts: { x: number; y: number }[], z0: number, z1: number) => {
@@ -253,5 +253,31 @@ describe("stairs with landings from IFC", () => {
       expect(after.runs[i]!.start.x).toBeCloseTo(before.runs[i]!.start.x, -1);
       expect(after.runs[i]!.start.y).toBeCloseTo(before.runs[i]!.start.y, -1);
     }
+  });
+});
+
+describe("curtain walls from IFC panels", () => {
+  it("panels in one plane become a curtain wall with grid lines where they meet; mullions go with them", () => {
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const lvl = ids.levels.ground;
+    const mk = (ifcClass: string, mesh: { positions: number[]; indices: number[] }) =>
+      doc.transact("I", (tx) => createDirectShape(tx, { levelId: lvl, ifcClass, globalId: ifcClass, ...mesh, color: 0x88aacc, properties: {} }).id);
+    const panels: string[] = [];
+    for (const [u0, u1] of [[0, 1175], [1225, 2375], [2425, 3600]]) {
+      for (const [z0, z1] of [[0, 1475], [1525, 3000]]) panels.push(mk("IfcPlate", box(rect(u0, -12, u1, 12), z0, z1)));
+    }
+    const mullion = mk("IfcMember", box(rect(1175, -50, 1225, 50), 0, 3000));
+    const r = doc.transact("C", (tx) => convertDirectShapes(tx, doc, panels));
+    expect(r.created).toHaveLength(1);
+    const w = doc.require<{ start: Vec2; end: Vec2; height: number; curtainEdits?: { uLines?: number[]; zLines?: number[] } }>(r.created[0]!);
+    expect(Math.abs(w.params.end.x - w.params.start.x)).toBeCloseTo(3600, 0);
+    expect(w.params.height).toBeCloseTo(3000, 0);
+    const u = w.params.curtainEdits!.uLines!;
+    const lines = w.params.start.x < w.params.end.x ? u : u.map((x) => 3600 - x).sort((a, b) => a - b);
+    expect(lines).toEqual([1200, 2400]);
+    expect(w.params.curtainEdits!.zLines).toEqual([1500]);
+    expect(doc.get(mullion)).toBeUndefined();
+    expect(doc.byCategory("DirectShape")).toHaveLength(0);
   });
 });

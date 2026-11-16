@@ -870,6 +870,7 @@ const commands: Record<string, () => void | Promise<void>> = {
     const fresh = new Document();
     applyResidentialTemplate(fresh);
     loadInto(fresh.toJSON(), null);
+    void clearAutosave();
   },
   async open() {
     if (dirty && !confirm("Discard unsaved changes?")) return;
@@ -878,6 +879,7 @@ const commands: Record<string, () => void | Promise<void>> = {
       const result = await openProject();
       if (result) {
         loadInto(result.json, result.path);
+        void clearAutosave();
         if (isTauri()) addRecentFile(result.path);
       }
     } catch (err) {
@@ -1455,6 +1457,7 @@ async function openRecent(path: string): Promise<void> {
     const json = await readProjectAt(path);
     if (!json) return;
     loadInto(json, path);
+    void clearAutosave();
     addRecentFile(path);
   } catch (err) {
     removeRecentFile(path);
@@ -2545,7 +2548,7 @@ void plugins.restore();
 
 // Autosave (every few minutes while there are unsaved changes; not while editing a family) and,
 // at start-up, recovery of work that was never saved.
-startAutosave(() => (projectSession ? null : { dirty, json: () => doc.toJSON(), path: filePath }));
+startAutosave(() => (projectSession ? null : { dirty, json: () => doc.toJSON(), path: filePath, revision: doc.revision }));
 void (async () => {
   const a = await readAutosave();
   if (!a) return;

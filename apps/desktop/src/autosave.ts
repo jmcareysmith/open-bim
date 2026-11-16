@@ -52,7 +52,11 @@ export async function readAutosave(): Promise<Autosave | null> {
   }
 }
 
+/** Bumped by each clear: a write begun before it is stale and is removed once it lands. */
+let generation = 0;
+
 export async function clearAutosave(): Promise<void> {
+  generation++;
   try {
     await run("readwrite", (s) => s.delete(KEY));
   } catch {
@@ -64,13 +68,23 @@ export async function clearAutosave(): Promise<void> {
  * Autosave every AUTOSAVE_MINUTES while `state()` says there are unsaved changes (and it isn't a
  * family being edited). Returns a stop function.
  */
-export function startAutosave(state: () => { dirty: boolean; json: () => DocumentJSON; path: string | null } | null, onSaved?: (time: number) => void): () => void {
+export function startAutosave(state: () => { dirty: boolean; json: () => DocumentJSON; path: string | null; revision: number } | null, onSaved?: (time: number) => void): () => void {
+  let written: { gen: number; revision: number } | null = null;
   const timer = setInterval(async () => {
     const s = state();
     if (!s || !s.dirty) return;
+    // Nothing changed since the last autosave (and nothing cleared it): no need to write again.
+    if (written && written.gen === generation && written.revision === s.revision) return;
+    const gen = generation;
     try {
       const time = Date.now();
       await writeAutosave({ json: s.json(), path: s.path, time });
+      if (gen !== generation) {
+        // Saved, opened or started afresh while this was writing: it's stale.
+        await clearAutosave();
+        return;
+      }
+      written = { gen, revision: s.revision };
       onSaved?.(time);
     } catch {
       /* storage full or unavailable: try again next time */

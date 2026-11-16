@@ -71,7 +71,9 @@ export function parseLas(buf: ArrayBuffer, max = MAX_POINT_CLOUD): RawPoints {
   if (sig !== "LASF") throw new Error("Not a LAS file");
   const minor = dv.getUint8(25);
   const offset = dv.getUint32(96, true);
-  const format = dv.getUint8(104) & 0x3f;
+  const rawFormat = dv.getUint8(104);
+  if (rawFormat & 0xc0) throw new Error("This is a compressed (LAZ) point cloud: decompress it to LAS first (e.g. with LAStools laszip)");
+  const format = rawFormat & 0x3f;
   const recLen = dv.getUint16(105, true);
   let total = dv.getUint32(107, true);
   if (minor >= 4 && total === 0 && buf.byteLength >= 255) total = Number(dv.getBigUint64(247, true));

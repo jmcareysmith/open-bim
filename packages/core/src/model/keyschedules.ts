@@ -41,7 +41,9 @@ export function createKeySchedule(tx: Transaction, doc: Document, category: stri
 
 /** Is this parameter set by a key on this element (so read-only there)? */
 export function keyedBy(doc: Document, el: Element, name: string): KeySchedule | undefined {
-  return keySchedules(doc, el.category).find((ks) => ks.params.fields.includes(name));
+  // Only when the element has chosen a key (without one, its own value stands and is editable).
+  const own = (el.params as { custom?: Record<string, unknown> }).custom;
+  return keySchedules(doc, el.category).find((ks) => ks.params.fields.includes(name) && typeof own?.[ks.params.keyName] === "string" && own[ks.params.keyName] !== "");
 }
 
 /** Elements using a key. */

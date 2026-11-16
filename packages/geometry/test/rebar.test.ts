@@ -138,3 +138,25 @@ describe("rebar", () => {
     expect(b.points[0]![2] - b.points[1]![2]).toBeCloseTo(144);
   });
 });
+
+describe("rebar review fixes", () => {
+  it("wall bars stop short of a door; stock no longer than the lap leaves bars whole", async () => {
+    const { createDoor } = await import("@open-bim/core");
+    const { doc, ids } = setup();
+    const t = doc.byCategory("WallType")[0]!.id;
+    const w = doc.transact("W", (tx) => createWall(tx, t, { x: 0, y: 0 }, { x: 4000, y: 0 }, ids.levels.ground, { height: 2400 }));
+    doc.transact("D", (tx) => createDoor(tx, doc, ids.doorTypes.single860, w.id, 2000));
+    const r = doc.transact("R", (tx) => createRebar(tx, doc, w.id, { bar: "HD12", spacing: 400, cover: 20, layers: "top" }));
+    const bars = rebarBars(doc, r);
+    // No bar point inside the door (x 1570–2430, below 2040 or so).
+    const inside = bars.some((b) => {
+      const [a, c] = [b.points[0]!, b.points[1]!];
+      const mid = [(a[0] + c[0]) / 2, (a[2] + c[2]) / 2];
+      return mid[0]! > 1600 && mid[0]! < 2400 && mid[1]! < 1900;
+    });
+    expect(inside).toBe(false);
+    // HD25 laps 1000: 1000 stock can't lap, so no endless split.
+    const r2 = doc.transact("R2", (tx) => createRebar(tx, doc, w.id, { bar: "HD25", spacing: 400, cover: 20, layers: "top", stockLength: 1000 }));
+    expect(rebarBars(doc, r2).length).toBeGreaterThan(0);
+  });
+});

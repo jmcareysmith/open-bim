@@ -2,6 +2,7 @@ import { registerCategory } from "../categories.ts";
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Vec2 } from "../element.ts";
 import { Cat, floorExtent, wallExtent, wallLength, wallThickness, type Floor, type LevelParams, type Wall } from "./architecture.ts";
+import { wallCuts } from "./openings.ts";
 import { columnExtent, type BeamParams, type Column, type PadFootingParams, type StripFootingParams, type StructuralSectionParams } from "./structure.ts";
 
 // Reinforcement (Revit: Rebar, Area Reinforcement). A rebar set lives in a concrete host and is
@@ -127,6 +128,11 @@ function lapped(bars: RebarBar[], p: RebarParams): RebarBar[] {
       continue;
     }
     const lap = lapLength(b.bar);
+    // Stock no longer than the lap can't be lapped: leave the bar whole.
+    if (stock - lap < Math.max(100, stock * 0.1)) {
+      out.push(b);
+      continue;
+    }
     const a = pts[k]!;
     const z = pts[k + 1]!;
     const along = (t: number): V3 => [a[0] + ((z[0] - a[0]) * t) / best, a[1] + ((z[1] - a[1]) * t) / best, a[2] + ((z[2] - a[2]) * t) / best];
@@ -158,7 +164,7 @@ function hostBars(doc: Document, rebar: Rebar): RebarBar[] {
       const w = host as Wall;
       if (w.params.curve) return [];
       const { bottom, top } = wallExtent(doc, w);
-      return wallBars(p, w, wallThickness(doc, w), bottom, top);
+      return wallBars(doc, p, w, wallThickness(doc, w), bottom, top);
     }
     case Cat.Floor: {
       const f = host as Floor;
@@ -275,7 +281,8 @@ function areaBars(p: RebarParams, rings: Vec2[][], bottom: number, top: number):
   const mats: { z: number; dir: number }[] = [];
   if (layers !== "top") mats.push({ z: bottom + p.cover + d / 2, dir: 0 }, { z: bottom + p.cover + (3 * d) / 2, dir: 1 });
   if (layers !== "bottom") mats.push({ z: top - p.cover - d / 2, dir: 0 }, { z: top - p.cover - (3 * d) / 2, dir: 1 });
-  if (top - bottom < 2 * p.cover + 2 * d) return [];
+  // Each face takes two bar layers; both faces need four.
+  if (top - bottom < 2 * p.cover + (layers === "both" ? 4 : 2) * d) return [];
   for (const m of mats) {
     const a = ang + (m.dir ? Math.PI / 2 : 0);
     const c = Math.cos(a);
@@ -312,7 +319,7 @@ function areaBars(p: RebarParams, rings: Vec2[][], bottom: number, top: number):
 }
 
 /** Wall mats: verticals at the spacing along the wall, horizontals up it, on each face asked for. */
-function wallBars(p: RebarParams, w: Wall, thickness: number, bottom: number, top: number): RebarBar[] {
+function wallBars(doc: Document, p: RebarParams, w: Wall, thickness: number, bottom: number, top: number): RebarBar[] {
   const d = barDiameter(p.bar);
   const len = wallLength(w);
   const out: RebarBar[] = [];
@@ -334,11 +341,35 @@ function wallBars(p: RebarParams, w: Wall, thickness: number, bottom: number, to
     const dy = (w.params.end.y - w.params.start.y) / l;
     return [w.params.start.x + dx * u - dy * v, w.params.start.y + dy * u + dx * v, z];
   };
+  // Doors, windows and openings: bars stop short of them by the cover (trimmer bars aren't drawn).
+  const cuts = wallCuts(doc, w);
+  /** [lo, hi] less the blocked intervals (each grown by the cover), pieces shorter than 2 × cover dropped. */
+  const pieces = (lo: number, hi: number, blocked: [number, number][]): [number, number][] => {
+    let out: [number, number][] = [[lo, hi]];
+    for (const [b0, b1] of blocked) {
+      const next: [number, number][] = [];
+      for (const [a0, a1] of out) {
+        if (b1 + p.cover <= a0 || b0 - p.cover >= a1) next.push([a0, a1]);
+        else {
+          if (b0 - p.cover > a0) next.push([a0, b0 - p.cover]);
+          if (b1 + p.cover < a1) next.push([b1 + p.cover, a1]);
+        }
+      }
+      out = next;
+    }
+    return out.filter(([a, b]) => b - a >= 2 * p.cover);
+  };
   for (const f of faces) {
     const vOut = f * (thickness / 2 - p.cover - d / 2);
     const vIn = f * (thickness / 2 - p.cover - (3 * d) / 2);
-    for (const u of spread(p.cover + d / 2, len - p.cover - d / 2)) out.push({ points: [at(u, vOut, bottom + p.cover), at(u, vOut, top - p.cover)], closed: false, diameter: d, bar: p.bar });
-    for (const z of spread(bottom + p.cover + d / 2, top - p.cover - d / 2)) out.push({ points: [at(p.cover, vIn, z), at(len - p.cover, vIn, z)], closed: false, diameter: d, bar: p.bar });
+    for (const u of spread(p.cover + d / 2, len - p.cover - d / 2)) {
+      const blocked = cuts.filter((c) => u > c.u0 - p.cover && u < c.u1 + p.cover).map((c): [number, number] => [c.z0, c.z1]);
+      for (const [z0, z1] of pieces(bottom + p.cover, top - p.cover, blocked)) out.push({ points: [at(u, vOut, z0), at(u, vOut, z1)], closed: false, diameter: d, bar: p.bar });
+    }
+    for (const z of spread(bottom + p.cover + d / 2, top - p.cover - d / 2)) {
+      const blocked = cuts.filter((c) => z > c.z0 - p.cover && z < c.z1 + p.cover).map((c): [number, number] => [c.u0, c.u1]);
+      for (const [u0, u1] of pieces(p.cover, len - p.cover, blocked)) out.push({ points: [at(u0, vIn, z), at(u1, vIn, z)], closed: false, diameter: d, bar: p.bar });
+    }
   }
   return out;
 }

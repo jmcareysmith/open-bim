@@ -121,7 +121,8 @@ function keyedValue(doc: Document, el: Element, name: string): ParamValue | unde
 export function setCustomValue(tx: Transaction, doc: Document, el: Element, name: string, value: ParamValue): void {
   const p = projectParameters(doc).find((x) => x.name === name);
   if (!p) throw new Error(`No project parameter called "${name}"`);
-  if (doc.byCategory<{ category: string; fields: string[]; keyName: string }>(Cat.KeySchedule).some((k) => k.params.category === el.category && k.params.fields.includes(name)))
+  const keys = el.params[CUSTOM] as Record<string, ParamValue> | undefined;
+  if (doc.byCategory<{ category: string; fields: string[]; keyName: string }>(Cat.KeySchedule).some((k) => k.params.category === el.category && k.params.fields.includes(name) && typeof keys?.[k.params.keyName] === "string" && keys[k.params.keyName] !== ""))
     throw new Error(`${name} is set by a key schedule: change the element's key, or the key's row`);
   if (!p.params.categories.includes(el.category)) throw new Error(`${name} doesn't apply to ${el.category}`);
   const h = holder(doc, el, p);

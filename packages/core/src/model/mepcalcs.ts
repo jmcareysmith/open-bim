@@ -1,7 +1,7 @@
 import type { Document, Transaction } from "../document.ts";
 import type { ElementId } from "../element.ts";
 import { Cat } from "./architecture.ts";
-import { ductShape, type Duct } from "./ducts.ts";
+import { ductPath, ductShape, type Duct } from "./ducts.ts";
 import { classificationInfo, elementConnectors, systemMembers, type MEPSystem, type ModelConnector } from "./mep.ts";
 import { PIPE_SIZES, type Pipe, type PipeParams } from "./pipes.ts";
 
@@ -100,7 +100,10 @@ export function systemPressure(doc: Document, sys: MEPSystem): PressureReport {
     }
   }
   const isInstance = (c: ModelConnector) => doc.get(c.ownerId)?.category === Cat.FamilyInstance;
-  let source = nodes.findIndex((c) => isInstance(c) && c.flowDirection === "out");
+  // Supply systems start where the equipment pushes out; return/exhaust where it takes in (drainage left above).
+  const cls = sys.params.classification;
+  const inward = cls === "returnAir" || cls === "exhaustAir" || cls === "vent";
+  let source = nodes.findIndex((c) => isInstance(c) && c.flowDirection === (inward ? "in" : "out"));
   if (source < 0) source = nodes.findIndex(isInstance);
   if (source < 0) {
     notes.push("No equipment in the system to start from.");
@@ -134,8 +137,10 @@ export function systemPressure(doc: Document, sys: MEPSystem): PressureReport {
     const v = area > 0 ? q / 1000 / area : 0;
     const f = frictionFactor((v * dh) / fluid.nu, fluid.eps / dh);
     const friction = dh > 0 ? ((f / dh) * fluid.rho * v * v) / 2 : 0;
-    const ends = elementConnectors(doc, el);
-    const length = ends.length >= 2 ? d3(ends[0]!, ends[1]!) / 1000 : 0;
+    // Along the run (flex ducts curve through their bend points).
+    const path = ductPath(el as Duct);
+    let length = 0;
+    for (let i = 1; i < path.length; i++) length += Math.hypot(path[i]!.x - path[i - 1]!.x, path[i]!.y - path[i - 1]!.y, path[i]!.z - path[i - 1]!.z) / 1000;
     const r: RunLoss = { id, flow: q, velocity: v, friction, length, loss: friction * length };
     byId.set(id, r);
     report.runs.push(r);

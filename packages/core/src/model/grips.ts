@@ -1,6 +1,6 @@
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Params, Vec2 } from "../element.ts";
-import { Cat, wallExtent, wallExtentRaw, type LevelParams, type Wall, type WallParams } from "./architecture.ts";
+import { Cat, wallExtent, wallExtentRaw, wallThickness, type LevelParams, type Wall, type WallParams } from "./architecture.ts";
 import { columnExtent, type Column, type ColumnParams } from "./structure.ts";
 import { elementLine, isLinear, setLineEnds } from "./edits.ts";
 import { JOIN_TOLERANCE } from "./joins.ts";
@@ -360,4 +360,53 @@ export function setVerticalEdge(tx: Transaction, doc: Document, id: ElementId, e
   }
   const key = el.category === Cat.Roof ? "baseOffset" : "offset";
   tx.update(id, { [key]: Math.round(z - level(p.levelId)) });
+}
+
+// ---- temporary dimensions for hosted elements ------------------------------------------------
+
+/**
+ * A door's, window's or opening's clearances along its wall (Revit's temporary dimensions): from
+ * its edges to the nearest wall face either side (walls teeing in or crossing, else the host's ends).
+ * `u` is its centre along the host, `half` half its width.
+ */
+export function hostedClearances(doc: Document, el: Element): { hostId: ElementId; u: number; half: number; left: { stop: number; dist: number }; right: { stop: number; dist: number } } | null {
+  const p = el.params as Record<string, unknown>;
+  if (!isWallCutter(el.category) || typeof p.hostId !== "string" || !p.hostId) return null;
+  const host = doc.get<WallParams>(p.hostId) as Wall | undefined;
+  if (!host || host.params.curve) return null;
+  const hp = hostedPlacement(doc, el);
+  const { start, end } = host.params;
+  const L = Math.hypot(end.x - start.x, end.y - start.y);
+  if (L < 1 || !(hp.width > 0)) return null;
+  const d = { x: (end.x - start.x) / L, y: (end.y - start.y) / L };
+  const half = hp.width / 2;
+  const hostHalf = wallThickness(doc, host) / 2;
+  // Faces of walls meeting the host along its length.
+  const stops = [0, L];
+  for (const w of doc.byCategory<WallParams>(Cat.Wall) as Wall[]) {
+    if (w.id === host.id || w.params.curve) continue;
+    for (const q of [w.params.start, w.params.end]) {
+      const u = (q.x - start.x) * d.x + (q.y - start.y) * d.y;
+      const v = -(q.x - start.x) * d.y + (q.y - start.y) * d.x;
+      if (u <= 1 || u >= L - 1 || Math.abs(v) > hostHalf + 1) continue;
+      const t = wallThickness(doc, w) / 2;
+      stops.push(u - t, u + t);
+    }
+  }
+  const lo = hp.position - half;
+  const hi = hp.position + half;
+  const left = Math.max(...stops.filter((s) => s <= lo + 0.5));
+  const right = Math.min(...stops.filter((s) => s >= hi - 0.5));
+  return { hostId: host.id, u: hp.position, half, left: { stop: left, dist: lo - left }, right: { stop: right, dist: right - hi } };
+}
+
+/** Move a hosted element so its `side` clearance is `dist` (validated: it must stay in the wall). */
+export function setHostedClearance(tx: Transaction, doc: Document, id: ElementId, side: "left" | "right", dist: number): void {
+  const el = doc.require(id);
+  const c = hostedClearances(doc, el);
+  if (!c) throw new Error("Only doors, windows and openings in straight walls have clearances");
+  if (!(dist >= 0)) throw new Error("The distance can't be negative");
+  const position = side === "left" ? c.left.stop + dist + c.half : c.right.stop - dist - c.half;
+  validateHosted(doc, { ...hostedPlacement(doc, el), position });
+  tx.update(id, { [alongKey(el)]: Math.round(position * 10) / 10 });
 }

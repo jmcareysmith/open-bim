@@ -108,6 +108,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Tab over a wall selects its chain (core joins.ts `wallChain`: L corners carry on, tees/junctions stop; Shift+Tab adds).
   ZR/ZZ Zoom Region (drag a box; viewport `zoomRegion`, then back to the previous tool). BX Selection Box (default 3D view,
   section box round the selection + 300, zoomed to it; right-click too). Section box arrows are screen-sized (`sizeBoxHandles`).
+  Temporary dimensions on a selected door/window/opening (plans, 3D): clearance to the nearest wall face each side (tees,
+  crossings or the host's ends), click to type (core grips.ts `hostedClearances`/`setHostedClearance`).
 - View windows (apps/desktop/src/panes.ts): Tile / Cascade / Tab Views (View → Windows, WT/WC/TW,
   or the ▦ ▾ at the end of the view tabs: Tile all / 2 / 3 / 4 most recent, Cascade, Tab Views).
   Each open view is a live window (a Viewport each, up to 9): drag the title bar, resize by the

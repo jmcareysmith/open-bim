@@ -12,6 +12,8 @@ import {
   flipWall,
   isPinned,
   setPinned,
+  hostedClearances,
+  setHostedClearance,
   floorExtent,
   lineLength,
   setLineLength,
@@ -124,6 +126,7 @@ export class GripLayer {
     }
     if (sel.length === 1 && isPinned(sel[0]!)) return this.position();
     if (sel.length === 1) this.addLength(sel[0]!);
+    if (sel.length === 1 && this.ctx.viewport.viewMode !== "drawing") this.addClearances(sel[0]!);
     if (in3d && sel.length === 1 && sel[0]!.category === Cat.Wall && curtainOf(doc, sel[0]!)) this.addCurtainLines(sel[0] as Wall);
     if (sel.length === 1 && sel[0]!.category === Cat.View) this.showExtent(sel[0] as View);
     if (sel.length === 1 && sel[0]!.category === Cat.Wall && this.ctx.viewport.viewMode !== "drawing") this.addFlip(sel[0]!);
@@ -272,6 +275,63 @@ export class GripLayer {
     };
     uIn.forEach((_, k) => line("u", k));
     zIn.forEach((_, k) => line("z", k));
+  }
+
+  /**
+   * Temporary dimensions for a selected door, window or opening (Revit's): the clearance to the
+   * nearest wall face either side; click one to type a new distance and move it.
+   */
+  private addClearances(el: Element): void {
+    const { doc } = this.ctx;
+    const c = hostedClearances(doc, el);
+    if (!c) return;
+    const host = doc.get(c.hostId) as Wall | undefined;
+    if (!host) return;
+    const { start, end } = host.params;
+    const L = Math.hypot(end.x - start.x, end.y - start.y);
+    const d = { x: (end.x - start.x) / L, y: (end.y - start.y) / L };
+    const n = { x: -d.y, y: d.x };
+    const half = wallThickness(doc, host) / 2;
+    const z = gripZ(doc, host);
+    for (const side of ["left", "right"] as const) {
+      const s = c[side];
+      if (!Number.isFinite(s.dist)) continue;
+      const mid = side === "left" ? (s.stop + c.u - c.half) / 2 : (c.u + c.half + s.stop) / 2;
+      const label = document.createElement("div");
+      label.className = "temp-dim temp-dim-side";
+      label.textContent = `${Math.round(s.dist)}`;
+      label.title = "Click to type the distance to this wall face";
+      label.onpointerdown = (ev) => ev.stopPropagation();
+      label.onclick = () => {
+        const input = document.createElement("input");
+        input.type = "number";
+        input.value = String(Math.round(s.dist));
+        label.replaceChildren(input);
+        input.focus();
+        input.select();
+        input.onkeydown = (ev) => {
+          ev.stopPropagation();
+          if (ev.key === "Escape") return this.refresh();
+          if (ev.key !== "Enter") return;
+          try {
+            doc.transact("Change clearance", (tx) => setHostedClearance(tx, doc, el.id, side, Number(input.value)));
+          } catch (e) {
+            this.ctx.status(`⚠ ${(e as Error).message}`);
+          }
+          this.refresh();
+        };
+        input.onblur = () => this.refresh();
+      };
+      this.root.append(label);
+      this.placed.push({
+        el: label,
+        at: () => {
+          const off = half + 16 * this.ctx.viewport.mmPerPixel();
+          return { x: start.x + d.x * mid - n.x * off, y: start.y + d.y * mid - n.y * off };
+        },
+        z: () => z,
+      });
+    }
   }
 
   /** A pinned element's pin (Revit's pushpin): click it to unpin. */

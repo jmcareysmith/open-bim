@@ -158,3 +158,23 @@ describe("3D shape handles: sills", () => {
     expect(() => doc.transact("Too high", (tx) => setVerticalEdge(tx, doc, win.id, "base", 2600))).toThrow();
   });
 });
+
+describe("temporary dimensions for doors and windows", () => {
+  it("clearances run to the nearest wall faces; typing one moves the door", async () => {
+    const { Document, applyResidentialTemplate, createWall, createDoor, hostedClearances, setHostedClearance, wallThickness } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const w = doc.transact("W", (tx) => createWall(tx, ids.wallTypes.exterior, { x: 0, y: 0 }, { x: 6000, y: 0 }, ids.levels.ground, { height: 2400 }));
+    // A partition teeing in at 4000.
+    const p = doc.transact("P", (tx) => createWall(tx, ids.wallTypes.interior, { x: 4000, y: 0 }, { x: 4000, y: 3000 }, ids.levels.ground, { height: 2400 }));
+    const d = doc.transact("D", (tx) => createDoor(tx, doc, ids.doorTypes.single860, w.id, 2000));
+    const c = hostedClearances(doc, d)!;
+    const half = c.half;
+    expect(c.left.stop).toBe(0);
+    expect(c.left.dist).toBeCloseTo(2000 - half);
+    const face = 4000 - wallThickness(doc, p as never) / 2;
+    expect(c.right.stop).toBeCloseTo(face);
+    doc.transact("Dim", (tx) => setHostedClearance(tx, doc, d.id, "right", 100));
+    expect(doc.require<{ position: number }>(d.id).params.position).toBeCloseTo(face - 100 - half, 0);
+  });
+});

@@ -26,6 +26,10 @@ import {
   type Room,
   type Wall,
   type WallParams,
+  barDiameter,
+  rebarQuantities,
+  type BarSize,
+  type Rebar,
 } from "@open-bim/core";
 import { SimpleKernel, elementArea, elementVolume, roomBoundary, type GeometryKernel, type MeshData } from "@open-bim/geometry";
 import { ifcGuid } from "./guid.ts";
@@ -106,6 +110,14 @@ function mapping(doc: Document, el: Element): Mapping | null {
     }
     case Cat.Toposolid:
       return { entity: "IfcGeographicElement", predefined: "TERRAIN" };
+    case Cat.Rebar:
+      return { entity: "IfcReinforcingBar", predefined: "MAIN" };
+    case Cat.DirectShape: {
+      // Imported shapes go back out as their class when it takes the plain element attributes, else as a proxy.
+      const cls = (el.params as { ifcClass?: string }).ifcClass ?? "";
+      const pre = (el.params as { properties?: Record<string, string> }).properties?.PredefinedType;
+      return PLAIN_CLASSES.has(cls) ? { entity: cls, predefined: pre ?? "NOTDEFINED" } : { entity: "IfcBuildingElementProxy", predefined: "NOTDEFINED" };
+    }
     case Cat.Stair:
       return { entity: "IfcStair", predefined: "NOTDEFINED" };
     case Cat.Ramp:
@@ -133,6 +145,15 @@ function mapping(doc: Document, el: Element): Mapping | null {
 }
 
 /** The level an element sits on (hosted elements: their wall's base level). */
+/** IFC4 element classes whose attributes are the element's own plus Tag and PredefinedType. */
+const PLAIN_CLASSES = new Set([
+  "IfcWall", "IfcSlab", "IfcRoof", "IfcCovering", "IfcColumn", "IfcBeam", "IfcMember", "IfcPlate", "IfcFooting", "IfcPile", "IfcRailing",
+  "IfcStair", "IfcStairFlight", "IfcRamp", "IfcRampFlight", "IfcCurtainWall", "IfcBuildingElementProxy", "IfcFurniture", "IfcChimney",
+  "IfcShadingDevice", "IfcGeographicElement", "IfcAirTerminal", "IfcSanitaryTerminal", "IfcLightFixture", "IfcOutlet", "IfcFireSuppressionTerminal",
+  "IfcUnitaryEquipment", "IfcElectricDistributionBoard", "IfcDuctSegment", "IfcDuctFitting", "IfcPipeSegment", "IfcPipeFitting",
+  "IfcCableCarrierSegment", "IfcCableCarrierFitting", "IfcFlowTerminal", "IfcDiscreteAccessory", "IfcMechanicalFastener",
+]);
+
 function levelOf(doc: Document, el: Element): ElementId | undefined {
   const p = el.params as Record<string, unknown>;
   if (el.category === Cat.Wall) return (p as WallParams).baseLevelId;
@@ -307,7 +328,12 @@ export function exportIfc(doc: Document, opts: IfcExportOptions = {}): string {
     const tag = elementMark(el) ?? null;
     const common = [guid(el.id), null, name, null, typeLabel(el, doc), placement, shape] as StepArg[];
     let ref: Ref;
-    if (m.entity === "IfcDoor" || m.entity === "IfcWindow") {
+    if (m.entity === "IfcReinforcingBar") {
+      // Bar size, area and total length (all its bars).
+      const rb = el as Rebar;
+      const d = barDiameter(rb.params.bar as BarSize);
+      ref = w.add("IfcReinforcingBar", ...common, tag, null, real(d), real((Math.PI * d * d) / 4), real(rebarQuantities(doc, rb).length), en("MAIN"), en("TEXTURED"));
+    } else if (m.entity === "IfcDoor" || m.entity === "IfcWindow") {
       const h = hostedPlacement(doc, el);
       ref = w.add(m.entity, ...common, tag, real(h.height), real(h.width), en(m.predefined), null, null);
     } else if (m.entity === "IfcSpace") {

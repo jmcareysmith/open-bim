@@ -39,6 +39,7 @@ import {
   type ElementId,
   type Grip,
   type Vec2,
+  type Transaction,
 } from "@open-bim/core";
 import { curtainExtent, curtainGridLines } from "@open-bim/geometry";
 import { snapPoint, viewPoint, type ToolContext } from "./tools.ts";
@@ -310,26 +311,7 @@ export class GripLayer {
       label.textContent = `${Math.round(s.dist)}`;
       label.title = "Click to type the distance to this wall face";
       label.onpointerdown = (ev) => ev.stopPropagation();
-      label.onclick = () => {
-        const input = document.createElement("input");
-        input.type = "number";
-        input.value = String(Math.round(s.dist));
-        label.replaceChildren(input);
-        input.focus();
-        input.select();
-        input.onkeydown = (ev) => {
-          ev.stopPropagation();
-          if (ev.key === "Escape") return this.refresh();
-          if (ev.key !== "Enter") return;
-          try {
-            doc.transact("Change clearance", (tx) => setHostedClearance(tx, doc, el.id, side, Number(input.value)));
-          } catch (e) {
-            this.ctx.status(`⚠ ${(e as Error).message}`);
-          }
-          this.refresh();
-        };
-        input.onblur = () => this.refresh();
-      };
+      this.editOnClick(label, s.dist, "Change clearance", (tx, v) => setHostedClearance(tx, doc, el.id, side, v));
       this.root.append(label);
       this.placed.push({
         el: label,
@@ -350,12 +332,15 @@ export class GripLayer {
     const L = Math.hypot(end.x - start.x, end.y - start.y);
     if (L < 1) return;
     const n = { x: -(end.y - start.y) / L, y: (end.x - start.x) / L };
-    // A third of the way along (clear of the length label and flip arrow in the middle).
-    const base = { x: start.x + (end.x - start.x) / 3, y: start.y + (end.y - start.y) / 3 };
     const z = gripZ(doc, wall);
     for (const side of ["left", "right"] as const) {
       const s = c[side];
       if (!s) continue;
+      // Where the two walls overlap: its middle, or a third of the way when that's the wall's middle
+      // (clear of the length label and flip arrow).
+      let f = (s.u0 + s.u1) / 2 / L;
+      if (Math.abs(f - 0.5) < 0.1) f = (s.u0 + (s.u1 - s.u0) / 3) / L;
+      const base = { x: start.x + (end.x - start.x) * f, y: start.y + (end.y - start.y) * f };
       const sign = side === "left" ? 1 : -1;
       const at = { x: base.x + n.x * sign * (s.dist / 2), y: base.y + n.y * sign * (s.dist / 2) };
       const label = document.createElement("div");
@@ -363,26 +348,7 @@ export class GripLayer {
       label.textContent = `${Math.round(s.dist)}`;
       label.title = "Distance to the parallel wall (centrelines): click to type a new one; this wall moves";
       label.onpointerdown = (ev) => ev.stopPropagation();
-      label.onclick = () => {
-        const input = document.createElement("input");
-        input.type = "number";
-        input.value = String(Math.round(s.dist));
-        label.replaceChildren(input);
-        input.focus();
-        input.select();
-        input.onkeydown = (ev) => {
-          ev.stopPropagation();
-          if (ev.key === "Escape") return this.refresh();
-          if (ev.key !== "Enter") return;
-          try {
-            doc.transact("Change wall distance", (tx) => setWallClearance(tx, doc, wall.id, side, Number(input.value)));
-          } catch (e) {
-            this.ctx.status(`⚠ ${(e as Error).message}`);
-          }
-          this.refresh();
-        };
-        input.onblur = () => this.refresh();
-      };
+      this.editOnClick(label, s.dist, "Change wall distance", (tx, v) => setWallClearance(tx, doc, wall.id, side, v));
       this.root.append(label);
       this.placed.push({ el: label, at: () => at, z: () => z });
       const other = doc.get(s.otherId) as Wall | undefined;
@@ -415,26 +381,7 @@ export class GripLayer {
       label.textContent = `${Math.round(c.dist)}`;
       label.title = "Distance to the grid: click to type a new one";
       label.onpointerdown = (ev) => ev.stopPropagation();
-      label.onclick = () => {
-        const input = document.createElement("input");
-        input.type = "number";
-        input.value = String(Math.round(c.dist));
-        label.replaceChildren(input);
-        input.focus();
-        input.select();
-        input.onkeydown = (ev) => {
-          ev.stopPropagation();
-          if (ev.key === "Escape") return this.refresh();
-          if (ev.key !== "Enter") return;
-          try {
-            doc.transact("Change distance to grid", (tx) => setPointClearance(tx, doc, el.id, c.gridId, Number(input.value)));
-          } catch (e) {
-            this.ctx.status(`⚠ ${(e as Error).message}`);
-          }
-          this.refresh();
-        };
-        input.onblur = () => this.refresh();
-      };
+      this.editOnClick(label, c.dist, "Change distance to grid", (tx, v) => setPointClearance(tx, doc, el.id, c.gridId, v));
       this.root.append(label);
       this.placed.push({ el: label, at: () => mid, z: () => z });
       this.addPermanent(mid, [
@@ -463,6 +410,32 @@ export class GripLayer {
     };
     this.root.append(b);
     this.placed.push({ el: b, at: () => at });
+  }
+
+  /** Click a temporary dimension to type a new value (Enter applies; Esc, an empty box or leaving cancels). */
+  private editOnClick(label: HTMLElement, value: number, name: string, apply: (tx: Transaction, v: number) => void): void {
+    label.onclick = () => {
+      const input = document.createElement("input");
+      input.type = "number";
+      input.value = String(Math.round(value));
+      label.replaceChildren(input);
+      input.focus();
+      input.select();
+      input.onkeydown = (ev) => {
+        ev.stopPropagation();
+        if (ev.key === "Escape") return this.refresh();
+        if (ev.key !== "Enter") return;
+        const v = input.value.trim() === "" ? NaN : Number(input.value);
+        if (!Number.isFinite(v)) return this.refresh();
+        try {
+          this.ctx.doc.transact(name, (tx) => apply(tx, v));
+        } catch (e) {
+          this.ctx.status(`⚠ ${(e as Error).message}`);
+        }
+        this.refresh();
+      };
+      input.onblur = () => this.refresh();
+    };
   }
 
   /** A pinned element's pin (Revit's pushpin): click it to unpin. */

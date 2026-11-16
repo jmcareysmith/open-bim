@@ -381,16 +381,25 @@ export function hostedClearances(doc: Document, el: Element): { hostId: ElementI
   const d = { x: (end.x - start.x) / L, y: (end.y - start.y) / L };
   const half = hp.width / 2;
   const hostHalf = wallThickness(doc, host) / 2;
-  // Faces of walls meeting the host along its length.
+  // Faces of walls meeting the host on its storey: teeing in, crossing, or at its corners.
   const stops = [0, L];
+  const hz = wallExtent(doc, host);
   for (const w of doc.byCategory<WallParams>(Cat.Wall) as Wall[]) {
     if (w.id === host.id || w.params.curve) continue;
-    for (const q of [w.params.start, w.params.end]) {
-      const u = (q.x - start.x) * d.x + (q.y - start.y) * d.y;
-      const v = -(q.x - start.x) * d.y + (q.y - start.y) * d.x;
-      if (u <= 1 || u >= L - 1 || Math.abs(v) > hostHalf + 1) continue;
-      const t = wallThickness(doc, w) / 2;
-      stops.push(u - t, u + t);
+    const wz = wallExtent(doc, w);
+    if (Math.min(hz.top, wz.top) - Math.max(hz.bottom, wz.bottom) < 1) continue;
+    const t = wallThickness(doc, w) / 2;
+    const uv = (q: Vec2) => ({ u: (q.x - start.x) * d.x + (q.y - start.y) * d.y, v: -(q.x - start.x) * d.y + (q.y - start.y) * d.x });
+    const a = uv(w.params.start);
+    const b = uv(w.params.end);
+    // Ends on the host (tees, and corner walls at its ends).
+    for (const q of [a, b]) if (Math.abs(q.v) <= hostHalf + 1 && q.u > -t - 1 && q.u < L + t + 1) stops.push(q.u - t, q.u + t);
+    // Crossing: where its line passes the host's.
+    if ((a.v > hostHalf) !== (b.v > hostHalf) || (a.v < -hostHalf) !== (b.v < -hostHalf)) {
+      if (Math.abs(b.v - a.v) > 1e-6) {
+        const u = a.u + ((0 - a.v) * (b.u - a.u)) / (b.v - a.v);
+        if (u > 0 && u < L) stops.push(u - t, u + t);
+      }
     }
   }
   const lo = hp.position - half;
@@ -415,14 +424,18 @@ export function setHostedClearance(tx: Transaction, doc: Document, id: ElementId
  * A straight wall's temporary dimensions (Revit's): centreline distance to the nearest parallel
  * wall on each side (one overlapping it along its length), with that wall's id.
  */
-export function wallClearances(doc: Document, wall: Wall): Partial<Record<"left" | "right", { otherId: ElementId; dist: number }>> {
+export function wallClearances(doc: Document, wall: Wall): Partial<Record<"left" | "right", { otherId: ElementId; dist: number; u0: number; u1: number }>> {
   const { start, end, curve } = wall.params;
   const L = Math.hypot(end.x - start.x, end.y - start.y);
   if (L < 1 || curve) return {};
   const d = { x: (end.x - start.x) / L, y: (end.y - start.y) / L };
-  const out: Partial<Record<"left" | "right", { otherId: ElementId; dist: number }>> = {};
+  const out: Partial<Record<"left" | "right", { otherId: ElementId; dist: number; u0: number; u1: number }>> = {};
+  const z = wallExtent(doc, wall);
   for (const w of doc.byCategory<WallParams>(Cat.Wall) as Wall[]) {
     if (w.id === wall.id || w.params.curve) continue;
+    // Same storey only (their heights overlap).
+    const wz = wallExtent(doc, w);
+    if (Math.min(z.top, wz.top) - Math.max(z.bottom, wz.bottom) < 1) continue;
     const a = w.params.start;
     const b = w.params.end;
     const l = Math.hypot(b.x - a.x, b.y - a.y);
@@ -435,7 +448,10 @@ export function wallClearances(doc: Document, wall: Wall): Partial<Record<"left"
     if (Math.abs(v) < 1) continue;
     const side = v > 0 ? "left" : "right";
     const cur = out[side];
-    if (!cur || Math.abs(v) < cur.dist) out[side] = { otherId: w.id, dist: Math.abs(v) };
+    // Where the two overlap along this wall (the dimension goes there).
+    const u0 = Math.max(0, Math.min(ua, ub));
+    const u1 = Math.min(L, Math.max(ua, ub));
+    if (!cur || Math.abs(v) < cur.dist) out[side] = { otherId: w.id, dist: Math.abs(v), u0, u1 };
   }
   return out;
 }

@@ -213,3 +213,22 @@ describe("temporary dimensions for columns", () => {
     expect(doc.require<{ position: Vec2 }>(c.id).params.position.x).toBeCloseTo(1000);
   });
 });
+
+describe("clearance stops", () => {
+  it("corner walls' inside faces and crossing walls stop it; walls upstairs don't", async () => {
+    const { Document, applyResidentialTemplate, createWall, createDoor, hostedClearances, wallThickness } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const t = ids.wallTypes.exterior;
+    const g = ids.levels.ground;
+    const host = doc.transact("H", (tx) => createWall(tx, t, { x: 0, y: 0 }, { x: 8000, y: 0 }, g, { height: 2400 }));
+    const corner = doc.transact("C", (tx) => createWall(tx, t, { x: 0, y: 0 }, { x: 0, y: 4000 }, g, { height: 2400 }));
+    const cross = doc.transact("X", (tx) => createWall(tx, ids.wallTypes.interior, { x: 5000, y: -2000 }, { x: 5000, y: 2000 }, g, { height: 2400 }));
+    // Upstairs, teeing onto the same line at 3000: not on this storey.
+    doc.transact("U", (tx) => createWall(tx, ids.wallTypes.interior, { x: 3000, y: 0 }, { x: 3000, y: 3000 }, ids.levels.first, { height: 2400 }));
+    const d = doc.transact("D", (tx) => createDoor(tx, doc, ids.doorTypes.single860, host.id, 2000));
+    const c = hostedClearances(doc, d)!;
+    expect(c.left.stop).toBeCloseTo(wallThickness(doc, corner as never) / 2);
+    expect(c.right.stop).toBeCloseTo(5000 - wallThickness(doc, cross as never) / 2);
+  });
+});

@@ -16,11 +16,11 @@ function plain(doc: Document, w: Wall): boolean {
 
 
 /** The footprints (with height ranges) of walls running through this one. */
-export function crossingCutters(doc: Document, wall: Wall): { loop: Vec2[]; z0: number; z1: number }[] {
+export function crossingCutters(doc: Document, wall: Wall): { loop: Vec2[]; z0: number; z1: number; top?: number }[] {
   if (!plain(doc, wall)) return [];
   const own = wallThickness(doc, wall);
   const { bottom, top } = wallExtent(doc, wall);
-  const out: { loop: Vec2[]; z0: number; z1: number }[] = [];
+  const out: { loop: Vec2[]; z0: number; z1: number; top?: number }[] = [];
   for (const id of crossingWalls(doc, wall)) {
     const o = doc.get(id) as Wall | undefined;
     if (!o || !plain(doc, o)) continue;
@@ -31,7 +31,7 @@ export function crossingCutters(doc: Document, wall: Wall): { loop: Vec2[]; z0: 
     const r = wallExtent(doc, o);
     const z0 = Math.max(bottom, r.bottom);
     const z1 = Math.min(top, r.top);
-    if (z1 - z0 > 1) out.push({ loop: joinedWallFootprint(doc, o), z0, z1 });
+    if (z1 - z0 > 1) out.push({ loop: joinedWallFootprint(doc, o), z0, z1, top: r.top });
   }
   return out;
 }
@@ -117,7 +117,9 @@ export function profileCrossCuts(doc: Document, wall: Wall): { u0: number; u1: n
     const a = span(c.loop, half - 0.5);
     const b = span(c.loop, -half + 0.5);
     if (!a || !b || Math.abs(a[0] - b[0]) > 2 || Math.abs(a[1] - b[1]) > 2) continue;
-    out.push({ u0: Math.min(a[0], b[0]), u1: Math.max(a[1], b[1]), z0: c.z0 - bottom, z1: c.z1 - bottom });
+    // Up to the crossing wall's own top (a profile can rise above this wall's nominal height).
+    const top = Math.max(c.z1, c.top ?? c.z1);
+    out.push({ u0: Math.min(a[0], b[0]), u1: Math.max(a[1], b[1]), z0: c.z0 - bottom, z1: top - bottom });
   }
   return out;
 }

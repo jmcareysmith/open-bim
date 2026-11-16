@@ -1370,9 +1370,12 @@ const commands: Record<string, () => void | Promise<void>> = {
     const v3 = activeView()?.params.kind === "3d" ? activeView()! : views(doc).find((x) => x.params.kind === "3d");
     if (!v3) return status("⚠ No 3D view in this project");
     const box = { min: { x: min[0]!, y: min[1]!, z: min[2]! }, max: { x: max[0]!, y: max[1]!, z: max[2]! } };
+    const keep = [...selection];
     edit("Selection box", (tx) => tx.update<ViewParams>(v3.id, { sectionBox: box }));
-    ctx.setActiveView(v3.id);
-    viewport.zoomToFit();
+    if (activeViewId !== v3.id) ctx.setActiveView(v3.id);
+    ctx.setSelection(keep.filter((id) => doc.has(id)));
+    // After the view (and its saved camera) has loaded.
+    requestAnimationFrame(() => requestAnimationFrame(() => viewport.zoomToFit()));
     status("Section box set round the selection (view Properties → Section box to turn it off).");
   },
   view3d() {

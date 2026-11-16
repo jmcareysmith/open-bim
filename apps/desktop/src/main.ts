@@ -18,6 +18,7 @@ import { WallProfileTool } from "./profiletool.ts";
 import { LevelTool, MatchTypeTool, ZoomRegionTool } from "./revittools.ts";
 import { selectOptions, setSelectOption } from "./selectopts.ts";
 import { openWorksetsDialog } from "./worksetsui.ts";
+import { openPurgeDialog } from "./purgeui.ts";
 import { worksets, activeWorkset, setActiveWorkset, enableWorksetAssignment, ungroup, enablePinning, isPinned, setPinned, setElementOverrides, setCategoryOverride, type DirectShapeParams, enableSharedNested, enableBeamSystems, createImageUnderlay, planCrop, createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
   ceilingPlanFor,
   createCeilingPlan,
@@ -1101,6 +1102,9 @@ const commands: Record<string, () => void | Promise<void>> = {
     });
     ctx.setSelection(ids);
     status(`Ungrouped ${groups.length} group(s).`);
+  },
+  purgeUnused() {
+    openPurgeDialog(doc, status, () => refreshAll());
   },
   worksets() {
     openWorksetsDialog(doc, status, () => refreshAll(), () =>

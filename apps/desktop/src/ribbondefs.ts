@@ -564,6 +564,7 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
           items: [
             { label: "System Browser", icon: "duct", cmd: "systemBrowser", title: "MEP systems, their members and totals (F9)" },
             { label: "Model Statistics", icon: "info", cmd: "manageStatistics", title: "How many of each element" },
+            { label: "Purge Unused", icon: "delete", cmd: "purgeUnused", title: "Remove types, materials, families, templates and filters nothing uses" },
           ],
         },
         { title: "Add-ins", items: [{ label: "Console & Plugins", icon: "console", cmd: "console", large: true, title: "Scripting console and plugins (`)" }] },

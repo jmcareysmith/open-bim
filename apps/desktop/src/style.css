@@ -460,3 +460,5 @@ body.pane-dragging canvas { pointer-events: none; }
 
 .sel-opt { border: 0; background: none; cursor: pointer; font-size: 13px; padding: 0 4px; }
 .sel-opt.off { opacity: 0.35; filter: grayscale(1); }
+.purge { max-height: 60vh; overflow: auto; min-width: 320px; }
+.purge-row { display: block; padding: 1px 0 1px 12px; }

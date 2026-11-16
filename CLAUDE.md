@@ -125,7 +125,8 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   (system families Walls/Floors/…/Ducts/Pipes and loadable ones, by category → family → type),
   Groups (model/detail), Links. Project Information, Materials, Project Parameters, Levels,
   Filters & Templates, Design Options, Revisions, System Browser (F9) and Model Statistics are
-  Manage-tab dialogs (`projectSection` in panels.ts).
+  Manage-tab dialogs (`projectSection` in panels.ts). Manage → Purge Unused (core purge.ts `unusedElements`: types without instances,
+  unreferenced materials (by id or layer name)/families/templates/filters; one type of each kind kept; purgeui.ts).
 - Status bar: ⧩ selection count at the right; click to filter the selection by category. Revit's selection toggles beside it
   (selectopts.ts, local storage): 📌 Select pinned elements (off: pinned can't be selected), ✥ Drag elements on selection
   (on: press on any element and drag it; default off).

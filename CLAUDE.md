@@ -313,7 +313,11 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - 2026-11-10: every REVIT_FEATURE_MAP row is ✅ except the three that rest on provisional figures (MEP sizing,
   energy, loads: waiting on Jeremy's standards). Visual programming has a Script (JavaScript) node (Jeremy's go-ahead,
   2026-11-11; `IN` list + `doc`, runs with app rights like the console); Python would need Pyodide.
-- Phase 9 done (2026-11-11); every roadmap phase is ticked. Next phase not yet agreed with Jeremy.
+- Phase 9 done (2026-11-11). Phase 10 (Revit via IFC) done 2026-11-16: a whole house exports and re-imports fully native
+  (packages/ifc/test/roundtrip.test.ts); converted elements keep IFC GlobalId/psets (`ifc` param, Properties → From IFC);
+  import indexes psets once (`propertyIndex`), streams IfcSpace separately (rooms), reads IfcGrid; export writes stairs,
+  ramps, railings, terrain, rebar, curtain walls as plates+mullions, and still-imported shapes as their class.
+  Next phase not yet agreed with Jeremy.
 - Speed (2026-11-16): `doc.revision` (bumps on every change) keys caches — byCategory index, wall join/crossing
   lookups (core joins.ts `wallIndex`: bbox grid); hlr.ts keeps triangles/feature edges per MeshData (WeakMap), sections keep
   view copies per mesh and cull outside crop/clip. Benchmark: `PERF=1 npx vitest run packages/geometry/test/perf.test.ts`

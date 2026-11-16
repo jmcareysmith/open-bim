@@ -143,7 +143,7 @@ Each phase ends with something usable. Work one feature per session; tick items 
 - [x] Point clouds: Insert → Point Cloud (LAS, XYZ/PTS/TXT/CSV; thinned to 200k; shared coordinates or centred), drawn in 3D, move
 - [x] Point clouds in plans (view range clips them) and sections/elevations (points between cut and far clip, cropped, jogs), snapping to scan points in plans
 
-## Phase 10 — Revit models in through IFC (current, 2026-11-16)
+## Phase 10 — Revit models in through IFC (done, 2026-11-16)
 
 RVT is closed (only the paid ODA BIM SDK reads it), so Revit projects come in as IFC and are converted
 to native elements where their shapes allow.

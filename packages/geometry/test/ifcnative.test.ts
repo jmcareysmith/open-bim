@@ -264,8 +264,8 @@ describe("curtain walls from IFC panels", () => {
     const mk = (ifcClass: string, mesh: { positions: number[]; indices: number[] }) =>
       doc.transact("I", (tx) => createDirectShape(tx, { levelId: lvl, ifcClass, globalId: ifcClass, ...mesh, color: 0x88aacc, properties: {} }).id);
     const panels: string[] = [];
-    for (const [u0, u1] of [[0, 1175], [1225, 2375], [2425, 3600]]) {
-      for (const [z0, z1] of [[0, 1475], [1525, 3000]]) panels.push(mk("IfcPlate", box(rect(u0, -12, u1, 12), z0, z1)));
+    for (const [u0, u1] of [[0, 1175], [1225, 2375], [2425, 3600]] as const) {
+      for (const [z0, z1] of [[0, 1475], [1525, 3000]] as const) panels.push(mk("IfcPlate", box(rect(u0, -12, u1, 12), z0, z1)));
     }
     const mullion = mk("IfcMember", box(rect(1175, -50, 1225, 50), 0, 3000));
     const r = doc.transact("C", (tx) => convertDirectShapes(tx, doc, panels));

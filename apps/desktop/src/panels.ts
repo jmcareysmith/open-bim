@@ -1,4 +1,4 @@
-import { convertDirectShapes, convertible, areaBoundary, curtainGridLines, areaLoopsFromWalls, massFloorArea, massTotals, roomBoundary, scheduleFields, scheduleTable } from "@open-bim/geometry";
+import { convertDirectShapes, convertible, areaBoundary, curtainExtent, curtainGridLines, areaLoopsFromWalls, massFloorArea, massTotals, roomBoundary, scheduleFields, scheduleTable } from "@open-bim/geometry";
 import { openColorSchemes } from "./colorschemes.ts";
 import { curtainPart, partLabel, setCurtainPart } from "./curtainpart.ts";
 import {
@@ -500,7 +500,7 @@ function curtainPartRows(ctx: PanelContext, w: Wall, key: string): HTMLElement[]
   }
   // Mullion segment "v:k:j" / "h:k:i": its line is everything sharing "v:k:".
   const [axis, line] = key.split(":");
-  const { u: us, z: zs } = curtainGridLines(arcLength(w.params.start, w.params.end, w.params.curve), wallExtent(doc, w).bottom, wallExtent(doc, w).top, grid, ed);
+  const { u: us, z: zs } = curtainGridLines(arcLength(w.params.start, w.params.end, w.params.curve), curtainExtent(doc, w).bottom, curtainExtent(doc, w).top, grid, ed);
   const lastLine = axis === "v" ? us.length - 1 : zs.length - 1;
   const segments = axis === "v" ? zs.length - 1 : us.length - 1;
   const edge = Number(line) === 0 || Number(line) === lastLine;
@@ -543,7 +543,7 @@ function curtainRows(ctx: PanelContext, w: Wall): HTMLElement[] {
   const { doc } = ctx;
   const grid = curtainOf(doc, w)!;
   const len = arcLength(w.params.start, w.params.end, w.params.curve);
-  const { bottom, top } = wallExtent(doc, w);
+  const { bottom, top } = curtainExtent(doc, w);
   const ed: CurtainEdits = w.params.curtainEdits ?? {};
   const { u: us, z: zs } = curtainGridLines(len, bottom, top, grid, ed);
   const save = (next: CurtainEdits | null, name = "Edit curtain wall") => edit(ctx, name, (tx) => setCurtainEdits(tx, doc, w.id, next));
@@ -2932,6 +2932,8 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
         const part = curtainPart();
         if (part?.id === w.id) sec.firstElementChild!.after(...curtainPartRows(ctx, w, part.key));
         sec.append(...curtainRows(ctx, w));
+        // Edit Profile clips the grid (gables, rakes): panels and mullions inside, mullions along its edges.
+        sec.append(...profileRows(ctx, w));
         break;
       }
       // Curve (Revit: an arc wall): how far its middle bows off the straight line, mm; 0 = straight.

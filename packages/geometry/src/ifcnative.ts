@@ -651,7 +651,7 @@ function familiesFromShapes(tx: Transaction, doc: Document, ids: ElementId[]): E
   return out;
 }
 
-type Panel = { id: ElementId; levelId: ElementId; c: Vec2; u: Vec2; u0: number; u1: number; z0: number; z1: number; thick: number };
+type Panel = { id: ElementId; levelId: ElementId; c: Vec2; u: Vec2; u0: number; u1: number; z0: number; z1: number; thick: number; pts: { x: number; y: number; z: number }[] };
 
 /** Imported panels as thin vertical rectangles, grouped by the plane they lie in. */
 function curtainGroups(doc: Document, ids: ElementId[]): Panel[][] {
@@ -662,7 +662,9 @@ function curtainGroups(doc: Document, ids: ElementId[]): Panel[][] {
     const { xy, z0, z1 } = bounds(ds.params);
     const r = minRect(xy);
     if (!r || r.wid > 150 || r.len < r.wid * 2 || z1 - z0 < 50) continue;
-    panels.push({ id, levelId: ds.params.levelId, c: r.c, u: r.u, u0: -r.len / 2, u1: r.len / 2, z0, z1, thick: r.wid });
+    const P = ds.params.positions;
+    const pts = Array.from({ length: P.length / 3 }, (_, i) => ({ x: P[i * 3]!, y: P[i * 3 + 1]!, z: P[i * 3 + 2]! }));
+    panels.push({ id, levelId: ds.params.levelId, c: r.c, u: r.u, u0: -r.len / 2, u1: r.len / 2, z0, z1, thick: r.wid, pts });
   }
   const groups: Panel[][] = [];
   for (const p of panels) {
@@ -712,31 +714,82 @@ function curtainFromPanels(tx: Transaction, doc: Document, g: Panel[]): ElementI
   const along = (p: Panel, s: number) => (p.c.x + p.u.x * s - ref.c.x) * ref.u.x + (p.c.y + p.u.y * s - ref.c.y) * ref.u.y;
   const ends = g.map((p) => [along(p, p.u0), along(p, p.u1)].sort((a, b) => a - b) as [number, number]);
   const gap = 200;
-  const us = cluster(ends.flat(), gap);
-  const zs = cluster(g.flatMap((p) => [p.z0, p.z1]), gap);
+  // Each panel's elevation outline (u along the reference line, z): grid lines come from its
+  // vertical and horizontal edges only (a gable's raked panels add none along the rake).
+  const elev = g.map((p) => hull(p.pts.map((q) => ({ x: (q.x - ref.c.x) * ref.u.x + (q.y - ref.c.y) * ref.u.y, y: q.z }))));
+  const uEdges: number[] = [];
+  const zEdges: number[] = [];
+  for (const h of elev) {
+    h.forEach((a, i) => {
+      const b = h[(i + 1) % h.length]!;
+      if (Math.hypot(b.x - a.x, b.y - a.y) < 50) return;
+      if (Math.abs(a.x - b.x) < 2) uEdges.push((a.x + b.x) / 2);
+      if (Math.abs(a.y - b.y) < 2) zEdges.push((a.y + b.y) / 2);
+    });
+  }
+  const us = cluster(uEdges.length ? uEdges : ends.flat(), gap);
+  const zs = cluster(zEdges.length ? zEdges : g.flatMap((p) => [p.z0, p.z1]), gap);
   if (us.length < 2 || zs.length < 2) return null;
-  const uMin = Math.min(...ends.map((e) => e[0]));
-  const uMax = Math.max(...ends.map((e) => e[1]));
-  const zMin = Math.min(...g.map((p) => p.z0));
-  const zMax = Math.max(...g.map((p) => p.z1));
   const off = g.reduce((s, p) => s + (-ref.u.y * (p.c.x - ref.c.x) + ref.u.x * (p.c.y - ref.c.y)), 0) / g.length;
-  const n = { x: -ref.u.y, y: ref.u.x };
-  const at = (u: number) => ({ x: ref.c.x + ref.u.x * u + n.x * off, y: ref.c.y + ref.u.y * u + n.y * off });
-  const lvl = doc.get<LevelParams>(ref.levelId)?.params.elevation ?? 0;
-  const w = createWall(tx, type.id, at(uMin), at(uMax), ref.levelId, { baseOffset: zMin - lvl, height: zMax - zMin });
-  // Interior grid lines (the outermost clusters are the wall's edges).
-  const uLines = us.slice(1, -1).map((u) => Math.round(u - uMin));
-  const zLines = zs.slice(1, -1).map((z) => Math.round(z - zMin));
-  tx.update<WallParams>(w.id, { curtainEdits: { uLines, zLines } });
-  // The panels, and mullions lying in the same plane within the wall's extent, are now the wall's.
-  for (const p of g) tx.delete(p.id);
+  // Mullions in the panels' plane and extent: the wall's (they go with the panels), and their outline counts (border mullions, rakes).
+  const pu0 = Math.min(...ends.map((e) => e[0]));
+  const pu1 = Math.max(...ends.map((e) => e[1]));
+  const pz0 = Math.min(...g.map((p) => p.z0));
+  const pz1 = Math.max(...g.map((p) => p.z1));
+  const members: { id: ElementId; elev: Vec2[] }[] = [];
   for (const m of doc.byCategory<DirectShapeParams>(Cat.DirectShape)) {
     if (m.params.ifcClass !== "IfcMember") continue;
     const { xy, z0, z1 } = bounds(m.params);
     const inPlane = xy.every((q) => Math.abs(-ref.u.y * (q.x - ref.c.x) + ref.u.x * (q.y - ref.c.y) - off) < 200);
     const us2 = xy.map((q) => (q.x - ref.c.x) * ref.u.x + (q.y - ref.c.y) * ref.u.y);
-    if (inPlane && Math.min(...us2) >= uMin - 200 && Math.max(...us2) <= uMax + 200 && z0 >= zMin - 200 && z1 <= zMax + 200) tx.delete(m.id);
+    if (!inPlane || Math.min(...us2) < pu0 - 200 || Math.max(...us2) > pu1 + 200 || z0 < pz0 - 200 || z1 > pz1 + 200) continue;
+    const P = m.params.positions;
+    members.push({ id: m.id, elev: hull(us2.map((u, i) => ({ x: u, y: P[i * 3 + 2]! }))) });
   }
+  const outlinePts = [...elev, ...members.map((m) => m.elev)].flat();
+  const uMin = Math.min(pu0, ...outlinePts.map((q) => q.x));
+  const uMax = Math.max(pu1, ...outlinePts.map((q) => q.x));
+  const zMin = Math.min(pz0, ...outlinePts.map((q) => q.y));
+  const zMax = Math.max(pz1, ...outlinePts.map((q) => q.y));
+  const n = { x: -ref.u.y, y: ref.u.x };
+  const at = (u: number) => ({ x: ref.c.x + ref.u.x * u + n.x * off, y: ref.c.y + ref.u.y * u + n.y * off });
+  const lvl = doc.get<LevelParams>(ref.levelId)?.params.elevation ?? 0;
+  const w = createWall(tx, type.id, at(uMin), at(uMax), ref.levelId, { baseOffset: zMin - lvl, height: zMax - zMin });
+  // Interior grid lines (strictly inside the wall; its edges are the outermost).
+  const uLines = us.filter((u) => u > uMin + gap && u < uMax - gap).map((u) => Math.round(u - uMin));
+  const zLines = zs.filter((z) => z > zMin + gap && z < zMax - gap).map((z) => Math.round(z - zMin));
+  tx.update<WallParams>(w.id, { curtainEdits: { uLines, zLines } });
+  // Not a rectangle (a gable, a raked or stepped top): the panels' outline becomes the wall's Edit Profile.
+  // Panels grown by half the joint gap merge across mullions; the hull of the panels trims the growth back.
+  const half = gap / 2;
+  const grown = [...elev, ...members.map((m) => m.elev)].filter((h) => h.length >= 3).map((h): Polygon => [[...hull(h.flatMap((q) => [{ x: q.x - half, y: q.y - half }, { x: q.x + half, y: q.y - half }, { x: q.x + half, y: q.y + half }, { x: q.x - half, y: q.y + half }])), ].map((q): [number, number] => [q.x, q.y])]);
+  const ringOf = (l: Vec2[]): [number, number][] => [...l.map((q): [number, number] => [q.x, q.y]), [l[0]!.x, l[0]!.y]];
+  for (const poly of grown) poly[0]!.push(poly[0]![0]!);
+  const merged = polygonClipping.union(grown[0]!, ...grown.slice(1));
+  const all = hull(outlinePts);
+  if (merged.length === 1 && all.length >= 3) {
+    const trimmed = polygonClipping.intersection(merged, [ringOf(all)]);
+    if (trimmed.length === 1) {
+      let outline = trimmed[0]![0]!.slice(0, -1).map(([x, y]) => ({ x: x - uMin, y: y - zMin }));
+      // Drop points on straight runs.
+      outline = outline.filter((q, i) => {
+        const a = outline[(i - 1 + outline.length) % outline.length]!;
+        const b = outline[(i + 1) % outline.length]!;
+        return Math.abs((q.x - a.x) * (b.y - a.y) - (q.y - a.y) * (b.x - a.x)) > Math.hypot(b.x - a.x, b.y - a.y) * 2;
+      });
+      const rect = (uMax - uMin) * (zMax - zMin);
+      if (outline.length >= 3 && polyArea(outline) < rect * 0.99) {
+        try {
+          setWallProfile(tx, doc, w.id, outline.map((q) => ({ x: Math.round(q.x), y: Math.round(q.y) })));
+        } catch {
+          // Not a usable outline: the rectangle stands.
+        }
+      }
+    }
+  }
+  // The panels, and mullions lying in the same plane within the wall's extent, are now the wall's.
+  for (const p of g) tx.delete(p.id);
+  for (const m of members) tx.delete(m.id);
   return w.id;
 }
 

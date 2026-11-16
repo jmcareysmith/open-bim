@@ -177,4 +177,5 @@ to native elements where their shapes allow.
 - [x] Export: rebar as IfcReinforcingBar; shapes still imported go back out as their class (proxy otherwise); curtain walls as plates + mullions; stairs, ramps, railings, terrain
 - [x] Terrain (IfcGeographicElement / site shape) → toposolid (outline, surface points, depth); toposolids export as terrain
 - [x] MEP systems: IfcRelAssignsToGroup → System property → run classification (supply/return/exhaust/outside air; cold/hot water, sanitary, vent, stormwater, fire, gas)
-- [ ] Still shapes: non-rectangular curtain panels; anything whose rebuilt version wouldn't match its mesh
+- [x] Non-rectangular curtain walls (gables, rakes, steps): the panels' and mullions' outline becomes the wall's Edit Profile; grid lines only from square panel edges
+- [ ] Still shapes: anything whose rebuilt version wouldn't match its mesh

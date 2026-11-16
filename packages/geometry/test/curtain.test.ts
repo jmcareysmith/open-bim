@@ -80,3 +80,27 @@ describe("curtain walls", () => {
     expect(minX).toBeCloseTo(1000 - 50, 3);
   });
 });
+
+describe("curtain walls with an Edit Profile", () => {
+  it("a gable outline: nothing outside it, grid up to the apex, mullions along the rakes", async () => {
+    const { setWallProfile } = await import("@open-bim/core");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const w = doc.transact("CW", (tx) => createWall(tx, ids.wallTypes.curtain, { x: 0, y: 0 }, { x: 6000, y: 0 }, ids.levels.ground, { height: 3000 }));
+    const gable = [{ x: 0, y: 0 }, { x: 6000, y: 0 }, { x: 6000, y: 3000 }, { x: 3000, y: 4500 }, { x: 0, y: 3000 }];
+    doc.transact("P", (tx) => setWallProfile(tx, doc, w.id, gable));
+    const mesh = new SimpleKernel().build(doc, doc.require(w.id))!;
+    const bb = boundingBox(mesh);
+    expect(bb.max[2]).toBeCloseTo(4500, 0);
+    // Every vertex inside the gable (u = x here, z up), within a mm.
+    const P = mesh.positions;
+    for (let i = 0; i < P.length; i += 3) {
+      const u = P[i]!;
+      const z = P[i + 2]!;
+      const roof = 3000 + 1500 * (1 - Math.abs(u - 3000) / 3000);
+      expect(z).toBeLessThanOrEqual(roof + 1);
+    }
+    // Rake mullions are parts of their own.
+    expect(mesh.parts!.some((p) => p.key.startsWith("e:"))).toBe(true);
+  });
+});

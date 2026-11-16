@@ -654,3 +654,43 @@ describe("profiles follow snapped wall ends", () => {
     expect(Math.abs(host.params.end.y - host.params.start.y)).toBeLessThan(1); // the wall along x
   });
 });
+
+describe("non-rectangular curtain walls from IFC", () => {
+  it("a gable's panels give the wall an Edit Profile; raked panels add no grid lines", async () => {
+    const { SimpleKernel } = await import("../src/index.ts");
+    const { setWallProfile, createWall } = await import("@open-bim/core");
+    const src = new Document();
+    const sids = applyResidentialTemplate(src);
+    const cw = src.transact("CW", (tx) => createWall(tx, sids.wallTypes.curtain, { x: 0, y: 0 }, { x: 6000, y: 0 }, sids.levels.ground, { height: 3000 }));
+    src.transact("P", (tx) => setWallProfile(tx, src, cw.id, [{ x: 0, y: 0 }, { x: 6000, y: 0 }, { x: 6000, y: 3000 }, { x: 3000, y: 4500 }, { x: 0, y: 3000 }]));
+    const mesh = new SimpleKernel().build(src, src.require(cw.id))!;
+    // Its parts as imported shapes: panels as plates, the rest as members.
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const plates: string[] = [];
+    doc.transact("I", (tx) => {
+      for (const pt of mesh.parts!) {
+        const tri = Array.from(mesh.indices.subarray(pt.start, pt.start + pt.count));
+        const used = [...new Set(tri)];
+        const map = new Map(used.map((v, i) => [v, i]));
+        const positions = used.flatMap((v) => [mesh.positions[v * 3]!, mesh.positions[v * 3 + 1]!, mesh.positions[v * 3 + 2]!]);
+        const panel = pt.key.startsWith("p:");
+        const id = createDirectShape(tx, { levelId: ids.levels.ground, ifcClass: panel ? "IfcPlate" : "IfcMember", globalId: pt.key, positions, indices: tri.map((v) => map.get(v)!), color: 0x88aacc, properties: {} }).id;
+        if (panel) plates.push(id);
+      }
+    });
+    const r = doc.transact("C", (tx) => convertDirectShapes(tx, doc, plates));
+    expect(r.created).toHaveLength(1);
+    const w = doc.require<WallParams>(r.created[0]!);
+    const prof = w.params.profile!;
+    expect(prof).toBeDefined();
+    const top = Math.max(...prof.map((q) => q.y));
+    // The mullions count: the same gable as the source.
+    expect(top).toBeCloseTo(4500, -1);
+    expect(Math.abs(w.params.end.x - w.params.start.x)).toBeCloseTo(6000, -1);
+    expect(prof.length).toBe(5);
+    // Grid lines as the source's (1500, 3000): none from the raked panels.
+    expect((w.params.curtainEdits?.zLines ?? []).map((z) => Math.round(z + w.params.baseOffset))).toEqual([1500, 3000]);
+    expect(doc.byCategory("DirectShape")).toHaveLength(0);
+  });
+});

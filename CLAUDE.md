@@ -379,5 +379,7 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   flex bends/origins; wall rebar mats stop at inserts; return/exhaust pressure from equipment inlets; LAZ refused.
   SimpleKernel cuts sloped-top walls at crossings (wallcrossings `cutSlopedWall`); Edit Profile walls only in OCCT.
   MEP sizing and pressure share one network (mep.ts `systemNetwork`).
+  Curtain walls take Edit Profile (curtain.ts: panels clipped, mullions kept inside both faces, border mullions along
+  off-grid edges, parts `e:<i>`; grid to the profile top, `curtainExtent`); IFC gable curtain walls convert with it.
 - Autosave (apps/desktop/src/autosave.ts): every 3 min while dirty (not in the family editor) the project goes to IndexedDB;
   Save clears it; at start-up a leftover autosave prompts "Recover it?" (loads it, marked unsaved).

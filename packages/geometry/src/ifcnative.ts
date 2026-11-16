@@ -131,8 +131,13 @@ function hull(pts: Vec2[]): Vec2[] {
 const polyArea = (l: Vec2[]) => Math.abs(l.reduce((s, q, i) => s + q.x * l[(i + 1) % l.length]!.y - l[(i + 1) % l.length]!.x * q.y, 0)) / 2;
 
 function snapWallEnds(tx: Transaction, doc: Document, ids: ElementId[]): void {
-  const ws = () => ids.map((id) => doc.get<WallParams>(id) as Wall | undefined).filter((w): w is Wall => !!w && !w.params.curve);
-  for (const w0 of ws()) {
+  const all = ids.map((id) => doc.get<WallParams>(id) as Wall | undefined).filter((w): w is Wall => !!w && !w.params.curve);
+  // Nearby walls by their (original) boxes, grown by the thickest wall.
+  const reachAll = Math.max(0, ...all.map((w) => wallThickness(doc, w))) + 10;
+  const grid = new BoxGrid<ElementId>();
+  for (const w of all) grid.add(w.id, Math.min(w.params.start.x, w.params.end.x) - reachAll, Math.min(w.params.start.y, w.params.end.y) - reachAll, Math.max(w.params.start.x, w.params.end.x) + reachAll, Math.max(w.params.start.y, w.params.end.y) + reachAll);
+  const near = (q: Vec2) => grid.near(q.x, q.y, q.x, q.y).map((id) => doc.require<WallParams>(id) as Wall);
+  for (const w0 of all) {
     const w = doc.require<WallParams>(w0.id) as Wall;
     const tw = wallThickness(doc, w);
     const patch: Partial<WallParams> = {};
@@ -140,7 +145,7 @@ function snapWallEnds(tx: Transaction, doc: Document, ids: ElementId[]): void {
       const e = w.params[end];
       let best: Vec2 | null = null;
       let bestD = Infinity;
-      for (const o of ws()) {
+      for (const o of near(e)) {
         if (o.id === w.id) continue;
         const to = wallThickness(doc, o);
         const reach = Math.max(tw, to);
@@ -165,6 +170,28 @@ function snapWallEnds(tx: Transaction, doc: Document, ids: ElementId[]): void {
     if (patch.start || patch.end) {
       tx.update<WallParams>(w.id, patch);
     }
+  }
+}
+
+/** A coarse plan grid over boxes, so lookups only see what's near. */
+class BoxGrid<T> {
+  private cells = new Map<number, T[]>();
+  constructor(private size = 5000) {}
+  private span(x0: number, y0: number, x1: number, y1: number, fn: (k: number) => void) {
+    const s = this.size;
+    for (let i = Math.floor(x0 / s); i <= Math.floor(x1 / s); i++) for (let j = Math.floor(y0 / s); j <= Math.floor(y1 / s); j++) fn(i * 1048576 + j);
+  }
+  add(item: T, x0: number, y0: number, x1: number, y1: number): void {
+    this.span(x0, y0, x1, y1, (k) => {
+      const l = this.cells.get(k);
+      if (l) l.push(item);
+      else this.cells.set(k, [item]);
+    });
+  }
+  near(x0: number, y0: number, x1: number, y1: number): T[] {
+    const out = new Set<T>();
+    this.span(x0, y0, x1, y1, (k) => this.cells.get(k)?.forEach((t) => out.add(t)));
+    return [...out];
   }
 }
 
@@ -1342,10 +1369,19 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
   }
   // Imported doors and windows in a converted wall become native ones (types matched by size, else
   // new "Imported" types); if one won't fit, the wall is just opened up for the imported shape.
+  const wallGrid = new BoxGrid<(typeof walls)[0]>();
+  const wallOrder = new Map(walls.map((w, i) => [w, i]));
+  for (const w of walls) {
+    const e = Math.abs(w.u.x) * w.len / 2 + Math.abs(w.u.y) * w.wid / 2 + 200;
+    const f = Math.abs(w.u.y) * w.len / 2 + Math.abs(w.u.x) * w.wid / 2 + 200;
+    wallGrid.add(w, w.c.x - e, w.c.y - f, w.c.x + e, w.c.y + f);
+  }
   for (const ds of doc.byCategory<DirectShapeParams>(Cat.DirectShape)) {
     if (!INSERT_CLASSES.has(ds.params.ifcClass)) continue;
     const { xy, z0, z1 } = bounds(ds.params);
-    for (const w of walls) {
+    const bx0 = Math.min(...xy.map((q) => q.x)), bx1 = Math.max(...xy.map((q) => q.x));
+    const by0 = Math.min(...xy.map((q) => q.y)), by1 = Math.max(...xy.map((q) => q.y));
+    for (const w of wallGrid.near(bx0, by0, bx1, by1).sort((a, b) => wallOrder.get(a)! - wallOrder.get(b)!)) {
       const us = xy.map((q) => (q.x - w.c.x) * w.u.x + (q.y - w.c.y) * w.u.y);
       const vs = xy.map((q) => -(q.x - w.c.x) * w.u.y + (q.y - w.c.y) * w.u.x);
       const mid = (Math.min(...vs) + Math.max(...vs)) / 2;

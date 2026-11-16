@@ -168,6 +168,53 @@ function gridAxes(api: IfcApi, model: number, mm: number): { tag: string; a: { x
   return out;
 }
 
+/**
+ * Every element's property sets, indexed in one pass (web-ifc's per-element lookup scans the whole
+ * model each time): element → its own and its type's sets, each set read once.
+ * Returns a lookup giving "Pset.Property" → value text.
+ */
+function propertyIndex(api: IfcApi, model: number): (id: number) => Record<string, string> {
+  const setsOf = new Map<number, number[]>();
+  const typeSetsOf = new Map<number, number[]>();
+  const add = (m: Map<number, number[]>, el: number, set: number) => m.set(el, [...(m.get(el) ?? []), set]);
+  const rels = api.GetLineIDsWithType(model, WebIFC.IFCRELDEFINESBYPROPERTIES);
+  for (let i = 0; i < rels.size(); i++) {
+    const r = api.GetLine(model, rels.get(i));
+    const set = r.RelatingPropertyDefinition?.value as number | undefined;
+    if (!set) continue;
+    for (const o of (r.RelatedObjects ?? []) as { value: number }[]) add(setsOf, o.value, set);
+  }
+  const types = api.GetLineIDsWithType(model, WebIFC.IFCRELDEFINESBYTYPE);
+  for (let i = 0; i < types.size(); i++) {
+    const r = api.GetLine(model, types.get(i));
+    const t = r.RelatingType?.value ? api.GetLine(model, r.RelatingType.value as number) : null;
+    for (const s of (t?.HasPropertySets ?? []) as { value: number }[]) for (const o of (r.RelatedObjects ?? []) as { value: number }[]) add(typeSetsOf, o.value, s.value);
+  }
+  const cache = new Map<number, Record<string, string>>();
+  const readSet = (id: number): Record<string, string> => {
+    const hit = cache.get(id);
+    if (hit) return hit;
+    const out: Record<string, string> = {};
+    try {
+      const s = api.GetLine(model, id);
+      const setName = label(s.Name) ?? "Properties";
+      for (const ref of ((s.HasProperties ?? s.Quantities ?? []) as { value: number }[])) {
+        const p = api.GetLine(model, ref.value);
+        const name = label(p?.Name);
+        if (!name) continue;
+        const v = label(p.NominalValue) ?? label(p.LengthValue) ?? label(p.AreaValue) ?? label(p.VolumeValue) ?? label(p.CountValue) ?? label(p.WeightValue);
+        if (v !== undefined) out[`${setName}.${name}`] = v;
+      }
+    } catch {
+      // A set we can't read: skipped.
+    }
+    cache.set(id, out);
+    return out;
+  };
+  // The element's own values win over its type's.
+  return (id) => Object.assign({}, ...(typeSetsOf.get(id) ?? []).map(readSet), ...(setsOf.get(id) ?? []).map(readSet));
+}
+
 /** Element expressID → storey expressID (contained-in and aggregated-by). */
 function storeyOf(api: IfcApi, model: number, storeyIds: Set<number>): Map<number, number> {
   const map = new Map<number, number>();
@@ -188,38 +235,6 @@ function storeyOf(api: IfcApi, model: number, storeyIds: Set<number>): Map<numbe
   return map;
 }
 
-/** "Pset.Property" → value text, from property sets and element quantities (own and type). */
-async function properties(api: IfcApi, model: number, id: number): Promise<Record<string, string>> {
-  const out: Record<string, string> = {};
-  let sets: Record<string, unknown>[] = [];
-  try {
-    sets = (await api.properties.getPropertySets(model, id, true, true)) as Record<string, unknown>[];
-  } catch {
-    // web-ifc's type-property lookup throws on types without property sets; fall back to the element's.
-    try {
-      sets = (await api.properties.getPropertySets(model, id, true)) as Record<string, unknown>[];
-    } catch {
-      return out;
-    }
-  }
-  for (const s of sets) {
-    const set = label(s.Name) ?? "Properties";
-    const items = ((s.HasProperties ?? s.Quantities) as Record<string, unknown>[] | undefined) ?? [];
-    for (const p of items) {
-      const name = label(p?.Name);
-      if (!name) continue;
-      const v =
-        label(p.NominalValue) ??
-        label(p.LengthValue) ??
-        label(p.AreaValue) ??
-        label(p.VolumeValue) ??
-        label(p.CountValue) ??
-        label(p.WeightValue);
-      if (v !== undefined) out[`${set}.${name}`] = v;
-    }
-  }
-  return out;
-}
 
 /** Import an IFC file into `doc` as levels and direct shapes, in one undoable transaction. */
 export async function importIfc(doc: Document, data: Uint8Array, api: IfcApi): Promise<IfcImportResult> {
@@ -237,6 +252,7 @@ export async function importIfc(doc: Document, data: Uint8Array, api: IfcApi): P
     }
     const where = storeyOf(api, model, new Set(storeys.map((s) => s.id)));
     const products = meshes(api, model);
+    const propsOf = propertyIndex(api, model);
     // Systems (ducts/pipes assigned to an IfcDistributionSystem or IfcSystem): "name (TYPE)" per element.
     const systemOf = new Map<number, string>();
     const groups = api.GetLineIDsWithType(model, WebIFC.IFCRELASSIGNSTOGROUP);
@@ -252,7 +268,7 @@ export async function importIfc(doc: Document, data: Uint8Array, api: IfcApi): P
     const info = new Map<number, { cls: string; guid: string; name?: string; props: Record<string, string> }>();
     for (const p of products) {
       const line = api.GetLine(model, p.expressID);
-      const props = await properties(api, model, p.expressID);
+      const props = propsOf(p.expressID);
       // Doors and windows: their stated opening size (mm), truer than the shape (which has trims).
       for (const k of ["OverallWidth", "OverallHeight"]) {
         const v = Number(label(line[k]));

@@ -56,7 +56,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
 - Sheets with a built-in title block or a Title Block family (sheet Properties → Title block; New family →
   Title Block, paper mm, {Sheet Number}/{Sheet Name}/{Project Name}/{Date}/{Revision}/{Scale}… in text;
   library "Title Block - A1 Simple"), viewports, and vector PDF export (`geometry/src/pdf.ts`).
-- UI: box select, type selector, temporary hide/isolate (H/I/U), properties for everything, browser.
+- UI: box select, type selector, temporary hide/isolate (H/I/U), properties for everything, browser. Multi-select Properties
+  (panels.ts `multiProperties`): type, levels, shared offsets/heights/sill, Mark/Comments — blank "(varies)" when they differ,
+  a change sets all. Element Properties → Edit Type (selects its type); type Properties → Duplicate.
 - Modify: Move/Copy/Rotate/Mirror/Array (MV, CO, RO, MM, AR; toolbar). Type a value + Enter; options
   strip (Copy, Multiple, Disjoin, Number) top-left of the view. Mirror by drawn axis, or Pick axis (options strip: click a wall/grid/ref plane/beam/line).
   Align (AL), Offset (OF), Trim/Extend (TR; corner or to boundary), Split (SL) — plans/3D only.

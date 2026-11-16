@@ -908,6 +908,65 @@ function intInput(value: number, min: number, max: number, onCommit: (v: number)
   return input;
 }
 
+/**
+ * Properties of several selected elements (Revit's multi-select): the type and the parameters they
+ * share; a value shows when they all agree (blank when they differ); changing one sets it on all.
+ */
+function multiProperties(ctx: PanelContext, ids: ElementId[]): HTMLElement {
+  const { doc } = ctx;
+  const els = ids.map((id) => doc.get(id)).filter((e): e is Element => !!e);
+  const cats = [...new Set(els.map((e) => e.category))];
+  const sec = h("div", { class: "section" }, h("h3", {}, `${cats.length === 1 ? cats[0] : "Multi-Select"} (${els.length})`));
+  const all = (fn: (tx: Transaction, e: Element) => void, name: string) => edit(ctx, name, (tx) => els.forEach((e) => fn(tx, e)));
+  const same = <T,>(vals: T[]) => (vals.every((v) => JSON.stringify(v) === JSON.stringify(vals[0])) ? vals[0] : undefined);
+  // Type: when they're one category with types.
+  const typeCats = [...new Set(els.map((e) => (e.typeId ? doc.get(e.typeId)?.category : undefined)))];
+  if (cats.length === 1 && typeCats.length === 1 && typeCats[0]) {
+    const cur = same(els.map((e) => e.typeId)) ?? "";
+    const opts = [...(cur ? [] : [{ value: "", label: "(varies)" }]), ...doc.byCategory(typeCats[0]).map((t) => ({ value: t.id, label: t.name ?? t.id }))];
+    sec.append(row("Type", select(opts, cur, (v) => v && all((tx, e) => tx.setType(e.id, v), "Change type"))));
+  }
+  const p0 = els.map((e) => e.params as Record<string, unknown>);
+  const has = (k: string, kind: string) => p0.every((p) => typeof p[k] === kind);
+  // Levels.
+  const levelOpts = levels(doc).map((l) => ({ value: l.id, label: l.name ?? l.id }));
+  for (const [k, label] of [["levelId", "Level"], ["baseLevelId", "Base level"], ["topLevelId", "Top level"]] as const) {
+    if (!has(k, "string")) continue;
+    const cur = (same(p0.map((p) => p[k])) as string | undefined) ?? "";
+    sec.append(row(label, select([...(cur ? [] : [{ value: "", label: "(varies)" }]), ...levelOpts], cur, (v) => v && all((tx, e) => tx.update(e.id, { [k]: v }), `Change ${label.toLowerCase()}`))));
+  }
+  // Lengths they share.
+  const LENGTHS: [string, string][] = [["baseOffset", "Base offset"], ["topOffset", "Top offset"], ["height", "Height"], ["offset", "Offset"], ["sillHeight", "Sill height"]];
+  for (const [k, label] of LENGTHS) {
+    if (!has(k, "number")) continue;
+    const cur = same(p0.map((p) => p[k])) as number | undefined;
+    const input = numberInput(cur ?? 0, (v) =>
+      all((tx, e) => {
+        tx.update(e.id, { [k]: v });
+        if (e.category === Cat.Door || e.category === Cat.Window || e.category === Cat.WallOpening) validateHosted(doc, hostedPlacement(doc, doc.require(e.id)));
+      }, `Change ${label.toLowerCase()}`),
+    );
+    if (cur === undefined) {
+      input.value = "";
+      input.placeholder = "(varies)";
+    }
+    sec.append(row(label, input));
+  }
+  // Mark and comments.
+  for (const [k, label] of [["mark", "Mark"], ["comments", "Comments"]] as const) {
+    if (!p0.every((p) => p[k] === undefined || typeof p[k] === "string")) continue;
+    if (!els.every((e) => TAGGABLE.has(e.category))) continue;
+    const cur = same(p0.map((p) => (p[k] as string | undefined) ?? ""));
+    const input = textInput(cur ?? "", (v) => all((tx, e) => tx.update(e.id, { [k]: v || undefined }), `Change ${label.toLowerCase()}`));
+    if (cur === undefined) input.placeholder = "(varies)";
+    sec.append(row(label, input));
+  }
+  // By category (Revit's filter list).
+  const counts = h("div", { class: "muted" }, cats.map((c) => `${c}: ${els.filter((e) => e.category === c).length}`).join(" · "));
+  sec.append(counts);
+  return sec;
+}
+
 function textInput(value: string, onCommit: (v: string) => void): HTMLInputElement {
   const input = h("input", { type: "text", value });
   input.onchange = () => onCommit(input.value.trim());
@@ -2850,7 +2909,7 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
     return;
   }
   if (ids.length > 1) {
-    root.replaceChildren(h("div", { class: "empty" }, `${ids.length} elements selected`));
+    root.replaceChildren(multiProperties(ctx, ids));
     return;
   }
   const el = doc.require(ids[0]!);
@@ -2860,6 +2919,25 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
     edit(ctx, name, (tx) => tx.update<P>(el.id, patch));
 
   const sec = h("div", { class: "section" }, h("h3", {}, el.category));
+  // Revit's Edit Type: the element's type properties (shared by every instance of the type).
+  if (el.typeId && doc.get(el.typeId)) {
+    const editType = h("button", { textContent: "Edit Type", title: "Type properties (they change every element of this type)" });
+    editType.onclick = () => ctx.setSelection([el.typeId!]);
+    sec.append(row("", editType));
+  }
+  // Types: Duplicate (Revit's Edit Type → Duplicate), then rename the copy.
+  if (getCategory(el.category).isType) {
+    const dup = h("button", { textContent: "Duplicate", title: "Make a copy of this type to change" });
+    dup.onclick = () => {
+      const taken = new Set(doc.byCategory(el.category).map((t) => t.name));
+      let name = `${el.name ?? "Type"} 2`;
+      for (let n = 3; taken.has(name); n++) name = `${el.name ?? "Type"} ${n}`;
+      let id = "";
+      edit(ctx, "Duplicate type", (tx) => (id = tx.create(el.category, structuredClone(el.params), { name }).id));
+      if (id) ctx.setSelection([id]);
+    };
+    sec.append(row("", dup));
+  }
   // Converted from IFC: its original class, GlobalId and property sets.
   const ifc = (el.params as { ifc?: { class: string; globalId: string; properties: Record<string, string> } | null }).ifc;
   if (ifc) {

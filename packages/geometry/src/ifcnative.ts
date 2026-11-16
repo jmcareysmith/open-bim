@@ -9,6 +9,7 @@ import {
   createColumn,
   createBeam,
   createRoof,
+  setWallCurve,
   type BeamParams,
   type ColumnParams,
   type StructuralSectionParams,
@@ -210,6 +211,87 @@ function roofFromMesh(tx: Transaction, doc: Document, p: DirectShapeParams, lvl:
   return createRoof(tx, typeId, p.levelId, ring, { slopes, baseOffset: z0 - lvl }).id;
 }
 
+/**
+ * A curved wall from its mesh: the centre where the curved faces' normals meet (least squares, end
+ * faces dropped as outliers), inner and outer radii from the vertices (all must lie on one or the
+ * other), and the angular span. Null if it isn't such a band (or spans a semicircle or more).
+ */
+function arcWall(p: DirectShapeParams): { start: Vec2; end: Vec2; curve: number; thick: number } | null {
+  const P = p.positions;
+  // Vertical faces: a point on each and its plan normal.
+  const lines: { q: Vec2; n: Vec2 }[] = [];
+  for (let i = 0; i < p.indices.length; i += 3) {
+    const [a, b, c] = [p.indices[i]! * 3, p.indices[i + 1]! * 3, p.indices[i + 2]! * 3];
+    const u = [P[b]! - P[a]!, P[b + 1]! - P[a + 1]!, P[b + 2]! - P[a + 2]!];
+    const w = [P[c]! - P[a]!, P[c + 1]! - P[a + 1]!, P[c + 2]! - P[a + 2]!];
+    const n = [u[1]! * w[2]! - u[2]! * w[1]!, u[2]! * w[0]! - u[0]! * w[2]!, u[0]! * w[1]! - u[1]! * w[0]!];
+    const l = Math.hypot(n[0]!, n[1]!, n[2]!);
+    if (l < 1e-9 || Math.abs(n[2]! / l) > 0.05) continue;
+    const h = Math.hypot(n[0]!, n[1]!);
+    const nn = { x: n[0]! / h, y: n[1]! / h };
+    // The middle of the face's span across its normal (a facet's chord midpoint: on a line to the centre).
+    const t = { x: -nn.y, y: nn.x };
+    const ss = [a, b, c].map((k) => P[k]! * t.x + P[k + 1]! * t.y);
+    const mid = (Math.min(...ss) + Math.max(...ss)) / 2;
+    const off = P[a]! * nn.x + P[a + 1]! * nn.y;
+    lines.push({ q: { x: t.x * mid + nn.x * off, y: t.y * mid + nn.y * off }, n: nn });
+  }
+  if (lines.length < 6) return null;
+  // Least-squares point nearest every normal line (minimise Σ distance² across each line).
+  const solve = (ls: typeof lines): Vec2 | null => {
+    let a11 = 0, a12 = 0, a22 = 0, b1 = 0, b2 = 0;
+    for (const { q, n } of ls) {
+      // Distance across the line = t·(x − q), t = the line's direction's normal = (−n.y, n.x).
+      const t = { x: -n.y, y: n.x };
+      a11 += t.x * t.x; a12 += t.x * t.y; a22 += t.y * t.y;
+      const d = t.x * q.x + t.y * q.y;
+      b1 += t.x * d; b2 += t.y * d;
+    }
+    const det = a11 * a22 - a12 * a12;
+    if (Math.abs(det) < 1e-9) return null;
+    return { x: (b1 * a22 - b2 * a12) / det, y: (a11 * b2 - a12 * b1) / det };
+  };
+  // Robustly: drop the worst-fitting tenth and solve again, until what's left fits within 1 mm.
+  const resid = (c: Vec2, { q, n }: (typeof lines)[0]) => Math.abs(-n.y * (c.x - q.x) + n.x * (c.y - q.y));
+  let use = lines;
+  let c = solve(use);
+  for (let k = 0; c && k < 40; k++) {
+    const sorted = [...use].sort((x, y) => resid(c!, x) - resid(c!, y));
+    if (resid(c, sorted[sorted.length - 1]!) < 1) break;
+    use = sorted.slice(0, Math.max(4, Math.floor(sorted.length * 0.9)));
+    c = solve(use);
+  }
+  if (!c || use.length < lines.length / 2) return null;
+  const pts: Vec2[] = [];
+  for (let i = 0; i < P.length; i += 3) pts.push({ x: P[i]!, y: P[i + 1]! });
+  const rs = pts.map((q) => Math.hypot(q.x - c!.x, q.y - c!.y));
+  const r0 = Math.min(...rs);
+  const r1 = Math.max(...rs);
+  if (r1 - r0 < 1 || rs.some((r) => Math.abs(r - r0) > 2 && Math.abs(r - r1) > 2)) return null;
+  // Angular span about the mean direction.
+  const mean = pts.reduce((s, q) => ({ x: s.x + (q.x - c!.x), y: s.y + (q.y - c!.y) }), { x: 0, y: 0 });
+  const m = Math.atan2(mean.y, mean.x);
+  const angs = pts.map((q) => {
+    let d = Math.atan2(q.y - c!.y, q.x - c!.x) - m;
+    while (d > Math.PI) d -= 2 * Math.PI;
+    while (d < -Math.PI) d += 2 * Math.PI;
+    return d;
+  });
+  const a0 = m + Math.min(...angs);
+  const a1 = m + Math.max(...angs);
+  if (a1 - a0 >= Math.PI - 1e-3 || a1 - a0 < 1e-3) return null;
+  const R = (r0 + r1) / 2;
+  const at = (t: number) => ({ x: c!.x + R * Math.cos(t), y: c!.y + R * Math.sin(t) });
+  const start = at(a0);
+  const end = at(a1);
+  // Sagitta: how far the arc's middle stands to the left of start → end (anticlockwise: to the right).
+  const mid = at((a0 + a1) / 2);
+  const chord = { x: end.x - start.x, y: end.y - start.y };
+  const L = Math.hypot(chord.x, chord.y);
+  const curve = ((mid.x - start.x) * -chord.y + (mid.y - start.y) * chord.x) / L;
+  return { start, end, curve, thick: r1 - r0 };
+}
+
 /** A structural section of this shape and size (b across, d deep), else a new "Imported <what> b x d". */
 function sectionFor(tx: Transaction, doc: Document, shape: "rect" | "circle", b: number, d: number, what: string, color?: number): ElementId {
   const B = Math.round(shape === "circle" ? Math.max(b, d) : b);
@@ -283,7 +365,18 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
       const r = minRect(xy);
       // A straight box: long and thin, and its plan fills the rectangle.
       if (!r || r.wid < 1 || r.len < r.wid || r.hullArea < 0.9 * r.len * r.wid) {
-        skipped.push(id);
+        // Or an arc: a band between two concentric arcs.
+        const arc = arcWall(p);
+        if (!arc) {
+          skipped.push(id);
+          continue;
+        }
+        const typeId = typeFor(tx, doc, Cat.WallType, "Imported Wall", arc.thick, mat);
+        const w = createWall(tx, typeId, arc.start, arc.end, p.levelId, { baseOffset: z0 - lvl, height: z1 - z0 });
+        setWallCurve(tx, doc, w.id, arc.curve);
+        created.push(w.id);
+        for (const nid of created.slice(made)) carryOver(tx, doc, nid, ds);
+        tx.delete(id);
         continue;
       }
       const typeId = typeFor(tx, doc, Cat.WallType, "Imported Wall", r.wid, mat);

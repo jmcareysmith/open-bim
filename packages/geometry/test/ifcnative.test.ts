@@ -141,3 +141,32 @@ describe("roof slabs", () => {
     expect(roofs[0]!.params.slopes.filter((s) => s !== null).map((s) => Math.round((s! * 180) / Math.PI))).toEqual([25]);
   });
 });
+
+describe("curved walls from IFC", () => {
+  it("recovers an arc wall's ends, bow and thickness from its mesh", async () => {
+    const { createWall, setWallCurve, wallThickness } = await import("@open-bim/core");
+    const { SimpleKernel } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const w0 = doc.transact("W", (tx) => createWall(tx, ids.wallTypes.exterior, { x: 0, y: 0 }, { x: 8000, y: 0 }, ids.levels.ground, { height: 2700 }));
+    doc.transact("C", (tx) => setWallCurve(tx, doc, w0.id, 1500));
+    const t = wallThickness(doc, doc.require(w0.id) as never);
+    const m = new SimpleKernel().build(doc, doc.require(w0.id))!;
+    const ds = doc.transact("I", (tx) => {
+      tx.delete(w0.id);
+      return createDirectShape(tx, { levelId: ids.levels.ground, ifcClass: "IfcWall", globalId: "a", positions: [...m.positions], indices: [...m.indices], color: 0x999999, properties: {} }).id;
+    });
+    const r = doc.transact("C", (tx) => convertDirectShapes(tx, doc, [ds]));
+    expect(r.skipped).toEqual([]);
+    const w = doc.byCategory<{ start: { x: number; y: number }; end: { x: number; y: number }; curve?: number }>("Wall").at(-1)!;
+    const ends = [w.params.start, w.params.end].sort((a, b) => a.x - b.x);
+    expect(ends[0]!.x).toBeCloseTo(0, 0);
+    expect(ends[0]!.y).toBeCloseTo(0, 0);
+    expect(ends[1]!.x).toBeCloseTo(8000, 0);
+    expect(Math.abs(w.params.curve!)).toBeCloseTo(1500, 0);
+    // Bows the same way (towards +y).
+    const midY = (w.params.start.y + w.params.end.y) / 2 + Math.sign(w.params.end.x - w.params.start.x) * w.params.curve!;
+    expect(midY).toBeCloseTo(1500, 0);
+    expect(wallThickness(doc, w as never)).toBeCloseTo(t, 0);
+  });
+});

@@ -1,6 +1,8 @@
 import {
+  alongArc,
   arcMid,
   arcLength,
+  tangentLine,
   Cat,
   columnExtent,
   curtainOf,
@@ -101,6 +103,11 @@ export class GripLayer {
     this.ctx.viewport.setOverlay(null);
     if (!this.enabled) return;
     const { doc } = this.ctx;
+    // Sections and elevations: selected model elements get their top/base handles there too.
+    if (this.ctx.viewport.viewMode === "drawing" && this.sectionView()) {
+      const model = this.ctx.selection().map((id) => doc.get(id)).filter((e): e is Element => !!e && (e.params as { viewId?: unknown }).viewId === undefined && (e.params as { sheetId?: unknown }).sheetId === undefined);
+      if (model.length <= MAX_ELEMENTS) for (const el of model) this.addHeightHandles(el);
+    }
     const sel = this.ctx.selection().map((id) => doc.get(id)).filter((e): e is Element => !!e && this.editable(e));
     if (!sel.length || sel.length > MAX_ELEMENTS) return;
     const in3d = this.ctx.viewport.viewMode === "3d";
@@ -182,17 +189,25 @@ export class GripLayer {
   private addCurtainLines(wall: Wall): void {
     const { doc } = this.ctx;
     const grid = curtainOf(doc, wall);
-    if (!grid || wall.params.curve) return;
-    const { start, end } = wall.params;
-    const len = Math.hypot(end.x - start.x, end.y - start.y);
+    if (!grid) return;
+    const { start, end, curve } = wall.params;
+    // Along the location line (arcs: along the arc).
+    const len = curve ? arcLength(start, end, curve) : Math.hypot(end.x - start.x, end.y - start.y);
     if (len < 1) return;
-    const d = { x: (end.x - start.x) / len, y: (end.y - start.y) / len };
     const { bottom, top } = curtainExtent(doc, wall);
     const edits = wall.params.curtainEdits ?? {};
     const { u: us, z: zs } = curtainGridLines(len, bottom, top, grid, edits);
     const uIn = us.slice(1, -1);
     const zIn = zs.slice(1, -1).map((z) => z - bottom);
-    const point = (u: number): Vec2 => ({ x: start.x + d.x * u, y: start.y + d.y * u });
+    const point = (u: number): Vec2 => {
+      const t = tangentLine(wall, u);
+      return { x: t.start.x + t.dir.x * u, y: t.start.y + t.dir.y * u };
+    };
+    const alongOf = (p: Vec2): number => {
+      if (curve) return alongArc(start, end, curve, p);
+      const d = { x: (end.x - start.x) / len, y: (end.y - start.y) / len };
+      return (p.x - start.x) * d.x + (p.y - start.y) * d.y;
+    };
     const save = (uLines: number[], zLines: number[]) => {
       try {
         doc.transact("Move grid line", (tx) => setCurtainEdits(tx, doc, wall.id, { ...edits, uLines, zLines }));
@@ -219,7 +234,7 @@ export class GripLayer {
           if (axis === "u") {
             const p = this.ctx.viewport.pickPlane(mv, z);
             if (!p) return;
-            const t = (p.x - start.x) * d.x + (p.y - start.y) * d.y;
+            const t = alongOf(p);
             // Between its neighbours (100 mm clear), as Revit keeps grid lines in order.
             const lo = (k > 0 ? uIn[k - 1]! : 0) + 100;
             const hi = (k + 1 < uIn.length ? uIn[k + 1]! : len) - 100;
@@ -251,10 +266,22 @@ export class GripLayer {
     zIn.forEach((_, k) => line("z", k));
   }
 
+  /** The open section/elevation (a view with a cut line), if that's what the viewport shows. */
+  private sectionView(): View | null {
+    const id = this.ctx.activeViewId();
+    const v = id ? this.ctx.doc.get(id) : undefined;
+    return v && v.category === Cat.View && (v as View).params.line ? (v as View) : null;
+  }
+
   /** Shape handles in 3D: arrows on a wall's or column's top and base; drag up or down. */
   private addHeightHandles(target: Element): void {
     const h = verticalHandles(this.ctx.doc, target);
     if (!h) return;
+    // In a section or elevation the handles sit in its drawing (x along the view, y = height).
+    const view = this.ctx.viewport.viewMode === "drawing" ? this.sectionView() : null;
+    if (this.ctx.viewport.viewMode === "drawing" && !view) return;
+    const f = view ? viewFrame(view) : null;
+    const across = f ? (h.at.x - f.origin[0]) * f.right[0] + (h.at.y - f.origin[1]) * f.right[1] : 0;
     const both = h.top !== null && h.bottom !== null;
     for (const edge of ["top", "base"] as const) {
       const start = edge === "top" ? h.top : h.bottom;
@@ -273,7 +300,7 @@ export class GripLayer {
         this.dragging = true;
         const from = z;
         el.onpointermove = (mv) => {
-          const v = this.ctx.viewport.pickVertical(mv, h.at);
+          const v = f ? (this.ctx.viewport.pickDrawing(mv)?.y ?? null) : this.ctx.viewport.pickVertical(mv, h.at);
           if (v === null) return;
           // Snap to 10 mm (Shift: free), and to levels within 150 mm.
           let q = mv.shiftKey ? v : Math.round(v / 10) * 10;
@@ -297,7 +324,7 @@ export class GripLayer {
         };
       };
       this.root.append(el);
-      this.placed.push({ el, at: () => h.at, z: () => z });
+      this.placed.push(f ? { el, at: () => ({ x: across, y: z }) } : { el, at: () => h.at, z: () => z });
     }
   }
 

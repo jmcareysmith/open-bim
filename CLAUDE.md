@@ -64,7 +64,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   length label to type a new length; press on a selected element and drag to move it. In 3D too: grips sit at the element's base
   (grips.ts `gripZ`, viewport `toScreen3`), walls/columns get ▲▼ top/base shape handles (core `setVerticalEdge`,
   viewport `pickVertical`; 10 mm and level snaps, Shift free); floors/ceilings/roofs/free families get one ⬍ handle that
-  moves them up or down; curtain walls show diamond grips on each interior grid line (drag along / up, kept 100 apart);
+  moves them up or down, doors/windows/openings one for the sill (validated); the same handles show for selected model
+  elements in sections/elevations (drawing y = height); curtain walls (straight or arc) show diamond grips on each
+  interior grid line (drag along / up, kept 100 apart);
   flip arrows; arrow keys nudge along the screen (`screenAxes`). Selected
   walls show a flip arrow (exterior side). Right-click (no drag): element menu, or on empty space
   the view menu with Visibility/Graphics (dialog; also VV). In 3D, orbit pivots on the selection.

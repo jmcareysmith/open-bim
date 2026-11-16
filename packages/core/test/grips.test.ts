@@ -143,3 +143,18 @@ describe("3D shape handles: floors, ceilings, roofs, families", () => {
     expect(() => doc.transact("Bad", (tx) => setVerticalEdge(tx, doc, f.id, "base", 0))).toThrow(/no base handle/);
   });
 });
+
+describe("3D shape handles: sills", () => {
+  it("a window's handle sets its sill; it must stay inside the wall", async () => {
+    const { Document, applyResidentialTemplate, createWall, createWindow, setVerticalEdge, verticalHandles } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const w = doc.transact("W", (tx) => createWall(tx, ids.wallTypes.exterior, { x: 0, y: 0 }, { x: 4000, y: 0 }, ids.levels.ground, { height: 2700 }));
+    const win = doc.transact("N", (tx) => createWindow(tx, doc, Object.values(ids.windowTypes)[0]!, w.id, 2000));
+    const h = verticalHandles(doc, win)!;
+    expect(h.at.x).toBeCloseTo(2000);
+    doc.transact("Sill", (tx) => setVerticalEdge(tx, doc, win.id, "base", 1000));
+    expect(doc.require<{ sillHeight: number }>(win.id).params.sillHeight).toBe(1000);
+    expect(() => doc.transact("Too high", (tx) => setVerticalEdge(tx, doc, win.id, "base", 2600))).toThrow();
+  });
+});

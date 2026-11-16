@@ -1,17 +1,17 @@
 import type { Document, Transaction } from "../document.ts";
 import type { Element, ElementId, Params, Vec2 } from "../element.ts";
-import { Cat, wallExtentRaw, type LevelParams, type Wall, type WallParams } from "./architecture.ts";
+import { Cat, wallExtent, wallExtentRaw, type LevelParams, type Wall, type WallParams } from "./architecture.ts";
 import { columnExtent, type Column, type ColumnParams } from "./structure.ts";
 import { elementLine, isLinear, setLineEnds } from "./edits.ts";
 import { JOIN_TOLERANCE } from "./joins.ts";
 import { transformElements, translation } from "./modify.ts";
-import { isWallCutter } from "./openings.ts";
+import { hostedPlacement, isWallCutter, validateHosted } from "./openings.ts";
 import { normaliseFootprint } from "./roofs.ts";
 import { validateRegion } from "./sketch.ts";
 import { tagPosition, type Tag } from "./tags.ts";
 import type { DimensionParams } from "./annotations.ts";
 import { calloutHeadPosition, viewFrame, type View, type ViewParams } from "./viewdefs.ts";
-import { setGridCurve, setWallCurve } from "./arcs.ts";
+import { setGridCurve, setWallCurve, tangentLine } from "./arcs.ts";
 
 /** The middle of an arc (start → end, bowing by `curve` to the left). */
 export function arcMid(start: Vec2, end: Vec2, curve: number): Vec2 {
@@ -296,6 +296,14 @@ export function verticalHandles(doc: Document, el: Element): { at: Vec2; top: nu
     const { bottom, top } = columnExtent(doc, c);
     return { at: c.params.position, top, bottom };
   }
+  // Doors, windows, openings and wall-hosted families: their sill, along the wall.
+  if (isWallCutter(el.category) && typeof p.hostId === "string" && p.hostId) {
+    const host = doc.get<WallParams>(p.hostId) as Wall | undefined;
+    if (!host) return null;
+    const hp = hostedPlacement(doc, el);
+    const t = tangentLine(host, hp.position);
+    return { at: { x: t.start.x + t.dir.x * hp.position, y: t.start.y + t.dir.y * hp.position }, top: null, bottom: wallExtent(doc, host).bottom + hp.sillHeight };
+  }
   const boundary = Array.isArray(p.boundary) ? (p.boundary as Vec2[]) : null;
   if (el.category === Cat.Floor && boundary?.length) return { at: centre(boundary), top: level(p.levelId) + Number(p.offset ?? 0), bottom: null };
   if (el.category === Cat.Ceiling && boundary?.length) return { at: centre(boundary), top: null, bottom: level(p.levelId) + Number(p.offset ?? 0) };
@@ -343,6 +351,13 @@ export function setVerticalEdge(tx: Transaction, doc: Document, id: ElementId, e
   }
   const h = verticalHandles(doc, el);
   if (!h || (edge === "top" ? h.top : h.bottom) === null) throw new Error(`This element has no ${edge} handle`);
+  if (isWallCutter(el.category) && typeof p.hostId === "string" && p.hostId) {
+    const host = doc.require<WallParams>(p.hostId) as Wall;
+    const sillHeight = Math.max(0, Math.round(z - wallExtent(doc, host).bottom));
+    validateHosted(doc, { ...hostedPlacement(doc, el), sillHeight });
+    tx.update(id, { sillHeight });
+    return;
+  }
   const key = el.category === Cat.Roof ? "baseOffset" : "offset";
   tx.update(id, { [key]: Math.round(z - level(p.levelId)) });
 }

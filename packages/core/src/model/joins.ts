@@ -256,3 +256,31 @@ function zRange(doc: Document, wall: Wall): [number, number] | null {
   const top = doc.get<LevelParams>(p.topLevelId);
   return top ? [bottom, top.params.elevation + p.topOffset] : null;
 }
+
+/**
+ * The chain of walls joined end to end through `wall` (Revit: Tab over a wall): each L corner (two
+ * wall ends meeting) carries on; tees and three-way junctions stop it. `wall` first, then in order.
+ */
+export function wallChain(doc: Document, wall: Wall): ElementId[] {
+  const seen = new Set<ElementId>([wall.id]);
+  const out: ElementId[] = [wall.id];
+  const walk = (from: Wall, end: WallEnd) => {
+    let cur = from;
+    let at = end;
+    for (let guard = 0; guard < 10000; guard++) {
+      const j = wallJoins(doc, cur)[at];
+      if (!j || j.kind !== "corner" || j.others.length !== 1) return;
+      const next = j.others[0]!;
+      if (seen.has(next.wallId)) return;
+      const w = doc.get(next.wallId) as Wall | undefined;
+      if (!w) return;
+      seen.add(w.id);
+      out.push(w.id);
+      cur = w;
+      at = next.end === "start" ? "end" : "start";
+    }
+  };
+  walk(wall, "end");
+  walk(wall, "start");
+  return out;
+}

@@ -1,5 +1,6 @@
 import type { ToolOption } from "./modifytools.ts";
-import { createBeamSystem, createScopeBox, pointCloudPoints, type PointCloud, type PointCloudParams,
+import {
+  wallChain, createBeamSystem, createScopeBox, pointCloudPoints, type PointCloud, type PointCloudParams,
   boundaryFromWalls,
   PICK_WALL_LINES,
   type PickWallLine,
@@ -300,6 +301,14 @@ export class SelectTool implements Tool {
     if (ev.key === "Tab" && this.lastPointer) {
       const id = this.ctx.viewport.pick(this.lastPointer);
       if (id && this.pickCurtainPart(this.lastPointer, id)) return true;
+      // Tab over a wall selects its chain (walls joined end to end), as Revit does; Shift+Tab adds it.
+      const el = id ? this.ctx.doc.get(id) : undefined;
+      if (el?.category === Cat.Wall) {
+        const chain = wallChain(this.ctx.doc, el as Wall);
+        this.ctx.setSelection(ev.shiftKey ? [...new Set([...this.ctx.selection(), ...chain])] : chain);
+        this.ctx.status(`${chain.length} wall(s) in the chain selected.`);
+        return true;
+      }
     }
     if (ev.key === "Escape" && curtainPart()) {
       setCurtainPart(null);

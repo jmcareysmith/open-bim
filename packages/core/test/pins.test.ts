@@ -32,3 +32,19 @@ describe("scale", () => {
     expect(wallThickness(doc, doc.require(w.id) as never)).toBe(t0);
   });
 });
+
+describe("wall chains (Tab)", () => {
+  it("a closed rectangle chains all four; a tee stops the chain", async () => {
+    const { wallChain } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    const t = ids.wallTypes.exterior;
+    const pts = [{ x: 0, y: 0 }, { x: 6000, y: 0 }, { x: 6000, y: 4000 }, { x: 0, y: 4000 }];
+    const ws = doc.transact("W", (tx) => pts.map((p, i) => createWall(tx, t, p, pts[(i + 1) % 4]!, ids.levels.ground, { height: 2400 })));
+    expect(new Set(wallChain(doc, ws[0] as never))).toEqual(new Set(ws.map((w) => w.id)));
+    // A free wall teeing into the bottom: not part of the chain, and its own chain is just itself.
+    const stem = doc.transact("T", (tx) => createWall(tx, t, { x: 3000, y: 0 }, { x: 3000, y: -2000 }, ids.levels.ground, { height: 2400 }));
+    expect(wallChain(doc, ws[0] as never)).not.toContain(stem.id);
+    expect(wallChain(doc, stem as never)).toEqual([stem.id]);
+  });
+});

@@ -159,3 +159,30 @@ describe("IFC project information", () => {
     expect(projectSettings(doc)?.params.info.name).toBe("Smith House");
   });
 });
+
+describe("IFC terrain", () => {
+  it("round-trip: a toposolid exports as terrain and converts back to a toposolid with its heights", async () => {
+    const { createToposolid } = await import("@open-bim/core");
+    const { convertDirectShapes: convert } = await import("@open-bim/geometry");
+    const src = source();
+    const ground = levels(src).sort((a, b) => a.params.elevation - b.params.elevation)[0]!.id;
+    src.transact("T", (tx) =>
+      createToposolid(tx, src, ground, [{ x: -20000, y: -20000 }, { x: 20000, y: -20000 }, { x: 20000, y: 20000 }, { x: -20000, y: 20000 }], [
+        { x: -20000, y: -20000, z: -500 },
+        { x: 20000, y: -20000, z: -500 },
+        { x: 20000, y: 20000, z: 1500 },
+        { x: -20000, y: 20000, z: 1500 },
+        { x: 0, y: 0, z: 800 },
+      ]),
+    );
+    const doc = new Document();
+    await importIfc(doc, new TextEncoder().encode(exportIfc(src, { timestamp: "t" })), api);
+    const terrain = doc.byCategory<DirectShapeParams>(Cat.DirectShape).filter((s) => s.params.ifcClass === "IfcGeographicElement").map((s) => s.id);
+    expect(terrain).toHaveLength(1);
+    doc.transact("C", (tx) => convert(tx, doc, terrain));
+    const t = doc.byCategory<{ points: { z: number }[] }>(Cat.Toposolid)[0]!;
+    const zs = t.params.points.map((q) => q.z);
+    expect(Math.min(...zs)).toBeCloseTo(-500, 0);
+    expect(Math.max(...zs)).toBeCloseTo(1500, 0);
+  });
+});

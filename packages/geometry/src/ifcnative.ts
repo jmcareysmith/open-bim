@@ -10,6 +10,7 @@ import {
   createBeam,
   createRoof,
   createCeiling,
+  createToposolid,
   createDuct,
   createPipe,
   ensureDuctTypes,
@@ -74,6 +75,8 @@ const WALL_CLASSES = new Set(["IfcWall", "IfcWallStandardCase"]);
 const SLAB_CLASSES = new Set(["IfcSlab"]);
 const COLUMN_CLASSES = new Set(["IfcColumn"]);
 const FOOTING_CLASSES = new Set(["IfcFooting"]);
+/** Terrain (Revit topography / toposolids). */
+const TERRAIN_CLASSES = new Set(["IfcGeographicElement", "IfcSite"]);
 /** Coverings: ceilings (flat, like slabs). */
 const CEILING_CLASSES = new Set(["IfcCovering"]);
 const BEAM_CLASSES = new Set(["IfcBeam", "IfcMember"]);
@@ -105,7 +108,7 @@ const INSERT_CLASSES = new Set(["IfcDoor", "IfcWindow"]);
 export function convertible(el: { category: string; params: unknown }): boolean {
   if (el.category !== Cat.DirectShape) return false;
   const c = (el.params as DirectShapeParams).ifcClass;
-  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || CEILING_CLASSES.has(c) || FOOTING_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c) || ROOF_CLASSES.has(c) || STAIR_CLASSES.has(c) || RAMP_CLASSES.has(c) || RUN_CLASSES.has(c) || FITTING_CLASSES.has(c) || RAILING_CLASSES.has(c) || PLATE_CLASSES.has(c) || c in FAMILY_OF;
+  return WALL_CLASSES.has(c) || SLAB_CLASSES.has(c) || CEILING_CLASSES.has(c) || FOOTING_CLASSES.has(c) || TERRAIN_CLASSES.has(c) || COLUMN_CLASSES.has(c) || BEAM_CLASSES.has(c) || ROOF_CLASSES.has(c) || STAIR_CLASSES.has(c) || RAMP_CLASSES.has(c) || RUN_CLASSES.has(c) || FITTING_CLASSES.has(c) || RAILING_CLASSES.has(c) || PLATE_CLASSES.has(c) || c in FAMILY_OF;
 }
 
 function hull(pts: Vec2[]): Vec2[] {
@@ -797,6 +800,39 @@ function runFromMesh(tx: Transaction, doc: Document, p: DirectShapeParams, lvl: 
 }
 
 /**
+ * Terrain: a toposolid whose boundary is the outline of the surface seen from above and whose spot
+ * heights are the surface's points (the highest at each plan position), its depth below the
+ * lowest point what's under it.
+ */
+function terrainFromMesh(tx: Transaction, doc: Document, p: DirectShapeParams, lvl: number, z0: number): ElementId | null {
+  const tops = facePlanes(p, true);
+  if (!tops.length) return null;
+  let outline: Polygon[] = [];
+  try {
+    const polys = tops.map((t): Polygon => [[...t.tri.map((q): [number, number] => [q.x, q.y]), [t.tri[0].x, t.tri[0].y]]]);
+    outline = polygonClipping.union(polys[0]!, ...polys.slice(1));
+  } catch {
+    return null;
+  }
+  const big = outline.map((poly) => poly[0]!.slice(0, -1).map(([x, y]) => ({ x, y }))).sort((a, b) => polyArea(b) - polyArea(a))[0];
+  if (!big || big.length < 3) return null;
+  // Surface points: each plan position's highest point (dropping the solid's underside).
+  const best = new Map<string, { x: number; y: number; z: number }>();
+  for (const t of tops) {
+    for (const q of t.tri) {
+      const z = t.a * q.x + t.b * q.y + t.c;
+      const k = `${Math.round(q.x)},${Math.round(q.y)}`;
+      const had = best.get(k);
+      if (!had || z > had.z) best.set(k, { x: q.x, y: q.y, z });
+    }
+  }
+  const pts = [...best.values()];
+  const low = Math.min(...pts.map((q) => q.z));
+  const topo = createToposolid(tx, doc, p.levelId, big, pts.map((q) => ({ x: q.x, y: q.y, z: q.z - lvl })), { thickness: Math.max(100, Math.round(low - z0)) });
+  return topo.id;
+}
+
+/**
  * A straight ramp from its mesh: one sloping top plane over a plan rectangle; it runs uphill along
  * the rectangle, from its low end's top to its high end's, with the slab's thickness and width.
  */
@@ -1070,6 +1106,13 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
       if (elev.length >= 3 && polyArea(elev) < 0.98 * r.len * (z1 - z0)) setWallProfile(tx, doc, w.id, elev);
       walls.push({ id: w.id, c: r.c, u: r.u, len: r.len, wid: r.wid, base: z0 });
       created.push(w.id);
+    } else if (TERRAIN_CLASSES.has(p.ifcClass)) {
+      const topo = terrainFromMesh(tx, doc, p, lvl, z0);
+      if (!topo) {
+        skipped.push(id);
+        continue;
+      }
+      created.push(topo);
     } else if (FOOTING_CLASSES.has(p.ifcClass)) {
       footings.push(id);
       continue;

@@ -104,6 +104,8 @@ function mapping(doc: Document, el: Element): Mapping | null {
       if (c && mep[c]) return { entity: mep[c]![0], predefined: mep[c]![1] };
       return { entity: "IfcBuildingElementProxy", predefined: "NOTDEFINED" };
     }
+    case Cat.Toposolid:
+      return { entity: "IfcGeographicElement", predefined: "TERRAIN" };
     case Cat.Stair:
       return { entity: "IfcStair", predefined: "NOTDEFINED" };
     case Cat.Ramp:

@@ -282,6 +282,26 @@ export function exportIfc(doc: Document, opts: IfcExportOptions = {}): string {
     properties(w, doc, el, m, ref, relGuid);
   }
 
+  // ---- grids: one IfcGrid on the lowest storey; straight grids as tagged polyline axes ------------
+  const straight = doc.byCategory<{ start: { x: number; y: number }; end: { x: number; y: number }; curve?: number | null }>("Grid").filter((g) => !g.params.curve);
+  const lowest = [...storeys.values()].sort((a, b) => a.elevation - b.elevation)[0];
+  if (straight.length && lowest) {
+    const axis = (g: (typeof straight)[0]) =>
+      w.add(
+        "IfcGridAxis",
+        g.name ?? "",
+        w.add("IfcPolyline", [g.params.start, g.params.end].map((q) => w.add("IfcCartesianPoint", [real(q.x), real(q.y)]))),
+        typed("IFCBOOLEAN", true),
+      );
+    // U: running closer to x; V: the rest (IFC wants both; one direction only goes all in U).
+    const isU = (g: (typeof straight)[0]) => Math.abs(g.params.end.x - g.params.start.x) >= Math.abs(g.params.end.y - g.params.start.y);
+    const u = straight.filter(isU).map(axis);
+    const v = straight.filter((g) => !isU(g)).map(axis);
+    const gridPlacement = w.add("IfcLocalPlacement", lowest.placement, w.add("IfcAxis2Placement3D", origin, null, null));
+    const grid = w.add("IfcGrid", guid("grid"), null, "Grids", null, null, gridPlacement, null, u.length ? u : v, u.length ? v : [], null, null);
+    lowest.elements.push(grid);
+  }
+
   // ---- relationships -----------------------------------------------------------------------------
   for (const s of storeys.values()) {
     if (s.elements.length) w.add("IfcRelContainedInSpatialStructure", relGuid("cont"), null, null, null, s.elements, s.ref);

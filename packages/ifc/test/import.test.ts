@@ -108,3 +108,22 @@ describe("IFC spaces", () => {
     expect((room.params as { number: string }).number).toBe("1");
   });
 });
+
+describe("IFC grids", () => {
+  it("round-trip: grids export as an IfcGrid and come back with their tags and lines", async () => {
+    const { createGrid } = await import("@open-bim/core");
+    const src = source();
+    src.transact("G", (tx) => {
+      createGrid(tx, src, { x: 0, y: -1000 }, { x: 0, y: 7000 }, "1");
+      createGrid(tx, src, { x: 8000, y: -1000 }, { x: 8000, y: 7000 }, "2");
+      createGrid(tx, src, { x: -1000, y: 0 }, { x: 9000, y: 0 }, "A");
+    });
+    const want = src.byCategory<{ start: Vec2; end: Vec2 }>(Cat.Grid).map((g) => `${g.name}:${Math.round(g.params.start.x)},${Math.round(g.params.start.y)}-${Math.round(g.params.end.x)},${Math.round(g.params.end.y)}`).sort();
+    expect(want.length).toBeGreaterThan(0);
+    const doc = new Document();
+    const r = await importIfc(doc, new TextEncoder().encode(exportIfc(src, { timestamp: "t" })), api);
+    expect(r.grids).toBe(want.length);
+    const got = doc.byCategory<{ start: Vec2; end: Vec2 }>(Cat.Grid).map((g) => `${g.name}:${Math.round(g.params.start.x)},${Math.round(g.params.start.y)}-${Math.round(g.params.end.x)},${Math.round(g.params.end.y)}`).sort();
+    expect(got).toEqual(want);
+  });
+});

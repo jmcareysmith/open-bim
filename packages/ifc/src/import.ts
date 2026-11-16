@@ -1,5 +1,5 @@
 import * as WebIFC from "web-ifc";
-import { createDirectShape, createLevel, createRoom, levels, type DirectShapeParams, type Document, type ElementId, type LevelParams } from "@open-bim/core";
+import { createDirectShape, createGrid, createLevel, createRoom, levels, type DirectShapeParams, type Document, type ElementId, type LevelParams } from "@open-bim/core";
 
 // IFC import via web-ifc. Storeys become levels (matched to existing levels by elevation), and each
 // product with a body becomes a DirectShape carrying its IFC class, GlobalId, name, colour and
@@ -21,6 +21,8 @@ export interface IfcImportResult {
   skipped: number;
   /** IfcSpaces brought in as rooms (number from Name, name from LongName). */
   rooms: number;
+  /** IfcGrid axes brought in as grids (named by their tags). */
+  grids: number;
   project: string;
 }
 
@@ -89,6 +91,79 @@ function meshes(api: IfcApi, model: number): Product[] {
     api.StreamAllMeshesWithTypes(model, [WebIFC.IFCSPACE], take);
   } catch {
     // Older web-ifc without typed streaming: no rooms.
+  }
+  return out;
+}
+
+type M34 = number[]; // row-major 3×4: [x-axis, y-axis, z-axis, origin] as columns
+
+/** World transform of an object placement (local placements chained to their parents), in file units. */
+function placement(api: IfcApi, model: number, id: number | undefined, depth = 0): M34 {
+  const I: M34 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0];
+  if (!id || depth > 50) return I;
+  const lp = api.GetLine(model, id);
+  const parent = placement(api, model, lp.PlacementRelTo?.value as number | undefined, depth + 1);
+  const ap = lp.RelativePlacement?.value ? api.GetLine(model, lp.RelativePlacement.value as number) : null;
+  if (!ap) return parent;
+  const vec = (ref: { value?: number } | null | undefined, def: number[]) => {
+    if (!ref?.value) return def;
+    const l = api.GetLine(model, ref.value);
+    const c = ((l.DirectionRatios ?? l.Coordinates) as { value: number }[]).map((x) => Number(x.value));
+    return [c[0] ?? 0, c[1] ?? 0, c[2] ?? 0];
+  };
+  const o = vec(ap.Location, [0, 0, 0]);
+  const z = vec(ap.Axis, [0, 0, 1]);
+  let x = vec(ap.RefDirection, [1, 0, 0]);
+  const norm = (v: number[]) => {
+    const l = Math.hypot(v[0]!, v[1]!, v[2]!) || 1;
+    return v.map((k) => k / l);
+  };
+  const zn = norm(z);
+  // x made square to z, then y = z × x.
+  const d = x[0]! * zn[0]! + x[1]! * zn[1]! + x[2]! * zn[2]!;
+  x = norm([x[0]! - d * zn[0]!, x[1]! - d * zn[1]!, x[2]! - d * zn[2]!]);
+  const y = [zn[1]! * x[2]! - zn[2]! * x[1]!, zn[2]! * x[0]! - zn[0]! * x[2]!, zn[0]! * x[1]! - zn[1]! * x[0]!];
+  const local: M34 = [x[0]!, y[0]!, zn[0]!, o[0]!, x[1]!, y[1]!, zn[1]!, o[1]!, x[2]!, y[2]!, zn[2]!, o[2]!];
+  // parent · local
+  const out: M34 = [];
+  for (let r = 0; r < 3; r++) {
+    for (let c = 0; c < 4; c++) {
+      let v = 0;
+      for (let k = 0; k < 3; k++) v += parent[r * 4 + k]! * local[k * 4 + c]!;
+      if (c === 3) v += parent[r * 4 + 3]!;
+      out.push(v);
+    }
+  }
+  return out;
+}
+
+/** Grid axes: their tag and plan line (model mm), from IfcGrid placements and polyline/line curves. */
+function gridAxes(api: IfcApi, model: number, mm: number): { tag: string; a: { x: number; y: number }; b: { x: number; y: number } }[] {
+  const out: { tag: string; a: { x: number; y: number }; b: { x: number; y: number } }[] = [];
+  const grids = api.GetLineIDsWithType(model, WebIFC.IFCGRID);
+  for (let i = 0; i < grids.size(); i++) {
+    const g = api.GetLine(model, grids.get(i));
+    const m = placement(api, model, g.ObjectPlacement?.value as number | undefined);
+    const world = (p: number[]) => ({ x: (m[0]! * p[0]! + m[1]! * p[1]! + m[2]! * (p[2] ?? 0) + m[3]!) * mm, y: (m[4]! * p[0]! + m[5]! * p[1]! + m[6]! * (p[2] ?? 0) + m[7]!) * mm });
+    for (const list of [g.UAxes, g.VAxes, g.WAxes]) {
+      for (const ref of (list ?? []) as { value: number }[]) {
+        const ax = api.GetLine(model, ref.value);
+        const curve = ax.AxisCurve?.value ? api.GetLine(model, ax.AxisCurve.value as number) : null;
+        if (!curve) continue;
+        const pt = (r: { value: number }) => ((api.GetLine(model, r.value).Coordinates ?? []) as { value: number }[]).map((c) => Number(c.value));
+        let ends: number[][] = [];
+        if (curve.Points) ends = (curve.Points as { value: number }[]).map(pt);
+        else if (curve.Pnt && curve.Dir) {
+          const p0 = pt(curve.Pnt);
+          const v = api.GetLine(model, curve.Dir.value as number);
+          const dir = ((api.GetLine(model, v.Orientation.value as number).DirectionRatios ?? []) as { value: number }[]).map((c) => Number(c.value));
+          const len = Number(v.Magnitude?.value ?? 1);
+          ends = [p0, p0.map((c, k) => c + (dir[k] ?? 0) * len)];
+        }
+        if (ends.length < 2) continue;
+        out.push({ tag: label(ax.AxisTag) ?? "", a: world(ends[0]!), b: world(ends[ends.length - 1]!) });
+      }
+    }
   }
   return out;
 }
@@ -253,7 +328,21 @@ export async function importIfc(doc: Document, data: Uint8Array, api: IfcApi): P
       }
       return n;
     });
-    return { shapes, levelsCreated: created, skipped, rooms, project };
+    // Grids: one per axis, named by its tag (a number added if the name is taken).
+    let grids = 0;
+    const axes = gridAxes(api, model, mm);
+    if (axes.length) {
+      doc.transact("Import IFC grids", (tx) => {
+        for (const ax of axes) {
+          if (Math.hypot(ax.b.x - ax.a.x, ax.b.y - ax.a.y) < 1) continue;
+          let name = ax.tag || undefined;
+          for (let k = 2; name && doc.byCategory("Grid").some((g) => g.name === name); k++) name = `${ax.tag} (${k})`;
+          createGrid(tx, doc, ax.a, ax.b, name);
+          grids++;
+        }
+      });
+    }
+    return { shapes, levelsCreated: created, skipped, rooms, grids, project };
   } finally {
     api.CloseModel(model);
   }

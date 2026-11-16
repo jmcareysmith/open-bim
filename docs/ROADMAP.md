@@ -165,4 +165,5 @@ to native elements where their shapes allow.
 - [x] Walls whose top isn't level (gables, skillions) get their elevation outline as an Edit Profile
 - [x] Converted walls snap their ends onto each other's centrelines, so corners and tees join
 - [x] IfcSpace → rooms (number from Name, name from LongName; web-ifc streams spaces separately)
+- [x] Grids: IfcGrid axes → grids by tag (placements resolved); export writes straight grids as an IfcGrid
 - [ ] Still shapes: non-rectangular curtain panels; anything whose rebuilt version wouldn't match its mesh

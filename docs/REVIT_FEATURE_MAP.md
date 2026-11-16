@@ -149,6 +149,7 @@ Status: ⬜ not started · 🟨 in progress · ✅ done
 |---|---|---|
 | Multi-user editing (worksharing equivalent, CRDT based) | 7 | ✅ |
 | Element borrowing / ownership | 7 | ✅ (editing borrows; others' edits refused while you're connected; Relinquish all mine; lapses when you leave) |
+| Worksets | 7 | ✅ (Collaborate → Worksets: enable, new/rename/delete (elements moved), active workset in the status bar takes new elements; element/multi-select Properties → Workset; view Properties → Worksets visibility) |
 | Cloud sync | 7 | ✅ (self-hosted server) |
 | Clash detection / interference check | 6 | ✅ |
 

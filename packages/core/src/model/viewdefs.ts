@@ -108,6 +108,8 @@ export type ViewParams = {
   phaseFilter?: "all" | "complete" | "new" | "previous" | "none" | null;
   /** Design options: which option this view shows per option set (default primary). */
   designOptions?: Record<string, string> | null;
+  /** Worksets hidden in this view (V/G → Worksets). */
+  hiddenWorksets?: ElementId[] | null;
   /** Area plans: their area scheme. */
   areaScheme?: "gross" | "rentable" | null;
 };

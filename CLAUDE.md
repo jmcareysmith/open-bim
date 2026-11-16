@@ -229,6 +229,9 @@ Owner: Jeremy (NZ, construction/property). Prefers concise communication.
   Element borrowing: binding `user`/`isActive` (Y map "owners"); core `doc.addCommitCheck` refuses edits to elements another
   active editor borrowed (derived edits too, e.g. fittings on their ducts); Collaborate → Relinquish all mine; Properties →
   Borrowed by. Optimistic: two people borrowing the same element at the same moment both succeed (CRDT).
+  Worksets (core/model/worksets.ts; worksetsui.ts): Collaborate → Worksets (enable: "Shared Levels and Grids" + "Workset1";
+  new/rename/delete moving elements), element `worksetId`, active workset per user (status bar picker; commit hook
+  `enableWorksetAssignment` via doc `createdInTransaction`), view `hiddenWorksets` (view Properties → Worksets) in `elementGraphics`.
 - Render (toolbar, from a 3D view; render.ts `worldUvs` gives the tracer real UVs for material textures): path traced, sun from site/date/time, Save PNG. Materials have
   roughness/metalness/transparency. Realistic style shows textures (Material Browser → Texture: an image,
   else drawn from colour + surface pattern; world-position mapping in viewport, apps/desktop/src/textures.ts); no AI render (needs a service decision).

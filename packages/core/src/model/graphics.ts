@@ -72,6 +72,8 @@ export type ViewGraphicsParams = {
   phase?: string | null;
   /** Design option shown per option set (from the view; default each set's primary). */
   designOptions?: Record<string, string> | null;
+  /** Worksets hidden in this view (V/G → Worksets; from the view). */
+  hiddenWorksets?: ElementId[] | null;
 };
 
 export type ViewTemplateParams = ViewGraphicsParams & {
@@ -129,6 +131,7 @@ export function effectiveGraphics(doc: Document, view: Element<ViewParams>): Vie
     phaseFilter: src.phaseFilter ?? view.params.phaseFilter ?? "all",
     phase: view.params.phase ?? null,
     designOptions: view.params.designOptions ?? null,
+    hiddenWorksets: view.params.hiddenWorksets ?? null,
   };
 }
 
@@ -278,6 +281,9 @@ export function elementGraphics(doc: Document, g: ViewGraphicsParams, el: Elemen
   r.cut = { color: cutStyle.color ?? null, weight: cutStyle.weight, pattern: cutStyle.pattern ?? null };
   const category = graphicsCategory(doc, el);
   r.visible = !g.hiddenCategories.includes(category);
+  // Worksets the view hides.
+  const ws = (el.params as { worksetId?: ElementId }).worksetId;
+  if (ws && g.hiddenWorksets?.includes(ws)) r.visible = false;
   const cat = g.categoryOverrides?.[category];
   if (cat) {
     // A hidden category stays hidden even if its override says visible.

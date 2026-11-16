@@ -460,7 +460,10 @@ export function ribbonTabs(m: RibbonMenus, voidToggle: () => HTMLElement): Ribbo
       id: "collaborate",
       label: "Collaborate",
       mode: "project",
-      panels: [{ title: "Share", items: [{ label: "Collaborate", icon: "collab", cmd: "collaborate", large: true, title: "Edit this model with others through a sync server" }] }],
+      panels: [
+        { title: "Share", items: [{ label: "Collaborate", icon: "collab", cmd: "collaborate", large: true, title: "Edit this model with others through a sync server" }] },
+        { title: "Manage Collaboration", items: [{ label: "Worksets", icon: "group", cmd: "worksets", large: true, title: "Worksets: turn on, add, rename, delete; the active one takes new elements" }] },
+      ],
     },
     {
       id: "view",

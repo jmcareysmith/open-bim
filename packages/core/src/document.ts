@@ -159,6 +159,12 @@ export class Document {
    * undo step (used by families to flex reference planes to their constraints). If it throws,
    * the whole transaction rolls back.
    */
+  /** Ids created in the transaction running now (for commit hooks); empty outside one. */
+  createdInTransaction(): ElementId[] {
+    if (!this.active) return [];
+    return [...this.active].filter(([id, before]) => before === undefined && this.elements.has(id)).map(([id]) => id);
+  }
+
   addCommitHook(hook: (tx: Transaction) => void): () => void {
     this.commitHooks.add(hook);
     return () => this.commitHooks.delete(hook);

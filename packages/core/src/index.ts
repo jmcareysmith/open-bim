@@ -83,3 +83,4 @@ export * from "./model/shafts.ts";
 import "./model/graphnodes.ts";
 export * from "./model/skeleton.ts";
 export * from "./model/pins.ts";
+export * from "./model/worksets.ts";

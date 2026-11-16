@@ -10,6 +10,8 @@ import {
   elementMark,
   keynoteTable,
   getCategory,
+  worksets,
+  isWorksetElement,
   createLegend,
   createSchedule,
   createRevision,
@@ -960,6 +962,12 @@ function multiProperties(ctx: PanelContext, ids: ElementId[]): HTMLElement {
     const input = textInput(cur ?? "", (v) => all((tx, e) => tx.update(e.id, { [k]: v || undefined }), `Change ${label.toLowerCase()}`));
     if (cur === undefined) input.placeholder = "(varies)";
     sec.append(row(label, input));
+  }
+  // Workset.
+  const wsAll = worksets(doc);
+  if (wsAll.length && els.every((e) => isWorksetElement(e))) {
+    const cur = (same(p0.map((p) => p.worksetId)) as string | undefined) ?? "";
+    sec.append(row("Workset", select([...(cur ? [] : [{ value: "", label: "(varies)" }]), ...wsAll.map((w) => ({ value: w.id, label: w.name ?? w.id }))], cur, (v) => v && all((tx, e) => tx.update(e.id, { worksetId: v }), "Change workset"))));
   }
   // By category (Revit's filter list).
   const counts = h("div", { class: "muted" }, cats.map((c) => `${c}: ${els.filter((e) => e.category === c).length}`).join(" · "));
@@ -2021,6 +2029,26 @@ function visibilityGraphics(ctx: PanelContext, id: ElementId, p: ViewGraphicsPar
       ),
     );
   }
+  // Worksets (the view's own, not a template's): untick to hide one here.
+  const ws = worksets(doc);
+  const view = doc.get(id);
+  if (ws.length && view?.category === Cat.View) {
+    const hidden = new Set((view.params as { hiddenWorksets?: ElementId[] | null }).hiddenWorksets ?? []);
+    box.append(h("h3", {}, "Worksets"));
+    for (const w of ws) {
+      box.append(
+        row(
+          w.name ?? w.id,
+          checkbox(!hidden.has(w.id), (on) => {
+            const next = new Set(hidden);
+            if (on) next.delete(w.id);
+            else next.add(w.id);
+            edit(ctx, on ? "Show workset" : "Hide workset", (tx) => tx.update(id, { hiddenWorksets: next.size ? [...next] : null }));
+          }),
+        ),
+      );
+    }
+  }
   return box;
 }
 
@@ -2924,6 +2952,12 @@ export function renderProperties(root: HTMLElement, ctx: PanelContext): void {
     const editType = h("button", { textContent: "Edit Type", title: "Type properties (they change every element of this type)" });
     editType.onclick = () => ctx.setSelection([el.typeId!]);
     sec.append(row("", editType));
+  }
+  // Workset (when the project has them).
+  const wsList = worksets(doc);
+  if (wsList.length && isWorksetElement(el)) {
+    const cur = (el.params as { worksetId?: string }).worksetId ?? "";
+    sec.append(row("Workset", select(wsList.map((w) => ({ value: w.id, label: w.name ?? w.id })), cur, (v) => edit(ctx, "Change workset", (tx) => tx.update(el.id, { worksetId: v })))));
   }
   // Types: Duplicate (Revit's Edit Type → Duplicate), then rename the copy.
   if (getCategory(el.category).isType) {

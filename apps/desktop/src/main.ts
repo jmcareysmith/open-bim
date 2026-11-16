@@ -17,7 +17,8 @@ import { FloorPointTool, SlopeArrowTool } from "./slopetool.ts";
 import { WallProfileTool } from "./profiletool.ts";
 import { LevelTool, MatchTypeTool, ZoomRegionTool } from "./revittools.ts";
 import { selectOptions, setSelectOption } from "./selectopts.ts";
-import { ungroup, enablePinning, isPinned, setPinned, setElementOverrides, setCategoryOverride, type DirectShapeParams, enableSharedNested, enableBeamSystems, createImageUnderlay, planCrop, createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
+import { openWorksetsDialog } from "./worksetsui.ts";
+import { worksets, activeWorkset, setActiveWorkset, enableWorksetAssignment, ungroup, enablePinning, isPinned, setPinned, setElementOverrides, setCategoryOverride, type DirectShapeParams, enableSharedNested, enableBeamSystems, createImageUnderlay, planCrop, createDraftingView, isAnnotationView, createPointCloud, parseAsciiPoints, parseLas, ensureFoundationSlabType,
   ceilingPlanFor,
   createCeilingPlan,
   Cat,
@@ -221,6 +222,8 @@ enableBeamSystems(doc);
 enableSharedNested(doc);
 // Pinned elements (PN/UP) can't be moved, reshaped or deleted.
 enablePinning(doc);
+// New model elements join the active workset (when worksets are on).
+enableWorksetAssignment(doc);
 /** While a family is open, the project's state to return to. */
 let projectSession: Session | null = null;
 interface Session {
@@ -1098,6 +1101,9 @@ const commands: Record<string, () => void | Promise<void>> = {
     });
     ctx.setSelection(ids);
     status(`Ungrouped ${groups.length} group(s).`);
+  },
+  worksets() {
+    openWorksetsDialog(doc, status, () => refreshAll());
   },
   pin() {
     const ids = selection.filter((id) => doc.has(id));
@@ -2196,6 +2202,20 @@ function refreshTypeSelector(): void {
 }
 
 /** Status bar selection count (Revit's funnel): click to filter the selection by category. */
+/** Status bar: the active workset (Revit's), when the project has worksets. */
+function refreshWorksetPicker(): void {
+  const s = $<HTMLSelectElement>("#active-ws");
+  const list = worksets(doc);
+  s.hidden = !list.length;
+  if (!list.length) return;
+  const act = activeWorkset(doc);
+  s.replaceChildren(...list.map((w) => new Option(w.name ?? w.id, w.id, false, w.id === act)));
+  s.onchange = () => {
+    setActiveWorkset(doc, s.value);
+    status(`Active workset: ${s.selectedOptions[0]?.text}. New elements go into it.`);
+  };
+}
+
 function refreshSelectionFilter(): void {
   const b = $<HTMLButtonElement>("#sel-filter");
   b.hidden = selection.length === 0;
@@ -2239,6 +2259,7 @@ function openSelectionFilter(): void {
 
 function refreshPanels(): void {
   refreshSelectionFilter();
+  refreshWorksetPicker();
   grips?.refresh();
   ribbon?.setContext(contextLabel());
   vgDialog?.refresh();

@@ -580,3 +580,31 @@ describe("MEP systems from IFC", () => {
     expect((doc.byCategory("Pipe")[0]!.params as { classification: string }).classification).toBe("hotWater");
   });
 });
+
+describe("doors in snapped walls", () => {
+  it("an imported door lands where it was, even after its wall's ends are snapped to a corner", async () => {
+    const { createWall, createDoor } = await import("@open-bim/core");
+    const { SimpleKernel, boundingBox } = await import("../src/index.ts");
+    const doc = new Document();
+    const ids = applyResidentialTemplate(doc);
+    doc.transact("W", (tx) => {
+      const a = createWall(tx, ids.wallTypes.exterior, { x: 0, y: 0 }, { x: 6000, y: 0 }, ids.levels.ground, { height: 2700 });
+      createWall(tx, ids.wallTypes.exterior, { x: 0, y: 0 }, { x: 0, y: 4000 }, ids.levels.ground, { height: 2700 });
+      createDoor(tx, doc, ids.doorTypes.single860, a.id, 3000);
+    });
+    const k = new SimpleKernel();
+    const door0 = doc.byCategory("Door")[0]!;
+    const want = boundingBox(k.build(doc, door0)!);
+    const parts = [...doc.byCategory("Wall"), door0].map((e) => ({ cls: e.category === "Door" ? "IfcDoor" : "IfcWall", m: k.build(doc, e)! }));
+    const shapes = doc.transact("I", (tx) => {
+      tx.delete(door0.id);
+      for (const w of doc.byCategory("Wall")) tx.delete(w.id);
+      return parts.map(({ cls, m }) => createDirectShape(tx, { levelId: ids.levels.ground, ifcClass: cls, globalId: cls + Math.random(), positions: [...m.positions], indices: [...m.indices], color: 0x999999, properties: {} }).id);
+    });
+    doc.transact("C", (tx) => convertDirectShapes(tx, doc, shapes));
+    const d = doc.byCategory("Door")[0]!;
+    const got = boundingBox(k.build(doc, d)!);
+    // Centre along x within a few mm.
+    expect((got.min[0] + got.max[0]) / 2).toBeCloseTo((want.min[0] + want.max[0]) / 2, -1);
+  });
+});

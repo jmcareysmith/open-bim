@@ -1382,14 +1382,20 @@ export function convertDirectShapes(tx: Transaction, doc: Document, ids: Element
     const bx0 = Math.min(...xy.map((q) => q.x)), bx1 = Math.max(...xy.map((q) => q.x));
     const by0 = Math.min(...xy.map((q) => q.y)), by1 = Math.max(...xy.map((q) => q.y));
     for (const w of wallGrid.near(bx0, by0, bx1, by1).sort((a, b) => wallOrder.get(a)! - wallOrder.get(b)!)) {
-      const us = xy.map((q) => (q.x - w.c.x) * w.u.x + (q.y - w.c.y) * w.u.y);
-      const vs = xy.map((q) => -(q.x - w.c.x) * w.u.y + (q.y - w.c.y) * w.u.x);
+      // Measured from the wall as it is now (its ends may have been snapped to its neighbours).
+      const cur = doc.get<WallParams>(w.id)?.params;
+      if (!cur) continue;
+      const len = Math.hypot(cur.end.x - cur.start.x, cur.end.y - cur.start.y);
+      const ux = (cur.end.x - cur.start.x) / len;
+      const uy = (cur.end.y - cur.start.y) / len;
+      const us = xy.map((q) => (q.x - cur.start.x) * ux + (q.y - cur.start.y) * uy);
+      const vs = xy.map((q) => -(q.x - cur.start.x) * uy + (q.y - cur.start.y) * ux);
       const mid = (Math.min(...vs) + Math.max(...vs)) / 2;
       if (Math.abs(mid) > w.wid / 2 + 100) continue;
-      const u0 = Math.max(-w.len / 2, Math.min(...us));
-      const u1 = Math.min(w.len / 2, Math.max(...us));
+      const u0 = Math.max(0, Math.min(...us));
+      const u1 = Math.min(len, Math.max(...us));
       if (u1 - u0 < 50) continue;
-      const along = (u0 + u1) / 2 + w.len / 2;
+      const along = (u0 + u1) / 2;
       const stated = (k: string) => Number(ds.params.properties[k]);
       const width = stated("OverallWidth") > 0 ? stated("OverallWidth") : u1 - u0;
       const height = stated("OverallHeight") > 0 ? stated("OverallHeight") : z1 - z0;

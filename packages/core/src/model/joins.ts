@@ -173,8 +173,13 @@ function endDirection(wall: Wall, end: WallEnd): Vec2 {
  * Walls near enough in plan (bounding boxes within a margin of the thickest wall type) and
  * sharing heights: the only ones a join, tee or crossing can involve. Cached per document revision.
  */
-type WallBox = { wall: Wall; x0: number; y0: number; x1: number; y1: number; z: [number, number] | null };
-const nearCache = new WeakMap<Document, { rev: number; boxes: WallBox[]; margin: number; near: Map<ElementId, Wall[]>; crossing: Map<ElementId, ElementId[]> }>();
+type WallBox = { i: number; wall: Wall; x0: number; y0: number; x1: number; y1: number; z: [number, number] | null };
+const CELL = 5000;
+const nearCache = new WeakMap<
+  Document,
+  { rev: number; boxes: WallBox[]; byWall: Map<Wall, WallBox>; cells: Map<number, WallBox[]>; margin: number; near: Map<ElementId, Wall[]>; crossing: Map<ElementId, ElementId[]> }
+>();
+const cellKey = (i: number, j: number) => i * 1048576 + j;
 function wallIndex(doc: Document) {
   const rev = doc.revision;
   let c = nearCache.get(doc);
@@ -182,9 +187,10 @@ function wallIndex(doc: Document) {
     const walls = doc.byCategory<WallParams>(Cat.Wall) as Wall[];
     let thick = 0;
     for (const t of doc.byCategory<LayeredTypeParams>(Cat.WallType)) thick = Math.max(thick, totalThickness(t));
-    const boxes = walls.map((w) => {
+    const boxes = walls.map((w, i) => {
       const pts = arcPoints(w.params.start, w.params.end, w.params.curve, Math.PI / 18);
       return {
+        i,
         wall: w,
         x0: Math.min(...pts.map((q) => q.x)),
         y0: Math.min(...pts.map((q) => q.y)),
@@ -193,7 +199,19 @@ function wallIndex(doc: Document) {
         z: zRange(doc, w),
       };
     });
-    c = { rev, boxes, margin: thick + 1000, near: new Map(), crossing: new Map() };
+    // A coarse grid over the boxes, so a wall only looks at walls near it.
+    const cells = new Map<number, WallBox[]>();
+    for (const b of boxes) {
+      for (let i = Math.floor(b.x0 / CELL); i <= Math.floor(b.x1 / CELL); i++) {
+        for (let j = Math.floor(b.y0 / CELL); j <= Math.floor(b.y1 / CELL); j++) {
+          const k = cellKey(i, j);
+          const list = cells.get(k);
+          if (list) list.push(b);
+          else cells.set(k, [b]);
+        }
+      }
+    }
+    c = { rev, boxes, byWall: new Map(boxes.map((b) => [b.wall, b])), cells, margin: thick + 1000, near: new Map(), crossing: new Map() };
     nearCache.set(doc, c);
   }
   return c;
@@ -203,12 +221,18 @@ function joinCandidates(doc: Document, wall: Wall): Wall[] {
   const idx = wallIndex(doc);
   const hit = idx.near.get(wall.id);
   if (hit && doc.get(wall.id) === wall) return hit;
-  const me = idx.boxes.find((b) => b.wall === wall);
+  const me = idx.byWall.get(wall);
   const range = me?.z ?? zRange(doc, wall);
   const pts = me ? null : arcPoints(wall.params.start, wall.params.end, wall.params.curve, Math.PI / 18);
   const box = me ?? { x0: Math.min(...pts!.map((q) => q.x)), y0: Math.min(...pts!.map((q) => q.y)), x1: Math.max(...pts!.map((q) => q.x)), y1: Math.max(...pts!.map((q) => q.y)) };
   const m = idx.margin;
-  const out = idx.boxes
+  // Walls in the grid cells round this one's box (each once).
+  const nearby = new Set<WallBox>();
+  for (let i = Math.floor((box.x0 - m) / CELL); i <= Math.floor((box.x1 + m) / CELL); i++) {
+    for (let j = Math.floor((box.y0 - m) / CELL); j <= Math.floor((box.y1 + m) / CELL); j++) for (const b of idx.cells.get(cellKey(i, j)) ?? []) nearby.add(b);
+  }
+  const out = [...nearby]
+    .sort((a, b) => a.i - b.i)
     .filter((o) => {
       if (o.wall.id === wall.id) return false;
       if (o.x0 > box.x1 + m || o.x1 < box.x0 - m || o.y0 > box.y1 + m || o.y1 < box.y0 - m) return false;
